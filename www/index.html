@@ -4381,7 +4381,7 @@ const WT={
  sniper:{n:'Cecchino',dmg:110,rate:1.1,spread:0,mag:5,rel:2,pierce:1,wt:5,s:'heavy',v:{bd:11,bar:[[0,4,104]],scope:1,c:'#2f3a2f',c2:'#1c1f1c'}},
  plasma:{n:'Lanciaplasma',dmg:32,rate:.3,mag:4,fm:1,rel:1.8,proj:'plasma',splash:1.2,wt:4,s:'zap',v:{bd:15,bar:[[0,8,80]],glow:'rgba(80,220,255,.9)',c:'#3a4266',c2:'#232845',fc:'rgba(120,230,255,.95)'}},
  minigun:{n:'Minigun',dmg:7,rate:.045,spread:.07,mag:120,rel:3,wt:3,s:'shot',v:{bd:16,bar:[[-7,3.5,92],[0,3.5,96],[7,3.5,92]],c:'#484c52',c2:'#222'}},
- rocket:{n:'Lanciarazzi',dmg:130,rate:1.2,mag:1,fm:1,rel:2.4,proj:'rocket',splash:2.4,wt:3,s:'heavy',v:{bd:17,bar:[[0,11,88]],c:'#4c5a3a',c2:'#2a3320'}},
+ rocket:{n:'Lanciarazzi',dmg:130,rate:1.2,mag:1,fm:1,mo:1,rel:2.4,proj:'rocket',splash:2.4,wt:3,s:'heavy',v:{bd:17,bar:[[0,11,88]],c:'#4c5a3a',c2:'#2a3320'}},
  laser:{n:'Laser',dmg:5,rate:.035,spread:0,mag:150,rel:2.2,beam:1,wt:3,s:'zap',v:{bd:12,bar:[[0,3,86]],glow:'rgba(255,60,90,.9)',c:'#555a66',c2:'#33363e'}}
 };
 const PK={hp:{n:'Vitalità',d:'+20 vita massima',max:10,c:120},ar:{n:'Corazza',d:'+15 armatura a inizio livello',max:8,c:100},sp:{n:'Agilità',d:'Entri ed esci dal riparo più in fretta',max:5,c:150},lk:{n:'Fortuna',d:'Rarità migliori da bauli e casse',max:5,c:250},cr:{n:'Recupero',d:'+10% crediti raccolti',max:8,c:140},ct:{n:'Critico',d:'+5% colpi critici (danno x2)',max:6,c:200}};
@@ -4389,15 +4389,15 @@ const CR=[{n:'Cassa Base',p:200,q:.3,min:0,c:'#aab2bd'},{n:'Cassa Avanzata',p:60
 const SEC=['Bunker','Laboratorio','Fonderia','Alveare','Criogenia','Nucleo'];
 
 let S=load();
-function load(){try{const s=JSON.parse(localStorage.getItem('sz_save'));if(s&&s.inv&&s.inv.length&&s.eq&&s.eq.length){s.inv.forEach(w=>{if(w.r===5&&!w.x)w.x=rollTrait();});s.eq=s.eq.slice(0,2);s.maxL=Math.min(s.maxL||1,NLV);return s;}}catch(e){}
+function load(){try{const s=JSON.parse(localStorage.getItem('sz_save'));if(s&&s.inv&&s.inv.length&&s.eq&&s.eq.length){s.inv.forEach(w=>{if(w.r===5&&!w.x)w.x=rollTrait();if(WT[w.t]&&WT[w.t].mo&&w.r<5){const ks=Object.keys(WT).filter(k=>!WT[k].mo&&WT[k].s==='heavy');w.t=ks.length?ks[w.id%ks.length]:'rifle';}});s.eq=s.eq.slice(0,2);s.maxL=Math.min(s.maxL||1,NLV);return s;}}catch(e){}
  return{cr:0,inv:[{id:1,t:'pistol',r:0,l:0}],eq:[1],perks:{},maxL:1,nid:2,auto:0,snd:1};}
 function save(){try{localStorage.setItem('sz_save',JSON.stringify(S));}catch(e){}}
 const pk=k=>S.perks[k]||0;
 const wget=id=>S.inv.find(w=>w.id===id);
 function wst(w){const t=WT[w.t],m=RAR[w.r].m*(1+.12*w.l);return{dmg:t.dmg*m,mag:t.fm?t.mag:Math.round(t.mag*(1+.1*w.r)),rel:t.rel*(1-.05*w.r),dps:t.dmg*m*(t.pel||1)/t.rate};}
 function rollRar(q,min){q+=pk('lk')*.25;const b=[60,26,10,3.2,.7,.1];let tot=0;const w=b.map((v,i)=>{const x=i<min?0:v*Math.pow(1+q,i*.55);tot+=x;return x;});let r=Math.random()*tot;for(let i=0;i<6;i++){r-=w[i];if(r<=0)return i;}return min;}
-function rollType(){const ks=Object.keys(WT);let tot=0;ks.forEach(k=>tot+=WT[k].wt);let r=Math.random()*tot;for(const k of ks){r-=WT[k].wt;if(r<=0)return k;}return'pistol';}
-function newWeapon(q,min,fr){const w={id:S.nid++,t:rollType(),r:fr!=null?fr:rollRar(q,min||0),l:0};if(w.r===5)w.x=rollTrait();S.inv.push(w);if(S.eq.length<2)S.eq.push(w.id);save();return w;}
+function rollType(ra){const ks=Object.keys(WT).filter(k=>!WT[k].mo||ra===5);let tot=0;ks.forEach(k=>tot+=WT[k].wt);let r=Math.random()*tot;for(const k of ks){r-=WT[k].wt;if(r<=0)return k;}return'pistol';}
+function newWeapon(q,min,fr){const r0=fr!=null?fr:rollRar(q,min||0),w={id:S.nid++,t:rollType(r0),r:r0,l:0};if(w.r===5)w.x=rollTrait();S.inv.push(w);if(S.eq.length<2)S.eq.push(w.id);save();return w;}
 const upCost=w=>Math.round(50*(w.l+1)*(1+w.r*.5)*Math.pow(1.15,w.l));
 const sellVal=w=>Math.round(30*Math.pow(2.1,w.r)*(1+w.l*.3));
 const pkCost=k=>Math.round(PK[k].c*Math.pow(1.6,pk(k)));
