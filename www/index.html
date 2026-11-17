@@ -4687,7 +4687,7 @@ function stFrame(st){st.cob=[];const hall=MODELS.hall,rg=st.rg=new THREE.Group()
  st.c2r=(x,z)=>[x*c+z*s+P0.x,-x*s+z*c+P0.z];st.r2c=(xr,zr)=>{const dx=xr-P0.x,dz=zr-P0.z;return[dx*c-dz*s,dx*s+dz*c];};
  st.put=(o,x,y,z,ry)=>{const r=st.c2r(x,z);o.position.set(r[0],y,r[1]);o.rotation.y=(ry||0)+P0.th;rg.add(o);return o;};
  st.hit=(xr,zr,m)=>st.obs.some(o=>Math.abs(xr-o.x)<o.hx+m&&Math.abs(zr-o.z)<o.hz+m);
- st.x0=st.kind===7?-13.3:st.kind===8?-9.6:-4.7;st.x1=st.kind===6?13.3:st.kind===8?9.6:4.7;st.wide=st.kind>=6;st.carve=st.kind===6?[[4.7,-11.5,13.6,3.3]]:st.kind===7?[[-13.6,-11.5,-4.7,3.3]]:st.kind===8?[[4.7,-8.5,9.9,3.3],[-9.9,-8.5,-4.7,3.3]]:[];st.dx=st.kind===6?7.6:st.kind===7?-7.6:0;
+ st.x0=st.kind===7?-13.3:st.kind===8?-9.6:-4.7;st.x1=st.kind===6?13.3:st.kind===8?9.6:4.7;st.wide=st.kind>=6;st.carve=st.kind===6?[[3.2,-11.5,13.6,3.3]]:st.kind===7?[[-13.6,-11.5,-3.2,3.3]]:st.kind===8?[[4.7,-8.5,9.9,3.3],[-9.9,-8.5,-4.7,3.3]]:[];st.dx=st.kind===6?11:st.kind===7?-11:0;
  st.ok=(x,z,m)=>{const r=st.c2r(x,z),mm=4.7-(m||4.2);return r[0]>=st.x0+mm&&r[0]<=st.x1-mm&&r[1]>Z1+.9&&r[1]<Z0-.9&&!st.hit(r[0],r[1],.95);};
  st.los=(x,y,z)=>{const n=Math.ceil(Math.hypot(x,z)/.25);for(let i=1;i<n;i++){const t=i/n,r=st.c2r(x*t,z*t),yy=1.62+(y-1.62)*t;for(const o of st.obs)if(yy<o.h&&Math.abs(r[0]-o.x)<o.hx+.12&&Math.abs(r[1]-o.z)<o.hz+.12)return false;if(yy<1.2)for(const o of st.cob)if(o.p&&!o.p.dead&&Math.abs(x*t-o.x)<o.hx+.1&&Math.abs(z*t-o.z)<o.hz+.1)return false;}return true;};
  st.depth=c>0?(P0.z-Z1)/c:(Z0-P0.z)/-c;
@@ -4888,7 +4888,7 @@ function updEnemy(e,dt){const T=e.T,r=e.root,pz=G.cz;if(e.fl>0){e.fl-=dt;const k
  if(T.m==='drone'){e.an+=dt;for(const ro of e.rot)ro.rotation.y+=dt*40;const tx_=Math.sin(e.an*1.7+e.sx)*Math.min(2.2,(pz-r.position.z)*.12),ty=1.5+Math.sin(e.an*2.3)*.45;TV.set(tx_,ty,pz-.4).sub(r.position);const d=TV.length();
   if(d<1.3){explode(r.position.clone(),2,0);hurt(T.dmg*G.ds,true);kill(e,true);return;}{const k=Math.min(1,T.spd*dt/d),yy=r.position.y;r.position.addScaledVector(TV,k);r.position.y=yy+clamp(ty-yy,-4.5*dt,4.5*dt);}r.rotation.y=Math.atan2(-r.position.x,pz-r.position.z);r.rotation.z=Math.sin(e.an*3)*.15;return;}
  r.rotation.y=Math.atan2(-r.position.x,pz-r.position.z);
- if(T.melee){if(e.mo===undefined)e.mo=[0,-1.15,1.15][G.en.filter(o=>o.T.melee&&!o.dead&&o.mo!==undefined).length%3];const tz=pz-2.3,dz=Math.hypot(r.position.x-e.mo,tz-r.position.z);let run=0,a=0;
+ if(T.melee){if(e.mo===undefined){const S_=G.stages[G.si],us=G.en.filter(o=>o!==e&&o.T.melee&&!o.dead&&o.mo!==undefined).map(o=>o.mo),ok=[0,-1.15,1.15,-2.25,2.25].filter(v=>!blk(S_,v,pz-2.3,.5)),f=ok.find(v=>!us.includes(v));e.mo=f===undefined?ok[rnd(ok.length)]||0:f;e.mb=f===undefined?1.5:0;}const tz=pz-2.3-(e.mb||0),dz=Math.hypot(r.position.x-e.mo,tz-r.position.z);let run=0,a=0;
   if(dz>.3){goTo(e,e.mo,tz,T.spd*dt,T.fast?.42:.5);turn(e,dt);e.an+=dt*6;run=e.sol&&!T.fast?.5:1;}
   else if(e.state!=='wind'){e.st-=dt;if(e.st<=0){e.state='wind';e.tele=e.teleT=T.fast?1.15:1.35;e.dod=0;qteStart(rnd(2)?'L':'R',e.teleT-.05,()=>{e.dod=1;},false,T.fast?'ASSALTO — SCHIVA':e.rob?'PUGNO — SCHIVA':'MAZZATA — SCHIVA');}}else{a=1;e.tele-=dt;if(e.tele<=0){e.state='hit';e.st=1.8;if(!e.dod)hurt(T.dmg*G.ds,true);G.shake=.5;TV.set(0,1.1,pz-.8);bits(TV,8,M.spark,3,.04,.4);snd('crash');}}
   poseH(e,run,a,dt);return;}
@@ -5425,13 +5425,23 @@ function wideShell(st,rg){const m=corrM(chI(G.L)),g=new THREE.Group(),x0=st.x0,x
  wallRun(g,m,x0,Z0,x0,Z1,1,0);wallRun(g,m,x1,Z0,x1,Z1,-1,0);wallRun(g,m,x0,Z0,x1,Z0,0,-1);wallRun(g,m,x0,Z1,x1,Z1,0,1);
  for(const b of st.carve){const cx=(b[0]+b[2])/2,cz=(b[1]+b[3])/2,w=b[2]-b[0],d=b[3]-b[1];wallRun(g,m,b[0],b[1],b[0],b[3],-1,0);wallRun(g,m,b[2],b[1],b[2],b[3],1,0);wallRun(g,m,b[0],b[3],b[2],b[3],0,1);wallRun(g,m,b[0],b[1],b[2],b[1],0,-1);st.obs.push({x:cx,z:cz,hx:w/2,hz:d/2,h:6});rg.add(box(w,5.5,d,iv,cx,2.75,cz));}
  bake(g);g.traverse(o=>{o.raycast=()=>{};});rg.add(box(wd,.3,len+1,iv,mx,-.15,mz),box(wd,.3,len+1,iv,mx,5.65,mz),box(.4,5.5,len+1,iv,x0-.2,2.75,mz),box(.4,5.5,len+1,iv,x1+.2,2.75,mz),box(wd,5.5,.4,iv,mx,2.75,Z0+.2),box(wd,5.5,.4,iv,mx,2.75,Z1-.2));}
-function wideDress(st,rg,L,fz,taken,LZ){const m=corrM(chI(L));for(const lz of LZ)for(const sx of[-1,1])taken.add(sx+'_'+lz);
- const rail=(xr,zr,y)=>{const cv=box(1.7,1.1,.25,M.hazard,xr,y+.55,zr,1.1);cv.castShadow=true;rg.add(cv);const cq=st.r2c(xr,zr),pr=mkProp(st,'crate',cv,{hp:null,cp:new V3(cq[0],y+.55,cq[1])}),sq=st.r2c(xr,zr-fz*.75);st.slots.push({x:sq[0],z:sq[1],y,cover:pr,used:null,el:1});st.obs.push({x:xr,z:zr,hx:.85,hz:.13,h:y+1});};
- if(st.kind<8){const s=st.kind===6?1:-1,cx=s*11.65,cz=(Z1-20.6)/2,hz=(-20.6-Z1)/2,dk=box(3.3,1.4,hz*2,m.r,cx,.7,cz,2);dk.castShadow=true;rg.add(dk);rg.add(box(3.4,.12,hz*2+.1,M.hazard,cx,1.42,cz,2));st.obs.push({x:cx,z:cz,hx:1.65,hz,h:1.4});rail(s*11.1,-21.3,1.4);rail(s*12.3,-23.6,1.4);
-  for(const[x,z]of[[s*6.2,-14.2],[s*8.8,-17.5]]){const c=box(1.5,1.5,1.5,M.mcrate,x,.75,z,1);c.castShadow=true;c.rotation.y=rr(-.3,.3);rg.add(c);st.obs.push({x,z,hx:.8,hz:.8,h:1.5});}st.spawn=[[s*11.6,-13.4],[s*12.2,-16.6],[s*10.4,-15]];}
+function wideDress(st,rg,L,fz,taken,LZ){const ci=chI(L),m=corrM(ci);for(const lz of LZ)for(const sx of[-1,1])taken.add(sx+'_'+lz);
+ const rail=(xr,zr,y)=>{const cv=box(1.7,1.1,.25,M.hazard,xr,y+.55,zr,1.1);cv.castShadow=true;rg.add(cv);const cq=st.r2c(xr,zr),pr=mkProp(st,'crate',cv,{hp:null,cp:new V3(cq[0],y+.55,cq[1])}),sq=st.r2c(xr,zr-fz*.75);st.slots.push({x:sq[0],z:sq[1],y,cover:pr,used:null,el:1});st.obs.push({x:xr,z:zr,hx:.85,hz:.13,h:y+1});},
+  dec=(wx,sx,zr)=>{if(Math.random()<.25)return;const g=new THREE.Group();g.position.x=wx-sx*4.7;rg.add(g);decor(g,ci,sx,zr);},decZ=(x)=>{const g=new THREE.Group();g.position.set(x,0,Z1+4.7);g.rotation.y=Math.PI/2;rg.add(g);decor(g,ci,1,0);},
+  stack=(x,z,s2)=>{const c=box(1.25,1.25,1.25,rnd(2)?M.mcrate:M.mcrateB,x,.625,z,1);c.castShadow=true;c.rotation.y=rr(-.2,.2);rg.add(c);if(s2){const c2=box(.8,.7,.8,M.mcrate,x+rr(-.1,.1),1.6,z,1);c2.rotation.y=rr(0,1);rg.add(c2);}st.obs.push({x,z,hx:.7,hz:.7,h:s2?1.95:1.25});},
+  chev=(x,y,z,ry,rz,n,dir)=>{const g=new THREE.Group();g.position.set(x,y,z);g.rotation.set(rz?0:-Math.PI/2,ry,0,'YXZ');rg.add(g);for(let i=0;i<n;i++)for(const d of[-1,1]){const c=nsh(P('box',m.e,.12,.7,.04,i*.8,d*.24,0,g));c.rotation.z=-d*.78*(dir||1);c.raycast=()=>{};}};
+ if(st.kind<8){const s=st.kind===6?1:-1,cx=s*6.2,cz=(Z1-21.2)/2,hz=(-21.2-Z1)/2,dk=box(4,1.4,hz*2,m.r,cx,.7,cz,2);dk.castShadow=true;rg.add(dk);rg.add(box(4.1,.12,hz*2+.1,M.hazard,cx,1.42,cz,2));st.obs.push({x:cx,z:cz,hx:2,hz,h:1.4});rail(s*5.3,-21.8,1.4);rail(s*7.1,-23.7,1.4);
+  R_(m.r,.8,5.5,.8,s*3.2,2.75,-11.5,rg).castShadow=true;for(const a of[[.42,0],[-.42,0],[0,.42],[0,-.42]])nsh(P('box',m.e,.07,4.6,.07,s*3.2+a[0],2.6,-11.5+a[1],rg));rg.add(box(1,.5,1,M.hazard,s*3.2,.25,-11.5,1));st.obs.push({x:s*3.2,z:-11.5,hx:.5,hz:.5,h:6});
+  chev(s>0?4.2:-5.8,3.7,Z1+.22,0,1,3,-s);chev(s>0?9:-10.6,3.7,Z1+.22,0,1,3,-s);for(const[x,z,hx,hz]of[[.3,-13.5,.5,-.87],[4,-16.6,.9,-.45],[7.6,-17.6,1,-.1]])chev(s*x,.03,z,Math.atan2(hz,-s*hx),0,2);
+  stack(s*4.6,-16.4,1);stack(s*9.6,-19.6,0);stack(-s*4,-8.2,1);stack(-s*4,-18.6,0);st.spawn=[[s*9.6,-13.8],[s*11.6,-16.2],[s*12.1,-13.4]];
+  for(const zr of LZ){if(Math.abs(zr+8.2)>1.4&&Math.abs(zr+18.6)>1.4)dec(-s*4.7,-s,zr);if(zr>-10.5)dec(s*3.2,s,zr);}for(const zr of[-14,-18,-22])dec(s*13.3,s,zr);decZ(s*9);decZ(s*12.6);}
  else{const zb=Z1+3.3;rg.add(box(19.2,.3,3.3,m.r,0,3.35,Z1+1.65,3),box(19.2,.16,.12,M.hazard,0,3.5,zb,3));for(const x of[-5.7,-2.8,2.8,5.7])rail(x,zb-.35,3.5);
-  for(const x of[-8.4,-4.3,4.3,8.4]){R_(m.w,.6,3.2,.6,x,1.6,zb-.2,rg).castShadow=true;R_(m.r,.8,.3,.8,x,.15,zb-.2,rg);st.obs.push({x,z:zb-.2,hx:.3,hz:.3,h:3.2});}
-  for(const s of[-1,1]){const r=box(2,.22,7.4,m.f,s*8.5,1.72,zb+3.4,2);r.rotation.x=Math.atan2(3.5,6.6);r.castShadow=true;rg.add(r);rg.add(box(.12,.9,7,M.hazard,s*7.5,2.2,zb+3.4,2));st.obs.push({x:s*8.5,z:zb+3.3,hx:1.05,hz:3.4,h:1.7});}}}
+  for(const x of[-8.4,-4.3,4.3,8.4]){R_(m.w,.6,3.2,.6,x,1.6,zb-.2,rg).castShadow=true;R_(m.r,.8,.3,.8,x,.15,zb-.2,rg);for(const a of[-.32,.32])nsh(P('box',m.e,.05,2.4,.05,x+a,1.7,zb+.12,rg));st.obs.push({x,z:zb-.2,hx:.3,hz:.3,h:3.2});}
+  for(const s of[-1,1]){const r=box(2,.22,7.4,m.f,s*8.5,1.72,zb+3.4,2);r.rotation.x=Math.atan2(3.5,6.6);r.castShadow=true;rg.add(r);rg.add(box(.12,.9,7,M.hazard,s*7.5,2.2,zb+3.4,2));st.obs.push({x:s*8.5,z:zb+3.3,hx:1.05,hz:3.4,h:1.7});
+   for(const zr of[-2,-6])dec(s*4.7,s,zr);for(const zr of[-10,-14])dec(s*9.6,s,zr);decZ(s*3.4);decZ(s*6.8);stack(s*6.6,-10.2,1);stack(s*5.6,Z1+1.2,0);
+   R_(m.r,.8,5.5,.8,s*4.7,2.75,-8.5,rg).castShadow=true;for(const a of[[.42,0],[-.42,0],[0,.42],[0,-.42]])nsh(P('box',m.e,.07,4.6,.07,s*4.7+a[0],2.6,-8.5+a[1],rg));}
+  const ch=P('tor',m.r,5,5,2.2,0,4.9,-12.5,rg);ch.rotation.x=Math.PI/2;ch.castShadow=false;ch.raycast=()=>{};const ch2=nsh(P('tor',m.e,4.4,4.4,1.2,0,4.86,-12.5,rg));ch2.rotation.x=Math.PI/2;ch2.raycast=()=>{};for(let i=0;i<4;i++){const a=i*1.5708+.785;nsh(C_(m.r,.06,.7,Math.cos(a)*2.4,5.2,-12.5+Math.sin(a)*2.4,rg)).raycast=()=>{};}
+  for(const zz of[-6,-10,-14])for(const sx of[-1,1])nsh(P('box',M.hazard,.14,.02,2.2,sx*1.6,.02,zz,rg)).raycast=()=>{};}}
 
 let tab=0,selL=S.maxL;
 let MENU=null;
