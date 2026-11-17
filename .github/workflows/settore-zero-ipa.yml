@@ -2,7 +2,7 @@ name: Settore Zero IPA
 
 on:
   push:
-    branches: [settore-zero]
+    branches: [main]
   workflow_dispatch:
 
 permissions:

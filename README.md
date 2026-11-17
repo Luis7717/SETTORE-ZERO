@@ -18,3 +18,7 @@ Sideloadly o AltStore.
 - Barile: dagli asset di Babylon.js, licenza CC-BY 4.0
 - Armi e granata: pacchetto «Guns & Explosives» di 3DModelsCC0, licenza CC0
 - Androide «Xbot» (Mixamo) e robot «RobotExpressive» di Tomás Laulhé / Quaternius (CC0), dagli esempi three.js
+
+## Scarica
+
+L'IPA più recente è sempre qui: https://github.com/Luis7717/settore-zero/releases/tag/settore-zero-ipa
