@@ -5361,7 +5361,7 @@ function corrPiece(cg,A,yaw,len,y0,y1,m,i0){const g=new THREE.Group();g.position
   nsh(C_(m.s,.16,tl+.04,-(CW-.32),y+3.45,z,g,'z')).rotation.x=Math.PI/2+pit;nsh(C_(m.r,.1,tl+.04,CW-.3,y+3.6,z,g,'z')).rotation.x=Math.PI/2+pit;}}
 function corrCorner(cg,C,yaw,s,y,m){const g=new THREE.Group(),a=CW*2;g.position.set(C[0],0,C[1]);g.rotation.y=yaw;cg.add(g);nsh(P('box',m.f,a,.3,a,0,y-.15,0,g));nsh(P('box',m.c,a,.3,a,0,y+CHT+.15,0,g));
  nsh(P('box',m.w,a+.6,CHT+.5,.3,0,y+CHT/2,-(CW+.15),g));nsh(P('box',m.w,.3,CHT+.5,a,-s*(CW+.15),y+CHT/2,0,g));nsh(R_(m.r,.42,CHT,.42,s*(CW-.2),y+CHT/2,CW-.2,g));nsh(R_(m.r,.42,CHT,.42,-s*(CW-.2),y+CHT/2,-(CW-.2),g));nsh(P('box',m.e2,1.5,.05,1.5,0,y+CHT-.03,0,g));
- for(let i=0;i<3;i++)for(const d of[-1,1]){const c=nsh(P('box',m.e,.09,.62,.05,s*(-1+i*.95),y+2.1+d*.2,-(CW-.02),g));c.rotation.z=-s*d*.78;}}
+ for(let i=0;i<3;i++)for(const d of[-1,1]){const c=nsh(P('box',m.e,.09,.62,.05,s*(-1+i*.95),y+2.1+d*.2,-(CW-.02),g));c.rotation.z=s*d*.78;}}
 function doorWall(g,z,s,y,m){for(const sx of[-1,1])nsh(P('box',m.w,CW-1.45+.3,CHT+.5,.3,sx*(1.45+(CW-1.45+.3)/2),y+CHT/2,z,g));nsh(P('box',m.w,2.9,CHT-3.3+.5,.3,0,y+3.3+(CHT-3.3+.5)/2,z,g));for(const sx of[-1,1])nsh(R_(m.r,.14,3.4,.2,sx*1.5,y+1.7,z+s*.18,g));nsh(R_(m.r,3.14,.14,.2,0,y+3.37,z+s*.18,g));
  const dg=new THREE.Group();dg.position.y=y;g.add(dg);return mkDoor(dg,z,s);}
 function pathDist(P,x,z){let best=1e9,bd=0,acc=0;for(let i=1;i<P.length;i++){const ax=P[i-1][0],az=P[i-1][1],dx=P[i][0]-ax,dz=P[i][1]-az,l2=dx*dx+dz*dz,t=l2?clamp(((x-ax)*dx+(z-az)*dz)/l2,0,1):0,d=Math.hypot(x-ax-dx*t,z-az-dz*t),l=Math.sqrt(l2);if(d<best){best=d;bd=acc+l*t;}acc+=l;}return bd;}
