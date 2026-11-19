@@ -15,13 +15,13 @@ Sideloadly o AltStore.
 
 Per provarlo sul computer: avvia `python -m http.server` dentro `www/` e apri http://127.0.0.1:8000
 
-## Crediti dei modelli 3D
+## Crediti
 
-- Soldato: personaggio Mixamo, dagli esempi di three.js
-- «Space Ship Hallway» di yeeyeeman (Sketchfab), licenza CC-BY 4.0
-- Barile: dagli asset di Babylon.js, licenza CC-BY 4.0
-- Armi e granata: pacchetto «Guns & Explosives» di 3DModelsCC0, licenza CC0
-- Androide «Xbot» (Mixamo) e robot «RobotExpressive» di Tomás Laulhé / Quaternius (CC0), dagli esempi three.js
+L'elenco completo di modelli, texture, suoni e musiche, con autori e licenze, è in [CREDITS.md](CREDITS.md).
+
+- Musica: *Tactical Pursuit* e *Space Boss Battle Theme* di Matthew Pablo (www.matthewpablo.com), CC-BY 3.0
+- «Space Ship Hallway» di yeeyeeman (Sketchfab), CC-BY 4.0
+- Armi, barile e texture nuovi: Poly Haven e OpenGameArt (CC0); suoni: The Free Firearm Sound Library, Kenney e altri (CC0)
 
 ## Scarica
 

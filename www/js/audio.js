@@ -1,13 +1,13 @@
-// Settore Zero — effetti sonori e colonna sonora sintetizzati
+// Settore Zero — audio: suoni e musiche registrati (www/suoni/) con ripiego sintetizzato (Web Audio)
 'use strict';
-/* ===== audio: effetti sintetizzati con riverbero + colonna sonora ===== */
+/* ===== audio: effetti sintetizzati con riverbero (usati come ripiego e come strato aggiuntivo) ===== */
 let AC=null,MG=null,SFX=null,REV=null,MUS=null,NB=null,silentEl=null;const sndLast={};
 function abuild(ctx){AC=ctx;const comp=AC.createDynamicsCompressor();comp.threshold.value=-14;comp.ratio.value=5;comp.attack.value=.003;comp.release.value=.2;MG=AC.createGain();MG.gain.value=.7;MG.connect(comp);comp.connect(AC.destination);
  SFX=AC.createGain();SFX.connect(MG);MUS=AC.createGain();MUS.gain.value=0;MUS.connect(MG);
  const len=AC.sampleRate*1.8|0,ib=AC.createBuffer(2,len,AC.sampleRate);for(let c=0;c<2;c++){const d=ib.getChannelData(c);let lp=0;for(let i=0;i<len;i++){const t=i/len;lp+=((Math.random()*2-1)-lp)*(.6-.45*t);d[i]=lp*Math.pow(1-t,2.6)*(i<300?i/300:1);}}
  const rvb=AC.createConvolver();rvb.buffer=ib;REV=AC.createGain();REV.gain.value=.55;REV.connect(rvb);rvb.connect(MG);
  NB=AC.createBuffer(1,AC.sampleRate*2,AC.sampleRate);const d=NB.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;}
-function ainit(){try{if(!AC){abuild(new(window.AudioContext||window.webkitAudioContext)());
+function ainit(){try{if(!AC){abuild(new(window.AudioContext||window.webkitAudioContext)());recLoad();
   try{const n=4000,b=new Uint8Array(44+n),dv=new DataView(b.buffer),W=(o,s)=>{for(let i=0;i<s.length;i++)b[o+i]=s.charCodeAt(i);};W(0,'RIFF');dv.setUint32(4,36+n,true);W(8,'WAVEfmt ');dv.setUint32(16,16,true);dv.setUint16(20,1,true);dv.setUint16(22,1,true);dv.setUint32(24,8000,true);dv.setUint32(28,8000,true);dv.setUint16(32,1,true);dv.setUint16(34,8,true);W(36,'data');dv.setUint32(40,n,true);b.fill(128,44);
    let s='';for(let i=0;i<b.length;i++)s+=String.fromCharCode(b[i]);silentEl=new Audio('data:audio/wav;base64,'+btoa(s));silentEl.loop=true;silentEl.volume=.01;}catch(e){}}
  if(AC.state==='suspended')AC.resume();if(silentEl&&silentEl.paused){const p=silentEl.play();if(p&&p.catch)p.catch(()=>{});}}catch(e){}}
@@ -20,7 +20,7 @@ function gun(p){const k=p.k||1;nz({dur:.035,vol:p.crack*k,type:'highpass',f0:180
 function clk(t,f,v){nz({t,dur:.018,vol:v||.2,type:'bandpass',f0:f,q:2.5});}
 const GUNS={pistol:{crack:.5,body:.4,bd:.14,thump:.5,tf:190,rev:.35},revolver:{crack:.55,body:.5,bd:.19,thump:.65,tf:155,rev:.5},smg:{crack:.4,body:.3,bd:.09,thump:.35,tf:200,rev:.25,lite:1},
  shotgun:{crack:.5,body:.8,bd:.32,thump:.9,tf:120,td:.22,rev:.65,lp:3000},rifle:{crack:.6,body:.45,bd:.13,thump:.5,tf:170,rev:.4},sniper:{crack:.7,body:.85,bd:.42,thump:.9,tf:105,td:.3,rev:.95},minigun:{crack:.5,body:.38,bd:.1,thump:.5,tf:150,rev:.3,lite:1}};
-function snd(n){if(!AC||!S.snd)return;const now=AC.currentTime;if(sndLast[n]&&now-sndLast[n]<.035)return;sndLast[n]=now;try{
+function sndSyn(n){try{
  if(n.charCodeAt(0)===119&&n.charCodeAt(1)===95){const k=n.slice(2),g=GUNS[k];if(g){gun(g);if(k==='shotgun'){clk(.3,1500,.25);clk(.44,2100,.22);}else if(k==='sniper'){clk(.5,1700,.2);clk(.72,2300,.18);}return;}
   if(k==='plasma'){osc({dur:.2,vol:.22,type:'sawtooth',f0:760,f1:130,rev:.4});nz({dur:.16,vol:.2,type:'bandpass',f0:2400,f1:500,q:2,rev:.4});return;}
   if(k==='rocket'){nz({dur:.6,vol:.45,type:'bandpass',f0:300,f1:2000,q:1.2,rev:.5});osc({dur:.25,vol:.5,f0:110,f1:45});return;}
@@ -50,9 +50,80 @@ function snd(n){if(!AC||!S.snd)return;const now=AC.currentTime;if(sndLast[n]&&no
  case'win':for(let i=0;i<4;i++)osc({t:i*.14,dur:.6,vol:.2,type:'triangle',f0:[392,494,587,784][i],rev:.7});break;
  case'lose0':osc({dur:.25,vol:.2,type:'sawtooth',f0:180,f1:90});break;
  case'lose':for(let i=0;i<3;i++)osc({t:i*.22,dur:.7,vol:.2,type:'sawtooth',f0:[196,165,110][i],f1:[185,150,80][i],rev:.8});break;}}catch(e){}}
+/* ===== suoni registrati (www/suoni/*.js, MP3 in base64 dentro SUONI) =====
+   Si decodificano una volta sola (al primo tocco, quando nasce l'AudioContext) e i buffer si riusano.
+   Se un suono manca o non si decodifica, snd() usa la versione sintetizzata qui sopra (sndSyn). */
+const REC={buf:{},fail:{},busy:0,started:0},VOX={};
+// nome usato dal gioco -> varianti registrate (f), volume (v), voci contemporanee (lim), variazione di intonazione (pr),
+// riverbero (rev), syn:1 = suona anche lo strato sintetizzato, then = suoni da aggiungere dopo [nome,ritardo,volume]
+const SMAP={
+ w_pistol:{f:['w_pistol'],v:.9,lim:4,rev:.12},
+ w_revolver:{f:['w_revolver'],v:1,lim:3,rev:.15},
+ w_smg:{f:['w_smg'],v:.7,lim:5,pr:.06,rev:.08},
+ w_shotgun:{f:['w_shotgun'],v:1,lim:3,rev:.18,then:[['pump',.36,.5]]},
+ w_rifle:{f:['w_rifle'],v:.85,lim:5,rev:.1},
+ w_sniper:{f:['w_sniper'],v:1,lim:2,rev:.2,then:[['rel',.62,.45]]},
+ w_minigun:{f:['w_minigun'],v:.55,lim:6,pr:.07,rev:.06},
+ w_plasma:{f:['plasma'],v:.6,lim:3,rev:.25},
+ w_rocket:{f:['rocket'],v:.75,lim:2,rev:.25},
+ eshot:{f:['eshot'],v:.5,lim:4,pr:.08,rev:.15},
+ esnipe:{f:['esnipe'],v:.7,lim:2,rev:.2},
+ zap:{f:['zap'],v:.3,lim:3,pr:.08},
+ boom:{f:['boom'],v:1,lim:3,pr:.1,rev:.3},
+ ric:{f:['ric1','ric2'],v:.4,lim:3,pr:.1,syn:1},
+ cover:{f:['cover1','cover2'],v:.5,lim:4,pr:.08,rev:.1},
+ rel:{f:['rel'],v:.6,lim:2},
+ step:{f:['step1','step2','step3'],v:.3,lim:2,pr:.06},
+ hurt:{f:['hurt1','hurt2'],v:.75,lim:1,pr:.05},
+ kill:{f:['kill1','kill2'],v:.5,lim:3,pr:.08,rev:.15},
+ head:{f:['head'],v:.4,lim:2,pr:.05},
+ crash:{f:['crash'],v:.7,lim:3,pr:.08,rev:.15},
+ metal:{f:['metal'],v:.6,lim:3,pr:.06,rev:.2},
+ chest:{f:['chest'],v:.6,lim:2,syn:1},
+ pick:{f:['pick'],v:.45,lim:2},
+ tele:{f:['tele'],v:.5,lim:2,pr:0},
+ throw:{f:['throw'],v:.6,lim:3,pr:.08},
+ rocket:{f:['rocket'],v:.7,lim:3,pr:.06,rev:.25},
+ slow:{f:['slow'],v:.6,lim:1,pr:0},
+ win:{f:['win'],v:.6,lim:1,pr:0,syn:1,voice:'v_win'},
+ lose0:{f:['lose0'],v:.45,lim:1,pr:0},
+ lose:{f:['v_lose'],v:.8,lim:1,pr:0,syn:1}
+};
+// musica registrata: durata esatta del loop (campioni a 44100 Hz) e margine prima/dopo nel file
+const MREC={level:{k:'mus_level',len:2731378/44100,pad:.3,v:.85},boss:{k:'mus_boss',len:2839609/44100,pad:.3,v:.85}};
+const MXF=1.6; // secondi di dissolvenza incrociata tra musica dei livelli e del boss
+function recData(k){const D=window.SUONI;return D&&typeof D[k]==='string'?D[k]:null;}
+function b64buf(s){const bin=atob(s),n=bin.length,u=new Uint8Array(n);for(let i=0;i<n;i++)u[i]=bin.charCodeAt(i);return u.buffer;}
+// toglie il silenzio iniziale che alcuni decoder MP3 aggiungono (ritardo dell'encoder): gli spari partono subito
+function trimLead(b){const d=b.getChannelData(0),max=Math.min(d.length,b.sampleRate*.12|0);let i=0;while(i<max&&Math.abs(d[i])<.003)i++;i=Math.max(0,i-16);if(i<32)return b;
+ const o=AC.createBuffer(b.numberOfChannels,b.length-i,b.sampleRate);for(let c=0;c<b.numberOfChannels;c++)o.getChannelData(c).set(b.getChannelData(c).subarray(i));return o;}
+function recDecode(k,cb){const s=recData(k);if(!s||!AC){cb(null);return;}let done=0;const fin=b=>{if(done)return;done=1;cb(b);};
+ try{const p=AC.decodeAudioData(b64buf(s),b=>fin(b),()=>fin(null));if(p&&p.catch)p.catch(()=>fin(null));}catch(e){fin(null);}}
+// decodifica tutti gli effetti, poi la musica dei livelli e infine quella del boss (una alla volta per non sovraccaricare l'iPhone)
+function recLoad(){if(REC.started||!AC)return;REC.started=1;const D=window.SUONI;if(!D)return;
+ for(const k of Object.keys(D)){if(k.indexOf('mus_')===0)continue;REC.busy++;recDecode(k,b=>{REC.busy--;if(b){REC.buf[k]=trimLead(b);delete D[k];}else REC.fail[k]=1;});}
+ recMusic('level',()=>recMusic('boss',null));}
+function recHasMus(tr){const m=MREC[tr];return !!(m&&(MU.rb[tr]||(!MU.rf[tr]&&recData(m.k))));}
+function recMusic(tr,next){const m=MREC[tr];if(!m||MU.rb[tr]||MU.rf[tr]||MU.rbusy[tr]){if(next)next();return;}if(!recData(m.k)){MU.rf[tr]=1;if(next)next();return;}
+ MU.rbusy[tr]=1;recDecode(m.k,b=>{MU.rbusy[tr]=0;
+  if(b&&b.duration>=m.pad+m.len){MU.rb[tr]=b;delete window.SUONI[m.k];if(MU.track===tr&&S.mus!==0)mPlay(tr,MU.src?MXF:.8);}
+  else{MU.rf[tr]=1;if(MU.track===tr&&!MU.src){if(MU.fail)mLive();else musicPrep();}}
+  if(next)setTimeout(next,200);});}
+// limita le voci contemporanee per lo stesso suono (spari rapidi): sfuma e ferma la più vecchia
+function voxAdd(n,lim,s,g){const a=VOX[n]||(VOX[n]=[]);while(a.length>=lim){const o=a.shift();try{o.g.gain.setTargetAtTime(0,AC.currentTime,.012);o.s.stop(AC.currentTime+.08);}catch(e){}}
+ const it={s,g};a.push(it);s.onended=()=>{const i=a.indexOf(it);if(i>=0)a.splice(i,1);};}
+function recOne(k,vol,rate,dl,rev,n,lim){const b=REC.buf[k];if(!b)return false;const s=AC.createBufferSource(),g=AC.createGain();s.buffer=b;s.playbackRate.value=rate;g.gain.value=vol;s.connect(g);aout(g,rev);
+ s.start(AC.currentTime+(dl||0));voxAdd(n,lim,s,g);return true;}
+function recPlay(n,m){const ok=m.f.filter(k=>REC.buf[k]);if(!ok.length)return false;const k=ok[Math.random()*ok.length|0],pr=m.pr==null?.04:m.pr,
+  rate=1+(Math.random()*2-1)*pr,vol=m.v*(1+(Math.random()*2-1)*.1);recOne(k,vol,rate,0,m.rev||0,n,m.lim||4);
+ if(m.then)for(const t of m.then)recOne(t[0],t[2],rate,t[1],m.rev||0,n+'+',2);
+ if(m.voice&&typeof state!=='undefined'&&state==='end')recOne(m.voice,.85,1,.25,0,'voce',1);
+ return true;}
+function snd(n){if(!AC||!S.snd)return;const now=AC.currentTime;if(sndLast[n]&&now-sndLast[n]<.035)return;sndLast[n]=now;
+ try{const m=SMAP[n];if(m&&recPlay(n,m)){if(m.syn)sndSyn(n);return;}}catch(e){}sndSyn(n);}
 
-/* ----- colonna sonora: metal/industrial, renderizzata una volta e poi suonata in loop ----- */
-const MU={track:null,vol:.3,buf:{},src:null,sg:null,fail:0,step:0,next:0,timer:null,live:null,busy:0};
+/* ----- colonna sonora: brani registrati in loop (MREC); ripiego: metal/industrial sintetizzato, renderizzato una volta e poi in loop ----- */
+const MU={track:null,vol:.3,buf:{},rb:{},rf:{},rbusy:{},src:null,sg:null,fail:0,step:0,next:0,timer:null,live:null,busy:0};
 const hz=m=>440*Math.pow(2,(m-69)/12);let MX=null,MB=null;
 const MOF={m:1,a:3,b:5,n:6,c:7,d:8,e:10,E:12};
 function mCurve(k){const n=2048,c=new Float32Array(n);for(let i=0;i<n;i++)c[i]=Math.tanh(k*(i/(n-1)*2-1));return c;}
@@ -118,11 +189,19 @@ function mRender(tr,cb){const OC=window.OfflineAudioContext||window.webkitOfflin
    const k=pk>0?.9/pk:1;MU.k=k;for(let c=0;c<2;c++){const o=out.getChannelData(c);for(let i=0;i<loop;i++)o[i]*=k;}cb(out);}catch(e){cb(null);}};
  try{X=new OC(2,loop+tail,sr);const pX=MX,pB=MB;MX=X;MB=mBusMk(X,X.destination);MB.dl.delayTime.value=sd*3;try{for(let n=0;n<N;n++)mStep(tr,n,n*sd);}finally{MX=pX;MB=pB;}
   X.oncomplete=e=>fin(e.renderedBuffer);const p=X.startRendering();if(p&&p.then)p.then(fin,()=>{if(!done){done=1;cb(null);}});}catch(e){if(!done){done=1;cb(null);}}}
-function musicPrep(){if(MU.busy||MU.fail||window.NOMUS)return;const tr=!MU.buf.level?'level':!MU.buf.boss?'boss':null;if(!tr)return;MU.busy=1;mRender(tr,b=>{MU.busy=0;if(!b){MU.fail=1;if(MU.track)mLive();return;}MU.buf[tr]=b;if(MU.track===tr&&AC&&!MU.src)mPlay(tr);setTimeout(musicPrep,300);});}
-function mCut(){if(!MU.src)return;const s=MU.src,g=MU.sg,t=AC.currentTime;try{g.gain.setTargetAtTime(0,t,.09);s.stop(t+.6);}catch(e){}MU.src=MU.sg=null;}
-function mPlay(tr){mCut();const b=MU.buf[tr];if(!b||S.mus===0)return 0;const s=AC.createBufferSource(),g=AC.createGain();s.buffer=b;s.loop=true;s.connect(g);g.connect(MUS);s.start(AC.currentTime+.05);MU.src=s;MU.sg=g;return 1;}
-function mLive(){if(!AC||MU.timer)return;MU.live=mBusMk(AC,MUS);MU.step=0;MU.next=AC.currentTime+.15;MU.timer=setInterval(()=>{if(!MU.track||state!=='play'||S.mus===0)return;const T=TRK[MU.track],sd=60/T.bpm/4,until=AC.currentTime+.3;if(MU.next<AC.currentTime)MU.next=AC.currentTime+.05;MX=AC;MB=MU.live;MB.dl.delayTime.value=sd*3;let gd=0;while(MU.next<until&&gd++<64){mStep(MU.track,MU.step,MU.next);MU.next+=sd;MU.step++;}},60);}
-function musicStart(tr){if(!AC)return;if(MU.track===tr)return;MU.track=tr;MU.step=0;MU.next=AC.currentTime+.15;const g=MUS.gain,t=AC.currentTime;g.cancelScheduledValues(t);g.setValueAtTime(g.value,t);g.linearRampToValueAtTime(S.mus===0?0:MU.vol,t+.4);
- if(MU.fail)mLive();else if(!mPlay(tr))musicPrep();}
-function musicStop(){if(!AC||!MU.track)return;MU.track=null;const g=MUS.gain,t=AC.currentTime;g.cancelScheduledValues(t);g.setValueAtTime(g.value,t);g.linearRampToValueAtTime(0,t+.5);mCut();}
-function musicVol(){if(!AC)return;const t=AC.currentTime;MUS.gain.cancelScheduledValues(t);MUS.gain.setValueAtTime(S.mus===0||!MU.track?0:MU.vol,t);if(MU.track&&S.mus!==0&&!MU.src&&!MU.fail)mPlay(MU.track);if(S.mus===0)mCut();}
+function musicPrep(){if(MU.busy||MU.fail||window.NOMUS)return;const need=t=>!MU.buf[t]&&!recHasMus(t),tr=need('level')?'level':need('boss')?'boss':null;if(!tr)return;MU.busy=1;mRender(tr,b=>{MU.busy=0;if(!b){MU.fail=1;if(MU.track&&!MU.src)mLive();return;}MU.buf[tr]=b;if(MU.track===tr&&AC&&!MU.src)mPlay(tr);setTimeout(musicPrep,300);});}
+// ferma la traccia attuale con una dissolvenza di f secondi
+function mCut(f){if(!MU.src)return;const s=MU.src,g=MU.sg,t=AC.currentTime;f=f||.09;try{g.gain.cancelScheduledValues(t);g.gain.setValueAtTime(g.gain.value,t);g.gain.linearRampToValueAtTime(0,t+f);s.stop(t+f+.05);}catch(e){}MU.src=MU.sg=null;}
+// suona una traccia in loop; xf = secondi di dissolvenza incrociata con quella che sta suonando
+// (le tracce registrate usano loopStart/loopEnd: nel file c'è un margine prima e dopo il ciclo)
+function mPlay(tr,xf){const rb=MU.rb[tr],b=rb||MU.buf[tr];if(!b||S.mus===0){mCut();return 0;}mCut(xf||.09);const s=AC.createBufferSource(),g=AC.createGain(),t=AC.currentTime+.03,m=rb?MREC[tr]:null,v=m?m.v:1;let off=0;s.buffer=b;s.loop=true;
+ if(m){s.loopStart=m.pad;s.loopEnd=m.pad+m.len;off=m.pad;}
+ if(xf){g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(v,t+xf);}else g.gain.value=v;
+ s.connect(g);g.connect(MUS);s.start(t,off);MU.src=s;MU.sg=g;return 1;}
+function mLive(){if(!AC||MU.timer)return;MU.live=mBusMk(AC,MUS);MU.step=0;MU.next=AC.currentTime+.15;MU.timer=setInterval(()=>{if(!MU.track||MU.rb[MU.track]||state!=='play'||S.mus===0)return;const T=TRK[MU.track],sd=60/T.bpm/4,until=AC.currentTime+.3;if(MU.next<AC.currentTime)MU.next=AC.currentTime+.05;MX=AC;MB=MU.live;MB.dl.delayTime.value=sd*3;let gd=0;while(MU.next<until&&gd++<64){mStep(MU.track,MU.step,MU.next);MU.next+=sd;MU.step++;}},60);}
+function musicStart(tr){if(!AC)return;if(MU.track===tr)return;const prev=MU.track;MU.track=tr;MU.step=0;MU.next=AC.currentTime+.15;const g=MUS.gain,t=AC.currentTime;g.cancelScheduledValues(t);g.setValueAtTime(g.value,t);g.linearRampToValueAtTime(S.mus===0?0:MU.vol,t+.4);
+ const xf=prev&&MU.src?MXF:0;
+ if(recHasMus(tr)){if(MU.rb[tr])mPlay(tr,xf);else recMusic(tr,null);return;}// ancora in decodifica: parte appena pronta
+ if(MU.fail)mLive();else if(!mPlay(tr,xf))musicPrep();}
+function musicStop(){if(!AC||!MU.track)return;MU.track=null;const g=MUS.gain,t=AC.currentTime;g.cancelScheduledValues(t);g.setValueAtTime(g.value,t);g.linearRampToValueAtTime(0,t+.5);mCut(.5);}
+function musicVol(){if(!AC)return;const t=AC.currentTime;MUS.gain.cancelScheduledValues(t);MUS.gain.setValueAtTime(S.mus===0||!MU.track?0:MU.vol,t);if(MU.track&&S.mus!==0&&!MU.src&&(MU.rb[MU.track]||!MU.fail))mPlay(MU.track,.5);if(S.mus===0)mCut();}
