@@ -72,7 +72,9 @@ export class View {
     const pitch = new THREE.Mesh(new THREE.PlaneGeometry(W + MX * 2, L + MY * 2), new THREE.MeshLambertMaterial({ map: tex }));
     pitch.rotation.x = -Math.PI / 2; s.add(pitch);
     // stadio intorno al campo (tribune, pubblico, tetto, cartelloni, cielo): src/stadium.js
-    const st = buildStadium(s); this.stadium = st; this.crowdMats = st.crowdMats; this.backStand = st.backStand;
+    // costruito subito dopo il primo disegno del menu, così il menu compare prima
+    this.stadium = null; this.crowdMats = []; this.backStand = null;
+    setTimeout(() => { const st = buildStadium(s); this.stadium = st; this.crowdMats = st.crowdMats; this.backStand = st.backStand; }, 0);
 
     // porte
     const postM = new THREE.MeshLambertMaterial({ color: 0xffffff });
@@ -167,7 +169,7 @@ export class View {
       this.figs.push(this.makeFig(p.pos === 'P' ? kit.gk : kit, p.look));
     }
     const b = match.ball; this.cx = b.x; this.cy = b.y;
-    this.backStand.visible = true;
+    if (this.backStand) this.backStand.visible = true;
   }
 
   setZoom(z) { this.zoomT = z; }
@@ -176,7 +178,7 @@ export class View {
     const m = this.match; if (!m) return;
     const s = this.flip, b = m.ball; this.t += dt;
     // pubblico: si anima quando il pallone si avvicina a una porta e soprattutto dopo un gol
-    this.stadium.update(dt, m.phase === 'goal' ? 1 : Math.max(0, (Math.abs(b.y) - 25) / 25) * 0.4);
+    if (this.stadium) this.stadium.update(dt, m.phase === 'goal' ? 1 : Math.max(0, (Math.abs(b.y) - 25) / 25) * 0.4);
     this.zoom += (this.zoomT - this.zoom) * Math.min(1, dt * 7);
     for (let i = 0; i < 22; i++) this.pose(m.players[i], this.figs[i], dt);
     // palla

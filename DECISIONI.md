@@ -75,3 +75,20 @@ restano sui loro rami finché la build su GitHub di questo blocco non è riuscit
    e una tappa con file falliti si riprova alla partita successiva.
    Caso limite rimasto: se la pagina di passaggio non risponde entro 8 s e Luis crea una nuova carriera, il vecchio
    salvataggio non viene copiato sopra (non si sovrascrive mai), ma resta recuperabile dalla copia di sicurezza.
+
+## Contenuti integrati dopo il caricamento a pezzi — 2026-11-19
+
+1. **Menu nuovi** (subagente Sonnet, ramo `wt-menu`): stili in `src/ui-style.js`, inseriti da `ui.js`. Le vecchie regole
+   CSS del template restano (le nuove prevalgono); si possono togliere in una pulizia futura. `color-mix()` serve iOS 16.2+,
+   sotto ripiega sul colore base.
+2. **Stadio serale** (subagente Opus, ramo `stadio-grafica`): `src/stadium.js`, 7-9 draw call e ~15.500 triangoli.
+   Costruito subito dopo il primo disegno del menu (non prima), così non ritarda l'apertura. Le luci della scena restano
+   quelle di prima (giorno): da rivedere nella fase grafica se l'atmosfera serale stona.
+3. **Suoni veri**: scelti dalla ricerca (tutti CC0 da Freesound, licenza ricontrollata sulle pagine). Ho usato le anteprime
+   MP3 di Freesound (scaricabili senza account) e ritagliato i tratti misurando il volume (non posso ascoltarli):
+   tifo costante 195-220 s e boato 109,6-116 s della registrazione Millerntor, "ooh" di Sandermotions, fischi, calcio, musica
+   "Race song loop". Totale 1,5 MB in `www/assets/audio/`. Pallone sul palo e rete restano sintetizzati.
+   **Da ascoltare sull'iPhone**: volumi relativi (`CROWD_SAMPLE_GAIN`, `KICK_SAMPLE_GAIN` in `src/audio.js`) e il piccolo
+   stacco possibile a ogni giro del loop del pubblico (MP3 non è perfetto per i loop).
+4. **Modelli 3D**: la ricerca non ha trovato un calciatore CC0 con tutte le animazioni; un subagente Opus prova
+   Kenney/KayKit con pose procedurali per scivolata, tuffo e colpo di testa, tenendo le figure a box come riserva.
