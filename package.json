@@ -1,13 +1,12 @@
 {
   "name": "tiro-a-giro",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "directories": {
-    "test": "test"
-  },
+  "description": "Tiro a Giro: calcio 3D in verticale per iPhone",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "node build.mjs",
+    "test": "node --test test/unit/",
+    "balance": "node test/balance.mjs",
+    "golden:update": "node test/golden-update.mjs"
   },
   "keywords": [],
   "author": "",
@@ -17,5 +16,6 @@
     "puppeteer-core": "^25.18.1",
     "three": "^0.187.0"
   },
-  "type": "module"
+  "type": "module",
+  "private": true
 }

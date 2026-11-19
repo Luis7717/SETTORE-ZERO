@@ -2,7 +2,7 @@
 import puppeteer from 'puppeteer-core';
 import { pathToFileURL } from 'node:url';
 const out = process.argv[2] || 'shots';
-const b = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const b = await puppeteer.launch({ executablePath: process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: 'new', args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const p = await b.newPage();
 await p.setViewport({ width: 390, height: 844, deviceScaleFactor: +(process.env.DSF || 1), isMobile: true, hasTouch: true });
 const errs = [];
