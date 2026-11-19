@@ -1,5 +1,5 @@
 // Carriera: squadre, giocatori, campionato a tre divisioni, mercato, soldi, salvataggio.
-import { rng32, FORMATIONS } from './sim.js';
+import { rng32, FORMATIONS, headingOf } from './sim.js';
 
 const KEY = 'tag_save_v1';
 export const DIV_NAMES = ['Prima Divisione', 'Seconda Divisione', 'Terza Divisione'];
@@ -45,6 +45,7 @@ export function genPlayer(r, pos, level, id, young) {
   else if (pos === 'D') Object.assign(p, { dif: v(5), fis: v(3), vel: v(-2), pas: v(-6), dri: v(-10), tir: v(-18), por: 12 });
   else if (pos === 'C') Object.assign(p, { pas: v(5), dri: v(1), vel: v(-2), dif: v(-6), tir: v(-5), fis: v(-2), por: 12 });
   else Object.assign(p, { tir: v(5), vel: v(2), dri: v(2), pas: v(-6), fis: v(-3), dif: v(-22), por: 12 });
+  p.tes = headingOf(p); // colpi di testa: stessa formula usata per i giocatori dei salvataggi vecchi (nessun numero casuale in più)
   p.pot = overall(p) + (p.age < 22 ? 4 + Math.floor(r() * 12) : p.age < 26 ? Math.floor(r() * 6) : 0);
   return p;
 }
