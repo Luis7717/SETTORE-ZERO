@@ -18,5 +18,6 @@ nuovi finché quel blocco non è finito e la build su GitHub non è riuscita. La
 | 2 | Ricerca musiche ed effetti sonori CC0/CC-BY | Sonnet | finita: 3 candidati Freesound CC0 (pubblico Millerntor, fischi/calcio, musica "Race song loop"), scelti 7 suoni, integrati (`assets/audio/`, crediti in `assets/CREDITI.md`) | nessuno |
 | 3 | Grafica dello stadio | Opus | finita, commit `46f6441` sul ramo `stadio-grafica` (7-9 draw call, ~15.500 triangoli), integrato | `src/stadium.js`, `test/stadium-shot.mjs` |
 | 4 | Grafica dei menu | Sonnet | finita, commit `a1e4df8` sul ramo `wt-menu` (worktree `TAG-wt-menu`), integrato | `src/ui.js`, `src/ui-style.js` |
-| 5 | Fase 1B motore: scatto, finta, testa/volée, barriera, vantaggio, difficoltà | Opus | in corso (worktree `TAG-wt-1b`, ramo `wt-1b`) | `src/sim/*`, `src/input.js`, `src/career.js`, `test/**` |
+| 5 | Fase 1B motore: scatto, finta, testa/volée, barriera, vantaggio, difficoltà | Opus | finita e unita (8 commit, 60 test verdi); eventi a schermo e testi integrati dal coordinatore | `src/sim/*`, `src/input.js`, `src/career.js`, `test/**` |
 | 6 | Modelli 3D dei giocatori (Kenney/KayKit), animazioni e pose | Opus | in corso (worktree `TAG-wt-modelli`, ramo `wt-modelli`) | `src/players3d.js`, `assets/models/`, poche righe di `src/render.js` |
+| 7 | Allenamento guidato (tutorial in campo, 5 prove) | Opus (coordinatore) | fatto | `src/tutorial.js`, `src/main.js`, `src/ui.js`, `src/index.tpl.html`, `test/unit/tutorial.test.mjs`, `test/tutorial-shot.mjs` |
