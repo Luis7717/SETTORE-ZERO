@@ -1,22 +1,21 @@
-// Prova a schermo dell'allenamento guidato (Puppeteer, iPhone 390×844): dall'ultima pagina di "Come si gioca"
-// si entra in campo, compare il riquadro della prova; un passaggio vero fa avanzare alla prova del tiro.
+// Prova a schermo dell'allenamento guidato (Puppeteer, iPhone 390×844): creando la squadra parte l'allenamento,
+// compare la scheda della prima meccanica; "Prova" la chiude e un passaggio vero conta come prima riuscita.
 import { b, p, wait, snap, errs } from './shot.mjs';
 
 await wait(1200);
 await p.evaluate(() => { document.querySelector('[data-a=create]').click(); });
-await wait(300);
-await p.evaluate(() => window.__ui.show('howto', 4));
-await wait(300);
-await snap('t0-come-si-gioca-ultima');
-await p.evaluate(() => document.querySelector('[data-a=tutorial]').click());
-await p.waitForFunction(() => window.__G.state === 'match' && window.__G.tut, { timeout: 10000 });
-await wait(1500);
-const a = await p.evaluate(() => ({ prova: window.__G.tut.i, riquadro: document.getElementById('tut').innerText }));
-await snap('t1-prova-passaggio');
+await p.waitForFunction(() => window.__G.state === 'match' && window.__G.tut && window.__G.tut.card, { timeout: 10000 });
+await wait(600);
+await snap('t1-scheda-passaggio');
+const scheda = await p.evaluate(() => document.getElementById('ov').innerText.replace(/\s+/g, ' ').slice(0, 120));
+await p.evaluate(() => document.querySelector('[data-o=tutgo]').click());
+await wait(800);
+await snap('t2-prova-1');
+const prima = await p.evaluate(() => document.getElementById('tut').innerText.replace(/\s+/g, ' '));
 await p.evaluate(() => { const m = window.__G.match, q = m.players[9]; m.userKick(0, { type: 'auto', tx: q.x, ty: q.y, curve: 0 }); });
-await wait(4000);
-const c = await p.evaluate(() => ({ prova: window.__G.tut.i, riquadro: document.getElementById('tut').innerText }));
-await snap('t2-prova-tiro');
-console.log(JSON.stringify({ prima: a, dopo: c }));
+await wait(5000);
+const dopo = await p.evaluate(() => ({ prova: window.__G.tut.k, riquadro: document.getElementById('tut').innerText.replace(/\s+/g, ' ') }));
+await snap('t3-prova-2');
+console.log(JSON.stringify({ scheda, prima, dopo }));
 console.log(errs.join('\n') || 'nessun errore');
 await b.close();

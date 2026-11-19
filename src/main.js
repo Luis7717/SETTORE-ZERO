@@ -77,23 +77,33 @@ function startMatch(mode, lvl) {
   G.mode = mode; G.title = title; G.subs = 5; G.bench = my.bench.slice(); G.res = null; G.paused = false; G.ts = 1; G.endT = 0;
   G.match = new Match({ seed: (Math.random() * 1e9) | 0, halfLen: mode === 'tutorial' ? 99999 : s.settings.half, human: [true, false], autoGk: [!!s.settings.autoGk, false], teams: [my, opp] });
   G.demo = null;
-  G.tut = mode === 'tutorial' ? new Tutorial(G.match, showTut) : null; showTut(null, '');
+  showTut(null, ''); G.tut = null;
   view.setMatch(G.match, 0); input.set(G.match, 0); input.enabled = true;
   ui.hide(); ov.style.display = 'none'; hud.style.display = 'block'; G.state = 'match';
   $('tn0').textContent = my.short; $('tn1').textContent = opp.short;
   $('k0').style.background = hex(my.kit.shirt); $('k1').style.background = hex(opp.kit.shirt);
   sfx.on = s.settings.sound; sfx.init(); sfx.resume(); sfx.music(false); sfx.crowd(0.16);
   s.tut = (s.tut || 0) + 1; career.save();
-  big(title, '', 1800);
+  // allenamento guidato: creato per ultimo, perché la sua prima scheda è un overlay che sopra verrebbe nascosto
+  if (mode === 'tutorial') G.tut = new Tutorial(G.match, { text: showTut, card: showLesson });
+  else big(title, '', 1800);
 }
 
 // riquadro dell'allenamento guidato, in alto sotto il punteggio
+// scheda di spiegazione di una meccanica (partita ferma); null = allenamento finito
+function showLesson(L, i, n) {
+  if (!L) { showTut(null, ''); big('Allenamento finito!', 'g', 2400, 'Ora sei pronto per il campionato'); return; }
+  G.paused = true; input.cancel(); showTut(null, '');
+  overlay(`<div class="ovs" style="font-size:13px;letter-spacing:.08em;color:#ffe14a">ALLENAMENTO · ${i + 1} DI ${n}</div><div class="ovh" style="margin-top:4px">${esc(L.title)}</div>
+  <div class="card"><p class="note" style="font-size:16px;line-height:1.45">${L.text}</p></div>
+  <button class="btn big" data-o="tutgo">Prova (3 volte)</button><button class="btn ghost" data-o="tutskip">Salta l'allenamento</button>`);
+}
 function showTut(title, text, i, n, good) {
   let el = $('tut');
   if (!el) { el = document.createElement('div'); el.id = 'tut'; hud.appendChild(el); }
   if (!text) { el.style.display = 'none'; return; }
   el.style.display = 'block'; el.className = good ? 'good' : '';
-  el.innerHTML = (title ? `<small>Prova ${Math.min(i + 1, n)} di ${n} · ${esc(title)}</small>` : '') + `<div>${text}</div>`;
+  el.innerHTML = (title ? `<small>${esc(title)} · prova ${Math.min(i + 1, n)} di ${n}</small>` : '') + `<div>${text}</div>`;
 }
 
 function big(text, cls, ms, small) {
@@ -172,6 +182,8 @@ function showSubs() {
 }
 ov.addEventListener('click', e => {
   const t = e.target.closest('[data-o]'); if (!t) return; const a = t.dataset.o, m = G.match; sfx.click();
+  if (a === 'tutgo') { ov.style.display = 'none'; G.paused = false; if (G.tut) G.tut.go(); return; }
+  if (a === 'tutskip') { career.s.tutDone = true; career.save(); finish(); return; }
   if (a === 'resume') { ov.style.display = 'none'; G.paused = false; }
   else if (a === 'second') { ov.style.display = 'none'; G.paused = false; m.startSecondHalf(); }
   else if (a === 'quit') { if (t.dataset.ok !== '1') { t.dataset.ok = '1'; t.textContent = 'Tocca di nuovo per confermare'; return; } if (G.mode === 'league') finish(true); else toMenu('hub'); }

@@ -72,7 +72,7 @@ export class UI {
       case 'go': this.sel = null; this.show(v); break;
       case 'kit': this.quiet = true; this.kit = +v; this.nameVal = this.root.querySelector('#club') ? this.root.querySelector('#club').value : ''; this.show('title', 'new'); break;
       case 'new': this.show('title', 'new'); break;
-      case 'create': { const n = (this.root.querySelector('#club').value || '').trim().slice(0, 18) || 'FC Tiro a Giro'; c.create(n, this.kit); this.show('howto', 0); break; }
+      case 'create': { const n = (this.root.querySelector('#club').value || '').trim().slice(0, 18) || 'FC Tiro a Giro'; c.create(n, this.kit); this.api.play('tutorial'); break; }
       case 'howto': if (+v >= HOWTO.length) this.show('hub'); else this.show('howto', +v); break;
       case 'tutorial': this.api.play('tutorial'); break;
       case 'play': this.api.play('league'); break;
