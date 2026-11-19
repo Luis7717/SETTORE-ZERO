@@ -6,6 +6,7 @@ import { UI } from './ui.js';
 import { Sfx } from './audio.js';
 import { Assets } from './assets.js';
 import { runLegacyMigration } from './legacy-save.js';
+import { Tutorial } from './tutorial.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('c'), hud = $('hud'), ov = $('ov'), uiRoot = $('ui');
@@ -38,6 +39,7 @@ function startDemo() {
   view.setMatch(G.demo, 0);
 }
 function toMenu(screen, arg) {
+  G.tut = null; showTut(null, '');
   G.state = 'menu'; G.match = null; input.enabled = false; input.set(null, 0); hud.style.display = 'none'; ov.style.display = 'none'; sfx.crowd(0); sfx.music(true);
   if (!G.demo) startDemo(); else view.setMatch(G.demo, 0);
   ui.show(screen, arg);
@@ -70,10 +72,12 @@ function startMatch(mode, lvl) {
   const s = career.s, my = career.myMatchTeam();
   let opp, title;
   if (mode === 'league') { const nm = career.nextMatch(); if (!nm) return; opp = career.aiMatchTeam(nm.opp); title = `Giornata ${nm.day} · ${DIV_NAMES[nm.div]}`; }
+  else if (mode === 'tutorial') { opp = career.aiMatchTeam({ name: 'Allenamento', short: 'ALL', kit: (s.kit + 4) % KITS.length, rating: 40, seed: 7 }); title = 'Allenamento guidato'; }
   else { opp = career.aiMatchTeam({ name: 'Amichevole', short: 'AMI', kit: (s.kit + 4) % KITS.length, rating: lvl, seed: (Math.random() * 1e9) | 0 }); title = 'Amichevole'; }
   G.mode = mode; G.title = title; G.subs = 5; G.bench = my.bench.slice(); G.res = null; G.paused = false; G.ts = 1; G.endT = 0;
-  G.match = new Match({ seed: (Math.random() * 1e9) | 0, halfLen: s.settings.half, human: [true, false], autoGk: [!!s.settings.autoGk, false], teams: [my, opp] });
+  G.match = new Match({ seed: (Math.random() * 1e9) | 0, halfLen: mode === 'tutorial' ? 99999 : s.settings.half, human: [true, false], autoGk: [!!s.settings.autoGk, false], teams: [my, opp] });
   G.demo = null;
+  G.tut = mode === 'tutorial' ? new Tutorial(G.match, showTut) : null; showTut(null, '');
   view.setMatch(G.match, 0); input.set(G.match, 0); input.enabled = true;
   ui.hide(); ov.style.display = 'none'; hud.style.display = 'block'; G.state = 'match';
   $('tn0').textContent = my.short; $('tn1').textContent = opp.short;
@@ -81,6 +85,15 @@ function startMatch(mode, lvl) {
   sfx.on = s.settings.sound; sfx.init(); sfx.resume(); sfx.music(false); sfx.crowd(0.16);
   s.tut = (s.tut || 0) + 1; career.save();
   big(title, '', 1800);
+}
+
+// riquadro dell'allenamento guidato, in alto sotto il punteggio
+function showTut(title, text, i, n, good) {
+  let el = $('tut');
+  if (!el) { el = document.createElement('div'); el.id = 'tut'; hud.appendChild(el); }
+  if (!text) { el.style.display = 'none'; return; }
+  el.style.display = 'block'; el.className = good ? 'good' : '';
+  el.innerHTML = (title ? `<small>Prova ${Math.min(i + 1, n)} di ${n} · ${esc(title)}</small>` : '') + `<div>${text}</div>`;
 }
 
 function big(text, cls, ms, small) {
@@ -123,6 +136,7 @@ function events(m) {
 }
 
 function finish(forfeit) {
+  if (G.mode === 'tutorial') { G.tut = null; showTut(null, ''); toMenu('hub'); return; }
   const m = G.match; input.enabled = false; hud.style.display = 'none'; ov.style.display = 'none'; sfx.crowd(0);
   if (forfeit) { m.score[0] = 0; m.score[1] = Math.max(3, m.score[1]); m.goalsLog = m.goalsLog.filter(g => g.team === 1); }
   let res = null;
@@ -196,7 +210,12 @@ function frame(now) {
       const target = input.drawing ? 0.13 : dive ? 0.3 : 1;
       G.ts += (target - G.ts) * Math.min(1, dt * 14);
       const sdt = dt * G.ts * (G.speed || 1), n = Math.max(1, Math.ceil(sdt / (1 / 60)));
+      if (G.tut) G.tut.before();
       for (let i = 0; i < n; i++) m.step(sdt / n);
+      if (G.tut) {
+        G.tut.after(sdt);
+        if (G.tut.finished && !G.endT) { career.s.tutDone = true; career.save(); G.endT = now + 2600; }
+      }
       events(m);
       const myRestart = m.phase === 'restart' && m.restart && m.restart.team === 0;
       const mine = m.ball.owner && m.ball.owner.team === 0;
@@ -210,6 +229,7 @@ function frame(now) {
       drawRadar(m);
       const h = m.hint(0); let txt = h === 'restart' ? RHINT[m.restart.type] : (HINTS[h] || '');
       if ((career.s.tut || 0) > 4 && (h === 'attack' || h === 'defend' || h === 'loose')) txt = '';
+      if (G.tut) txt = '';
       if (txt !== lastHint) { lastHint = txt; const el = $('hint'); el.className = h === 'dive' || (h === 'restart' && m.restart.type === 'penalty') ? 'hot' : ''; el.innerHTML = txt ? `<span>${txt}</span>` : ''; }
     }
     if (G.bigT && now > G.bigT) { G.bigT = 0; $('big').className = ''; }

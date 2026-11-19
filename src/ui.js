@@ -74,6 +74,7 @@ export class UI {
       case 'new': this.show('title', 'new'); break;
       case 'create': { const n = (this.root.querySelector('#club').value || '').trim().slice(0, 18) || 'FC Tiro a Giro'; c.create(n, this.kit); this.show('howto', 0); break; }
       case 'howto': if (+v >= HOWTO.length) this.show('hub'); else this.show('howto', +v); break;
+      case 'tutorial': this.api.play('tutorial'); break;
       case 'play': this.api.play('league'); break;
       case 'friendly': this.api.play('friendly', +v); break;
       case 'form': s.formation = v; c.autoLineup(); c.save(); this.sel = null; this.redraw(); break;
@@ -181,7 +182,7 @@ export class UI {
 
   howto(i) {
     const [t, x] = HOWTO[i];
-    return `<div class="how"><div class="stepbar"><div class="dots">${HOWTO.map((_, n) => `<i class="${n === i ? 'on' : ''}"></i>`).join('')}</div><div class="dim">${i + 1} / ${HOWTO.length}</div></div><div class="ill"><svg viewBox="0 0 80 80">${HOW_ILL[i]}</svg></div><h1>${t}</h1><p>${x}</p><button class="btn big" data-a="howto" data-v="${i + 1}">${i + 1 < HOWTO.length ? 'Avanti' : 'Ho capito'}</button>${this.c.s ? '<button class="btn ghost" data-a="go" data-v="hub">Salta</button>' : ''}</div>`;
+    return `<div class="how"><div class="stepbar"><div class="dots">${HOWTO.map((_, n) => `<i class="${n === i ? 'on' : ''}"></i>`).join('')}</div><div class="dim">${i + 1} / ${HOWTO.length}</div></div><div class="ill"><svg viewBox="0 0 80 80">${HOW_ILL[i]}</svg></div><h1>${t}</h1><p>${x}</p>${i + 1 < HOWTO.length ? '' : '<button class="btn big" data-a="tutorial">Prova in campo</button>'}<button class="btn ${i + 1 < HOWTO.length ? 'big' : ''}" data-a="howto" data-v="${i + 1}">${i + 1 < HOWTO.length ? 'Avanti' : 'Ho capito, vai al menu'}</button>${this.c.s ? '<button class="btn ghost" data-a="go" data-v="hub">Salta</button>' : ''}</div>`;
   }
 
   // dopo la partita
