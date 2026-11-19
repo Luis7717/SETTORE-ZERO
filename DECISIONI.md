@@ -138,3 +138,17 @@ restano sui loro rami finché la build su GitHub di questo blocco non è riuscit
    **L'umano simulato non ne guadagna**: crossa poco e ha meno angoli; i suoi gol erano già pochissimi (vedi 1A, punto 3).
    Obiettivo 2-4 gol a partita ancora non raggiunto: i due test `todo` restano.
 8. **Impronta rigenerata una volta** alla fine (`npm run golden:update`), con tutto il resto verde.
+
+## Richieste del 2026-11-19 sera (dopo la prova sull'iPhone)
+
+1. **Allenamento**: per ogni meccanica una scheda di spiegazione e poi 3 prove in 3 situazioni diverse
+   (passaggio, tiro, corsa e scatto, finta, recupera palla, scivolata, dribbling, portiere). Parte da solo alla
+   creazione della squadra (con "Salta l'allenamento"); le pagine "Come si gioca" restano nel menu.
+   In allenamento non ci sono espulsioni né stanchezza: ogni prova riparte pulita.
+2. **Duello col difensore**: telecamera più bassa e più avanti, anelli verdi sotto i 3 compagni più liberi,
+   tempo al 35% (`DUEL_SLOW` in main.js, `DUEL_LOW`/`DUEL_MATES` in render.js), tasto giallo **Dribbling** in basso.
+   La regola del duello e del dribbling è nel motore (subagente, sezione "Duello e statistiche").
+3. **Statistiche**: "si abbassa" interpretato come calo DENTRO la partita (torna pieno alla partita dopo):
+   velocità che cala col tempo in base alla resistenza (= `fis`), dribbling e colpi di testa che calano un poco
+   a ogni successo. Statistica nuova "colpi di testa" (`tes`), calcolata per i giocatori dei salvataggi vecchi.
+   Ricordate a Luis le due che non aveva elencato: passaggio e portiere.

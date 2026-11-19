@@ -9,6 +9,8 @@ const HAIR = [0x1c1410, 0x4a2f1b, 0x8a5a2b, 0xd9b66a, 0x222222, 0x2b2b2b];
 const SCALE = 1.25;
 const PREVIEW_COLOR = 0x7dd3ff; // puntini dell'anteprima della traiettoria
 const OFFSIDE_COLOR = 0xff5a5a; // linea del fuorigioco
+const DUEL_MATES = 3;           // compagni liberi evidenziati durante un duello
+const DUEL_LOW = 0.42;          // quanto si abbassa la telecamera nel duello (0 = niente, 1 = a terra)
 
 function canvasTex(w, h, draw) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
@@ -118,6 +120,9 @@ export class View {
     this.target = new THREE.Sprite(new THREE.SpriteMaterial({ map: tg, depthTest: false })); this.target.scale.set(1.7, 1.7, 1); this.target.renderOrder = 21; this.target.visible = false; s.add(this.target);
     this.recv = new THREE.Mesh(this.shGeo, new THREE.MeshBasicMaterial({ map: ringT, transparent: true, depthWrite: false, color: 0x7dffb0 }));
     this.recv.scale.set(1.6, 1, 1.6); this.recv.position.y = 0.04; this.recv.visible = false; s.add(this.recv);
+    // duello: anelli verdi sotto i compagni liberi a cui passare
+    this.mateRings = [];
+    for (let i = 0; i < DUEL_MATES; i++) { const r = this.recv.clone(); r.material = this.recv.material; r.visible = false; s.add(r); this.mateRings.push(r); }
 
     // linea disegnata
     this.pathMax = 160;
@@ -212,6 +217,10 @@ export class View {
       const k = 1.9 + Math.sin(this.t * 6) * 0.12; this.ring.scale.set(k, 1, k);
       this.marker.visible = true; this.marker.position.set(s * c.x, 2.75 + Math.sin(this.t * 5) * 0.08, -s * c.y);
     } else { this.ring.visible = false; this.marker.visible = false; }
+    // duello col difensore: telecamera più bassa e più avanti, compagni liberi evidenziati
+    const duel = !!(m.duelFor && m.duelFor(this.me));
+    this.duelK = (this.duelK || 0) + ((duel ? 1 : 0) - (this.duelK || 0)) * Math.min(1, dt * 5);
+    this.showFreeMates(m, duel);
     // telecamera dietro l'azione
     const dir = this.me === 1 ? -1 : 1;
     let fx = b.x, fy = b.y;
@@ -231,6 +240,7 @@ export class View {
     let camY = this.cy * dir - back, hh = hgt, lookY = this.cy * dir + ahead;
     if (camY < minY) { hh += Math.min(6, (minY - camY) * 0.35); camY = minY; }
     camY += (-HL - 12.5 - camY) * dk; hh += (10.5 - hh) * dk; lookY += ((this.cy * dir - HL) / 2 + 3 - lookY) * dk;
+    const du = this.duelK; hh *= 1 - DUEL_LOW * du; camY += back * 0.3 * du; lookY += 8 * du;
     const camX = this.cx * dir * (0.82 - 0.3 * a) * (1 - 0.55 * dk);
     this.cam.position.set(camX, hh, -camY);
     this.cam.lookAt(this.cx * dir * (0.9 - 0.45 * a) * (1 - 0.45 * dk), 0, -lookY);
@@ -272,6 +282,23 @@ export class View {
     } else if (p.pos === 'P' && v < 1.2) { al = -0.5; ar = -0.5; az = 0.5; tl = -0.15; tr = -0.15; kl = 0.3; kr = 0.3; body.position.y = -0.04; }
     f.tL.rotation.x = tl; f.tR.rotation.x = tr; f.kL.rotation.x = Math.max(0, kl); f.kR.rotation.x = Math.max(0, kr);
     f.aL.rotation.x = al; f.aR.rotation.x = ar; f.aL.rotation.z = -az; f.aR.rotation.z = az;
+  }
+
+  // i compagni più liberi (lontani dagli avversari) e raggiungibili, sotto un anello verde
+  showFreeMates(m, on) {
+    const rings = this.mateRings; if (!rings) return;
+    let list = [];
+    if (on) {
+      const c = m.ctrl[this.me];
+      for (const p of m.players) {
+        if (p.team !== this.me || p.off || p === c || p.pos === 'P') continue;
+        const d = Math.hypot(p.x - c.x, p.y - c.y); if (d > 32) continue;
+        list.push({ p, free: m.nearOpp(p.x, p.y, p.team) - d * 0.05 });
+      }
+      list.sort((u, v) => v.free - u.free); list = list.slice(0, DUEL_MATES);
+    }
+    const s = this.flip;
+    rings.forEach((r, i) => { const it = list[i]; r.visible = !!it; if (it) r.position.set(s * it.p.x, 0.05, -s * it.p.y); });
   }
 
   render() { this.r.render(this.scene, this.cam); }

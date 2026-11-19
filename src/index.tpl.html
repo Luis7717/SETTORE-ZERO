@@ -80,12 +80,14 @@ input{width:100%;height:50px;border-radius:12px;border:1px solid #ffffff2a;backg
 #tut small{display:block;color:#ffe14a;font-weight:800;font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:3px}
 #tut b{color:#ffe14a}
 #tut.good{border-color:#5ee08f;background:#0d2a1ae6}
+#drib{pointer-events:auto;display:none;position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 62px);min-width:170px;height:58px;border-radius:999px;border:0;background:#ffe14a;color:#141414;font-size:19px;font-weight:900;letter-spacing:.03em;box-shadow:0 6px 0 #b39400,0 10px 24px #0008}
+#drib:active{transform:translateX(-50%) translateY(4px);box-shadow:0 2px 0 #b39400}
 #load{position:fixed;inset:0;display:none;z-index:50;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#070b14ee;font-weight:800;font-size:15px;letter-spacing:.03em}
 #load .tr{width:62%;max-width:280px;height:10px;border-radius:99px;background:#ffffff1c;overflow:hidden}
 #loadbar{height:100%;width:0;border-radius:99px;background:#ffe14a;transition:width .15s}
 </style></head><body>
 <canvas id="c"></canvas>
-<div id="hud"><div id="slow"></div><div id="sb"><div id="score"><i id="k0"></i><span id="tn0"></span><b id="sc">0 – 0</b><span id="tn1"></span><i id="k1"></i></div></div><button id="pause">II</button><div id="clock">0'</div><canvas id="radar" width="156" height="236"></canvas><div id="big"></div><div id="hint"></div></div>
+<div id="hud"><div id="slow"></div><div id="sb"><div id="score"><i id="k0"></i><span id="tn0"></span><b id="sc">0 – 0</b><span id="tn1"></span><i id="k1"></i></div></div><button id="pause">II</button><div id="clock">0'</div><canvas id="radar" width="156" height="236"></canvas><div id="big"></div><div id="hint"></div><button id="drib">Dribbling</button></div>
 <div id="fade"></div><div id="ov"></div><div id="ui"></div>
 <div id="load"><div>Si entra in campo…</div><div class="tr"><div id="loadbar"></div></div></div>
 <script>/*BUNDLE*/</script>
