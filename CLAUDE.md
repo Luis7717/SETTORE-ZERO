@@ -31,10 +31,13 @@
 - `npm install` · `npm run build` · `npm test` (test del motore con `node:test`).
 - `npm run balance -- 60 60 20` → umano simulato contro IA: vittorie, gol, tiri, possesso.
   **I numeri di equilibrio si misurano con questo** (non IA contro IA: nella squadra umana pressa solo il controllato).
+- `node test/diag-flow.mjs 60 20 bot` → diagnosi dell'attacco: azioni, ultimi 30 m, palle perse per zona e motivo, angoli, rimesse.
 - `node test/sim-test.mjs ai 12` → IA contro IA, conteggio eventi.
+- Le regolazioni del motore sono costanti con nome in cima a `src/sim/ai.js`, `motion.js`, `match.js`.
+  Le scelte fatte in autonomia e gli obiettivi non ancora raggiunti sono in `DECISIONI.md`.
 - `npm run golden:update` → rigenera l'impronta delle partite a seme fisso (`test/fixtures/golden.json`).
   Solo quando il comportamento cambia **di proposito**; mai per far passare un refactoring.
-- Prove su schermo: `node test/flow1.mjs shots` (Puppeteer, iPhone 390×844). Chrome: variabile `CHROME`,
+- Prove su schermo: `node test/flow1.mjs shots`, `node test/preview-shot.mjs shots` (Puppeteer, iPhone 390×844). Chrome: variabile `CHROME`,
   predefinito `C:/Program Files/Google/Chrome/Application/chrome.exe`. Debug in pagina: `window.__G`, `__career`, `__view`, `__ui`, `__start`.
 
 ## Gesti (tutto a un dito)

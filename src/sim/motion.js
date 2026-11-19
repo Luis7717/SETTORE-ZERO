@@ -2,6 +2,15 @@
 // I metodi vengono copiati su Match.prototype (vedi match.js): `this` è la partita.
 import { W, L, HW, HL, GW, GH, BOX_W, BOX_D, SIX_W, SIX_D, PEN_D, CIRCLE, G, ROLL, clamp, hyp, rng32, FORMATIONS, effStats, ballPhys, segInfo } from './core.js';
 
+// Regolazioni (misurate con test/balance.mjs, test/diag-flow.mjs e i test in test/unit)
+const GK_AI_SPEED = 2.6;    // velocità base del tuffo del portiere comandato dal computer (m/s)
+const GK_HUMAN_SPEED = 2.4; // velocità base del tuffo quando lo comanda il giocatore (m/s)
+const SHOT_BLOCK_R = 0.6;   // un tiro forte si ferma su un difensore solo se lo prende quasi in pieno (m)
+const PARRY_OUT = 0.6;      // respinte non bloccate che finiscono oltre la linea di fondo
+const BLOCK_OUT = 0.4;      // tiri ribattuti vicino all'area che finiscono in angolo
+const TACKLE_LOOSE = 0.3;   // contrasti vinti in cui la palla schizza via invece di restare al difensore
+const PASS_DEFLECT = 0.3;   // passaggi intercettati che vengono solo deviati
+
 export class MotionMethods {
   movePlayers(dt) {
     const b = this.ball, live = this.phase === 'play';
@@ -85,7 +94,7 @@ export class MotionMethods {
 
   diveStep(p, dt) {
     const hm = this.human[p.team] && !this.autoGk[p.team];
-    const b = this.ball, d = p.dive, vs = Math.min(hm ? 6.5 + p.st.por * 0.035 : 4.5 + p.st.por * 0.03, (hm ? 30 : 22) * (p.t + dt));
+    const b = this.ball, d = p.dive, vs = Math.min(hm ? GK_HUMAN_SPEED + p.st.por * 0.03 : GK_AI_SPEED + p.st.por * 0.025, (hm ? 30 : 22) * (p.t + dt));
     d.hx += clamp(d.tx - d.hx, -vs * dt, vs * dt);
     d.hh += clamp(d.th - d.hh, -vs * 0.7 * dt, vs * 0.7 * dt);
     const bt = Math.abs(d.hx - d.x0) > 0.75 ? d.hx - d.dirx * 0.75 : d.x0;
@@ -103,10 +112,25 @@ export class MotionMethods {
     const b = this.ball, sp = hyp(b.vx, b.vy, b.vh);
     this.stats.saves[p.team]++;
     if (sp < 16 || (central && sp < 25)) { this.ev('save', { p, catch: true }); this.give(p); return; }
+    if (this.rnd() < PARRY_OUT) { this.deflectBehind(p); this.ev('save', { p, catch: false, out: true }); return; }
     const sx = p.dive ? p.dive.dirx : (b.x >= p.x ? 1 : -1);
     b.vx = sx * (5 + this.rnd() * 3); b.vy = -b.vy * 0.15; b.vh = 2 + this.rnd() * 2; b.ct = 0;
     if (b.last !== p) { b.prev = b.last; b.last = p; } b.kick = null; b.shot = null; b.noP = p; b.noT = 0.4; this.predT = 0;
     this.ev('save', { p, catch: false });
+  }
+
+  // Manda il pallone oltre la linea di fondo difesa dalla squadra di p, fuori dai pali
+  // (o sopra la traversa se è già alto): ne nasce un calcio d'angolo, mai un gol.
+  deflectBehind(p) {
+    const b = this.ball, out = p.team ? 1 : -1, by = out * HL;
+    const dist = Math.max(0.3, Math.abs(by - b.y)), t = Math.max(0.3, dist / (3 + this.rnd() * 3)), vy = out * dist / t;
+    const sx = Math.abs(b.x) > 0.3 ? Math.sign(b.x) : (this.rnd() < 0.5 ? -1 : 1);
+    const vx = (sx * (GW / 2 + 0.9 + this.rnd() * 3) - b.x) / t;
+    b.vy = vy; b.ct = 0;
+    if (b.h > 1.5 || Math.abs(vx) > 18) { b.vx = (this.rnd() - 0.5) * 3; b.vh = (GH + 0.8 - b.h + 0.5 * G * t * t) / t; }
+    else { b.vx = vx; b.vh = 0.5 * G * t + 0.4 + this.rnd(); }
+    b.h = Math.max(b.h, 0.05);
+    if (b.last !== p) { b.prev = b.last; b.last = p; } b.kick = null; b.shot = null; b.noP = p; b.noT = 0.4; this.predT = 0;
   }
 
   foul(by, on) {
@@ -153,6 +177,15 @@ export class MotionMethods {
           let need = 0.10 + 0.22 * c.st.dri / (c.st.dri + o.st.dif);
           if (hc && !ho) need *= 2.5 - 1.3 * this.teams[o.team].skill;
           if (ho && this.ctrl[o.team] !== o) need *= 2.4;
+          if (o.contact >= need && this.rnd() < TACKLE_LOOSE) {
+            o.contact = 0; o.tackleCd = 0.5; c.stun = 0.3; c.tackleCd = 0.6;
+            const side = Math.abs(b.x) > HW - 12 ? Math.sign(b.x) : (this.rnd() < 0.5 ? -1 : 1);
+            const ang = Math.atan2(b.y - o.y, b.x - o.x) + (this.rnd() - 0.5) * 1.6, sp = 5 + this.rnd() * 4;
+            b.owner = null; b.vx = Math.cos(ang) * sp * 0.6 + side * (4 + this.rnd() * 5); b.vy = Math.sin(ang) * sp; b.vh = 1 + this.rnd() * 1.5; b.h = 0.05; b.ct = 0;
+            b.prev = b.last; b.last = o; b.kick = null; b.shot = null; b.noP = c; b.noT = 0.3; this.lastPass = null; this.predT = 0;
+            this.ev('tackle', { p: o, on: c, loose: true });
+            return;
+          }
           if (o.contact >= need) {
             b.owner = o; b.prev = b.last; b.last = o; b.kick = null; this.lastPass = null;
             o.protect = 0.5; o.contact = 0; o.aiT = 0.25; o.dx = o.x; o.dy = o.y; o.holdN = 0;
@@ -173,7 +206,7 @@ export class MotionMethods {
       const d = hyp(p.x - b.x, p.y - b.y);
       // palla appena calciata che si allontana: non si può toccare
       if (b.kick && b.kick.age < 0.3 && b.kick.team !== p.team && (p.x - b.x) * b.vx + (p.y - b.y) * b.vy < 0) continue;
-      if (d < (gk ? 1.25 : 0.95) && b.h < (gk ? 2.35 : 1.7) && d < bd) { bd = d; best = p; }
+      if (d < (gk ? 1.25 : (b.kick && b.kick.type === 'shot' && b.kick.team !== p.team ? SHOT_BLOCK_R : 0.95)) && b.h < (gk ? 2.35 : 1.7) && d < bd) { bd = d; best = p; }
     }
     if (!best) return;
     const p = best, sp = hyp(b.vx - p.vx, b.vy - p.vy), gk = p.pos === 'P' && this.inOwnBox(p);
@@ -182,9 +215,20 @@ export class MotionMethods {
     const fresh = b.kick && b.kick.age < 0.22 && sp > 6;
     if (!gk && !mate && ((b.shot && sp > 14) || sp > 22 + p.st.dri * 0.06 || fresh)) {
       const hard = !!b.shot;
+      if (hard && !mate && Math.abs(b.y) > HL - BOX_D - 4 && this.rnd() < BLOCK_OUT) {
+        this.deflectBehind(p); b.vh = Math.max(b.vh, 1.5); this.ev('block', { p, hard, out: true }); return;
+      }
       b.vx = -b.vx * 0.25 + (this.rnd() - .5) * 5; b.vy = -b.vy * 0.3 + (this.rnd() - .5) * 3; b.vh = 1.5 + this.rnd() * 3; b.ct = 0;
       b.prev = b.last; b.last = p; b.shot = null; b.kick = null; b.noP = p; b.noT = 0.3; this.predT = 0;
       this.ev('block', { p, hard });
+      return;
+    }
+    // passaggio intercettato: a volte il difensore riesce solo a deviarlo
+    if (!gk && !mate && b.kick && b.kick.type !== 'shot' && sp > 8 && this.rnd() < PASS_DEFLECT) {
+      const a = Math.atan2(b.vy, b.vx) + (this.rnd() < 0.5 ? -1 : 1) * (0.5 + this.rnd() * 0.9), v = hyp(b.vx, b.vy) * (0.45 + this.rnd() * 0.25);
+      b.vx = Math.cos(a) * v; b.vy = Math.sin(a) * v; b.vh = 0.5 + this.rnd() * 2; b.h = Math.max(b.h, 0.05); b.ct = 0;
+      b.prev = b.last; b.last = p; b.shot = null; b.kick = null; b.noP = p; b.noT = 0.3; this.lastPass = null; this.predT = 0;
+      this.ev('block', { p, hard: false, deflect: true });
       return;
     }
     this.give(p);

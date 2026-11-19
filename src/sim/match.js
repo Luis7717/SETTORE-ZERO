@@ -3,6 +3,11 @@ import { W, L, HW, HL, GW, GH, BOX_W, BOX_D, SIX_W, SIX_D, PEN_D, CIRCLE, G, ROL
 import { AIMethods } from './ai.js';
 import { MotionMethods } from './motion.js';
 
+const PREVIEW_SEC = 2.4; // durata massima dell'anteprima della traiettoria (s)
+const SHOT_V0 = 22; // velocità base del tiro (m/s), più la bravura del tiratore
+const GK_REACT = 0.42; // tempo di reazione base del portiere del computer (s), meno la sua bravura
+const WIDE_GAP = 2; // metri dalla linea laterale degli esterni quando la squadra attacca
+
 export class Match {
   constructor(o) {
     this.rnd = rng32(o.seed || 1);
@@ -79,9 +84,11 @@ export class Match {
     const dir = p.team ? -1 : 1, b = this.ball;
     const bf = clamp((b.y * dir + HL) / L, 0, 1), bx = b.x / HW;
     let ax, ay;
-    if (this.att === p.team) { ay = p.by * 0.5 + bf * 0.55 + (p.pos === 'A' ? 0.06 : (p.pos === 'C' && Math.abs(p.bx) > 0.6 ? 0.05 : 0)); ax = p.bx + bx * 0.15; }
+    // in attacco gli esterni (terzini e ali) restano larghi, quasi sulla linea laterale
+    const wide = this.att === p.team && Math.abs(p.bx) > 0.6 && p.pos !== 'P';
+    if (this.att === p.team) { ay = p.by * 0.5 + bf * 0.55 + (p.pos === 'A' ? 0.06 : (p.pos === 'C' && Math.abs(p.bx) > 0.6 ? 0.05 : 0)); ax = wide ? Math.sign(p.bx) : p.bx + bx * 0.15; }
     else { ay = p.by * 0.55 + bf * 0.36 - 0.03; ax = p.bx * 0.7 + bx * 0.28; }
-    return [clamp(ax, -0.95, 0.95) * HW * 0.94, (clamp(ay, 0.04, 0.96) - 0.5) * L * dir];
+    return [wide ? ax * (HW - WIDE_GAP) : clamp(ax, -0.95, 0.95) * HW * 0.94, (clamp(ay, 0.04, 0.96) - 0.5) * L * dir];
   }
   place(p, x, y) {
     p.x = x; p.y = y; p.vx = p.vy = 0; p.tx = x; p.ty = y; p.state = 'play'; p.t = 0; p.stun = 0; p.contact = 0;
@@ -183,9 +190,24 @@ export class Match {
   }
   setupKickoff(team) { this.setRestart('kickoff', team, 0, 0); }
 
+  // y (nel verso d'attacco di T) del penultimo avversario; HL se non ce ne sono abbastanza
+  lineOf(T) {
+    const dir = T ? -1 : 1; let a = -99, s = -99;
+    for (const o of this.players) if (o.team !== T && !o.off) { const v = o.y * dir; if (v > a) { s = a; a = v; } else if (v > s) s = v; }
+    return s === -99 ? HL : s;
+  }
+  // linea del fuorigioco per chi attacca (squadra T), in coordinata y del campo:
+  // penultimo difensore, ma mai dietro al pallone né nella propria metà campo
+  offsideY(T) {
+    const dir = T ? -1 : 1;
+    return dir * Math.max(this.lineOf(T), this.ball.y * dir, 0);
+  }
+
   // ------------------------------------------------------------ calci
-  kick(p, spec) {
-    const b = this.ball, T = p.team, dir = T ? -1 : 1;
+  // Parametri di lancio del pallone, senza toccare la partita.
+  // gA / gT danno l'errore casuale di direzione e di altezza: in partita this.gauss(), nell'anteprima 0.
+  launch(p, spec, gA, gT) {
+    const b = this.ball, T = p.team;
     const sx = b.owner === p ? b.x : p.x + p.fx * 0.6, sy = b.owner === p ? b.y : p.y + p.fy * 0.6;
     let type = spec.type, th = spec.th || 0;
     let dx = spec.tx - sx, dy = spec.ty - sy, D = hyp(dx, dy);
@@ -194,7 +216,7 @@ export class Match {
     const press = this.nearOpp(p.x, p.y, T);
     let sig = type === 'shot' ? (0.5 + (100 - p.st.tir) * 0.04) * (press < 2 ? 1.5 : 1) : (0.3 + (100 - p.st.pas) * 0.025) * (type === 'loft' ? 1.4 : 1);
     if (spec.human) sig *= 0.75;
-    const a = this.gauss() * sig * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
+    const a = gA() * sig * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
     let ux = dx / D, uy = dy / D;
     [ux, uy] = [ux * ca - uy * sa, ux * sa + uy * ca];
     const nx = -uy, ny = ux;
@@ -207,17 +229,38 @@ export class Match {
       if (D / Tt > vm) D = vm * Tt;
       v0 = D / Tt; vh = G * Tt / 2;
     } else {
-      v0 = 20 + p.st.tir * 0.13; Tt = D / v0;
-      th = Math.max(0.05, th + this.gauss() * sig * 0.017 * D);
+      v0 = SHOT_V0 + p.st.tir * 0.14; Tt = D / v0;
+      th = Math.max(0.05, th + gT() * sig * 0.017 * D);
       vh = (th + 0.5 * G * Tt * Tt) / Tt;
     }
     Tt = Math.max(Tt, 0.15);
     const c = clamp(spec.curve || 0, -D * 0.3, D * 0.3);
     let ac = clamp(-8 * c / (Tt * Tt), -14, 14);
     const lv = -ac * Tt / 2;
+    return { type, sx, sy, v0, vx: ux * v0 + nx * lv, vy: uy * v0 + ny * lv, vh, cax: nx * ac, cay: ny * ac, ct: ac ? Tt : 0 };
+  }
+
+  // Anteprima del volo del pallone per il calcio `spec`, senza errore di mira e senza cambiare la partita.
+  // Punti ogni 1/30 s: { t, x, y, h }.
+  predictKick(p, spec, sec = PREVIEW_SEC) {
+    const L = this.launch(p, spec, () => 0, () => 0);
+    const s = { x: L.sx, y: L.sy, h: 0.02, vx: L.vx, vy: L.vy, vh: L.vh, cax: L.cax, cay: L.cay, ct: L.ct };
+    const pts = [{ t: 0, x: s.x, y: s.y, h: s.h }];
+    for (let k = 1; k <= sec * 60; k++) {
+      ballPhys(s, 1 / 60);
+      if (k % 2 === 0) pts.push({ t: k / 60, x: s.x, y: s.y, h: s.h });
+      if (Math.abs(s.x) > HW + 1 || Math.abs(s.y) > HL + 1 || (s.h === 0 && hyp(s.vx, s.vy) < 0.3)) break;
+    }
+    return pts;
+  }
+
+  kick(p, spec) {
+    const b = this.ball, T = p.team, dir = T ? -1 : 1;
+    // stesso ordine di estrazione dei numeri casuali di prima: prima la direzione, poi (solo nei tiri) l'altezza
+    const { type, sx, sy, v0, vx, vy, vh, cax, cay, ct } = this.launch(p, spec, () => this.gauss(), () => this.gauss());
     b.owner = null; b.x = sx; b.y = sy; b.h = 0.02;
-    b.vx = ux * v0 + nx * lv; b.vy = uy * v0 + ny * lv; b.vh = vh;
-    b.cax = nx * ac; b.cay = ny * ac; b.ct = ac ? Tt : 0;
+    b.vx = vx; b.vy = vy; b.vh = vh;
+    b.cax = cax; b.cay = cay; b.ct = ct;
     b.noP = p; b.noT = 0.35;
     if (b.last !== p) { b.prev = b.last; b.last = p; }
     let exempt = false;
@@ -251,7 +294,7 @@ export class Match {
         if (Math.abs(cx) < GW / 2 + 1.6 && ch < GH + 1.3 && hyp(s.vx, s.vy) > 5) {
           const gk = this.gk(defT);
           b.shot = { team: 1 - defT, cx, ch, tc: i * dt, on: Math.abs(cx) < GW / 2 && ch < GH, gx0: gk.x };
-          gk.reactT = Math.max(0.06, 0.36 - gk.st.por * 0.0026) * (1.25 - 0.35 * this.teams[defT].skill);
+          gk.reactT = Math.max(0.06, GK_REACT - gk.st.por * 0.0026) * (1.25 - 0.35 * this.teams[defT].skill);
           gk.decided = false;
         }
         return;

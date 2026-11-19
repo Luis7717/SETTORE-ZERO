@@ -5,6 +5,8 @@ import { W, L, HW, HL, GW, GH, BOX_W, BOX_D, SIX_W, SIX_D, PEN_D, CIRCLE } from 
 const SKIN = [0xf1c9a5, 0xd9a47a, 0xa9744f, 0x6b4630];
 const HAIR = [0x1c1410, 0x4a2f1b, 0x8a5a2b, 0xd9b66a, 0x222222, 0x2b2b2b];
 const SCALE = 1.25;
+const PREVIEW_COLOR = 0x7dd3ff; // puntini dell'anteprima della traiettoria
+const OFFSIDE_COLOR = 0xff5a5a; // linea del fuorigioco
 
 function canvasTex(w, h, draw) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
@@ -171,6 +173,17 @@ export class View {
     this.path = new THREE.Mesh(pg, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, depthTest: false, side: THREE.DoubleSide }));
     this.path.renderOrder = 15; this.path.frustumCulled = false; s.add(this.path);
     this.arrow = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.1, 12), new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false })); this.arrow.renderOrder = 16; this.arrow.visible = false; s.add(this.arrow);
+
+    // anteprima della traiettoria vera (puntini azzurri) e linea del fuorigioco (rossa), solo mentre si disegna
+    this.prevMax = 80;
+    const pvg = new THREE.BufferGeometry();
+    pvg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(this.prevMax * 3), 3));
+    const dot = canvasTex(32, 32, (g) => { g.fillStyle = '#fff'; g.beginPath(); g.arc(16, 16, 13, 0, 7); g.fill(); });
+    this.preview = new THREE.Points(pvg, new THREE.PointsMaterial({ map: dot, color: PREVIEW_COLOR, size: 0.7, sizeAttenuation: true, depthTest: false, transparent: true, alphaTest: 0.3 }));
+    this.preview.renderOrder = 17; this.preview.frustumCulled = false; this.preview.visible = false; s.add(this.preview);
+    const og = new THREE.PlaneGeometry(W, 0.4); og.rotateX(-Math.PI / 2);
+    this.offside = new THREE.Mesh(og, new THREE.MeshBasicMaterial({ color: OFFSIDE_COLOR, transparent: true, opacity: 0.85, depthTest: false }));
+    this.offside.renderOrder = 14; this.offside.visible = false; s.add(this.offside);
   }
 
   makeFig(kit, look) {
@@ -331,6 +344,15 @@ export class View {
     this.path.material.color.setHex(shot ? 0xffe14a : 0xffffff);
     if (recv) { this.recv.visible = true; this.recv.position.set(s * recv.x, 0.04, -s * recv.y); } else this.recv.visible = false;
   }
-  clearPath() { this.path.visible = false; this.arrow.visible = false; this.target.visible = false; this.recv.visible = false; }
+  // pts: punti del volo vero { x, y, h } (da Match.predictKick); offY: y della linea del fuorigioco o null
+  setPreview(pts, offY) {
+    const s = this.flip, pos = this.preview.geometry.attributes.position.array, n = Math.min(pts.length, this.prevMax);
+    for (let i = 0; i < n; i++) { pos[i * 3] = s * pts[i].x; pos[i * 3 + 1] = pts[i].h + 0.12; pos[i * 3 + 2] = -s * pts[i].y; }
+    this.preview.geometry.attributes.position.needsUpdate = true;
+    this.preview.geometry.setDrawRange(0, n); this.preview.visible = n > 1;
+    this.offside.visible = offY !== null;
+    if (offY !== null) this.offside.position.set(0, 0.05, -s * offY);
+  }
+  clearPath() { this.path.visible = false; this.arrow.visible = false; this.target.visible = false; this.recv.visible = false; this.preview.visible = false; this.offside.visible = false; }
 }
 const SKINC = ['#f1c9a5', '#d9a47a', '#a9744f', '#6b4630'];

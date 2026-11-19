@@ -2,11 +2,47 @@
 // I metodi vengono copiati su Match.prototype (vedi match.js): `this` è la partita.
 import { W, L, HW, HL, GW, GH, BOX_W, BOX_D, SIX_W, SIX_D, PEN_D, CIRCLE, G, ROLL, clamp, hyp, rng32, FORMATIONS, effStats, ballPhys, segInfo } from './core.js';
 
+// Regolazioni dell'IA (misurate con test/balance.mjs e test/diag-flow.mjs)
+const CLEAR_ZONE = 30;      // metri dalla propria linea di fondo in cui un difensore pressato può spazzare
+const CLEAR_TOUCH = 0.6;    // spazzate mandate apposta in fallo laterale
+const LOFT_RISK = 0.35;     // margine richiesto in più per un lancio alto (i lanci si perdevano 1 volta su 2)
+const CROSS_FREE = 2.2;     // il cross si sceglie solo se il compagno in area ha questo spazio (m)
+const SHOT_RANGE = 32;      // distanza massima dalla porta per pensare al tiro (m)
+const BOX_SHOT = 16;        // sotto questa distanza la posizione di tiro è sempre buona (m)
+const SHOT_BAR = 0.18;      // soglia della qualità del tiro (più bassa = tira più spesso)
+const LONG_SHOT = 1.1;      // peso della posizione per i tiri da fuori area
+const SHOT_BLOCKED = 0.65;  // porta coperta da un difensore: si tira lo stesso, ma meno volentieri
+const THROUGH_BOX = 1.0;    // preferenza per il filtrante che porta un compagno dentro l'area
+const PRESS_NEAR = 2.6;     // avversario più vicino di così = portatore pressato (m)
+const PRESS_REACT = 3.4;    // distanza dell'avversario che fa decidere in fretta il portatore (m)
+const PRESS_REACT_T = 0.06; // tempo minimo di decisione sotto pressione (s), più lento per squadre scarse
+const SHOT_POST = 0.45;     // distanza dal palo a cui mira l'IA (m): più vicino = più gol e più tiri fuori
+const HELPERS = 2;          // compagni che vengono incontro al portatore
+
 export class AIMethods {
-  aiShoot(p, pen) {
+  // side: -1/1 = palo scelto; se manca, lato opposto al portiere (con un po' di casualità)
+  aiShoot(p, pen, side) {
     const dir = p.team ? -1 : 1, gk = this.gk(1 - p.team);
-    const side = pen ? (this.rnd() < 0.5 ? -1 : 1) : (gk.x > 0 ? -1 : 1) * (this.rnd() < 0.8 ? 1 : -1);
-    this.kick(p, { type: 'shot', tx: side * (GW / 2 - 0.8), ty: dir * HL, th: this.rnd() < 0.55 ? 0.3 + this.rnd() * 0.4 : 1.2 + this.rnd() * 0.8, curve: (this.rnd() - 0.5) * 1.5 });
+    if (!side) side = pen ? (this.rnd() < 0.5 ? -1 : 1) : (gk.x > 0 ? -1 : 1) * (this.rnd() < 0.8 ? 1 : -1);
+    this.kick(p, { type: 'shot', tx: side * (GW / 2 - (pen ? 0.8 : SHOT_POST)), ty: dir * HL, th: this.rnd() < 0.55 ? 0.3 + this.rnd() * 0.4 : 1.2 + this.rnd() * 0.8, curve: (this.rnd() - 0.5) * 1.5 });
+  }
+
+  // lato di tiro con la linea libera (0 = entrambi coperti); a pari merito, il palo lontano dal portiere
+  shotSide(p) {
+    const T = p.team, gy = (T ? -1 : 1) * HL, gk = this.gk(1 - T), tx = GW / 2 - SHOT_POST;
+    const open = [-1, 1].filter(sd => this.lane(p.x, p.y, sd * tx, gy, T, 28, true) > 0);
+    if (!open.length) return 0;
+    if (open.length === 1) return open[0];
+    return gk.x > 0 ? -1 : 1;
+  }
+
+  // spazzata: lunga e alta verso la fascia; a volte direttamente in fallo laterale
+  clear(p) {
+    const dir = p.team ? -1 : 1, side = Math.abs(p.x) > 4 ? Math.sign(p.x) : (this.rnd() < 0.5 ? -1 : 1);
+    const touch = this.rnd() < CLEAR_TOUCH;
+    const tx = side * (touch ? HW + 3 + this.rnd() * 6 : HW - 6 - this.rnd() * 10);
+    const ty = clamp(p.y + dir * (22 + this.rnd() * 16), -HL + 6, HL - 6);
+    this.kick(p, { type: "loft", tx, ty });
   }
 
   passOptions(p, exempt) {
@@ -28,10 +64,10 @@ export class AIMethods {
         // pallonetto solo se nessun avversario può arrivare sul punto di caduta prima della palla
         const Tl = clamp(d / 14, 0.75, 2.6); let mar = 9;
         for (const o of this.players) if (o.team !== T && !o.off) mar = Math.min(mar, hyp(o.x - tx, o.y - ty) - (0.9 + this.vmax(o) * Math.max(0, Tl - 0.35)));
-        const s2 = Math.min(mar / 3, 0.8) - 0.1; if (s2 > safe) { safe = s2; type = 'loft'; }
+        const s2 = Math.min(mar / 3, 0.8) - LOFT_RISK; if (s2 > safe) { safe = s2; type = 'loft'; }
       }
       const gain = (ty - oy) * dir;
-      let sc = clamp(safe, -2, 1.2) + gain * 0.09 + Math.min(open, 8) * 0.06 - (d > 30 ? 0.25 : 0) + (through ? 0.6 : 0);
+      let sc = clamp(safe, -2, 1.2) + gain * 0.09 + Math.min(open, 8) * 0.06 - (d > 30 ? 0.25 : 0) + (through ? (Math.abs(tx) < BOX_W / 2 && ty * dir > HL - BOX_D ? THROUGH_BOX : 0.6) : 0);
       const dg = hyp(tx, ty - gy); if (dg < 22) sc += (22 - dg) * 0.05;
       if (m.pos === 'P') sc -= 1;
       sc += (this.rnd() - 0.5) * 0.6 * (1 - sk);
@@ -43,8 +79,8 @@ export class AIMethods {
       const mf = m.y * dir;
       if (!exempt && mf > line + 0.2 && mf > b.y * dir && mf > 0) continue;
       consider(m, m.x + m.vx * 0.5, m.y + m.vy * 0.5, false);
-      if (Math.abs(ox) > 14 && oy * dir > HL - 24 && m.pos !== 'D' && Math.abs(m.x) < 11 && m.y * dir > HL - 17) {
-        const sc = 1.3 + (this.rnd() - 0.5) * 0.5 - hyp(m.x, m.y - gy) * 0.03;
+      if (Math.abs(ox) > 14 && oy * dir > HL - 24 && m.pos !== 'D' && Math.abs(m.x) < 11 && m.y * dir > HL - 17 && this.nearOpp(m.x, m.y, T) > CROSS_FREE) {
+        const sc = 1.1 + (this.rnd() - 0.5) * 0.5 - hyp(m.x, m.y - gy) * 0.03;
         if (!best || sc > best.sc) best = { m, tx: m.x + m.vx * 0.6, ty: m.y + m.vy * 0.6, type: 'loft', sc, safe: 0.5, d: hyp(m.x - ox, m.y - oy), gain: 8, cross: true };
       }
       if (m.pos !== 'D' && m.pos !== 'P' && mf > oy * dir - 3 && mf > -10) {
@@ -61,14 +97,25 @@ export class AIMethods {
     const b = this.ball, T = p.team, dir = T ? -1 : 1, sk = this.teams[T].skill, gy = dir * HL;
     const dg = hyp(p.x, p.y - gy), press = this.nearOpp(b.x, b.y, T);
     p.aiT -= this.dtT;
+    // avversario in arrivo: si decide subito (prima che arrivi il contrasto)
+    const react = PRESS_REACT_T + 0.1 * (1 - sk);
+    if (press < PRESS_REACT && p.aiT > react) p.aiT = react;
     if (p.aiT <= 0 && p.stun <= 0) {
       p.aiT = 0.42 - 0.2 * sk + this.rnd() * 0.15;
-      if (dg < 32) {
+      if (dg < SHOT_RANGE) {
         const ang = Math.abs(Math.atan2(p.x, Math.max(0.1, HL - p.y * dir)));
-        let q = clamp((32 - dg) / 16, 0, 1) * clamp(1.25 - ang * 0.9, 0.1, 1);
-        if (this.lane(p.x, p.y, 0, gy, T, 28, true) < 0) q *= 0.4;
+        // dentro l'area si tira quasi sempre; da fuori solo da buona posizione (i tiri da lontano li para quasi tutti)
+        let q = (dg < BOX_SHOT ? 1 : clamp((SHOT_RANGE - dg) / (SHOT_RANGE - BOX_SHOT), 0, 1) * LONG_SHOT) * clamp(1.25 - ang * 0.9, 0.1, 1);
+        // si guarda la linea verso ciascun palo (dove si mira davvero), meglio se lontano dal portiere
+        const side = this.shotSide(p);
+        if (!side) q *= SHOT_BLOCKED;
         if (dg < 10) q += 0.5;
-        if (q > 0.33 + this.rnd() * 0.3 - (press < 2.5 ? 0.12 : 0)) { this.aiShoot(p); return; }
+        if (q > SHOT_BAR + this.rnd() * 0.3 - (press < 2.5 ? 0.12 : 0)) { this.aiShoot(p, false, side); return; }
+      }
+      // pressato vicino alla propria porta e senza passaggi sicuri: spazzata lunga verso la fascia
+      if (p.y * dir < -HL + CLEAR_ZONE && press < 2.6) {
+        const safe = this.passOptions(p);
+        if (!safe || safe.safe < (this.inOwnBox(p) ? 0.5 : 0.15)) { this.clear(p); return; }
       }
       // avversario che chiude la strada verso la porta
       const gdx = -p.x * 0.5, gdy = gy - p.y, gn = hyp(gdx, gdy) || 1;
@@ -82,7 +129,7 @@ export class AIMethods {
       p.holdN = (p.holdN || 0) + 1;
       if (pass) {
         let want = 0;
-        if (press < 2.1) want = pass.safe > 0 ? 0.92 : (p.y * dir < -HL * 0.5 ? 0.5 : 0);
+        if (press < PRESS_NEAR) want = pass.safe > 0 ? 0.95 : (p.y * dir < -HL * 0.5 ? 0.5 : 0);
         else if (pass.safe > 0.15) {
           if (pass.gain > 6) want = front < 5 ? 0.8 : 0.45;
           else if (front < 4) want = 0.6;
@@ -94,7 +141,7 @@ export class AIMethods {
       let bs = -1e9, ba = base;
       for (const o of [-1.2, -0.7, -0.35, 0, 0.35, 0.7, 1.2]) {
         const a = base + o, qx = p.x + Math.cos(a) * 5, qy = p.y + Math.sin(a) * 5;
-        let s2 = (dg - hyp(qx, qy - gy)) * 1.5 + Math.min(this.nearOpp(qx, qy, T), 4) * 1.1 - Math.abs(o) * 0.3;
+        let s2 = (dg - hyp(qx, qy - gy)) * 1.5 + Math.min(this.nearOpp(qx, qy, T), 4) * (press < PRESS_NEAR ? 2.6 : 1.1) - Math.abs(o) * 0.3;
         if (Math.abs(qx) > HW - 2 || Math.abs(qy) > HL - 1.5) s2 -= 6;
         if (s2 > bs) { bs = s2; ba = a; }
       }
@@ -123,11 +170,7 @@ export class AIMethods {
 
   // ------------------------------------------------------------ IA
   computeLines() {
-    for (let T = 0; T < 2; T++) {
-      const dir = T ? -1 : 1; let a = -99, s = -99;
-      for (const o of this.players) if (o.team !== T && !o.off) { const v = o.y * dir; if (v > a) { s = a; a = v; } else if (v > s) s = v; }
-      this.offLine[T] = Math.max(0, s === -99 ? HL : s);
-    }
+    for (let T = 0; T < 2; T++) this.offLine[T] = Math.max(0, this.lineOf(T));
   }
   computeChasers() {
     const b = this.ball;
@@ -136,6 +179,12 @@ export class AIMethods {
       let bp = null, bd = 1e9;
       for (const p of this.players) if (p.team === T && !p.off && p.pos !== 'P' && p.state === 'play') { const d = hyp(p.x - b.x, p.y - b.y); if (d < bd) { bd = d; bp = p; } }
       this.presser[T] = bp;
+    }
+    this.helpers = [[], []];
+    if (b.owner) {
+      const c = b.owner, near = this.players.filter(q => q.team === c.team && q !== c && !q.off && q.pos !== 'P' && q.state === 'play')
+        .sort((q1, q2) => hyp(q1.x - c.x, q1.y - c.y) - hyp(q2.x - c.x, q2.y - c.y));
+      this.helpers[c.team] = near.slice(0, HELPERS);
     }
     this.cover = [null, null];
     if (b.owner) {
@@ -216,8 +265,26 @@ export class AIMethods {
     if (this.phase === 'restart' && this.restart.type === 'kickoff' && p.ty * dir > -0.3) p.ty = -dir * 0.3;
   }
 
+  // compagno vicino al portatore: cerca uno spazio libero raggiungibile con un passaggio sicuro
+  offerSupport(p, c) {
+    const T = p.team, dir = T ? -1 : 1;
+    p.supT = (p.supT || 0) - this.dtT;
+    if (p.supT <= 0 || p.supC !== c) {
+      p.supT = 0.35 + this.rnd() * 0.25; p.supC = c;
+      let bs = -1e9; p.supX = p.x - c.x; p.supY = p.y - c.y;
+      for (const r of [8, 11]) for (let k = -5; k <= 5; k++) {
+        const a = Math.atan2(dir, 0) + k * 0.5, qx = c.x + Math.cos(a) * r, qy = c.y + Math.sin(a) * r;
+        if (Math.abs(qx) > HW - 1.5 || Math.abs(qy) > HL - 2 || qy * dir > this.offLine[T] - 0.8) continue;
+        const sc = Math.min(this.nearOpp(qx, qy, T), 7) * 0.8 + clamp(this.lane(c.x, c.y, qx, qy, T, 16), -2, 2) * 1.2 + (qy - c.y) * dir * 0.07 - hyp(qx - p.x, qy - p.y) * 0.08 + this.rnd() * 0.3;
+        if (sc > bs) { bs = sc; p.supX = qx - c.x; p.supY = qy - c.y; }
+      }
+    }
+    p.tx = clamp(c.x + p.supX, -HW + 1, HW - 1); p.ty = clamp(c.y + p.supY, -HL + 1, HL - 1);
+  }
+
   support(p) {
     const b = this.ball, T = p.team, dir = T ? -1 : 1;
+    if (this.phase === 'play' && b.owner && b.owner.team === T && this.helpers && this.helpers[T].includes(p)) return this.offerSupport(p, b.owner);
     const [ax, ay] = this.anchor(p);
     p.soT -= this.dtT;
     if (p.soT <= 0) {

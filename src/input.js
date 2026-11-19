@@ -1,6 +1,8 @@
 // Comandi a un dito. Traduce i tocchi in ordini per la squadra `team`.
 import { HW, HL, GW, GH } from './sim.js';
 
+const NO_OFFSIDE = ['throw', 'goalkick', 'corner']; // ripartenze senza fuorigioco
+
 export class Input {
   // out: { kick(spec), move(x,y,held), stop(), slide(dx,dy), dive(dx,th), sw(playerIndex) }
   constructor(el, view, out) {
@@ -80,6 +82,11 @@ export class Input {
     let recv = null;
     if (!e.goal) { let bd = 5; for (const p of m.players) if (p.team === this.team && !p.off && p !== m.ctrl[this.team]) { const d = Math.hypot(p.x - e.x, p.y - e.y); if (d < bd) { bd = d; recv = p; } } }
     this.view.setPath(pts, e.goal, recv);
+    // anteprima del volo vero e linea del fuorigioco (non vale su rimessa, rinvio e angolo)
+    const c = m.ctrl[this.team];
+    if (!c || b.owner !== c) return;
+    const free = m.phase === 'restart' && NO_OFFSIDE.includes(m.restart.type);
+    this.view.setPreview(m.predictKick(c, this.spec()), free ? null : m.offsideY(this.team));
   }
 
   spec() {
