@@ -57,7 +57,11 @@ ui.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(!b||b.di
 
 ACT.tgfx=()=>{S.gfx=S.gfx===0?1:0;save();resize();state='play';pause();};
 let last=performance.now();
-const startLevel0=startLevel;startLevel=function(L){if(modelsReady)return startLevel0(L);const b=ui.querySelector('[data-a=play]');if(b)b.textContent='CARICAMENTO…';modelsP.then(()=>startLevel0(L));};
+// ingresso in un livello (Gioca, Rigioca, livello successivo, Riprova): prima carica solo i pezzi di quel livello
+// con la barra di avanzamento e libera quelli che non servono più (js/caricamento.js), poi avvia. Restituisce una Promise.
+const startLevel0=startLevel;startLevel=function(L){return carLevel(L,()=>startLevel0(L));};
+// arma presa da un baule a metà livello e non ancora scaricata: arriva in sottofondo (nel frattempo c'è quella procedurale)
+{const bw=buildWeapon;buildWeapon=function(){bw();try{carArmaOra();}catch(e){console.warn('[caricamento] arma',e);}};}
 let FT=.016,FTt=0,DPRs=0,FGood=0,DCeil=9,FR=0;const resize0=resize;resize=function(){resize0();DPRs=0;FGood=0;};
 function adapt(raw){if(raw>.2)return;FT+=(raw-FT)*.06;FTt+=raw;if(FTt<1)return;FTt=0;if(!DPRs)DPRs=DPR;const set=v=>{DPRs=v;renderer.setPixelRatio(v);renderer.setSize(innerWidth,innerHeight,false);FGood=0;PF.m.push('dpr'+v);};
  if(FT>.024){if(DPRs>1){DCeil=DPRs-.25;set(Math.max(1,DPRs-.25));}}else if(FT<.0172){if(++FGood>=12&&DPRs<Math.min(DPR,DCeil))set(Math.min(DPR,DCeil,DPRs+.25));}else FGood=0;}
@@ -73,5 +77,7 @@ function diagText(){const n=Math.max(1,PF.n),by={},u=navigator.userAgent,os=(u.m
 ACT.diag=()=>{const wasPause=state==='pause';PF.ret=wasPause?'pause':'hub';ui.className='ov';ui.style.display='flex';ui.innerHTML='<div class="sc"><div class="card"><h4>Diagnostica prestazioni</h4><p style="font-size:12px;color:#a9b6c6;margin:4px 0 8px">Tocca "Copia" e incolla il testo nella chat con Claude (oppure fai uno screenshot).</p><pre id="dgt" style="white-space:pre-wrap;word-break:break-word;font-size:10px;line-height:1.35;background:#0008;padding:8px;border-radius:8px;max-height:52vh;overflow:auto;-webkit-user-select:text;user-select:text">'+diagText().replace(/</g,'&lt;')+'</pre><div class="row"><button class="b g big" data-a="dcopy">Copia</button><button class="b big" data-a="dback">Indietro</button></div></div></div>';};
 ACT.dcopy=()=>{const t=diagText(),ok=()=>{const b=ui.querySelector('[data-a=dcopy]');if(b)b.textContent='Copiato ✓';};try{navigator.clipboard.writeText(t).then(ok,()=>{});}catch(e){}try{const r=document.createRange();r.selectNodeContents($('dgt'));const s=getSelection();s.removeAllRanges();s.addRange(r);document.execCommand('copy');ok();}catch(e){}};
 ACT.dback=()=>{if(PF.ret==='pause'){state='play';pause();}else hubShow();};
-resize();hubShow();modelsP.then(()=>{plateTex();if(state==='hub')hubShow();});setTimeout(musicPrep,400);requestAnimationFrame(loop);
+// il menu compare subito; la sua scena 3D (sala, Varr e Kross, casse) si costruisce appena arrivano quei modelli
+// (si parte dopo il primo disegno, così l'interfaccia è già sullo schermo mentre i modelli si decodificano)
+resize();hubShow();requestAnimationFrame(()=>setTimeout(()=>carMenu().then(()=>{plateTex();if(state==='hub'&&!MENU)menuBuild();}),0));setTimeout(musicPrep,400);requestAnimationFrame(loop);
 

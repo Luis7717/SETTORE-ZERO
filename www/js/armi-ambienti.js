@@ -3,15 +3,15 @@
 // Ripiego: se un modello n_* manca, resta la grafica vecchia.
 'use strict';
 
-/* ===== caricamento dei modelli n_* =====
-   Se i tag models/n_*.js stanno con gli altri modelli (prima di js/dati.js) li carica già grafica.js dentro modelsP;
-   se stanno più in basso li carichiamo qui, appena modelsP ha finito. */
+/* ===== preparazione dei modelli n_* =====
+   I modelli arrivano a pezzi (js/caricamento.js): appena n_barile o n_texture sono pronti li prepariamo qui;
+   se uno viene liberato al cambio livello torniamo alla grafica vecchia per quel pezzo. */
 const AA_KEYS=['n_pistola','n_cecchino','n_rpg','n_barile','n_texture'];
 function AA_prep(){AA_prepBarile();AA_prepTex();}
-modelsP.then(()=>{AA_prep();// subito, prima che menu.js avvii il livello
- const todo=AA_KEYS.filter(k=>!MODELS[k]&&typeof ASSET!=='undefined'&&typeof ASSET[k]==='string');
- if(!todo.length||!THREE.GLTFLoader)return;const L=new THREE.GLTFLoader();
- for(const k of todo){try{L.parse(b64buf(ASSET[k]),'',gl=>{MODELS[k]=gl;ASSET[k]=null;AA_prep();},e=>console.warn('modello non caricato',k,e));}catch(e){console.warn('modello non caricato',k,e);}}});
+CAR.hooks.push((k,ev)=>{
+ if(ev==='pronto'&&(k==='n_barile'||k==='n_texture'))AA_prep();
+ if(ev==='libera'&&k==='n_barile'&&AA_prepBarile.done){AA_prepBarile.done=0;if(AA_prepBarile.old)MODELS.bar=AA_prepBarile.old;else delete MODELS.bar;}
+ if(ev==='libera'&&k==='n_texture')AA_TX=null;});
 
 /* ===== armi in prima persona =====
    Convenzione dei modelli (come WM in definizioni.js): avanti = -z, misure in metri.

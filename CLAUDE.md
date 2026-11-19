@@ -28,15 +28,18 @@
   - `index.html` — solo struttura della pagina e lista degli script (l'**ordine conta**)
   - `css/style.css` — stile di menu e HUD
   - `lib/three.min.js` (three.js), `lib/loaders.js` (GLTFLoader, SkeletonUtils)
-  - `models/*.js` — un modello 3D per file: `ASSET.nome="<glb in base64>";` (**non aprirli**: sono enormi)
+  - `assets/models/*.glb` (modelli 3D) e `assets/audio/*.mp3` (suoni e musiche): file separati, caricati a pezzi da `js/caricamento.js`
+    (menu subito; all'ingresso di un livello solo ciò che serve, con barra; al cambio livello libera il resto; `carNeeds(L)` decide cosa serve).
+    `assets/elenco.js` è generato. Per aggiungere un modello/suono in base64 (`models/x.js` con `ASSET.x="..."`) lancia `node tools/estrai-asset.js`.
   - `js/*.js` — codice del gioco, script classici (niente moduli) che condividono le variabili globali:
     `dati` (trama, 45 livelli `LV`, armi `WT`/`RAR`/`TRAITS`, salvataggio `localStorage`), `audio` (suoni e musica sintetizzati),
     `grafica`, `definizioni` (nemici `ET`, armi), `livelli`, `nemici` (IA), `combattimento`, `comandi` (tocco, slider),
     `aggiornamento` (ciclo di gioco), `hud`, `colossi` (boss), `modelli`, `corridoi`, `sale`, `menu` (avvio del gioco, va per ultimo)
   - Attenzione: alcune funzioni sono ridefinite in file successivi (es. `buildRun`, `runHaz`, `escFx` in `corridoi.js`): vale l'ultima.
-- `App/main.swift` — involucro iOS: una WKWebView a schermo intero che carica `index.html` (può leggere tutta la cartella).
+- `App/main.swift` — involucro iOS: WKWebView a schermo intero che serve i file dell'app con lo schema `app://localhost/` (WKURLSchemeHandler).
+  Al primo avvio `www/migra.html` (caricata da file://) copia il localStorage della vecchia origine file:// in quella nuova (chiave di salvataggio: `sz_save`).
 - `App/Info.plist`, icone `AppIcon60x60@2x/3x.png`.
 - `.github/workflows/settore-zero-ipa.yml` — a ogni push compila con `swiftc` su macOS, copia tutta `www/` nell'app,
   firma "ad-hoc" e crea `SettoreZero.ipa` (non firmata: TrollStore/Sideloadly/AltStore).
-  Release: da `main` → `settore-zero-ipa`; da un altro branch → `settore-zero-ipa-<branch>` (non tocca quella di main).
-- Per provare in locale: `python -m http.server` dentro `www/` e apri `http://127.0.0.1:8000`.
+  Release: da `main` → `settore-zero-ipa`; da `caricamento-a-pezzi` → `settore-zero-ipa-prova`; da un altro branch → `settore-zero-ipa-<branch>`.
+- Per provare in locale: `python -m http.server` dentro `www/` e apri `http://127.0.0.1:8000` (serve un server: i file si caricano con fetch).

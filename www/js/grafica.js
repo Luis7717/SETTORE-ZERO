@@ -119,8 +119,10 @@ function setTheme(i){baseMats();if(i===curTh)return;curTh=i;const t=TH[i];for(co
  M.wall=sMat(makeTex(512,(t.met?PAT.plate:PAT.concrete)(t.wall),t.met?3:4),t.met?{roughness:.5,metalness:.45}:{roughness:.9});
  M.floor=sMat(makeTex(512,PAT.floor(t.floor),4),{roughness:.7,metalness:.15});M.ceil=sMat(makeTex(512,PAT.plate(t.ceil),3),{roughness:.7,metalness:.3});
  scene.fog=new THREE.FogExp2(t.fog,.02);scene.background=new THREE.Color(t.fog);hemi.color.set(t.amb).multiplyScalar(HEMI_K);spot.color.set(t.l1);pl1.color.set(t.l1);pl2.color.set(t.l2);M.strip.color.set(t.l1);STRIPC.copy(M.strip.color);
- // modello "sala": pareti meno bianche e meno lucide (prima riflettevano tutta la luce e sembravano bruciate)
- if(HM.Wall_Roof_White){const c=a=>new THREE.Color(a[0]/255,a[1]/255,a[2]/255).convertSRGBToLinear();HM.Wall_Roof_White.color.copy(c(t.wall)).multiplyScalar(.6).lerp(new THREE.Color(1,1,1),.05);HM.Wall_Roof_White.roughness=.56;
+ hmTheme(t);}
+// modello "sala": pareti meno bianche e meno lucide (prima riflettevano tutta la luce e sembravano bruciate).
+// Separata da setTheme perché la sala ora può arrivare dopo (caricamento a pezzi): modelPrep la riapplica.
+function hmTheme(t){if(HM.Wall_Roof_White){const c=a=>new THREE.Color(a[0]/255,a[1]/255,a[2]/255).convertSRGBToLinear();HM.Wall_Roof_White.color.copy(c(t.wall)).multiplyScalar(.6).lerp(new THREE.Color(1,1,1),.05);HM.Wall_Roof_White.roughness=.56;
   HM.Wall_Black.color.copy(lc(0x07090c));HM.Wall_Black.roughness=.42;HM.Wall_Black.metalness=.5;HM.lambert1.color.copy(c(t.floor)).multiplyScalar(.85);HM.lambert1.roughness=.6;
   HM.Floor_and_vent.color.copy(lc(0x101317));HM.Floor_and_vent.roughness=.5;HM.Floor_and_vent.metalness=.75;HM.Floor_vent.roughness=.55;
   HM.Wall_blue.emissive.copy(lc(t.l2));HM.Vent_light.emissive.copy(lc(t.l1));HM.Glass.opacity=.1;scene.fog.density=.012;}}
@@ -198,8 +200,11 @@ function decal(h){if(!h.face)return;const n=h.face.normal.clone().transformDirec
 const MODELS={},HM={};let modelsReady=false;
 function noRay(o){o.traverse(m=>{m.raycast=()=>{};});return o;}
 function b64buf(s){const bin=atob(s),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u.buffer;}
-const modelsP=new Promise(res=>{const ks=typeof ASSET==='undefined'||!THREE.GLTFLoader?[]:Object.keys(ASSET);let n=0;const done=()=>{if(++n>=ks.length){modelsReady=true;res();}};if(!ks.length){modelsReady=true;res();return;}
- const L=new THREE.GLTFLoader();ks.forEach(k=>{try{L.parse(b64buf(ASSET[k]),'',gl=>{MODELS[k]=gl;ASSET[k]=null;if(/^g_(ak|shotgun|flare|frag|luger)$/.test(k))gl.scene.traverse(m=>{if(m.isMesh&&m.material.normalScale)m.material.normalScale.y*=-1;});if(k==='hall')gl.scene.traverse(m=>{if(m.isMesh){HM[m.material.name]=m.material;m.receiveShadow=true;}});done();},()=>done());}catch(e){done();}});});
+// I modelli arrivano a pezzi da www/assets (js/caricamento.js): modelPrep li prepara appena caricati, come faceva prima modelsP.
+// modelsP resta per compatibilità: si risolve quando è pronta la scena del menu (NON vuol dire "tutti i modelli caricati").
+const modelsP=new Promise(res=>{CAR.menuRes=res;});
+function modelPrep(k,gl){if(/^g_(ak|shotgun|flare|frag|luger)$/.test(k))gl.scene.traverse(m=>{if(m.isMesh&&m.material.normalScale)m.material.normalScale.y*=-1;});
+ if(k==='hall'){gl.scene.traverse(m=>{if(m.isMesh){HM[m.material.name]=m.material;m.receiveShadow=true;}});if(curTh>=0)hmTheme(TH[curTh]);}}
 const RQ=new THREE.Quaternion(),_q=new THREE.Quaternion(),_pq=new THREE.Quaternion(),_Y=new V3(0,1,0),_d=new V3();
 const AX=new WeakMap();
 function aimBone(b,dx,dy,dz,k){let ax=AX.get(b);if(!ax){const c=b.children.find(o=>o.isBone);ax=c&&c.position.lengthSq()>1e-6?c.position.clone().normalize():_Y;AX.set(b,ax);}_d.set(dx,dy,dz).normalize().applyQuaternion(RQ);b.parent.updateWorldMatrix(true,false);b.parent.getWorldQuaternion(_pq);_q.setFromUnitVectors(ax,_d).premultiply(_pq.invert());b.quaternion.slerp(_q,k);}

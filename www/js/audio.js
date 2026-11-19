@@ -1,4 +1,4 @@
-// Settore Zero — audio: suoni e musiche registrati (www/suoni/) con ripiego sintetizzato (Web Audio)
+// Settore Zero — audio: suoni e musiche registrati (www/assets/audio/, scaricati a pezzi da js/caricamento.js) con ripiego sintetizzato (Web Audio)
 'use strict';
 /* ===== audio: effetti sintetizzati con riverbero (usati come ripiego e come strato aggiuntivo) ===== */
 let AC=null,MG=null,SFX=null,REV=null,MUS=null,NB=null,silentEl=null;const sndLast={};
@@ -50,8 +50,9 @@ function sndSyn(n){try{
  case'win':for(let i=0;i<4;i++)osc({t:i*.14,dur:.6,vol:.2,type:'triangle',f0:[392,494,587,784][i],rev:.7});break;
  case'lose0':osc({dur:.25,vol:.2,type:'sawtooth',f0:180,f1:90});break;
  case'lose':for(let i=0;i<3;i++)osc({t:i*.22,dur:.7,vol:.2,type:'sawtooth',f0:[196,165,110][i],f1:[185,150,80][i],rev:.8});break;}}catch(e){}}
-/* ===== suoni registrati (www/suoni/*.js, MP3 in base64 dentro SUONI) =====
-   Si decodificano una volta sola (al primo tocco, quando nasce l'AudioContext) e i buffer si riusano.
+/* ===== suoni registrati (www/assets/audio/*.mp3, scaricati da js/caricamento.js dentro SUONI) =====
+   Gli effetti arrivano in sottofondo dopo il menu, la musica all'ingresso dei livelli (quella del boss solo nei livelli col boss).
+   Si decodificano una volta sola (al primo tocco, quando nasce l'AudioContext, o appena arrivano) e i buffer si riusano.
    Se un suono manca o non si decodifica, snd() usa la versione sintetizzata qui sopra (sndSyn). */
 const REC={buf:{},fail:{},busy:0,started:0},VOX={};
 // nome usato dal gioco -> varianti registrate (f), volume (v), voci contemporanee (lim), variazione di intonazione (pr),
@@ -92,19 +93,33 @@ const SMAP={
 // musica registrata: durata esatta del loop (campioni a 44100 Hz) e margine prima/dopo nel file
 const MREC={level:{k:'mus_level',len:2731378/44100,pad:.3,v:.85},boss:{k:'mus_boss',len:2839609/44100,pad:.3,v:.85}};
 const MXF=1.6; // secondi di dissolvenza incrociata tra musica dei livelli e del boss
-function recData(k){const D=window.SUONI;return D&&typeof D[k]==='string'?D[k]:null;}
+// dati da decodificare: ArrayBuffer scaricato (o stringa base64 dei vecchi suoni/*.js incorporati)
+function recData(k){const D=window.SUONI,v=D&&D[k];return typeof v==='string'||v instanceof ArrayBuffer?v:null;}
+// file audio che esistono (assets/elenco.js) anche se non ancora scaricati: niente musica sintetizzata di ripiego per loro
+REC.known={};for(const k in((window.ELENCO_ASSET||{}).audio||{}))REC.known[k]=1;for(const k in(window.SUONI||{}))REC.known[k]=1;
 function b64buf(s){const bin=atob(s),n=bin.length,u=new Uint8Array(n);for(let i=0;i<n;i++)u[i]=bin.charCodeAt(i);return u.buffer;}
 // toglie il silenzio iniziale che alcuni decoder MP3 aggiungono (ritardo dell'encoder): gli spari partono subito
 function trimLead(b){const d=b.getChannelData(0),max=Math.min(d.length,b.sampleRate*.12|0);let i=0;while(i<max&&Math.abs(d[i])<.003)i++;i=Math.max(0,i-16);if(i<32)return b;
  const o=AC.createBuffer(b.numberOfChannels,b.length-i,b.sampleRate);for(let c=0;c<b.numberOfChannels;c++)o.getChannelData(c).set(b.getChannelData(c).subarray(i));return o;}
 function recDecode(k,cb){const s=recData(k);if(!s||!AC){cb(null);return;}let done=0;const fin=b=>{if(done)return;done=1;cb(b);};
- try{const p=AC.decodeAudioData(b64buf(s),b=>fin(b),()=>fin(null));if(p&&p.catch)p.catch(()=>fin(null));}catch(e){fin(null);}}
+ try{const p=AC.decodeAudioData(typeof s==='string'?b64buf(s):s,b=>fin(b),()=>fin(null));if(p&&p.catch)p.catch(()=>fin(null));}catch(e){fin(null);}}
 // decodifica tutti gli effetti, poi la musica dei livelli e infine quella del boss (una alla volta per non sovraccaricare l'iPhone)
 function recLoad(){if(REC.started||!AC)return;REC.started=1;const D=window.SUONI;if(!D)return;
- for(const k of Object.keys(D)){if(k.indexOf('mus_')===0)continue;REC.busy++;recDecode(k,b=>{REC.busy--;if(b){REC.buf[k]=trimLead(b);delete D[k];}else REC.fail[k]=1;});}
+ for(const k of Object.keys(D)){if(k.indexOf('mus_')===0||!recData(k))continue;recFx(k);}
  recMusic('level',()=>recMusic('boss',null));}
-function recHasMus(tr){const m=MREC[tr];return !!(m&&(MU.rb[tr]||(!MU.rf[tr]&&recData(m.k))));}
-function recMusic(tr,next){const m=MREC[tr];if(!m||MU.rb[tr]||MU.rf[tr]||MU.rbusy[tr]){if(next)next();return;}if(!recData(m.k)){MU.rf[tr]=1;if(next)next();return;}
+function recFx(k){const D=window.SUONI;REC.busy++;recDecode(k,b=>{REC.busy--;if(b){REC.buf[k]=trimLead(b);delete D[k];}else REC.fail[k]=1;});}
+function recHasMus(tr){const m=MREC[tr];return !!(m&&(MU.rb[tr]||(!MU.rf[tr]&&(recData(m.k)||REC.known[m.k]))));}
+const recTrack=k=>Object.keys(MREC).find(t=>MREC[t].k===k)||null;
+// dal caricatore: file audio arrivato. Risolve quando è decodificato (musica) o subito (effetti, o se manca ancora l'AudioContext)
+function recAdd(k,buf){if(buf==null)return Promise.resolve();window.SUONI[k]=buf;REC.known[k]=1;if(!AC||!REC.started)return Promise.resolve();
+ const tr=recTrack(k);if(tr)return new Promise(res=>recMusic(tr,res));if(!REC.buf[k])recFx(k);return Promise.resolve();}
+// dal caricatore: file audio mancante o rotto -> ripiego sintetizzato come prima
+function recMiss(k){delete REC.known[k];const tr=recTrack(k);if(!tr){REC.fail[k]=1;return;}MU.rf[tr]=1;if(MU.track===tr&&!MU.src){if(MU.fail)mLive();else musicPrep();}}
+// cambio livello: libera la musica che non serve (mai quella che sta suonando). true = liberata
+function recFree(k){const tr=recTrack(k);if(!tr||MU.track===tr||MU.rbusy[tr])return false;delete MU.rb[tr];delete window.SUONI[k];return true;}
+// fetch=1: se il brano esiste ma non è ancora scaricato, chiede al caricatore di scaricarlo (parte appena pronto)
+function recMusic(tr,next,fetch){const m=MREC[tr];if(!m||MU.rb[tr]||MU.rf[tr]||MU.rbusy[tr]){if(next)next();return;}
+ if(!recData(m.k)){if(!REC.known[m.k])MU.rf[tr]=1;else if(fetch&&typeof carAudio==='function')carAudio(m.k);if(next)next();return;}
  MU.rbusy[tr]=1;recDecode(m.k,b=>{MU.rbusy[tr]=0;
   if(b&&b.duration>=m.pad+m.len){MU.rb[tr]=b;delete window.SUONI[m.k];if(MU.track===tr&&S.mus!==0)mPlay(tr,MU.src?MXF:.8);}
   else{MU.rf[tr]=1;if(MU.track===tr&&!MU.src){if(MU.fail)mLive();else musicPrep();}}
@@ -201,7 +216,7 @@ function mPlay(tr,xf){const rb=MU.rb[tr],b=rb||MU.buf[tr];if(!b||S.mus===0){mCut
 function mLive(){if(!AC||MU.timer)return;MU.live=mBusMk(AC,MUS);MU.step=0;MU.next=AC.currentTime+.15;MU.timer=setInterval(()=>{if(!MU.track||MU.rb[MU.track]||state!=='play'||S.mus===0)return;const T=TRK[MU.track],sd=60/T.bpm/4,until=AC.currentTime+.3;if(MU.next<AC.currentTime)MU.next=AC.currentTime+.05;MX=AC;MB=MU.live;MB.dl.delayTime.value=sd*3;let gd=0;while(MU.next<until&&gd++<64){mStep(MU.track,MU.step,MU.next);MU.next+=sd;MU.step++;}},60);}
 function musicStart(tr){if(!AC)return;if(MU.track===tr)return;const prev=MU.track;MU.track=tr;MU.step=0;MU.next=AC.currentTime+.15;const g=MUS.gain,t=AC.currentTime;g.cancelScheduledValues(t);g.setValueAtTime(g.value,t);g.linearRampToValueAtTime(S.mus===0?0:MU.vol,t+.4);
  const xf=prev&&MU.src?MXF:0;
- if(recHasMus(tr)){if(MU.rb[tr])mPlay(tr,xf);else recMusic(tr,null);return;}// ancora in decodifica: parte appena pronta
+ if(recHasMus(tr)){if(MU.rb[tr])mPlay(tr,xf);else recMusic(tr,null,1);return;}// ancora in decodifica: parte appena pronta
  if(MU.fail)mLive();else if(!mPlay(tr,xf))musicPrep();}
 function musicStop(){if(!AC||!MU.track)return;MU.track=null;const g=MUS.gain,t=AC.currentTime;g.cancelScheduledValues(t);g.setValueAtTime(g.value,t);g.linearRampToValueAtTime(0,t+.5);mCut(.5);}
 function musicVol(){if(!AC)return;const t=AC.currentTime;MUS.gain.cancelScheduledValues(t);MUS.gain.setValueAtTime(S.mus===0||!MU.track?0:MU.vol,t);if(MU.track&&S.mus!==0&&!MU.src&&(MU.rb[MU.track]||!MU.fail))mPlay(MU.track,.5);if(S.mus===0)mCut();}

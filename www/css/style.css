@@ -177,3 +177,8 @@ html,body{margin:0;height:100%;background:var(--bg);overflow:hidden;font-family:
 .tip{font-size:12px;color:#9aa6b6;line-height:1.5;margin-top:10px}
 .dots span{display:inline-block;font-weight:700;margin-right:10px;white-space:nowrap}
 .dots i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+/* barra di caricamento all'ingresso dei livelli (js/caricamento.js): pannello come le schermate di fine livello, sopra a tutto */
+#car{position:fixed;inset:0;z-index:50;display:flex;align-items:center;padding:20px 16px;background:rgba(2,4,8,.8);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);touch-action:none}
+#car .pan p{color:#e8ecf2;font-size:14px;line-height:1.45;margin:2px 0 6px}
+#car .prog{height:6px;margin:12px 0 6px}
+#car .prog i{width:0;transition:width .15s linear;box-shadow:0 0 10px #6cf8}
