@@ -73,6 +73,6 @@ function runHaz(m,sp,dt){const rs=G.stages[G.si],esc=rs.rk==='e'||rs.rk==='m',to
   if(h.s===2&&d<(Z.hd||0)){h.s=3;h.dzm.visible=false;if(!h.ok){hurt(16*G.ds,true);G.shake=.7;snd(Z.snd||'crash');}if(Z.end)Z.end(h);if(state!=='play')return;}
   if(h.s===3&&d<-2.6){h.s=4;if(G.dg&&G.dg.man)G.dg=null;}}
  const ts=m.ts===undefined?1:m.ts;m.ts=ts+((slow>=1?.3:slow?.62:1)-ts)*Math.min(1,dt*(slow?7:3.5));
- if(tot-s<5.5&&!rs.haz.some(h=>h.kind==='lock'&&h.s<3))rs.door.o=1;}
+ if((rs.tot0||tot)-s<5.5&&!rs.haz.some(h=>h.kind==='lock'&&h.s<3))rs.door.o=1;}
 function escFx(dt){G.fxT=(G.fxT||0)-dt;G.shake=Math.max(G.shake,.2);if(G.fxT<=0){G.fxT=rr(.3,.55);const l=Math.hypot(PP.dx,PP.dz)||1,fx=PP.dx/l,fz=PP.dz/l,d=rr(6,11),sx=rnd(2)?1:-1,o=sx*rr(.8,2.1),y=G.py||0;TV.set(G.px+fx*d-fz*o,y+rr(3,3.9),G.pz+fz*d+fx*o);bits(TV,5,rnd(2)?M.scrap:M.spark,2.5,.09,1.1);
   if(rnd(3)===0){TV.set(G.px+fx*d-fz*sx*2.4,y+rr(1,3),G.pz+fz*d+fx*sx*2.4);glow(TV,rr(2,3.4),0xff8030,.35,4);glow(TV,1.6,0xfff0c0,.18,5);snd('boom');}}}

@@ -57,7 +57,7 @@ function cineOn(t,ft,f){G.phase='cine';G.cine={t,ft,f};hud.classList.add('cine')
 function cineOff(){G.cine=null;hud.classList.remove('cine');$('card').style.display='none';}
 function startFight(st){G.mv=null;G.px=G.pz=0;$('fade').style.opacity=0;const a=st.actor;
  if(st.boss){cineOn(3.1);spawnWave(st);st.wd=1.3;const c=$('card');c.innerHTML='<small>'+BOSS[chI(G.L)].t+'</small><b>'+chOf(G.L).boss.toUpperCase()+'</b>';c.style.display='block';if(st.say)sub(st.say,3600);}
- else if(a){const e=st.outP[st.outP.length-1];cineOn(2.6,1.3,()=>{a.path=navPath(st,a.root.position.x,a.root.position.z,e[0],e[1],.4);a.pi=0;a.end=1;});if(st.say)sub(st.say,3800);}
+ else if(a){const e=st.exitP||st.outP[st.outP.length-1];cineOn(2.6,1.3,()=>{a.path=navPath(st,a.root.position.x,a.root.position.z,e[0],e[1],.4);a.pi=0;a.end=1;});if(st.say)sub(st.say,3800);}
  else G.phase='fight';}
 function escPre(m){const n=Math.floor((1.5-m.lb)/.2);m.nb=m.nb||0;while(m.nb<n&&m.nb<7){const p=new V3(m.nb?rr(-2.2,2.2):0,rr(1.2,2.6),m.nb?G.pz+Math.max(3.4,8-m.nb*.75):.5),r=rr(3,4.2);glow(p,r*1.7,0xff6a18,.6,3.5);glow(p,r,0xffe6a8,.4,4.5);bits(p,7,m.nb%2?M.spark:M.scrap,7,.1,1);if(m.nb%2===0)snd('boom');xl.position.copy(p);xl.intensity=5;G.shake=1;m.nb++;}if(m.lb<=0)hud.classList.remove('cine');}
 function escFx(dt){G.fxT=(G.fxT||0)-dt;G.shake=Math.max(G.shake,.2);if(G.fxT<=0){G.fxT=rr(.3,.55);const z=G.pz-rr(7,13),sx=rnd(2)?1:-1;TV.set(sx*rr(2.2,4.2),rr(3.6,4.8),z);bits(TV,5,rnd(2)?M.scrap:M.spark,2.5,.09,1.1);if(rnd(3)===0){TV.set(sx*4.2,rr(1,3),z);glow(TV,rr(2,3.4),0xff8030,.35,4);glow(TV,1.6,0xfff0c0,.18,5);snd('boom');}}}
@@ -129,12 +129,12 @@ function doorTpl(){if(DOORT)return DOORT;const W=1.45,H=3.3,T=.2,N=6,ph=H/N,sl=.
   for(const fz of[-1,1]){for(const y of[.6,2.7])P('box',md,.9,.12,.04,sx*.88,y,fz*.07,g);P('box',M.hazard,.9,.24,.03,sx*.88,1.65,fz*.068,g);P('box',md,.07,H-.24,.04,sx*1.37,H/2,fz*.07,g);P('box',md,.05,H-.5,.03,sx*.36,H/2,fz*.068,g);
    for(let k=0;k<N;k++){const tx=k%2?-T:T,mine=sx<0?tx>0:tx<0;if(!mine)continue;const c=P('cyl',md,.11,.05,.11,tx+sx*.16,(k+.5)*ph,fz*.07,g);c.rotation.x=Math.PI/2;const c2=P('cyl',ms,.05,.07,.05,tx+sx*.16,(k+.5)*ph,fz*.075,g);c2.rotation.x=Math.PI/2;}}
   bake(g);return g;});return DOORT;}
-function mkDoor(rg,wz,s){const T=doorTpl(),d={l:[],k:0,o:0,g:0,rg,pl:[new THREE.Plane(new V3(0,1,0),1e6),new THREE.Plane(new V3(0,1,0),1e6)]},z=wz+s*.2,mm=new Map();const bk=P('box',M.hole0,2.9,3.3,.04,0,1.65,wz+s*.1,rg);bk.castShadow=false;
+function mkDoor(rg,wz,s){const T=doorTpl(),d={l:[],k:0,o:0,g:0,rg,pl:[new THREE.Plane(new V3(0,1,0),1e6),new THREE.Plane(new V3(0,1,0),1e6)]},z=wz+s*.2,mm=new Map();const bk=P('box',M.hole0,2.9,3.3,.04,0,1.65,wz+s*.1,rg);bk.castShadow=false;d.wz=wz;d.s=s;d.bk=bk;
  T.forEach((t,i)=>{const g=new THREE.Group();for(const c of t.children){let m=mm.get(c.material);if(!m){m=c.material.clone();m.clippingPlanes=d.pl;mm.set(c.material,m);}const me=new THREE.Mesh(c.geometry,m);me.castShadow=false;g.add(me);}g.position.set(0,0,z);g.userData.sx=i?1:-1;rg.add(g);d.l.push(g);});
  d.lamp=P('box',M.doorL,.7,.12,.05,0,3.56,z+s*.05,rg);d.lamp.castShadow=false;return d;}
 const DPL=new V3(),DPN=new V3(),DPM=new THREE.Matrix3();
-function updDoor(dt){const st=G.stages[G.si],d=st&&st.door;if(!d)return;if(d.o&&!d.so){d.so=1;snd('metal');}const g=d.o||d.g;if(g!==d.gg){d.gg=g;d.lamp.material=g?dmat('dgo',0x30ff70,{emissiveIntensity:2.2}):M.doorL;}
- const k0=d.k;d.k=clamp(d.k+(d.o?1:-1)*dt*1.7,0,1);if(d.k===k0&&d.cp)return;
+function updDoor(dt){const st=G.stages[G.si];if(st&&st.door0&&st.door0.cl){animDoor(st.door0,dt);if(st.door0.k===0){st.door0.cl=0;dropBehind();}}const d=st&&st.door;if(!d)return;if(d.o&&!d.pv){d.pv=1;showNext();}if(d.o&&!d.so){d.so=1;snd('metal');}const g=d.o||d.g;if(g!==d.gg){d.gg=g;d.lamp.material=g?dmat('dgo',0x30ff70,{emissiveIntensity:2.2}):M.doorL;}animDoor(d,dt);}
+function animDoor(d,dt){const k0=d.k;d.k=clamp(d.k+(d.o?1:-1)*dt*1.7,0,1);if(d.k===k0&&d.cp)return;
  if(!d.cp||d.k!==k0){d.cp=1;d.rg.updateWorldMatrix(true,false);const mw=d.rg.matrixWorld;DPM.getNormalMatrix(mw);for(let i=0;i<2;i++){const sx=i?-1:1;DPN.set(sx,0,0).applyMatrix3(DPM).normalize();DPL.set(-sx*1.452,0,0).applyMatrix4(mw);d.pl[i].setFromNormalAndCoplanarPoint(DPN,DPL);}}
  const e=d.k<.12?0:(d.k-.12)/.88,q=e*e*(3-2*e),off=(d.k<.12?d.k/.12*.035:.035)+q*1.68;for(const m of d.l)m.position.x=m.userData.sx*off;}
 function buildRoom(st,L,boss,secs){const rg=stFrame(st),P0=st.pose,c=Math.cos(P0.th);
@@ -177,11 +177,12 @@ function blob(r,s){const b=new THREE.Mesh(GEO.cyl,BLOBM);b.scale.set(s*2,.01,s*2
 function warm(){try{$('fade').style.opacity=1;const tmp=new THREE.Group(),ts=new Set(['drone']),ds=[];scene.add(tmp);let boss=0,i=0;for(const d of lvDef(G.L))if(!d.run)d.waves.forEach(w=>w.forEach(t=>{if(t==='boss')boss=1;else ts.add(t);}));
   for(const t of ts){const d=mkDummy(t);d.root.position.set((i%5-2)*1.3,0,-6-(i/5|0)*1.5);i++;tmp.add(d.root);ds.push(d.root);}if(boss){const e={root:new THREE.Group()};BUILD.mech(e,null,chI(G.L));e.root.position.set(0,0,-14);tmp.add(e.root);ds.push(e.root);}
   const p=new V3(0,1.5,-5);glow(p,.5,0xffffff,.05,1);glow(p,.5,0x111111,.05,1,false);bits(p,1,M.spark,1,.05,.05);bits(p,1,M.scrap,1,.05,.05);tracer(new V3(0,1.4,-1),p);
-  cam.position.set(0,1.6,0);cam.rotation.set(0,0,0);cam.updateMatrixWorld();scene.updateMatrixWorld();renderer.shadowMap.needsUpdate=true;renderer.render(scene,cam);for(const r of ds)freeE(r);scene.remove(tmp);}catch(e){}}
+  const wb=new THREE.BoxGeometry(.2,.2,.2),seen=new Set();let wi=0;for(const st of G.stages)if(st.clip)for(const[m,c]of st.clip.mats){if(seen.has(m))continue;seen.add(m);const q=new THREE.Mesh(wb,c);q.position.set((wi%8-4)*.3,1.2+(wi/8|0)*.3,-3);wi++;tmp.add(q);}
+  cam.position.set(0,1.6,0);cam.rotation.set(0,0,0);cam.updateMatrixWorld();scene.updateMatrixWorld();renderer.shadowMap.needsUpdate=true;renderer.render(scene,cam);for(const r of ds)freeE(r);scene.remove(tmp);wb.dispose();}catch(e){}}
 function freeE(r){r.traverse(o=>{if(o.isMesh&&o.userData.own&&o.geometry)o.geometry.dispose();if(o.isSkinnedMesh&&o.skeleton&&o.skeleton.boneTexture)o.skeleton.dispose();});}
 function enterRoom(i){PF.m.push('room');const old=G.stages[G.si];if(old&&old.rg.parent)world.remove(old.rg);for(const e of G.en){enG.remove(e.root);freeE(e.root);if(e.las)fxG.remove(e.las);}G.en=[];G.aimers=0;for(const h of holes)fxG.remove(h);holes.length=0;
- G.si=i;const st=G.stages[i],o=st.r2c(0,0);st.rg.rotation.y=-st.pose.th;st.rg.position.set(o[0],0,o[1]);world.add(st.rg);st.rg.updateMatrixWorld(true);
- G.lit=st.run?(st.rk==='e'||st.rk==='m'?1:0):st.lit||0;G.py=0;G.lookP=0;G.lookT=null;renderer.toneMappingExposure=G.lit===2?.6:1.12;hemi.intensity=G.lit===2?.035:G.lit===1?.26:.38;if(HM.Vent_light){const dm=G.lit===2;HM.Vent_light.emissiveIntensity=dm?.05:1;HM.Wall_blue.emissiveIntensity=dm?.3:1;for(const k in HM)HM[k].envMapIntensity=dm?.1:1;}G.qte=null;G.dg=null;G.wnd=null;G.sl=1;qsHide();for(const a of G.acts)enG.remove(a.root);G.acts=[];cineOff();st.actor=null;
+ G.si=i;const st=G.stages[i],o=st.r2c(0,0);st.rg.rotation.y=-st.pose.th;st.rg.position.set(o[0],0,o[1]);world.add(st.rg);if(G.pw&&G.pw.parent)G.pw.parent.remove(G.pw);st.rg.updateMatrixWorld(true);clipMode(st,'none');dropBehind();{const d0=st.door0;if(d0&&d0.hid){d0.hid=0;for(const m of d0.l)m.visible=true;d0.k=1;d0.o=0;d0.cp=0;d0.cl=1;snd('metal');if(old&&st.link)keepBehind(old,st.link);}}
+ G.lit=st.run?(st.rk==='e'||st.rk==='m'?1:0):st.lit||0;G.py=0;G.lookP=0;G.lookT=null;renderer.toneMappingExposure=G.lit===2?.6:1.12;hemi.intensity=G.lit===2?.035:G.lit===1?.26:.38;if(HM.Vent_light){const dm=G.lit===2;HM.Vent_light.emissiveIntensity=dm?.05:1;HM.Wall_blue.emissiveIntensity=dm?.3:1;for(const k in HM)HM[k].envMapIntensity=dm?.1:1;}syncClip();G.qte=null;G.dg=null;G.wnd=null;G.sl=1;qsHide();for(const a of G.acts)enG.remove(a.root);G.acts=[];cineOff();st.actor=null;
  if(st.run){const esc=st.rk==='e'||st.rk==='m';G.mv={P:st.inP,t:0,el:0,kind:'run',lb:esc?1.5:0,dur:pathLen(st.inP)/((esc?5.5:5)+Math.min(1.5,G.L*.035))};G.phase='run';if(esc)hud.classList.add('cine');
   sub(st.say||'BASE:'+RUNTXT[chI(G.L)],3800);toast('Trascina il cursore fino in fondo',2600);
   if(MODELS.xbot){if(st.rk==='c'||st.rk==='q'){const a=mkActor(st.rk==='c'?'varr':'kross');a.fol=7;a.root.position.set(0,0,-7);a.root.rotation.y=Math.PI;}else if(st.rk==='m'){const a=mkActor('marsh');a.fol=3.4;a.fx=1.4;a.root.position.set(1.4,0,-4.4);a.root.rotation.y=Math.PI;}}}
@@ -200,5 +201,46 @@ function buildLevel(L){
  seeded(L*7919+101,()=>{const secSt=[];for(let i=0;i<nSec;i++)secSt.push(rnd(rooms));let ri=0;
   for(const d of D){const i=G.stages.length;if(d.run){const rs={i,run:true,rk:d.rk,say:d.say,pose:{x:0,z:Z0-1.2,th:0,i:0,o:1},slots:[],waves:[],wi:0,wd:0,zc:0};G.stages.push(rs);buildRun(rs,L);continue;}
    const st={i,pose:POSES[d.pose],slots:[],waves:d.waves,wi:0,wd:.9,zc:0,kind:d.kind,sty:d.sty,lit:d.lit,fl:d.fl,say:d.say,boss:d.boss};G.stages.push(st);buildRoom(st,L,d.boss,secSt.filter(q=>q===ri).length);ri++;st.waves.forEach(a=>G.total+=a.length);}});
- G.nS=G.stages.length;
+ G.nS=G.stages.length;linkStages();
  buildWeapon();enterRoom(0);}
+/* ===== porte aperte sulla stanza successiva =====
+   Ogni stanza ha le sue coordinate. Per ogni coppia di stanze si calcola come ruotare e spostare la successiva
+   in modo che il suo ingresso combaci con la porta d'uscita della precedente; il percorso d'uscita prosegue
+   oltre la porta fino al punto di partenza della stanza nuova, così il passaggio avviene senza stacchi. */
+const LINK_GAP=0;
+function stFrameMat(st,m){const o=st.r2c(0,0);return m.compose(new V3(o[0],0,o[1]),new THREE.Quaternion().setFromAxisAngle(new V3(0,1,0),-st.pose.th),new V3(1,1,1));}
+function relMat(o,root,m){m.identity();const ch=[];for(let x=o;x&&x!==root;x=x.parent)ch.push(x);for(let i=ch.length-1;i>=0;i--){ch[i].updateMatrix();m.multiply(ch[i].matrix);}return m;}
+function linkStages(){for(let i=0;i+1<G.nS;i++){const a=G.stages[i],b=G.stages[i+1],d=a.door;if(!d||d.wz===undefined||!a.rg||!b.rg)continue;
+ const Ma=stFrameMat(a,new THREE.Matrix4()).multiply(relMat(d.rg,a.rg,new THREE.Matrix4())),Dc=new V3(0,0,d.wz).applyMatrix4(Ma),nc=new V3(0,0,-d.s).transformDirection(Ma);nc.y=0;nc.normalize();
+ const Mb=stFrameMat(b,new THREE.Matrix4());let En,inw;
+ if(b.run){const d0=b.door0;if(!d0||d0.wz===undefined)continue;const M0=Mb.clone().multiply(relMat(d0.rg,b.rg,new THREE.Matrix4()));En=new V3(0,0,d0.wz).applyMatrix4(M0);inw=new V3(0,0,d0.s).transformDirection(M0);}
+ else{const o=b.pose.o!==0;En=new V3(0,0,o?Z0:Z1).applyMatrix4(Mb);inw=new V3(0,0,o?-1:1).transformDirection(Mb);}
+ inw.y=0;inw.normalize();const beta=Math.atan2(nc.x,nc.z)-Math.atan2(inw.x,inw.z),c=Math.cos(beta),s=Math.sin(beta),rot=v=>new V3(v.x*c+v.z*s,v.y,-v.x*s+v.z*c);
+ const p=Dc.clone().addScaledVector(nc,LINK_GAP).sub(rot(En));p.y=Dc.y-En.y;b.link={beta,p};
+ const P=a.run?a.inP:a.outP;if(!P||!b.inP)continue;a.exitP=P[P.length-1].slice();a.tot0=pathLen(P);const S=b.inP[0],TS=rot(new V3(S[0],0,S[1])).add(p);P.push([Dc.x+nc.x*.3,Dc.z+nc.z*.3],[TS.x,TS.z]);}
+ for(let i=0;i+1<G.nS;i++){const a=G.stages[i],b=G.stages[i+1];if(b.link)clipLink(a,b);}}
+/* taglio delle sale collegate (materiali copiati per stanza, 4 piani in modalità "intersezione"):
+   - sala attuale a porta aperta: si nasconde solo ciò che sta nel tunnel dell'apertura, oltre la porta
+     (es. la porta chiusa del modello della sala), così si vede la stanza successiva;
+   - stanza successiva vista da dietro la porta: si nasconde ciò che sporge dietro il suo ingresso. */
+const TUN_D=.12,TUN_W=1.46,TUN_H=3.32,CLIP_RUN=-.2,CLIP_ROOM=.15,CLIP_MARGIN=.05;
+function clipKit(st){if(st.clip)return st.clip;const P=()=>new THREE.Plane(new V3(0,1,0),1e6);return st.clip={p:[P(),P(),P(),P()],li:null,tun:null,mats:new Map()};}
+function clipLink(a,b){const d=a.door,ka=clipKit(a),kb=clipKit(b),Ra=relMat(d.rg,a.rg,new THREE.Matrix4()),pl=(n,p)=>new THREE.Plane().setFromNormalAndCoplanarPoint(n,p).applyMatrix4(Ra);
+ ka.tun=[pl(new V3(0,0,d.s),new V3(0,0,d.wz+d.s*TUN_D)),pl(new V3(-1,0,0),new V3(-TUN_W,0,0)),pl(new V3(1,0,0),new V3(TUN_W,0,0)),pl(new V3(0,1,0),new V3(0,TUN_H,0))];
+ let En,inw;if(b.run){const d0=b.door0,R0=relMat(d0.rg,b.rg,new THREE.Matrix4());En=new V3(0,0,d0.wz).applyMatrix4(R0);inw=new V3(0,0,d0.s).transformDirection(R0);}else{const o=b.pose.o!==0;En=new V3(0,0,o?Z0:Z1);inw=new V3(0,0,o?-1:1);}
+ inw.y=0;inw.normalize();kb.li=new THREE.Plane().setFromNormalAndCoplanarPoint(inw,En.addScaledVector(inw,b.run?CLIP_RUN:CLIP_ROOM));clipMeshes(a);clipMeshes(b);}
+function boxMinDist(pl,b){const n=pl.normal;return pl.constant+(n.x>0?n.x*b.min.x:n.x*b.max.x)+(n.y>0?n.y*b.min.y:n.y*b.max.y)+(n.z>0?n.z*b.min.z:n.z*b.max.z);}
+function clipMeshes(st){const k=st.clip,R=new THREE.Matrix4(),bx=new THREE.Box3(),own=new Set(k.mats.values());st.rg.traverse(o=>{if(!o.isMesh||!o.geometry)return;const ms=Array.isArray(o.material)?o.material:[o.material];if(ms.some(m=>!m||m.clippingPlanes&&!own.has(m)))return;
+  if(!o.geometry.boundingBox)o.geometry.computeBoundingBox();bx.copy(o.geometry.boundingBox).applyMatrix4(relMat(o,st.rg,R));
+  if(!((k.li&&boxMinDist(k.li,bx)<-CLIP_MARGIN)||(k.tun&&boxMinDist(k.tun[0],bx)<-CLIP_MARGIN)))return;
+  const sw=m=>{if(own.has(m))return m;let c=k.mats.get(m);if(!c){c=m.clone();c.clippingPlanes=k.p;c.clipIntersection=true;k.mats.set(m,c);own.add(c);}return c;};o.material=Array.isArray(o.material)?o.material.map(sw):sw(o.material);});}
+/* mode: 'in' = stanza vista da dietro la porta, 'out' = sala con la porta aperta, altrimenti nessun taglio */
+function clipMode(st,mode){const k=st.clip;if(!k)return;st.rg.updateMatrixWorld(true);const mw=st.rg.matrixWorld;
+ for(let i=0;i<4;i++){const p=k.p[i];if(mode==='out'&&k.tun)p.copy(k.tun[i]).applyMatrix4(mw);else if(mode==='in'&&k.li){if(i===0)p.copy(k.li).applyMatrix4(mw);else p.set(new V3(0,1,0),-1e6);}else p.set(new V3(0,1,0),1e6);}}
+function syncClip(){for(const st of G.stages||[])if(st.clip)for(const[m,c]of st.clip.mats){if(m.emissiveIntensity!==undefined)c.emissiveIntensity=m.emissiveIntensity;if(m.envMapIntensity!==undefined)c.envMapIntensity=m.envMapIntensity;}}
+/* la sala precedente, riportata nelle coordinate della nuova stanza (trasformazione inversa del collegamento) */
+function keepBehind(a,lk){const w=G.pb||(G.pb=new THREE.Group()),c=Math.cos(lk.beta),s=Math.sin(lk.beta),p=lk.p;w.rotation.set(0,-lk.beta,0);w.position.set(-(p.x*c-p.z*s),-p.y,-(p.x*s+p.z*c));w.add(a.rg);world.add(w);w.updateMatrixWorld(true);clipMode(a,'out');if(a.door){a.door.cp=0;animDoor(a.door,0);}}
+function dropBehind(){const w=G.pb;if(!w)return;for(const ch of w.children.slice())w.remove(ch);if(w.parent)w.parent.remove(w);}
+function showNext(){const b=G.stages[G.si+1],a=G.stages[G.si];if(!b||!b.link||!b.rg)return;const w=G.pw||(G.pw=new THREE.Group());w.rotation.set(0,b.link.beta,0);w.position.copy(b.link.p);
+ const o=b.r2c(0,0);b.rg.rotation.y=-b.pose.th;b.rg.position.set(o[0],0,o[1]);w.add(b.rg);world.add(w);w.updateMatrixWorld(true);clipMode(a,'out');clipMode(b,'in');if(a.door&&a.door.bk)a.door.bk.visible=false;
+ const d0=b.door0;if(d0){d0.hid=1;for(const m of d0.l)m.visible=false;if(d0.bk)d0.bk.visible=false;}renderer.shadowMap.needsUpdate=true;}
