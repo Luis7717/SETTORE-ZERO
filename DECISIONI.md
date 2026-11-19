@@ -90,8 +90,11 @@ restano sui loro rami finché la build su GitHub di questo blocco non è riuscit
    "Race song loop". Totale 1,5 MB in `www/assets/audio/`. Pallone sul palo e rete restano sintetizzati.
    **Da ascoltare sull'iPhone**: volumi relativi (`CROWD_SAMPLE_GAIN`, `KICK_SAMPLE_GAIN` in `src/audio.js`) e il piccolo
    stacco possibile a ogni giro del loop del pubblico (MP3 non è perfetto per i loop).
-4. **Modelli 3D**: la ricerca non ha trovato un calciatore CC0 con tutte le animazioni; un subagente Opus prova
-   Kenney/KayKit con pose procedurali per scivolata, tuffo e colpo di testa, tenendo le figure a box come riserva.
+4. **Modelli 3D**: Kenney "Animated Characters: Protagonists" (CC0), convertito in GLB e ridotto a 720 triangoli
+   (124 KB, `assets/models/player.glb`). Corsa e fermo sono clip veri; calcio, colpo di testa, scivolata, tuffo, a terra ed
+   esultanza sono pose procedurali sulle ossa. Le draw call scendono da ~160-200 a ~55; i triangoli salgono di ~10 mila
+   (accettato: per un iPhone 13 Pro 32 mila triangoli in scena sono pochi). Senza il file restano le figure a box.
+   **Da provare sull'iPhone**: fps, cadenza della corsa (`RUN_REF`, `RUN_FULL` in `src/players3d.js`), leggibilità da lontano.
 
 ## Fase 1B (motore e gesti) — 2026-11-19
 

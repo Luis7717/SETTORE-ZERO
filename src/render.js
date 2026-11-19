@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { W, L, HW, HL, GW, GH, BOX_W, BOX_D, SIX_W, SIX_D, PEN_D, CIRCLE } from './sim.js';
 import { buildStadium } from './stadium.js';
+import { loadPlayers3D } from './players3d.js';
 
 const SKIN = [0xf1c9a5, 0xd9a47a, 0xa9744f, 0x6b4630];
 const HAIR = [0x1c1410, 0x4a2f1b, 0x8a5a2b, 0xd9b66a, 0x222222, 0x2b2b2b];
@@ -140,7 +141,25 @@ export class View {
     this.offside.renderOrder = 14; this.offside.visible = false; s.add(this.offside);
   }
 
+  // modello 3D dei giocatori (assets 'player'): se manca o non si legge restano le figure a box
+  useAssets(assets) {
+    if (this.p3d || this.p3dLoading || !assets.has('player')) return this.p3dLoading || Promise.resolve(null);
+    this.p3dLoading = loadPlayers3D(assets.get('player')).then((m) => {
+      this.p3d = m; this.p3dLoading = null;
+      if (m && this.match) this.setMatch(this.match, this.me);
+      return m;
+    });
+    return this.p3dLoading;
+  }
+
   makeFig(kit, look) {
+    if (this.p3d) {
+      const f = this.p3d.make(kit, look); f.g.scale.setScalar(SCALE);
+      f.sh = new THREE.Mesh(this.shGeo, this.shMat); f.sh.position.y = 0.025; f.sh.scale.set(1.3, 1, 1.3);
+      f.warn = new THREE.Sprite(this.warnMat); f.warn.scale.set(0.7, 0.7, 1); f.warn.position.y = 2.25; f.warn.visible = false; f.warn.renderOrder = 22; f.g.add(f.warn);
+      this.scene.add(f.g); this.scene.add(f.sh);
+      return f;
+    }
     const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
     const M = c => new THREE.MeshLambertMaterial({ color: c });
     const skin = M(SKIN[look % 4]), hair = M(HAIR[(look >> 2) % HAIR.length]), shirt = M(kit.shirt), shorts = M(kit.shorts), socks = M(kit.socks), boot = M(0x16161a);
@@ -226,6 +245,7 @@ export class View {
     const wx = s * p.fx, wz = -s * p.fy, yaw = Math.atan2(wx, wz);
     g.position.set(s * p.x, 0, -s * p.y); g.rotation.y = yaw;
     f.sh.position.set(s * p.x, 0.025, -s * p.y);
+    if (f.m3d) { f.warn.visible = !!p.warn; this.p3d.pose(p, f, dt, { t: this.t, phase: this.match.phase, flip: s, yaw, ball: this.match.ball, scale: SCALE }); return; }
     const v = Math.hypot(p.vx, p.vy), A = Math.min(1, v / 6.5), ph = p.phase;
     body.rotation.set(0, 0, 0); body.position.set(0, 0, 0);
     let tl = -A * 0.95 * Math.sin(ph), tr = A * 0.95 * Math.sin(ph);

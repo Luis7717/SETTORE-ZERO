@@ -12,3 +12,9 @@ li citiamo lo stesso). Sono le anteprime MP3 di Freesound, ritagliate senza rico
 | audio/whistle_long.mp3 | https://freesound.org/people/SpliceSound/sounds/218318/ | SpliceSound | 0–1,5 s |
 | audio/kick.mp3 | https://freesound.org/people/bittermelonheart/sounds/555042/ | bittermelonheart | intero |
 | audio/music.mp3 | https://freesound.org/people/neko_4444/sounds/739064/ | neko_4444 | intero (loop) |
+
+## Modelli 3D
+
+| File | Origine | Autore | Licenza | Lavorazione |
+|------|---------|--------|---------|-------------|
+| models/player.glb | Kenney "Animated Characters 1" (ora "Animated Characters: Protagonists"), https://kenney.nl/assets/animated-characters-protagonists | Kenney (www.kenney.nl) | **CC0 1.0** (pubblico dominio) | `characterMedium.fbx` + clip `idle`, `run`, `jump` convertiti in glTF con FBX2glTF (pacchetto npm `fbx2gltf`), uniti in un solo file con gltf-transform, semplificati da 1604 a 720 triangoli (meshoptimizer); texture di partenza `skaterMaleA.png` (il gioco ne usa la testa e ridipinge maglia, pantaloncini, calzettoni e scarpe coi colori delle squadre, `src/players3d.js`) |

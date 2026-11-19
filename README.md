@@ -29,6 +29,8 @@ Sideloadly o AltStore.
 ## Note
 
 Squadre, giocatori e sponsor sono inventati. Grafica 3D con three.js (licenza MIT).
+Modello dei giocatori: Kenney, "Animated Characters: Protagonists" (CC0, https://kenney.nl).
+Suoni: Freesound, tutti CC0 (autori e link in `assets/CREDITI.md`).
 
 ## Scarica
 
