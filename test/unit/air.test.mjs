@@ -22,7 +22,7 @@ test('colpo di testa: su un cross alto l\'attaccante in area colpisce verso la p
   assert.ok(ok >= 16, `colpi verso la porta ${ok}/20`);
 });
 
-test('colpo di testa: cross vero dalla fascia, l'attaccante va sul pallone e colpisce verso la porta', () => {
+test("colpo di testa: cross vero dalla fascia, l'attaccante va sul pallone e colpisce verso la porta", () => {
   let ok = 0;
   for (let s = 0; s < 10; s++) {
     // Arrange
