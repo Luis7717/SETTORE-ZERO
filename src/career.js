@@ -1,5 +1,7 @@
 // Carriera: squadre, giocatori, campionato a tre divisioni, mercato, soldi, salvataggio.
 import { rng32, FORMATIONS, headingOf } from './sim.js';
+import { lookFromSeed, normalizeLook, normalizeKitStyle, kitStyleFromSeed, squadNumbers, hash32 } from './looks.js';
+import { crestFromSeed, normalizeCrest } from './crest.js';
 
 const KEY = 'tag_save_v1';
 export const DIV_NAMES = ['Prima Divisione', 'Seconda Divisione', 'Terza Divisione'];
@@ -19,6 +21,9 @@ const TOWN = ['Borgoalto', 'Roccamarina', 'Valdoro', 'Monteluce', 'Pietrafina', 
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const pick = (r, a) => a[Math.floor(r() * a.length)];
+// campione creato nell'editor: un buon giovane della Terza Divisione (le squadre lì stanno tra 50 e 60)
+export const CHAMP_LEVEL = 62;
+export const randomName = r => pick(r, NOMI)[0] + '. ' + pick(r, COGNOMI);
 
 export function overallAs(p, pos) {
   const pen = p.pos === pos ? 1 : ((p.pos === 'P') !== (pos === 'P') ? 0.55 : (p.pos + pos === 'DA' || p.pos + pos === 'AD' ? 0.82 : 0.92));
@@ -62,14 +67,18 @@ function roundRobin(ids) {
 
 export class Career {
   constructor() { this.s = null; }
-  load() { try { const t = localStorage.getItem(KEY); if (t) { this.s = JSON.parse(t); return true; } } catch (e) { } return false; }
+  load() { try { const t = localStorage.getItem(KEY); if (t) { this.s = JSON.parse(t); this.upgrade(); return true; } } catch (e) { } return false; }
+  // salvataggi vecchi: numeri di maglia mancanti assegnati (senza doppioni). Stile della divisa, stemma e aspetto
+  // dei giocatori non si scrivono: se mancano si calcolano sempre uguali (kitStyle(), crest(), lookOf()).
+  upgrade() { const s = this.s; if (s && Array.isArray(s.squad)) this.ensureNums(); }
+  ensureNums() { const nums = squadNumbers(this.s.squad); for (const p of this.s.squad) p.num = nums.get(p.id); }
   save() { try { localStorage.setItem(KEY, JSON.stringify(this.s)); } catch (e) { } }
   reset() { try { localStorage.removeItem(KEY); } catch (e) { } this.s = null; }
   rnd() { const s = this.s; s.seed = (s.seed * 1664525 + 1013904223) >>> 0; return s.seed / 4294967296; }
 
   create(name, kit) {
     const seed = (Date.now() ^ (Math.random() * 1e9)) >>> 0, r = rng32(seed);
-    const s = this.s = { v: 1, seed, club: name, kit, money: 250, season: 1, day: 0, nextId: 1, teams: {}, divs: [[], [], []], squad: [], market: [], settings: { half: 150, diff: 1, sound: true, autoGk: false }, tut: 0, history: [], last: null };
+    const s = this.s = { v: 1, seed, club: name, kit, crest: crestFromSeed(seed), kitStyle: { ...normalizeKitStyle(null) }, money: 250, season: 1, day: 0, nextId: 1, teams: {}, divs: [[], [], []], squad: [], market: [], settings: { half: 150, diff: 1, sound: true, autoGk: false }, tut: 0, history: [], last: null };
     const towns = TOWN.slice().sort(() => r() - 0.5);
     let k = 0;
     for (let d = 0; d < 3; d++) for (let i = 0; i < 10; i++) {
@@ -81,9 +90,28 @@ export class Career {
     }
     const mk = (pos, n, lvl) => { for (let i = 0; i < n; i++) s.squad.push(genPlayer(r, pos, lvl + (i < 2 ? 2 : -1), s.nextId++, i >= n - 1)); };
     mk('P', 2, 54); mk('D', 6, 54); mk('C', 6, 54); mk('A', 4, 54);
+    this.ensureNums();
     s.formation = '4-4-2'; s.lineup = []; this.autoLineup(); s.teams.me.rating = this.myRating();
     this.newSeason(true); this.refreshMarket(20);
     this.save();
+  }
+
+  // ------------------------------------------------ stile della divisa, stemma, aspetto, campione
+  kitStyle() { return normalizeKitStyle(this.s.kitStyle); }
+  setKitStyle(st) { this.s.kitStyle = normalizeKitStyle(st); this.save(); }
+  crest() { return normalizeCrest(this.s.crest, crestFromSeed(hash32('club', this.s.club))); }
+  setCrest(c) { this.s.crest = normalizeCrest(c); this.save(); }
+  // stemma di qualunque squadra: la mia, oppure deterministico dal seme (stessa squadra = stesso stemma)
+  teamCrest(t) { if (!t || t.id === 'me') return this.crest(); return normalizeCrest(t.crest, crestFromSeed(t.seed !== undefined ? t.seed : hash32(t.id, t.name))); }
+  setLook(id, look) { const p = this.player(id); if (!p) return false; p.look = normalizeLook(look); this.save(); return true; }
+  // campione dell'editor: entra in rosa con ruolo, aspetto e numero scelti; se il numero era di un altro, l'altro ne riceve uno libero
+  addChampion({ name, pos, look, num }) {
+    const s = this.s, p = genPlayer(() => this.rnd(), pos, CHAMP_LEVEL, s.nextId++, true);
+    p.name = String(name || '').trim().slice(0, 20) || p.name; p.look = normalizeLook(look); p.champ = true;
+    if (Number.isInteger(num) && num >= 1 && num <= 99) { for (const q of s.squad) if (q.num === num) delete q.num; p.num = num; }
+    s.squad.unshift(p); this.ensureNums();
+    this.autoLineup(); s.teams.me.rating = this.myRating(); this.save();
+    return p;
   }
 
   div() { return this.s.divs.findIndex(d => d.includes('me')); }
@@ -160,7 +188,7 @@ export class Career {
     const p = s.market[i];
     if (s.squad.length >= 24) return 'Rosa al completo (massimo 24)';
     if (s.money < p.price) return 'Soldi insufficienti';
-    s.money -= p.price; s.market.splice(i, 1); delete p.price; s.squad.push(p); this.save(); return null;
+    s.money -= p.price; s.market.splice(i, 1); delete p.price; s.squad.push(p); this.ensureNums(); this.save(); return null;
   }
   sellPrice(p) { return Math.round(value(p) * 0.8); }
   sell(id) {
@@ -178,16 +206,28 @@ export class Career {
     const c = typeof k === 'number' ? KITS[k] : KITS[0];
     return alt ? { shirt: c[2], shorts: c[1], socks: c[2], gk: { shirt: 0x2ad17a, shorts: 0x15803d, socks: 0x15803d } } : { shirt: c[1], shorts: c[2], socks: c[1], gk: { shirt: 0xffa41c, shorts: 0x222222, socks: 0xffa41c } };
   }
+  // aggiunge alla divisa lo stile (maglia, maniche, colletto, motivo, calzettoni) e lo stemma coi colori della squadra
+  dress(kit, k, style, crest, gk) {
+    const c = KITS[k] || KITS[0];
+    kit.style = gk ? { ...style, sleeves: 1, pattern: 0, collar: 0 } : { ...style };
+    kit.crest = { ...crest, c1: c[1], c2: c[2] };
+    if (gk) kit.gloves = true;
+    return kit;
+  }
   myMatchTeam() {
     const s = this.s, F = FORMATIONS[s.formation];
-    const kit = this.kitOf(s.kit); kit.gk = { shirt: 0x27e0c0, shorts: 0x0c5c52, socks: 0x27e0c0 };
+    const kit = this.dress(this.kitOf(s.kit), s.kit, this.kitStyle(), this.crest()); kit.gk = this.dress({ shirt: 0x27e0c0, shorts: 0x0c5c52, socks: 0x27e0c0 }, s.kit, this.kitStyle(), this.crest(), true);
     return { name: s.club, short: s.teams.me.short, formation: s.formation, players: s.lineup.map(id => this.player(id)), bench: this.bench(), skill: 0.6, kit };
   }
   aiMatchTeam(t) {
     const s = this.s, r = rng32(t.seed + s.season * 977), fs = Object.keys(FORMATIONS), formation = fs[Math.floor(r() * fs.length)], F = FORMATIONS[formation];
     const players = F.map((f, i) => genPlayer(r, f[0], t.rating, -i - 1));
+    // aspetto e numero degli avversari: dal seme della squadra, senza consumare i numeri casuali di r
+    players.forEach((p, i) => { p.look = lookFromSeed(hash32(t.seed, i)); p.num = i + 1; });
     const same = t.kit === s.kit || Math.abs(colorDist(KITS[t.kit][1], KITS[s.kit][1])) < 110;
-    return { name: t.name, short: t.short, formation, players, skill: this.skillOf(t.rating, this.divOf(t)), kit: this.kitOf(t.kit, same) };
+    const kit = this.kitOf(t.kit, same), st = kitStyleFromSeed(t.seed), cr = this.teamCrest(t);
+    this.dress(kit, t.kit, st, cr); this.dress(kit.gk, t.kit, st, cr, true);
+    return { name: t.name, short: t.short, formation, players, skill: this.skillOf(t.rating, this.divOf(t)), kit };
   }
 
   // ------------------------------------------------ risultati

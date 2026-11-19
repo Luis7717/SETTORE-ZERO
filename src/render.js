@@ -167,9 +167,9 @@ export class View {
     return this.p3dLoading;
   }
 
-  makeFig(kit, look) {
+  makeFig(kit, look, num, name) {
     if (this.p3d) {
-      const f = this.p3d.make(kit, look); f.g.scale.setScalar(SCALE);
+      const f = this.p3d.make(kit, look, { num, name }); f.g.scale.setScalar(SCALE);
       f.sh = new THREE.Mesh(this.shGeo, this.shMat); f.sh.position.y = 0.025; f.sh.scale.set(1.3, 1, 1.3);
       f.warn = new THREE.Sprite(this.warnMat); f.warn.scale.set(0.7, 0.7, 1); f.warn.position.y = 2.25; f.warn.visible = false; f.warn.renderOrder = 22; f.g.add(f.warn);
       this.scene.add(f.g); this.scene.add(f.sh);
@@ -177,6 +177,7 @@ export class View {
     }
     const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
     const M = c => new THREE.MeshLambertMaterial({ color: c });
+    if (typeof look === 'object') look = (look.skin >> 1) + 4 * look.hairColor; // aspetto di src/looks.js → colori della figura a box
     const skin = M(SKIN[look % 4]), hair = M(HAIR[(look >> 2) % HAIR.length]), shirt = M(kit.shirt), shorts = M(kit.shorts), socks = M(kit.socks), boot = M(0x16161a);
     const box = (w, h, d, m, x, y, z, parent) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); (parent || body).add(o); return o; };
     const torso = box(0.44, 0.54, 0.25, shirt, 0, 1.2, 0);
@@ -195,16 +196,19 @@ export class View {
   }
 
   setMatch(match, me = 0) {
-    for (const f of this.figs) { this.scene.remove(f.g); this.scene.remove(f.sh); }
+    for (const f of this.figs) { this.scene.remove(f.g); this.scene.remove(f.sh); if (f.m3d) this.p3d.dispose(f); }
     this.figs = []; this.match = match; this.me = me; this.flip = me === 1 ? -1 : 1;
     if (!match) return;
     for (const p of match.players) {
       const kit = match.teams[p.team].kit;
-      this.figs.push(this.makeFig(p.pos === 'P' ? kit.gk : kit, p.look));
+      this.figs.push(this.figFor(p));
     }
     const b = match.ball; this.cx = b.x; this.cy = b.y;
     if (this.backStand) this.backStand.visible = true;
   }
+
+  // figura di un giocatore della partita: divisa (portiere a parte), aspetto, numero e cognome
+  figFor(p) { const kit = this.match.teams[p.team].kit, f = this.makeFig(p.pos === 'P' ? kit.gk : kit, p.look, p.src && p.src.num || p.i + 1, p.src && p.src.name); f.src = p.src; return f; }
 
   setZoom(z) { this.zoomT = z; }
 
@@ -214,7 +218,11 @@ export class View {
     // pubblico: si anima quando il pallone si avvicina a una porta e soprattutto dopo un gol
     if (this.stadium) this.stadium.update(dt, m.phase === 'goal' ? 1 : Math.max(0, (Math.abs(b.y) - 25) / 25) * 0.4);
     this.zoom += (this.zoomT - this.zoom) * Math.min(1, dt * 7);
-    for (let i = 0; i < 22; i++) this.pose(m.players[i], this.figs[i], dt);
+    for (let i = 0; i < 22; i++) {
+      const p = m.players[i]; let f = this.figs[i];
+      if (f.src !== p.src) { this.scene.remove(f.g); this.scene.remove(f.sh); if (f.m3d) this.p3d.dispose(f); f = this.figs[i] = this.figFor(p); } // cambio: entra un altro giocatore
+      this.pose(p, f, dt);
+    }
     // palla
     this.ballM.position.set(s * b.x, b.h + 0.21, -s * b.y);
     const sp = Math.hypot(b.vx, b.vy);

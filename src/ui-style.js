@@ -184,4 +184,43 @@ export const UI_CSS = `
 #ui .card .st b{font-size:16px}
 #ui .card .st span{text-align:left}
 #ui .good{color:var(--good)}#ui .bad{color:var(--bad)}
+
+/* stemmi piccoli */
+#ui .crest.xs{width:22px;height:26px;filter:drop-shadow(0 2px 3px #0007)}
+#ui .crest.sm{width:30px;height:36px;display:inline-block;vertical-align:middle;margin:0 6px 0 0}
+#ui .pn.cr{display:flex;align-items:center;gap:8px}
+#ui .pbtns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+#ui .pbtns .btn{min-height:48px}
+#ui .pbtns .btn .crest.xs{margin-right:2px}
+
+/* editor: stemma, campione, aspetto, divisa */
+#ui .edtop .pill{margin-left:auto}
+#ui .edstage{position:sticky;top:calc(env(safe-area-inset-top) + 56px);z-index:4;height:min(38vh,320px);margin:0 -16px;background:radial-gradient(70% 80% at 50% 38%,color-mix(in srgb,var(--k1) 45%,#1d2c4b) 0%,#0c1528 72%);border-bottom:1px solid var(--line);overflow:hidden}
+#ui .edstage canvas{display:block;width:100%;height:100%;border:0;touch-action:none}
+#ui .edstage.cst{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;height:min(34vh,290px)}
+#ui .edstage .crest.big{width:auto;height:72%;filter:drop-shadow(0 10px 22px #000a)}
+#ui .edstage.cst b{font-size:18px;font-weight:850;letter-spacing:.02em}
+#ui .edwait{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--dim);font-weight:700;pointer-events:none}
+#ui .edname{position:absolute;left:12px;bottom:10px;background:#0a1224c0;border:1px solid var(--line2);border-radius:999px;padding:5px 12px;font-size:13px;font-weight:800;letter-spacing:.03em;pointer-events:none}
+#ui .edtabs{position:sticky;top:calc(env(safe-area-inset-top) + 56px + min(38vh,320px));z-index:3;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:6px;margin:0 -16px;padding:8px 16px;background:#0a1224f0;border-bottom:1px solid var(--line)}
+#ui .edtab{min-height:46px;border-radius:12px;background:var(--panel);border:1px solid var(--line2);color:#cbd7ee;font-size:14px;font-weight:800;padding:0 4px}
+#ui .edtab.on{background:var(--gold);color:#15130a;border-color:var(--gold)}
+#ui #edpanel h3{margin:18px 2px 8px}
+#ui .edchips{display:flex;flex-wrap:wrap;gap:8px}
+#ui .edchips .chip{flex:1 0 auto;min-width:30%}
+#ui .edsw{display:flex;flex-wrap:wrap;gap:10px}
+#ui .sw{width:46px;height:46px;border-radius:50%;background:var(--c);border:3px solid #ffffff22;box-shadow:inset 0 -6px 10px #0003;padding:0;transition:transform .12s}
+#ui .sw.on{border-color:var(--gold);transform:scale(1.08);box-shadow:0 0 0 3px #ffd93d33,inset 0 -6px 10px #0003}
+#ui .edgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+#ui .edgrid.g5{grid-template-columns:repeat(4,1fr)}
+#ui .edopt{display:flex;flex-direction:column;align-items:center;gap:4px;min-height:92px;padding:8px 4px 6px;border-radius:14px;background:var(--panel);border:2px solid var(--line2)}
+#ui .edopt .crest{width:42px;height:50px}
+#ui .edopt span{font-size:11px;font-weight:750;color:#c4d1e8;line-height:1.15;text-align:center}
+#ui .edopt.on{border-color:var(--gold);background:#1b2a47;box-shadow:0 0 0 3px #ffd93d22}
+#ui .ednum{display:grid;grid-template-columns:64px 1fr 64px;gap:10px;align-items:center;margin-bottom:10px}
+#ui .ednum b{text-align:center;font-size:40px;font-weight:900}
+#ui .ednum .btn{font-size:28px}
+#ui .edbar{position:sticky;bottom:calc(-1*(env(safe-area-inset-bottom) + 28px));z-index:5;display:grid;grid-template-columns:1fr 1.8fr;gap:10px;margin:18px -16px calc(-1*(env(safe-area-inset-bottom) + 28px));padding:12px 16px calc(env(safe-area-inset-bottom) + 14px);background:linear-gradient(#0a122400,#0a1224f2 30%)}
+#ui .edbar .btn{min-height:56px}
+#ui .edbar .btn.big{font-size:16px}
 `;

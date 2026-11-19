@@ -1,37 +1,77 @@
 // Giocatori 3D: un solo modello umanoide animato (Kenney "Animated Characters", CC0) condiviso da tutti.
-// Ogni giocatore = 1 SkinnedMesh (1 draw call) con il proprio scheletro clonato, un mixer e un materiale
-// Lambert con una texture 256×256 dipinta al volo coi colori della maglia (cache per maglia + aspetto).
+// Ogni giocatore = 1 SkinnedMesh (1 draw call): corpo + capelli veri (mesh agganciata all'osso della testa, fusa
+// nella stessa geometria) con un materiale Lambert e una texture dipinta al volo (512×512 in partita, 1024 nell'editor):
+// viso (occhi, colore degli occhi, sopracciglia, barba), maglia con stile e motivo della squadra, stemma sul petto,
+// cognome e numero sulla schiena, pantaloncini, calzettoni, scarpe.
 // Clip nel file: idle, run, jump. Calcio, scivolata, tuffo, a terra, esultanza, colpo di testa e posa del
-// portiere sono fatti ruotando le ossa sopra il clip (pose procedurali), come faceva la figura a box.
+// portiere sono fatti ruotando le ossa sopra il clip (pose procedurali).
 //
-// Uso (da render.js): const m = await loadPlayers3D(arrayBuffer); f = m.make(kit, look); m.pose(p, f, dt, ctx)
+// Uso (da render.js): const m = await loadPlayers3D(arrayBuffer); f = m.make(kit, look, { num, name }); m.pose(p, f, dt, ctx)
+//   kit = { shirt, shorts, socks, style?, crest?, gloves? }  look = oggetto di src/looks.js (o un numero dei salvataggi vecchi)
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+import { SKINS, HAIR_COLORS, EYE_COLORS, BOOTS, normalizeLook, lookFromSeed, normalizeKitStyle, backName, hash32 } from './looks.js';
+import { drawCrest } from './crest.js';
 
 const MODEL_H = 1.86;          // altezza del modello prima di SCALE (la testa è grande: un po' più alto della figura a box, che arriva a 1,75)
-const TEX = 256;               // lato della texture dipinta per ogni maglia
+export const TEX = 512;        // lato della texture dipinta per ogni giocatore in partita
 const RUN_FULL = 1.6;          // m/s: sopra questa velocità il clip di corsa è a peso pieno
 const RUN_REF = 6.0;           // m/s: velocità a cui il clip di corsa gira a velocità 1
 const KICK_T = 0.35;           // durata di kickAnim nel motore
 const HEAD_H = 1.3;            // palla sopra questa altezza al momento del colpo = colpo di testa
-const BOOT = '#17171b', SOLE = '#e9e9e9';
-const SKIN = ['#f1c9a5', '#d9a47a', '#a9744f', '#6b4630'];
-const HAIR = ['#1c1410', '#4a2f1b', '#8a5a2b', '#d9b66a', '#222222', '#2b2b2b'];
+const SOLE = '#e4e4e4';
+const FIT_OFF = [-0.012, 0.05]; // maglia aderente / larga: spostamento del busto lungo la normale (in raggi della testa)
+const HAIR_ROWS = 18, HAIR_COLS = 28; // griglia della calotta dei capelli (elevazione × giro)
+const HAIR_MIN = 0.014;        // spessore minimo dei capelli sul bordo (raggi della testa): niente sfarfallio con la pelle
 
 // Zone della texture Kenney (coordinate su 1024, origine in alto a sinistra, come le UV glTF)
 const R = {
   head: [0, 0, 640, 440], neck: [0, 440, 640, 50],
-  torso: [0, 490, 640, 534],               // busto e braccia (croce)
-  forearmL: [0, 640, 125, 200], forearmR: [515, 640, 125, 200],
+  torso: [0, 490, 640, 534],               // busto (dietro in alto, capovolto; davanti in basso) e braccia (striscia orizzontale)
   soles: [640, 0, 384, 140], shoes: [640, 140, 190, 390],
   hands: [830, 140, 194, 630], hands2: [640, 530, 190, 240],
-  legs: [620, 770, 404, 254],             // pantaloni: in alto fianchi, in basso caviglie
+  legs: [620, 770, 404, 254],             // gambe: in alto i fianchi (770), in basso le caviglie (1024)
+  hair: [16, 496, 160, 120],              // zona libera: tinta dei capelli (la usano le UV della mesh dei capelli)
 };
-const SHORTS_END = 885, SOCKS_START = 925; // su 1024, dentro la zona legs
+const FACE = { x: 320, eyeY: 222, eyeDX: 36, browY: 196, noseY: 247, mouthY: 274 }; // viso al centro della zona testa
+const BACK = { x: 320, top: 762 };        // schiena: centro e attaccatura del collo (verso il basso = v che cala)
+const LEG_TOP = 770, KNEE = 905;
 
 const hex = c => '#' + (c >>> 0).toString(16).padStart(6, '0').slice(-6);
 const rgb = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+const shade = (h, f) => { const c = rgb(h); return '#' + c.map(x => Math.max(0, Math.min(255, Math.round(x * f))).toString(16).padStart(2, '0')).join(''); };
+const lumH = h => { const c = rgb(h); return (0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]) / 255; };
+const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const DEG = Math.PI / 180;
+const GETS = ['getX', 'getY', 'getZ', 'getW'];
+const SCALP = 2;               // passo (px su 1024) della mappa testa → direzione usata per dipingere la cute
+
+// ---------------------------------------------------------------- tagli di capelli
+// Ogni taglio: spessore in raggi della testa in funzione di elevazione e giro (gradi, giro 0 = viso), -1 = niente.
+// `line` = elevazione dell'attaccatura in funzione del giro (fronte alta, dietro bassa sulla nuca).
+const hairline = (az, front = 30, side = 8, back = -22) => { const c = Math.cos(az * DEG); return c > 0 ? side + (front - side) * c * c : side + (back - side) * c * c; };
+const edge = (el, line, w = 14) => smooth(0, w, el - line);
+const HAIR = [
+  null,                                                                    // calvo
+  null,                                                                    // rasato: solo dipinto
+  (el, az) => { const l = hairline(az); return el < l ? -1 : 0.06 * edge(el, l); },                                  // corti
+  (el, az) => { const l = hairline(az, 32); return el < l ? -1 : (0.05 + 0.13 * smooth(35, 75, el)) * edge(el, l); }, // spazzola
+  (el, az) => { const l = hairline(az); if (el < l) return -1; const f = Math.max(0, Math.cos(az * DEG)); return (0.05 + 0.24 * f * f * smooth(20, 55, el) * (1 - smooth(70, 90, el) * 0.6)) * edge(el, l); }, // ciuffo
+  (el, az) => { const l = hairline(az, 28); if (el < l) return -1; const s = Math.sin(az * DEG); return (0.07 + 0.07 * Math.max(0, s) * smooth(10, 60, el)) * edge(el, l); }, // riga di lato
+  (el, az) => { const w = Math.abs(Math.sin(az * DEG)) * Math.cos(el * DEG); const l = hairline(az, 22, 10, -10); if (el < l || w > 0.2) return -1; return (0.12 + 0.2 * smooth(30, 80, el)) * edge(el, l, 8) * smooth(0.2, 0.08, w); }, // cresta
+  (el, az) => { const l = hairline(az); if (el < l) return -1; const sp = Math.max(0, Math.sin(az * DEG * 7) * Math.sin(el * DEG * 6 + 0.5)); return (0.06 + 0.16 * sp * smooth(20, 60, el)) * edge(el, l); }, // a punte
+  (el, az) => { const l = hairline(az, 26, 4, -24); if (el < l) return -1; const b = 0.5 + 0.5 * Math.sin(az * DEG * 9) * Math.sin(el * DEG * 8); return (0.11 + 0.06 * b) * edge(el, l, 10); }, // ricci
+  (el, az) => { const l = hairline(az, 24, -8, -30); if (el < l) return -1; return (0.12 + 0.24 * smooth(-10, 50, el) + 0.04 * Math.sin(az * DEG * 8) * Math.sin(el * DEG * 7)) * edge(el, l, 30); }, // afro
+  (el, az) => { const l = hairline(az, 18, -34, -40); if (el < l) return -1; const c = Math.cos(az * DEG); if (c > 0.55 && el < 22) return -1; return 0.09 * edge(el, l, 8); }, // caschetto
+  (el, az) => { const l = hairline(az, 26, -48, -66); if (el < l) return -1; const c = Math.cos(az * DEG); if (c > 0.5 && el < 24) return -1; return (0.08 + 0.03 * smooth(-60, 0, -el)) * edge(el, l, 8); }, // lunghi
+  (el, az) => { const l = hairline(az, 30, 6, -18); return el < l ? -1 : 0.05 * edge(el, l); },                       // coda (+ coda di cavallo)
+  (el, az) => { const l = hairline(az, 30, 6, -18); return el < l ? -1 : 0.05 * edge(el, l); },                       // chignon (+ crocchia)
+  (el, az) => { const l = hairline(az, 24, -40, -58); if (el < l) return -1; const c = Math.cos(az * DEG); if (c > 0.55 && el < 22) return -1; return (0.08 + 0.05 * Math.abs(Math.sin(az * DEG * 10))) * edge(el, l, 8); }, // treccine
+  (el, az) => { const l = hairline(az, 6, 2, -22); if (el < l) return -1; const c = Math.cos(az * DEG); if (c > 0.6 && el < 6) return -1; return (0.07 + 0.03 * Math.max(0, c)) * edge(el, l, 8); }, // frangia
+  (el, az) => { const l = hairline(az, 36, 10, -20); return el < l ? -1 : (0.035 + 0.02 * smooth(-20, 40, -Math.cos(az * DEG) * 40)) * edge(el, l); }, // all'indietro
+];
+const CURLY = new Set([8, 9, 14]);
 
 class Players3D {
   constructor(gltf) {
@@ -39,10 +79,10 @@ class Players3D {
     this.mesh = null; this.scene.traverse(o => { if (o.isSkinnedMesh && !this.mesh) this.mesh = o; });
     if (!this.mesh) throw new Error('nessuna SkinnedMesh nel modello');
     this.clips = {}; for (const c of gltf.animations) this.clips[c.name] = c;
-    this.base = this.mesh.material.map ? this.mesh.material.map.image : null;
-    this.texCache = new Map(); this.headCache = new Map();
+    this.geoCache = new Map();
     this.q = new THREE.Quaternion(); this.q2 = new THREE.Quaternion(); this.e = new THREE.Euler(); this.todo = [];
     this.measure();
+    this.headFrame();
   }
 
   // scala e verso: il modello deve guardare +z ed essere alto MODEL_H con i piedi a y = 0
@@ -61,78 +101,345 @@ class Players3D {
     const sph = new THREE.Sphere(); box.getBoundingSphere(sph); this.radius = sph.radius / h * MODEL_H * 1.6;
   }
 
-  // ---------------------------------------------------------------- texture della maglia
-  headTex(look) {
-    const key = look & 0xff;
-    if (this.headCache.has(key)) return this.headCache.get(key);
-    const k = TEX / 1024, [hx, hy, hw, hh] = R.head.map(x => Math.round(x * k)), hn = Math.round((R.head[3] + R.neck[3]) * k);
-    const c = document.createElement('canvas'); c.width = hw; c.height = hn;
-    const g = c.getContext('2d', { willReadFrequently: true });
-    g.drawImage(this.base, 0, 0, 640, 490, 0, 0, hw, hn);
-    const img = g.getImageData(0, 0, hw, hn), d = img.data;
-    // colori di partenza campionati sulla pelle (collo) e sui capelli (in alto a sinistra)
-    const at = (x, y) => { const i = (Math.round(y * k) * hw + Math.round(x * k)) * 4; return [d[i], d[i + 1], d[i + 2]]; };
-    const bSkin = at(320, 470), bHair = at(60, 40), tSkin = rgb(SKIN[look % 4]), tHair = rgb(HAIR[(look >> 2) % HAIR.length]);
-    const lum = c => 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2] + 1, ls = lum(bSkin), lh = lum(bHair);
-    const dist = (r, g2, b, c) => Math.abs(r - c[0]) + Math.abs(g2 - c[1]) + Math.abs(b - c[2]);
-    for (let i = 0; i < d.length; i += 4) {
-      const r = d[i], g2 = d[i + 1], b = d[i + 2], l = 0.3 * r + 0.59 * g2 + 0.11 * b + 1;
-      const ds = dist(r, g2, b, bSkin), dh = dist(r, g2, b, bHair);
-      let t = null, f = 1;
-      // occhi e sopracciglia (centro del viso) restano scuri: lì i capelli si riconoscono solo se molto vicini
-      const px = (i >> 2) % hw, py = (i >> 2) / hw | 0, eyes = px > 250 * k && px < 400 * k && py > 185 * k && py < 300 * k;
-      if (ds < 90 && ds <= dh) { t = tSkin; f = l / ls; } else if (dh < (eyes ? 40 : 120) && l < ls) { t = tHair; f = Math.min(1.6, l / lh); }
-      if (t) { d[i] = Math.min(255, t[0] * f); d[i + 1] = Math.min(255, t[1] * f); d[i + 2] = Math.min(255, t[2] * f); }
+  // testa nello spazio della mesh: centro, assi (su, avanti, destra), raggio, triangoli (per i raggi e per dipingere la cute)
+  headFrame() {
+    const geo = this.mesh.geometry, P = geo.attributes.position, UV = geo.attributes.uv, J = geo.attributes.skinIndex, W = geo.attributes.skinWeight;
+    const names = this.mesh.skeleton.bones.map(b => b.name), H = names.indexOf('Head'), Hip = names.indexOf('Hips');
+    this.headJoint = H; this.boneOf = [];
+    const isHead = [], c = new THREE.Vector3(), hip = new THREE.Vector3(), face = new THREE.Vector3(), v = new THREE.Vector3();
+    let nh = 0, np = 0, nf = 0;
+    for (let i = 0; i < P.count; i++) {
+      let best = 0, bw = -1, hw = 0;
+      for (let k = 0; k < 4; k++) { const j = J[GETS[k]](i), w = W[GETS[k]](i); if (w > bw) { bw = w; best = j; } if (j === H) hw += w; }
+      this.boneOf[i] = names[best];
+      isHead[i] = hw > 0.5; v.fromBufferAttribute(P, i);
+      if (isHead[i]) { c.add(v); nh++; const du = UV.getX(i) * 1024 - FACE.x, dv = UV.getY(i) * 1024 - FACE.eyeY; if (du * du + dv * dv < 70 * 70) { face.add(v); nf++; } }
+      if (best === Hip) { hip.add(v); np++; }
     }
-    g.putImageData(img, 0, 0);
-    this.headCache.set(key, c);
+    c.divideScalar(nh || 1); hip.divideScalar(np || 1); face.divideScalar(nf || 1);
+    const up = c.clone().sub(hip).normalize(), fwd = face.clone().sub(c); fwd.addScaledVector(up, -fwd.dot(up)).normalize();
+    const right = new THREE.Vector3().crossVectors(up, fwd).normalize();
+    // il centro "geometrico" della testa sta un po' sotto la media dei vertici (la calotta ha più vertici)
+    const dist = []; for (let i = 0; i < P.count; i++) if (isHead[i]) dist.push(v.fromBufferAttribute(P, i).distanceTo(c));
+    dist.sort((a, b) => a - b);
+    this.head = { c, up, fwd, right, R: dist[dist.length >> 1] || 1 };
+    // triangoli della testa
+    const idx = geo.index.array, tris = [];
+    for (let t = 0; t < idx.length; t += 3) {
+      const a = idx[t], b = idx[t + 1], d = idx[t + 2];
+      if (isHead[a] + isHead[b] + isHead[d] < 2) continue;
+      tris.push({ p: [a, b, d].map(i => new THREE.Vector3().fromBufferAttribute(P, i)), uv: [a, b, d].map(i => [UV.getX(i) * 1024, UV.getY(i) * 1024]), dir: [a, b, d].map(i => this.toDir(new THREE.Vector3().fromBufferAttribute(P, i))) });
+    }
+    this.headTris = tris;
+    this.scalpMap();
+  }
+  // per ogni quadretto della zona testa della texture (passo SCALP px) la direzione dal centro della testa:
+  // serve a dipingere la cute sotto i capelli con un'attaccatura morbida che segue il taglio scelto
+  scalpMap() {
+    const cw = 640 / SCALP, ch = 440 / SCALP, map = new Float32Array(cw * ch * 2).fill(NaN), h = this.head;
+    const v = new THREE.Vector3();
+    for (const t of this.headTris) {
+      const [a, b, c] = t.uv, dv = t.p.map(p => p.clone().sub(h.c).normalize());
+      const x0 = Math.max(0, Math.floor(Math.min(a[0], b[0], c[0]) / SCALP)), x1 = Math.min(cw - 1, Math.ceil(Math.max(a[0], b[0], c[0]) / SCALP));
+      const y0 = Math.max(0, Math.floor(Math.min(a[1], b[1], c[1]) / SCALP)), y1 = Math.min(ch - 1, Math.ceil(Math.max(a[1], b[1], c[1]) / SCALP));
+      const det = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]); if (Math.abs(det) < 1e-6) continue;
+      for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+        const px = (x + 0.5) * SCALP, py = (y + 0.5) * SCALP;
+        const l1 = ((b[1] - c[1]) * (px - c[0]) + (c[0] - b[0]) * (py - c[1])) / det, l2 = ((c[1] - a[1]) * (px - c[0]) + (a[0] - c[0]) * (py - c[1])) / det, l3 = 1 - l1 - l2;
+        if (l1 < -0.02 || l2 < -0.02 || l3 < -0.02) continue;
+        v.set(0, 0, 0).addScaledVector(dv[0], l1).addScaledVector(dv[1], l2).addScaledVector(dv[2], l3);
+        const [el, az] = this.toDir(v.add(h.c)), i = (y * cw + x) * 2; map[i] = el; map[i + 1] = az;
+      }
+    }
+    this.scalp = { map, cw, ch };
+  }
+  toDir(p) { const h = this.head, d = p.clone().sub(h.c); const y = d.dot(h.up), x = d.dot(h.right), z = d.dot(h.fwd); return [Math.atan2(y, Math.hypot(x, z)) / DEG, Math.atan2(x, z) / DEG]; }
+  dirVec(el, az) { const h = this.head, ce = Math.cos(el * DEG); return new THREE.Vector3().addScaledVector(h.up, Math.sin(el * DEG)).addScaledVector(h.fwd, ce * Math.cos(az * DEG)).addScaledVector(h.right, ce * Math.sin(az * DEG)); }
+  // distanza dal centro della testa alla sua superficie lungo d (raggio contro i triangoli della testa)
+  headDist(d) {
+    const o = this.head.c, e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), pv = new THREE.Vector3(), tv = new THREE.Vector3(), qv = new THREE.Vector3();
+    let best = Infinity;
+    for (const t of this.headTris) {
+      const [a, b, c] = t.p; e1.subVectors(b, a); e2.subVectors(c, a); pv.crossVectors(d, e2);
+      const det = e1.dot(pv); if (Math.abs(det) < 1e-12) continue;
+      const inv = 1 / det; tv.subVectors(o, a); const u = tv.dot(pv) * inv; if (u < 0 || u > 1) continue;
+      qv.crossVectors(tv, e1); const w = d.dot(qv) * inv; if (w < 0 || u + w > 1) continue;
+      const k = e2.dot(qv) * inv; if (k > 0 && k < best) best = k;
+    }
+    return best === Infinity ? null : best;
+  }
+
+  // ---------------------------------------------------------------- geometria: capelli fusi col corpo, maglia larga o aderente
+  hairGeo(style) {
+    const fn = HAIR[style], h = this.head, R = h.R, pos = [], uv = [], ind = [];
+    const [sx, sy, sw, sh] = R_HAIR;
+    if (fn) {
+      const elMin = -72, grid = [];
+      let lastD = R;
+      for (let r = 0; r <= HAIR_ROWS; r++) {
+        const el = elMin + (90 - elMin) * r / HAIR_ROWS, row = [];
+        for (let k = 0; k < HAIR_COLS; k++) {
+          const az = -180 + 360 * k / HAIR_COLS, t = r === HAIR_ROWS ? fn(89.9, 0) : fn(el, az);
+          if (t < 0) { row.push(-1); continue; }
+          const d = this.dirVec(Math.min(el, 89.9), az), hd = this.headDist(d) ?? lastD; lastD = hd;
+          const p = h.c.clone().addScaledVector(d, hd + Math.max(t, HAIR_MIN) * R);
+          row.push(pos.length / 3); pos.push(p.x, p.y, p.z);
+          uv.push((sx + sw * (k / HAIR_COLS)) / 1024, (sy + sh * (1 - r / HAIR_ROWS)) / 1024);
+        }
+        grid.push(row);
+      }
+      for (let r = 0; r < HAIR_ROWS; r++) for (let k = 0; k < HAIR_COLS; k++) {
+        const k2 = (k + 1) % HAIR_COLS, a = grid[r][k], b = grid[r][k2], c = grid[r + 1][k2], d = grid[r + 1][k];
+        if (a < 0 || b < 0 || c < 0 || d < 0) continue;
+        if (r + 1 === HAIR_ROWS) { ind.push(a, b, d); continue; } // in cima tutti i punti coincidono: un triangolo basta
+        ind.push(a, b, c, a, c, d);
+      }
+    }
+    const extra = (g, at) => { // pezzi in più (coda, crocchia) nello spazio della testa
+      const base = pos.length / 3, P = g.attributes.position, U = g.attributes.uv, m = new THREE.Matrix4().makeBasis(h.right, h.up, h.fwd);
+      for (let i = 0; i < P.count; i++) {
+        const p = new THREE.Vector3().fromBufferAttribute(P, i).multiplyScalar(R).applyMatrix4(m).add(at);
+        pos.push(p.x, p.y, p.z); uv.push((sx + sw * U.getX(i)) / 1024, (sy + sh * U.getY(i)) / 1024);
+      }
+      const gi = g.index ? g.index.array : P.array.map((_, i) => i).slice(0, P.count); for (let i = 0; i < gi.length; i++) ind.push(base + gi[i]);
+    };
+    if (style === 12) { // coda di cavallo: cono che scende dietro la nuca
+      const d = this.dirVec(12, 180), at = h.c.clone().addScaledVector(d, (this.headDist(d) || R) + 0.04 * R);
+      const g = new THREE.CylinderGeometry(0.2, 0.07, 1.1, 7, 2); g.translate(0, -0.55, 0); g.rotateX(-0.5); at.addScaledVector(h.up, 0.05 * R);
+      extra(g, at);
+    } else if (style === 13) { // crocchia in alto dietro
+      const d = this.dirVec(42, 180), at = h.c.clone().addScaledVector(d, (this.headDist(d) || R) + 0.16 * R);
+      extra(new THREE.IcosahedronGeometry(0.3, 1), at);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(ind);
+    g.computeVertexNormals();
+    return g;
+  }
+
+  bodyGeo(hair, fit) {
+    const key = hair + ':' + fit;
+    if (this.geoCache.has(key)) return this.geoCache.get(key);
+    const base = this.mesh.geometry, hg = this.hairGeo(hair), nb = base.attributes.position.count, nh = hg.attributes.position.count;
+    const out = new THREE.BufferGeometry(), A = base.attributes;
+    // copia componente per componente: gli attributi del glTF possono essere interlacciati o normalizzati
+    const GET = ['getX', 'getY', 'getZ', 'getW'];
+    const cat = (name, size, hairVal) => {
+      const src = A[name], arr = name === 'skinIndex' ? new Uint16Array((nb + nh) * size) : new Float32Array((nb + nh) * size);
+      for (let i = 0; i < nb; i++) for (let k = 0; k < size; k++) arr[i * size + k] = src[GET[k]](i);
+      for (let i = 0; i < nh; i++) for (let k = 0; k < size; k++) arr[(nb + i) * size + k] = hairVal(i, k);
+      out.setAttribute(name, new THREE.BufferAttribute(arr, size));
+    };
+    const HP = hg.attributes.position.array, HN = hg.attributes.normal ? hg.attributes.normal.array : [], HU = hg.attributes.uv.array;
+    cat('position', 3, (i, k) => HP[i * 3 + k]); cat('normal', 3, (i, k) => HN[i * 3 + k]); cat('uv', 2, (i, k) => HU[i * 2 + k]);
+    cat('skinIndex', 4, (i, k) => (k === 0 ? this.headJoint : 0)); cat('skinWeight', 4, (i, k) => (k === 0 ? 1 : 0));
+    // maglia aderente o larga: il busto e le spalle si gonfiano un poco lungo la normale
+    const off = FIT_OFF[fit] * this.head.R, P = out.attributes.position.array, N = A.normal;
+    for (let i = 0; i < nb; i++) if (/Spine|Chest|Shoulder|^(Left|Right)Arm$/.test(this.boneOf[i])) for (let k = 0; k < 3; k++) P[i * 3 + k] += N[GET[k]](i) * off;
+    const bi = base.index.array, hi = hg.index ? hg.index.array : [], idx = new (nb + nh > 65535 ? Uint32Array : Uint16Array)(bi.length + hi.length);
+    idx.set(bi); for (let i = 0; i < hi.length; i++) idx[bi.length + i] = hi[i] + nb;
+    out.setIndex(new THREE.BufferAttribute(idx, 1));
+    out.boundingSphere = base.boundingSphere; out.boundingBox = base.boundingBox;
+    this.geoCache.set(key, out);
+    return out;
+  }
+
+  // ---------------------------------------------------------------- texture del giocatore
+  paint(kit, look, opt, size) {
+    const c = document.createElement('canvas'); c.width = c.height = size;
+    const g = c.getContext('2d'); g.scale(size / 1024, size / 1024);
+    const L = look, st = normalizeKitStyle(kit.style), skin = SKINS[L.skin][1], hairC = HAIR_COLORS[L.hairColor][1];
+    const shirt = hex(kit.shirt), alt = hex(kit.shorts === kit.shirt ? (lumH(hex(kit.shirt)) > 0.5 ? 0x1b1b1b : 0xffffff) : kit.shorts);
+    const rect = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
+    rect(0, 0, 1024, 1024, skin);
+    this.paintHead(g, L, skin, hairC);
+    this.paintShirt(g, kit, st, shirt, alt, skin, opt);
+    this.paintHair(g, L, hairC); // dopo la maglia: la tinta dei capelli sta in una zona libera dentro il rettangolo del busto
+    this.paintLegs(g, kit, st, alt, skin);
+    // mani (guanti per il portiere), scarpe con suola e una fascia di contrasto
+    const glove = kit.gloves ? '#f4f4f4' : skin;
+    rect(...R.hands, glove); rect(...R.hands2, glove);
+    if (kit.gloves) { g.fillStyle = shade(shirt, 0.8); for (const [x, y, w, h] of [R.hands, R.hands2]) g.fillRect(x, y + h * 0.4, w, h * 0.12); }
+    const boot = BOOTS[L.boots][1], acc = lumH(boot) > 0.6 ? '#1b1b1f' : (L.boots === 0 ? '#e9e9e9' : '#ffffff');
+    rect(...R.soles, SOLE); rect(...R.shoes, boot);
+    g.save(); g.beginPath(); g.rect(...R.shoes); g.clip(); g.strokeStyle = acc; g.lineWidth = 14;
+    for (let y = 140; y < 600; y += 175) { g.beginPath(); g.moveTo(640, y + 70); g.lineTo(830, y); g.stroke(); }
+    g.restore();
     return c;
   }
 
-  kitTex(kit, look) {
-    const key = [kit.shirt, kit.shorts, kit.socks, kit.stripe, look & 0xff].join(',');
-    let t = this.texCache.get(key); if (t) return t;
-    const c = document.createElement('canvas'); c.width = c.height = TEX;
-    const g = c.getContext('2d'), k = TEX / 1024, skin = SKIN[look % 4];
-    const rect = (r, col) => { g.fillStyle = col; g.fillRect(r[0] * k, r[1] * k, r[2] * k, r[3] * k); };
-    rect([0, 0, 1024, 1024], skin);
-    if (this.base) g.drawImage(this.headTex(look), 0, 0);
-    // maglia (busto + maniche corte), avambracci nudi, righe verticali se la maglia le ha
-    rect(R.torso, hex(kit.shirt));
-    if (kit.stripe !== undefined) for (const x of [262, 372]) rect([x, 490, 48, 534], hex(kit.stripe));
-    rect(R.forearmL, skin); rect(R.forearmR, skin);
-    // colletto e bordo delle maniche più scuri: si legge meglio da lontano
-    g.globalAlpha = 0.25; rect([125, 640, 10, 200], '#000'); rect([505, 640, 10, 200], '#000'); g.globalAlpha = 1;
-    // pantaloncini, ginocchia, calzettoni
-    const [lx, ly, lw] = R.legs;
-    rect([lx, ly, lw, SHORTS_END - ly], hex(kit.shorts));
-    rect([lx, SOCKS_START, lw, 1024 - SOCKS_START], hex(kit.socks));
-    // scarpe e mani
-    rect(R.soles, SOLE); rect(R.shoes, BOOT); rect(R.hands, skin); rect(R.hands2, skin);
-    t = new THREE.CanvasTexture(c); t.flipY = false; t.colorSpace = THREE.SRGBColorSpace;
-    t.anisotropy = 4; t.generateMipmaps = true;
-    this.texCache.set(key, t);
-    return t;
+  paintHead(g, L, skin, hairC) {
+    const F = FACE, dark = shade(skin, 0.82), deep = shade(skin, 0.62);
+    // ombra sotto il mento e sul collo, orecchie, naso, bocca
+    const grd = g.createLinearGradient(0, 300, 0, 470); grd.addColorStop(0, skin); grd.addColorStop(1, shade(skin, 0.86));
+    g.fillStyle = grd; g.fillRect(0, 300, 640, 190);
+    g.strokeStyle = dark; g.lineWidth = 7; g.lineCap = 'round';
+    for (const ex of [F.x - 136, F.x + 136]) { g.beginPath(); g.ellipse(ex, F.eyeY + 18, 13, 22, 0, 0, Math.PI * 2); g.fillStyle = shade(skin, 0.93); g.fill(); g.beginPath(); g.arc(ex, F.eyeY + 18, 8, -1.2, 1.2); g.stroke(); }
+    g.strokeStyle = deep; g.lineWidth = 5; g.beginPath(); g.arc(F.x, F.noseY - 6, 9, 0.35, Math.PI - 0.35); g.stroke();
+    g.strokeStyle = shade(skin, 0.55); g.lineWidth = 6; g.beginPath(); g.moveTo(F.x - 15, F.mouthY); g.quadraticCurveTo(F.x, F.mouthY + 7, F.x + 15, F.mouthY); g.stroke();
+    g.fillStyle = shade(skin, 0.9); g.beginPath(); g.ellipse(F.x, F.mouthY + 12, 9, 3, 0, 0, Math.PI * 2); g.fill();
+    this.paintBeard(g, L, skin, hairC);
+    // occhi
+    const iris = EYE_COLORS[L.eyeColor][1];
+    for (const s of [-1, 1]) {
+      const x = F.x + s * F.eyeDX, y = F.eyeY;
+      const [rx, ry, tilt, lid] = [[12, 11, 0, 0], [14, 9, 0.12, 0], [14, 6, 0.05, 0], [15, 13, 0, 0], [17, 8, 0.2, 0], [13, 10, 0, 0.45]][L.eyes];
+      g.save(); g.translate(x, y); g.rotate(-s * tilt);
+      g.beginPath();
+      if (L.eyes === 1 || L.eyes === 4) { g.moveTo(-rx, 0); g.quadraticCurveTo(0, -ry * 2, rx, 0); g.quadraticCurveTo(0, ry * 1.6, -rx, 0); } else g.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+      g.fillStyle = '#fbfbf8'; g.fill(); g.save(); g.clip();
+      const ir = Math.min(ry * 1.05 + 2, 10.5);
+      g.fillStyle = iris; g.beginPath(); g.arc(s * 1.5, 1, ir, 0, Math.PI * 2); g.fill();
+      g.fillStyle = shade(iris, 0.55); g.lineWidth = 2; g.strokeStyle = shade(iris, 0.5); g.stroke();
+      g.fillStyle = '#0d0907'; g.beginPath(); g.arc(s * 1.5, 1, ir * 0.48, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#fff'; g.beginPath(); g.arc(s * 1.5 - 3, -3, Math.max(2, ir * 0.25), 0, Math.PI * 2); g.fill();
+      if (lid) { g.fillStyle = shade(skin, 0.9); g.fillRect(-rx - 2, -ry - 2, rx * 2 + 4, ry * 2 * lid + 2); }
+      g.restore();
+      // ciglia: linea scura sopra
+      g.strokeStyle = '#1a120d'; g.lineWidth = 3.5; g.beginPath();
+      if (lid) { g.moveTo(-rx, -ry + ry * 2 * lid); g.lineTo(rx, -ry + ry * 2 * lid); } else if (L.eyes === 1 || L.eyes === 4) { g.moveTo(-rx, 0); g.quadraticCurveTo(0, -ry * 2, rx, 0); } else g.ellipse(0, 0, rx, ry, 0, Math.PI * 1.05, Math.PI * 1.95);
+      g.stroke(); g.restore();
+    }
+    // sopracciglia (colore dei capelli, un po' più scuro)
+    const bc = shade(hairC, lumH(hairC) > 0.6 ? 0.7 : 0.85);
+    g.strokeStyle = bc; g.lineCap = 'round';
+    for (const s of [-1, 1]) {
+      const x = F.x + s * F.eyeDX, y = F.browY;
+      const [w, th, arc, ang] = [[15, 6, 4, 0], [14, 3, 3, 0], [16, 10, 3, 0], [15, 5.5, 9, 0], [16, 6.5, 0, 0], [15, 7, 1, -0.28]][L.brows];
+      g.lineWidth = th; g.save(); g.translate(x, y); g.rotate(s * ang);
+      g.beginPath(); g.moveTo(-w, 2); g.quadraticCurveTo(0, -arc - 1, w, 2); g.stroke(); g.restore();
+    }
+  }
+
+  paintBeard(g0, L, skin, hairC) {
+    let g = g0;
+    if (!L.beard) return;
+    const F = FACE, x = F.x, y = F.mouthY, col = hairC, out = g;
+    const lay = document.createElement('canvas'); lay.width = 640; lay.height = 440; g = lay.getContext('2d');
+    g.save(); g.fillStyle = col;
+    const jaw = () => { g.beginPath(); g.moveTo(x - 92, F.eyeY + 42); g.lineTo(x - 82, y + 34); g.quadraticCurveTo(x, y + 78, x + 82, y + 34); g.lineTo(x + 92, F.eyeY + 42); g.lineTo(x + 62, F.eyeY + 48); g.quadraticCurveTo(x + 40, y - 10, x + 24, y - 8); g.quadraticCurveTo(x, y - 18, x - 24, y - 8); g.quadraticCurveTo(x - 40, y - 10, x - 62, F.eyeY + 48); g.closePath(); };
+    const mouth = () => { g.globalCompositeOperation = 'destination-out'; g.beginPath(); g.ellipse(x, y + 2, 17, 7, 0, 0, Math.PI * 2); g.fill(); g.globalCompositeOperation = 'source-over'; };
+    if (L.beard === 1) { // ombra: puntinato leggero
+      const sl = document.createElement('canvas'); sl.width = 300; sl.height = 200; const q = sl.getContext('2d');
+      q.translate(150 - x, 100 - y - 10); q.fillStyle = col;
+      q.beginPath(); q.moveTo(x - 92, F.eyeY + 42); q.lineTo(x - 82, y + 34); q.quadraticCurveTo(x, y + 78, x + 82, y + 34); q.lineTo(x + 92, F.eyeY + 42); q.lineTo(x + 50, y - 2); q.lineTo(x - 50, y - 2); q.closePath(); q.clip();
+      const r = (() => { let a = 7; return () => { a = (a * 16807) % 2147483647; return a / 2147483647; }; })();
+      for (let i = 0; i < 900; i++) q.fillRect(x - 100 + r() * 200, y - 70 + r() * 150, 2.2, 2.2);
+      g.globalAlpha = 0.5; g.drawImage(q.canvas, x - 150, y + 10 - 100); g.globalAlpha = 1;
+    } else if (L.beard === 2 || L.beard === 4) { // pizzetto (+ baffi)
+      g.beginPath(); g.moveTo(x - 16, y + 12); g.quadraticCurveTo(x, y + 8, x + 16, y + 12); g.lineTo(x + 12, y + 40); g.quadraticCurveTo(x, y + 48, x - 12, y + 40); g.closePath(); g.fill();
+    }
+    if (L.beard === 3 || L.beard === 4 || L.beard === 6) { // baffi
+      g.beginPath(); g.moveTo(x - 24, y + 4); g.quadraticCurveTo(x - 20, y - 12, x, y - 9); g.quadraticCurveTo(x + 20, y - 12, x + 24, y + 4); g.quadraticCurveTo(x, y - 3, x - 24, y + 4); g.fill();
+    }
+    if (L.beard === 5) { g.globalAlpha = 0.85; jaw(); g.fill(); g.globalAlpha = 1; mouth(); }
+    if (L.beard === 6) { jaw(); g.fill(); g.fillRect(x - 80, y + 30, 160, 70); mouth(); }
+    g.restore();
+    out.drawImage(lay, 0, 0);
+  }
+
+  // cute sotto i capelli (ogni triangolo della testa coperto dal taglio) e tinta dei capelli per le UV della mesh
+  paintHair(g, L, hairC) {
+    const fn = HAIR[L.hair], buzz = L.hair === 1;
+    if ((fn || buzz) && this.scalp) {
+      const { map, cw, ch } = this.scalp, lay = document.createElement('canvas'); lay.width = cw; lay.height = ch;
+      const q = lay.getContext('2d'), img = q.createImageData(cw, ch), d = img.data, col = rgb(shade(hairC, 0.85));
+      for (let i = 0; i < cw * ch; i++) {
+        const el = map[i * 2], az = map[i * 2 + 1]; if (el !== el) continue;
+        // rasato: ombra fino all'attaccatura; con la mesh: cute dipinta un po' oltre il bordo dei capelli
+        const a2 = buzz ? smooth(-3, 3, el - hairline(az, 30, 8, -22)) * 0.85 : (fn(el, az) >= 0 || fn(el + 4, az) >= 0 ? 1 : 0);
+        d[i * 4] = col[0]; d[i * 4 + 1] = col[1]; d[i * 4 + 2] = col[2]; d[i * 4 + 3] = a2 * 255;
+      }
+      q.putImageData(img, 0, 0);
+      g.save(); g.imageSmoothingEnabled = true; g.drawImage(lay, 0, 0, 640, 440); g.restore();
+    }
+    // tinta con le ciocche
+    const [x, y, w, h] = R.hair;
+    g.fillStyle = hairC; g.fillRect(x - 16, y - 16, w + 32, h + 32);
+    const r = (() => { let a = 11 + L.hair; return () => { a = (a * 16807) % 2147483647; return a / 2147483647; }; })();
+    if (CURLY.has(L.hair)) for (let i = 0; i < 900; i++) { g.fillStyle = r() < 0.5 ? shade(hairC, 0.78) : shade(hairC, 1.2); g.beginPath(); g.arc(x + r() * w, y + r() * h, 0.8 + r() * 1.4, 0, 7); g.fill(); }
+    else for (let i = 0; i < 70; i++) { g.fillStyle = r() < 0.55 ? shade(hairC, 0.75) : shade(hairC, 1.22); g.fillRect(x + r() * w, y + r() * h * 0.3, 1.5 + r() * 2, h * (0.4 + r() * 0.6)); }
+  }
+
+  paintShirt(g, kit, st, shirt, alt, skin, opt) {
+    const [tx, ty, tw, th] = R.torso, rect = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
+    rect(tx, ty, tw, th, shirt);
+    // motivo, nei colori della squadra (righe sul busto e sulle maniche come verrebbero su una maglia vera)
+    g.save(); g.beginPath(); g.rect(tx, ty, tw, th); g.clip(); g.fillStyle = alt;
+    if (st.pattern === 1) for (let x = 262; x < 400; x += 44) { g.fillRect(x, 490, 20, 534); }
+    else if (st.pattern === 2) { for (let y = 790; y < 1024; y += 52) g.fillRect(240, y, 160, 22); for (let y = 740; y > 490; y -= 52) g.fillRect(240, y - 22, 160, 22); }
+    else if (st.pattern === 3) { g.beginPath(); g.moveTo(240, 790); g.lineTo(400, 900); g.lineTo(400, 950); g.lineTo(240, 840); g.fill(); g.beginPath(); g.moveTo(400, 740); g.lineTo(240, 630); g.lineTo(240, 580); g.lineTo(400, 690); g.fill(); }
+    else if (st.pattern === 4) { g.fillRect(320, 768, 80, 256); g.fillRect(240, 490, 80, 278); g.fillRect(384, 640, 256, 200); }
+    g.restore();
+    // maniche: corte (a metà braccio), lunghe (fino al polso, polsino colorato), senza (spalla scoperta con bordino)
+    const armY = 640, armH = 200;
+    if (st.sleeves === 0) { rect(0, armY, 165, armH, skin); rect(475, armY, 165, armH, skin); rect(165, armY, 10, armH, alt); rect(465, armY, 10, armH, alt); }
+    else if (st.sleeves === 1) { rect(0, armY, 14, armH, alt); rect(626, armY, 14, armH, alt); }
+    else { rect(0, armY, 238, armH, skin); rect(402, armY, 238, armH, skin); rect(236, armY, 6, armH, alt); rect(398, armY, 6, armH, alt); }
+    // colletto: girocollo, a V, polo con bottoni (davanti scende da v 768)
+    const top = 768;
+    g.fillStyle = alt; g.strokeStyle = alt; g.lineWidth = 9;
+    if (st.collar === 0) { g.beginPath(); g.ellipse(320, top, 34, 18, 0, 0, Math.PI); g.stroke(); }
+    else if (st.collar === 1) { g.lineWidth = 8; g.beginPath(); g.moveTo(288, top); g.lineTo(320, top + 44); g.lineTo(352, top); g.stroke(); }
+    else { g.beginPath(); g.moveTo(278, top); g.lineTo(312, top + 26); g.lineTo(306, top); g.fill(); g.beginPath(); g.moveTo(362, top); g.lineTo(328, top + 26); g.lineTo(334, top); g.fill(); g.fillRect(314, top, 12, 46); g.fillStyle = shirt; for (const y of [top + 14, top + 32]) { g.beginPath(); g.arc(320, y, 3.5, 0, 7); g.fill(); } }
+    rect(270, top - 8, 100, 8, alt); rect(270, top - 2, 100, 4, shade(alt, 0.85)); // bordo del collo dietro
+    // stemma sul petto (lato sinistro del giocatore) e numero piccolo
+    if (kit.crest) drawCrest(g, kit.crest, kit.crest.c1, kit.crest.c2, 343, 790, 30);
+    // cognome e numero sulla schiena (capovolti: sulla schiena le UV vanno dal collo verso il basso con v che cala)
+    const ink = this.inkFor(shirt, alt, st.pattern);
+    g.save(); g.translate(BACK.x, BACK.top); g.rotate(Math.PI); g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.lineJoin = 'round';
+    if (opt.name) { let fs = 26; g.font = `800 ${fs}px "Arial Narrow",Arial,sans-serif`; const w = g.measureText(opt.name).width; if (w > 96) { fs = Math.floor(fs * 96 / w); g.font = `800 ${fs}px "Arial Narrow",Arial,sans-serif`; } g.lineWidth = 5; g.strokeStyle = ink.line; g.strokeText(opt.name, 0, 64); g.fillStyle = ink.fill; g.fillText(opt.name, 0, 64); }
+    if (opt.num) { const n = String(opt.num); g.font = `900 ${n.length > 1 ? 96 : 104}px "Arial Narrow",Arial,sans-serif`; g.save(); g.scale(n.length > 1 ? 0.78 : 1, 1); g.lineWidth = 9; g.strokeStyle = ink.line; g.strokeText(n, 0, 140); g.fillStyle = ink.fill; g.fillText(n, 0, 140); g.restore(); }
+    g.restore();
+  }
+  // colore di cognome e numero: il secondario della squadra se si legge sulla maglia, altrimenti bianco o nero
+  inkFor(shirt, alt, pattern) {
+    const ls = lumH(shirt), la = lumH(alt);
+    const fill = pattern === 0 && Math.abs(ls - la) > 0.3 ? alt : (ls > 0.55 ? '#14161c' : '#ffffff');
+    return { fill, line: lumH(fill) > 0.5 ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.45)' };
+  }
+
+  paintLegs(g, kit, st, alt, skin) {
+    const [lx, , lw] = R.legs, shorts = hex(kit.shorts), socks = hex(kit.socks), rect = (y0, y1, col) => { g.fillStyle = col; g.fillRect(lx, y0, lw, y1 - y0); };
+    const sEnd = st.shorts === 1 ? 918 : 878;
+    rect(LEG_TOP, 1024, skin);
+    // ginocchio: leggera ombra
+    g.fillStyle = shade(skin, 0.9); g.fillRect(lx, KNEE - 4, lw, 8);
+    rect(LEG_TOP, sEnd, shorts); rect(sEnd - 7, sEnd, shade(shorts, 0.8));
+    // banda laterale dei pantaloncini nel colore della maglia
+    g.fillStyle = hex(kit.shirt === kit.shorts ? 0xffffff : kit.shirt); for (const x of [lx + 6, 832 - 8, 832 + 4, 1024 - 10]) g.fillRect(x, LEG_TOP, 6, sEnd - LEG_TOP - 8);
+    const sStart = st.socks === 1 ? 992 : st.socks === 2 ? 948 : 922;
+    rect(sStart, 1024, socks);
+    if (st.socks === 2) { rect(sStart, sStart + 20, shade(socks, 0.82)); rect(sStart + 20, sStart + 24, alt); }
+    else rect(sStart + 6, sStart + 12, lumH(socks) > 0.5 ? shade(socks, 0.75) : alt);
   }
 
   // ---------------------------------------------------------------- un giocatore
-  make(kit, look) {
+  make(kit, look, opt = {}) {
+    const L = typeof look === 'number' ? lookFromSeed(look) : normalizeLook(look);
+    const st = normalizeKitStyle(kit.style);
     const g = new THREE.Group(), body = new THREE.Group(), fix = new THREE.Group(); g.add(body); body.add(fix);
     const model = cloneSkinned(this.scene); fix.add(model);
     fix.rotation.y = this.fixYaw; fix.scale.setScalar(this.fixScale); fix.position.y = this.fixY;
     let mesh = null; const bones = {};
     model.traverse(o => { if (o.isSkinnedMesh) mesh = o; if (o.isBone) bones[o.name] = o; });
-    const mat = new THREE.MeshLambertMaterial({ map: this.kitTex(kit, look) });
+    const size = opt.tex || TEX, canvas = this.paint(kit, L, { num: opt.num, name: opt.name ? backName(opt.name) : '' }, size);
+    const tex = new THREE.CanvasTexture(canvas); tex.flipY = false; tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4; tex.generateMipmaps = true;
+    const mat = new THREE.MeshLambertMaterial({ map: tex });
+    mesh.geometry = this.bodyGeo(L.hair, st.fit);
     mesh.material = mat; mesh.frustumCulled = true;
     mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, MODEL_H / 2 / this.fixScale, 0), this.radius / this.fixScale);
-    const mixer = new THREE.AnimationMixer(model), act = {};
+    const mixer = new THREE.AnimationMixer(model), act = {}, ph = (hash32(L.hair, L.skin, opt.num || 0) % 1000) / 1000;
     for (const n of ['idle', 'run', 'jump']) {
       if (!this.clips[n]) continue;
       const a = mixer.clipAction(this.clips[n]); a.play(); a.setEffectiveWeight(n === 'idle' ? 1 : 0);
-      a.time = ((look * 0.37) % 1) * this.clips[n].duration; act[n] = a;
+      a.time = ph * this.clips[n].duration; act[n] = a;
     }
-    return { g, body, fix, model, mesh, mixer, act, bones, mat, saved: [], m3d: true };
+    return { g, body, fix, model, mesh, mixer, act, bones, mat, tex, saved: [], m3d: true, tris: mesh.geometry.index.count / 3 };
   }
+  // libera la texture di un giocatore tolto dalla scena (la geometria è condivisa e resta in cache)
+  dispose(f) { if (f && f.tex) { f.tex.dispose(); f.mat.dispose(); } }
 
   // rotazione di un osso attorno a un asse del corpo (x = di lato, y = su, z = avanti), sopra la posa del clip
   rot(f, name, ax, ang) {
@@ -227,15 +534,21 @@ class Players3D {
     if (this.todo.length) this.flush(f);
   }
 }
+const R_HAIR = R.hair;
 
 // Carica il modello da un ArrayBuffer (assets.get('player')). Ritorna null se manca o non si legge.
+// Lo stesso buffer dà sempre lo stesso oggetto (la partita e l'editor lo condividono).
+const loaded = new WeakMap();
 export function loadPlayers3D(buf) {
   if (!buf) return Promise.resolve(null);
-  return new Promise((ok) => {
+  if (loaded.has(buf)) return loaded.get(buf);
+  const pr = new Promise((ok) => {
     try {
-      new GLTFLoader().parse(buf, '', (gltf) => {
+      new GLTFLoader().parse(buf.slice(0), '', (gltf) => {
         try { ok(new Players3D(gltf)); } catch (e) { console.warn('modello giocatori non usabile:', e); ok(null); }
       }, (e) => { console.warn('modello giocatori non leggibile:', e); ok(null); });
     } catch (e) { console.warn('modello giocatori non leggibile:', e); ok(null); }
   });
+  loaded.set(buf, pr);
+  return pr;
 }

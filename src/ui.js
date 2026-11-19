@@ -2,6 +2,8 @@
 import { FORMATIONS, headingOf } from './sim.js';
 import { UI_CSS } from './ui-style.js';
 import { DIV_NAMES, POS_NAME, KITS, overall, overallAs, value, fmtMoney } from './career.js';
+import { Editor } from './editor.js';
+import { crestSvg, crestFromSeed } from './crest.js';
 
 const hex = n => '#' + n.toString(16).padStart(6, '0');
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -11,13 +13,8 @@ const statOf = (p, k) => (k === 'tes' ? headingOf(p) : p[k]);
 const ovrCls = o => (o >= 75 ? 'o4' : o >= 65 ? 'o3' : o >= 55 ? 'o2' : 'o1');
 
 
-let uid = 0;
-const lum = n => { const r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255; return (0.299 * r + 0.587 * g + 0.114 * b) / 255; };
-// stemma originale: scudo con banda diagonale e sigla (colori maglia)
-const crest = (kit, short, cls = '') => {
-  const k = KITS[kit] || KITS[0], id = 'cr' + (++uid), ink = lum(k[1]) > 0.55 ? '#111827' : '#ffffff';
-  return `<svg class="crest ${cls}" viewBox="0 0 40 48" aria-hidden="true"><defs><clipPath id="${id}"><path d="M3 3h34v22c0 11-9 17-17 21C12 42 3 36 3 25z"/></clipPath></defs><g clip-path="url(#${id})"><rect width="40" height="48" fill="${hex(k[1])}"/><path d="M-4 30L44 6v14L-4 44z" fill="${hex(k[2])}" opacity=".9"/></g><path d="M3 3h34v22c0 11-9 17-17 21C12 42 3 36 3 25z" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2"/>${short ? `<text x="20" y="24" text-anchor="middle" font-size="11" font-weight="900" font-family="system-ui,sans-serif" fill="${ink}" stroke="${lum(k[1]) > 0.55 ? '#fff' : '#000'}" stroke-opacity=".35" stroke-width=".6" paint-order="stroke">${esc(short)}</text>` : ''}</svg>`;
-};
+// stemma di una squadra (src/crest.js): sagoma, motivo e simbolo, coi colori della maglia
+const crestK = (c, kit, cls = '') => { const k = KITS[kit] || KITS[0]; return crestSvg(c, k[1], k[2], cls); };
 const shirt = k => `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M13 4q7 5 14 0l10 5 4 9-6 3-2-3v18H9V18l-2 3-6-3 4-9z" fill="${hex(k[1])}" stroke="#fff" stroke-opacity=".5" stroke-width="1.4" stroke-linejoin="round"/><path d="M13 4q7 5 14 0" fill="none" stroke="${hex(k[2])}" stroke-width="2.6"/><path d="M1 18l6 3M39 18l-6 3" stroke="${hex(k[2])}" stroke-width="3"/></svg>`;
 const ico = d => `<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
 const ICONS = {
@@ -52,6 +49,7 @@ export const HOWTO = [
 
 export class UI {
   constructor(root, career, api) {
+    this.ed = new Editor(this);
     this.root = root; this.c = career; this.api = api; this.screen = ''; this.sel = null; this.tabDiv = null; this.mfilter = 'T'; this.kit = 0; this.msg = '';
     if (typeof document !== 'undefined') { const st = document.createElement('style'); st.textContent = UI_CSS; document.head.appendChild(st); }
     root.addEventListener('click', e => {
@@ -59,22 +57,30 @@ export class UI {
       api.click(); this.act(t.dataset.a, t.dataset.v, t);
     });
   }
-  hide() { this.root.style.display = 'none'; this.screen = ''; }
+  hide() { this.ed.unmount(); this.root.style.display = 'none'; this.screen = ''; }
+  tcrest(t, cls) { return crestK(this.c.teamCrest(t), t.kit, cls); }
+  editor() { return this.ed.html(); }
   show(name, arg) {
+    if (name !== 'editor') this.ed.unmount();
     this.screen = name; this.arg = arg; this.root.style.display = 'block';
     const s = this.c.s, k = s ? KITS[s.kit] : KITS[this.kit]; if (k) { this.root.style.setProperty('--k1', hex(k[1])); this.root.style.setProperty('--k2', hex(k[2])); }
     const fresh = !this.quiet; this.quiet = false;
-    this.root.innerHTML = '<div class="scr' + (fresh ? ' in' : '') + '">' + this[name](arg) + '</div>'; this.root.firstChild.scrollTop = this.keepScroll || 0; this.keepScroll = 0; }
+    this.root.innerHTML = '<div class="scr' + (fresh ? ' in' : '') + '">' + this[name](arg) + '</div>'; this.root.firstChild.scrollTop = this.keepScroll || 0; this.keepScroll = 0;
+    if (name === 'editor') this.ed.mount(this.root); }
   redraw() { this.quiet = true; const sc = this.root.firstChild ? this.root.firstChild.scrollTop : 0; this.keepScroll = sc; this.show(this.screen, this.arg); }
   toast(m) { this.msg = m; this.redraw(); this.msg = ''; }
 
   act(a, v, el) {
     const c = this.c, s = c.s;
+    if (a.startsWith('ed') && this.ed.act(a, v, el)) return;
     switch (a) {
       case 'go': this.sel = null; this.show(v); break;
       case 'kit': this.quiet = true; this.kit = +v; this.nameVal = this.root.querySelector('#club') ? this.root.querySelector('#club').value : ''; this.show('title', 'new'); break;
       case 'new': this.show('title', 'new'); break;
-      case 'create': { const n = (this.root.querySelector('#club').value || '').trim().slice(0, 18) || 'FC Tiro a Giro'; c.create(n, this.kit); this.api.play('tutorial'); break; }
+      case 'create': { const n = (this.root.querySelector('#club').value || '').trim().slice(0, 18) || 'FC Tiro a Giro'; this.nameVal = n; this.ed.openNew(n, this.kit); this.show('editor'); break; }
+      case 'edlook': if (this.ed.openLook(+v)) this.show('editor'); break;
+      case 'edkit': this.ed.openKit(); this.show('editor'); break;
+      case 'edcrest': this.ed.openCrest(); this.show('editor'); break;
       case 'howto': if (+v >= HOWTO.length) this.show('hub'); else this.show('howto', +v); break;
       case 'tutorial': this.api.play('tutorial'); break;
       case 'play': this.api.play('league'); break;
@@ -100,10 +106,10 @@ export class UI {
     if (mode !== 'new' && has) return `<div class="hero">${PITCH}${BALL}<div class="logo">TIRO<span>A</span>GIRO</div><p class="sub">Disegna la giocata. Vinci il campionato.</p><div class="claim"><i>CAMPIONATO</i><i>MERCATO</i><i>A UN DITO</i></div></div>
       <button class="btn big" data-a="continue">Continua carriera</button><button class="btn ghost" data-a="new">Nuova carriera</button>`;
     return `<div class="hero small">${PITCH}${BALL}<div class="logo">TIRO<span>A</span>GIRO</div></div>
-      <div class="card"><div class="newhead">${crest(this.kit, '')}<div class="dim">Crea la tua squadra e parti dalla Terza Divisione.</div></div>
+      <div class="card"><div class="newhead">${crestK(crestFromSeed(this.kit * 7 + 3), this.kit)}<div class="dim">Crea la tua squadra e parti dalla Terza Divisione.</div></div>
       <label>Nome della tua squadra</label><input id="club" maxlength="18" placeholder="es. Atletico Sole" value="${esc(this.nameVal || '')}" autocomplete="off">
       <label>Colori <b>${KITS[this.kit][0]}</b></label><div class="kits">${KITS.map((k, i) => `<div class="kit ${i === this.kit ? 'on' : ''}" data-a="kit" data-v="${i}" role="button" aria-label="${k[0]}">${shirt(k)}</div>`).join('')}</div></div>
-      <button class="btn big" data-a="create">Inizia dalla Terza Divisione</button>${has ? '<button class="btn ghost" data-a="continue">Annulla</button><p class="note">Una nuova carriera sostituisce quella salvata.</p>' : ''}`;
+      <button class="btn big" data-a="create">Avanti: stemma e campione</button>${has ? '<button class="btn ghost" data-a="continue">Annulla</button><p class="note">Una nuova carriera sostituisce quella salvata.</p>' : ''}`;
   }
 
   head(title, back = 'hub') { const k = this.c.s.kit; return `<div class="top"><button class="back" data-a="go" data-v="${back}" aria-label="Indietro">‹</button><h2>${title}</h2><div class="money">${fmtMoney(this.c.s.money)}</div></div>${this.msg ? `<div class="flash">${esc(this.msg)}</div>` : ''}`; }
@@ -112,9 +118,9 @@ export class UI {
     const c = this.c, s = c.s, nm = c.nextMatch(), d = c.div(), tab = c.table(d), pos = tab.findIndex(t => t.id === 'me') + 1;
     const tile = (a, v, ic, t, sub) => `<button class="tile" data-a="${a}" data-v="${v}"><span class="ic">${ICONS[ic]}</span><b>${t}</b><span>${sub}</span></button>`;
     const me = s.teams.me, last = s.last ? (s.last.my > s.last.op ? 'w' : s.last.my < s.last.op ? 'l' : 'd') : '';
-    return `<div class="clubbar">${crest(s.kit, me.short)}<div><h1>${esc(s.club)}</h1><div class="dim">${DIV_NAMES[d]} · Stagione ${s.season} · <b style="color:var(--gold)">${pos}°</b> posto</div></div></div>
+    return `<div class="clubbar">${this.tcrest(me)}<div><h1>${esc(s.club)}</h1><div class="dim">${DIV_NAMES[d]} · Stagione ${s.season} · <b style="color:var(--gold)">${pos}°</b> posto</div></div></div>
     ${nm ? `<div class="card next"><div class="nx-top"><span class="lbl">Giornata ${nm.day} di 18</span><span class="pill ${nm.home ? 'gold' : ''}">${nm.home ? 'In casa' : 'In trasferta'}</span></div>
-      <div class="vs"><div>${crest(s.kit, me.short, 'lg')}<b>${esc(s.club)}</b><span>forza <em>${c.myRating()}</em></span></div><i>VS</i><div>${crest(nm.opp.kit, nm.opp.short, 'lg')}<b>${esc(nm.opp.name)}</b><span>forza <em>${nm.opp.rating}</em></span></div></div>
+      <div class="vs"><div>${this.tcrest(me, 'lg')}<b>${esc(s.club)}</b><span>forza <em>${c.myRating()}</em></span></div><i>VS</i><div>${this.tcrest(nm.opp, 'lg')}<b>${esc(nm.opp.name)}</b><span>forza <em>${nm.opp.rating}</em></span></div></div>
       <div class="prog"><i style="width:${Math.round((nm.day - 1) / 18 * 100)}%"></i></div>
       <button class="btn big play" data-a="play">${PLAY}Gioca</button></div>` : ''}
     ${s.last ? `<div class="last"><span class="wl ${last}">${last === 'w' ? 'V' : last === 'l' ? 'S' : 'P'}</span><span>Ultima: ${esc(s.club)} <b style="color:var(--txt)">${s.last.my} – ${s.last.op}</b> ${esc(s.last.opp)}</span></div>` : ''}
@@ -126,7 +132,7 @@ export class UI {
     return `<div class="prow ${this.sel === p.id ? 'sel' : ''}" data-a="pl" data-v="${p.id}"><span class="pos p${slotPos || p.pos}">${POS_NAME[slotPos || p.pos]}</span><span class="pn">${esc(p.name)}${off ? ` <em>(${POS_NAME[p.pos]})</em>` : ''}</span><span class="age">${p.age}a</span><span class="ovr ${ovrCls(o)}">${o}</span>${extra}</div>`;
   }
   pcard(p, btn) {
-    return `<div class="pcard"><div class="pc1"><b>${esc(p.name)}</b><span>${POS_NAME[p.pos]} · ${p.age} anni · valore ${fmtMoney(value(p))}${p.apps !== undefined && p.apps > 0 ? ` · ${p.apps} pres. ${p.goals} gol` : ''}</span></div>
+    return `<div class="pcard"><div class="pc1"><b>${esc(p.name)}</b><span>${POS_NAME[p.pos]} · ${p.age} anni · valore ${fmtMoney(value(p))}${p.num ? ` · n. ${p.num}` : ''}${p.apps !== undefined && p.apps > 0 ? ` · ${p.apps} pres. ${p.goals} gol` : ''}</span></div>
       <div class="stats">${(p.pos === 'P' ? [['por', 'POR'], ['pas', 'PAS'], ['fis', 'RES'], ['vel', 'VEL']] : STATS).map(([k, n]) => { const v = statOf(p, k); return `<div class="${ovrCls(v)}"><i>${n}</i><b>${v}</b><u style="--w:${Math.max(6, Math.min(100, v))}%"></u></div>`; }).join('')}</div>${btn || ''}</div>`;
   }
 
@@ -134,7 +140,7 @@ export class UI {
     const c = this.c, s = c.s, F = FORMATIONS[s.formation], sp = this.sel !== null ? c.player(this.sel) : null;
     return this.head('Rosa') + `<div class="chips">${Object.keys(FORMATIONS).map(f => `<button class="chip ${f === s.formation ? 'on' : ''}" data-a="form" data-v="${f}">${f}</button>`).join('')}<button class="chip" data-a="auto">Migliori 11</button></div>
     <p class="note">Tocca due giocatori per scambiarli. Forza della squadra: <b style="color:var(--gold)">${c.myRating()}</b></p>
-    ${sp ? this.pcard(sp, `<button class="btn ghost sm" data-a="sell" data-v="${sp.id}">Vendi per ${fmtMoney(c.sellPrice(sp))}</button>`) : ''}
+    ${sp ? this.pcard(sp, `<div class="pbtns"><button class="btn sm" data-a="edlook" data-v="${sp.id}">Aspetto</button><button class="btn ghost sm" data-a="sell" data-v="${sp.id}">Vendi per ${fmtMoney(c.sellPrice(sp))}</button></div>`) : ''}
     <h3>Titolari</h3>${s.lineup.map((id, i) => this.prow(c.player(id), F[i][0])).join('')}
     <h3>Panchina</h3>${c.bench().sort((a, b) => 'PDCA'.indexOf(a.pos) - 'PDCA'.indexOf(b.pos) || overall(b) - overall(a)).map(p => this.prow(p)).join('')}`;
   }
@@ -151,7 +157,7 @@ export class UI {
     const c = this.c, d = this.tabDiv === null ? c.div() : this.tabDiv, t = c.table(d);
     return this.head('Classifica') + `<div class="chips">${DIV_NAMES.map((n, i) => `<button class="chip ${i === d ? 'on' : ''}" data-a="tab" data-v="${i}">${n.split(' ')[0]}</button>`).join('')}</div>
     <table class="tbl"><tr><th></th><th class="l">SQUADRA</th><th>G</th><th>V</th><th>N</th><th>P</th><th>DR</th><th>PT</th></tr>
-    ${t.map((r, i) => { const tm = c.team(r.id), k = KITS[tm.kit] || KITS[0], dr = r.gf - r.ga; return `<tr class="${r.id === 'me' ? 'me' : ''} ${i < 2 && d > 0 ? 'up' : ''} ${i >= 8 && d < 2 ? 'dn' : ''} ${i === 0 && d === 0 ? 'up' : ''}"><td>${i + 1}</td><td class="l"><span><b style="background:linear-gradient(135deg,${hex(k[1])} 55%,${hex(k[2])} 55%)"></b><em>${esc(tm.name)}</em></span></td><td>${r.p}</td><td>${r.w}</td><td>${r.d}</td><td>${r.l}</td><td>${dr > 0 ? '+' : ''}${dr}</td><td><b>${r.pts}</b></td></tr>`; }).join('')}</table>
+    ${t.map((r, i) => { const tm = c.team(r.id), dr = r.gf - r.ga; return `<tr class="${r.id === 'me' ? 'me' : ''} ${i < 2 && d > 0 ? 'up' : ''} ${i >= 8 && d < 2 ? 'dn' : ''} ${i === 0 && d === 0 ? 'up' : ''}"><td>${i + 1}</td><td class="l"><span>${this.tcrest(tm, 'xs')}<em>${esc(tm.name)}</em></span></td><td>${r.p}</td><td>${r.w}</td><td>${r.d}</td><td>${r.l}</td><td>${dr > 0 ? '+' : ''}${dr}</td><td><b>${r.pts}</b></td></tr>`; }).join('')}</table>
     <div class="legend">${d > 0 || d === 0 ? `<span><i style="background:var(--good)"></i>${d > 0 ? 'Promozione' : 'Titolo'}</span>` : ''}${d < 2 ? '<span><i style="background:var(--bad)"></i>Retrocessione</span>' : ''}</div>
     <p class="note">${d > 0 ? 'Le prime due salgono di divisione. ' : 'La prima vince il titolo. '}${d < 2 ? 'Le ultime due retrocedono.' : ''}</p>`;
   }
@@ -160,7 +166,7 @@ export class UI {
     const c = this.c, s = c.s, d = c.div();
     return this.head('Calendario') + s.fix[d].map((round, i) => {
       const m = round.find(x => x[0] === 'me' || x[1] === 'me'), home = m[0] === 'me', opp = c.team(home ? m[1] : m[0]), r = (s.res || [])[i];
-      return `<div class="prow ${i === s.day ? 'sel' : ''}"><span class="cal">${i + 1}</span><span class="pn">${home ? 'Casa' : 'Fuori'} · ${esc(opp.name)}</span><span class="age">forza ${opp.rating}</span><span class="ovr ${r ? (r[0] > r[1] ? 'o3' : r[0] < r[1] ? 'bad' : 'o2') : ''}" style="min-width:52px">${r ? r[0] + '–' + r[1] : '·'}</span></div>`;
+      return `<div class="prow ${i === s.day ? 'sel' : ''}"><span class="cal">${i + 1}</span><span class="pn cr">${this.tcrest(opp, 'xs')}${home ? 'Casa' : 'Fuori'} · ${esc(opp.name)}</span><span class="age">forza ${opp.rating}</span><span class="ovr ${r ? (r[0] > r[1] ? 'o3' : r[0] < r[1] ? 'bad' : 'o2') : ''}" style="min-width:52px">${r ? r[0] + '–' + r[1] : '·'}</span></div>`;
     }).join('');
   }
 
@@ -179,6 +185,7 @@ export class UI {
     <h3>Difficoltà avversari</h3>${opt('diff', [[0, 'Facile'], [1, 'Normale'], [2, 'Difficile']])}
     <h3>Portiere</h3>${opt('autoGk', [[false, 'Manuale (tuffo col dito)'], [true, 'Automatico']])}
     <h3>Audio</h3>${opt('sound', [[true, 'Acceso'], [false, 'Spento']])}
+    <h3>Squadra</h3><div class="pbtns"><button class="btn" data-a="edkit">Stile della divisa</button><button class="btn" data-a="edcrest">${this.tcrest(this.c.s.teams.me, 'xs')}Stemma</button></div>
     <h3>Carriera</h3><button class="btn ghost" data-a="wipe">Cancella la carriera salvata</button>`;
   }
 
@@ -192,13 +199,14 @@ export class UI {
     const s = this.c.s, m = r.m, vd = m.score[0] > m.score[1] ? ['w', 'VITTORIA'] : m.score[0] < m.score[1] ? ['l', 'SCONFITTA'] : ['d', 'PAREGGIO'];
     const sc = m.goalsLog.map(g => `<div class="${g.team === 0 ? 'gl' : 'gr'}">${g.team === 0 ? `${esc(g.name)} ${g.minute}'` : `${g.minute}' ${esc(g.name)}`}</div>`).join('');
     const st = (n, a, b) => { const fa = parseFloat(a) || 0, fb = parseFloat(b) || 0; return `<div class="st"><b>${a}</b><span>${n}</span><b>${b}</b><div class="bar"><i style="--f:${fa || (fb ? 0.01 : 1)}"></i><i style="--f:${fb || (fa ? 0.01 : 1)}"></i></div></div>`; }, ps = m.stats.poss[0] + m.stats.poss[1] || 1;
-    return `<div class="res"><div class="dim">${r.title}</div><div class="scoreboard"><div class="score"><span>${esc(m.teams[0].short)}</span><b>${m.score[0]} – ${m.score[1]}</b><span>${esc(m.teams[1].short)}</span></div><div class="verdict ${vd[0]}">${vd[1]}</div><div class="scorers">${sc}</div></div>
+    return `<div class="res"><div class="dim">${r.title}</div><div class="scoreboard"><div class="score"><span>${this.mcrest(m.teams[0])}${esc(m.teams[0].short)}</span><b>${m.score[0]} – ${m.score[1]}</b><span>${this.mcrest(m.teams[1])}${esc(m.teams[1].short)}</span></div><div class="verdict ${vd[0]}">${vd[1]}</div><div class="scorers">${sc}</div></div>
     ${st('Tiri', m.stats.shots[0], m.stats.shots[1])}${st('In porta', m.stats.onT[0], m.stats.onT[1])}${st('Possesso', Math.round(m.stats.poss[0] / ps * 100) + '%', Math.round(m.stats.poss[1] / ps * 100) + '%')}${st('Angoli', m.stats.corners[0], m.stats.corners[1])}${st('Falli', m.stats.fouls[0], m.stats.fouls[1])}</div>
     ${r.res ? `<div class="card"><div class="st"><span>Incasso partita</span><b class="good">+${fmtMoney(r.res.income)}</b></div><div class="st"><span>Stipendi</span><b class="bad">−${fmtMoney(r.res.wages)}</b></div><div class="st"><span>Cassa</span><b>${fmtMoney(s.money)}</b></div>
       ${r.res.grown.length ? `<p class="note">Migliorati: ${r.res.grown.map(esc).join(', ')}</p>` : ''}
       ${r.res.others.length ? `<p class="note">Altri risultati: ${r.res.others.map(o => `${o[0]} ${o[1]}–${o[2]} ${o[3]}`).join(' · ')}</p>` : ''}</div>` : ''}
     <button class="btn big" data-a="${r.res && r.res.season ? 'season' : 'continue'}">Continua</button>`;
   }
+  mcrest(t) { const c = t.kit && t.kit.crest; return c ? crestSvg(c, c.c1, c.c2, 'sm') : ''; }
   season(r) {
     const t = r.outcome === 'up' ? 'PROMOSSI!' : r.outcome === 'down' ? 'Retrocessi' : r.outcome === 'champ' ? 'CAMPIONI!' : 'Stagione finita';
     return `<div class="how season">${r.outcome === 'down' ? '' : TROPHY}<h1>${t}</h1><p>Hai chiuso al <b>${r.pos}° posto</b> in ${DIV_NAMES[r.div]}.</p><p>Premio di fine stagione: <b>${fmtMoney(r.prize + r.bonus)}</b></p><p>La prossima stagione giochi in <b>${DIV_NAMES[r.newDiv]}</b>. I giocatori hanno un anno in più: controlla la rosa e il mercato.</p><button class="btn big" data-a="continue">Avanti</button></div>`;
