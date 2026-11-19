@@ -32,7 +32,7 @@ try {
   res.barraVista = await bar;
   await p.waitForFunction(() => window.__G.state === 'match', { timeout: 10000 });
   await wait(1200);
-  res.partita = await p.evaluate(async () => { const r = await window.__assets.stages.get('match'); return { ok: r.ok, falliti: r.failed, barraNascosta: document.getElementById('load').style.display === 'none', stato: window.__G.state, folla: !!window.__G && !!document }; });
+  res.partita = await p.evaluate(async () => { const A = window.__assets; return { ok: ['crowd', 'kick'].filter(id => A.has(id)), falliti: [...A.failed.keys()], barraNascosta: document.getElementById('load').style.display === 'none', stato: window.__G.state, tappaDaRiprovare: !A.stages.has('match') }; });
   await p.screenshot({ path: `${out}/load-1-partita.png` });
   res.errori = errs;
   // file unico da disco
@@ -43,7 +43,7 @@ try {
   await q.waitForFunction(() => window.__ui && window.__ui.screen === 'title', { timeout: 20000 });
   await q.evaluate(() => { document.querySelector('[data-a=create]').click(); window.__ui.show('hub'); window.__enter('friendly', 50); });
   await q.waitForFunction(() => window.__G.state === 'match', { timeout: 10000 });
-  res.fileUnico = await q.evaluate(async () => (await window.__assets.stages.get('match')).ok);
+  res.fileUnico = await q.evaluate(() => ['crowd', 'kick'].filter(id => window.__assets.has(id)));
   res.erroriFileUnico = errs2;
 } finally {
   await b.close(); srv.close();
