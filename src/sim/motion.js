@@ -1,5 +1,6 @@
 // Movimento dei giocatori, scivolate, tuffi, parate, falli, possesso e contatti col pallone.
 // I metodi vengono copiati su Match.prototype (vedi match.js): `this` è la partita.
+import { WEAR_TES, WEAR_TES_MIN } from './duel.js';
 import { W, L, HW, HL, GW, GH, BOX_W, BOX_D, SIX_W, SIX_D, PEN_D, CIRCLE, G, ROLL, clamp, hyp, rng32, FORMATIONS, effStats, ballPhys, segInfo } from './core.js';
 
 // Regolazioni (misurate con test/balance.mjs, test/diag-flow.mjs e i test in test/unit)
@@ -28,7 +29,10 @@ const AIR_SHOT_RANGE = 17;  // distanza massima dalla porta per colpire di testa
 const HEAD_CLEAR_ZONE = 32; // un difensore entro questa distanza dalla propria porta respinge di testa (m)
 const HEAD_V0 = 12;         // velocità base del colpo di testa (m/s), più la bravura
 const VOLLEY_V0 = 18;       // velocità base del tiro al volo (m/s), più la bravura
-const FEINT_PROTECT = 0.3;  // dopo la finta il portatore non può essere contrastato per questo tempo (s)
+const FEINT_PROTECT = 0.3;
+const AIR_TES_K = 1.5;      // contrasto aereo: quanto pesa la differenza di colpi di testa (per punto / 100)
+const AIR_DIST_K = 0.6;     // ... e quanto pesa essere più vicini al pallone (per metro)
+const AIR_WIN_MIN = 0.15, AIR_WIN_MAX = 0.85; // limiti della probabilità di vincere il contrasto aereo  // dopo la finta il portatore non può essere contrastato per questo tempo (s)
 
 export class MotionMethods {
   movePlayers(dt) {
@@ -40,6 +44,7 @@ export class MotionMethods {
       if (p.tackleCd > 0) p.tackleCd -= dt;
       if (p.kickAnim > 0) p.kickAnim -= dt;
       if (p.feintCd > 0) p.feintCd -= dt;
+      if (p.dribCd > 0) p.dribCd -= dt;
       if (p.state === 'play') {
         let dx = p.tx - p.x, dy = p.ty - p.y; const d = hyp(dx, dy);
         const vm = this.vmax(p) * (b.owner === p ? 0.86 + p.st.dri * 0.001 : 1) * p.spdF * (p.sprint ? 1 + SPRINT_BONUS * (0.3 + 0.7 * p.energy) : 1);
@@ -58,6 +63,7 @@ export class MotionMethods {
         p.fx += (lx - p.fx) * k; p.fy += (ly - p.fy) * k;
         const n = hyp(p.fx, p.fy) || 1; p.fx /= n; p.fy /= n;
         p.phase += v * dt * 1.9;
+        // stanchezza: correndo l'energia cala (più in fretta con meno `fis` = resistenza, e nello scatto); vmax() la usa
         if (v < RECOVER_V) p.energy = Math.min(1, p.energy + RECOVER_RATE * dt);
         else p.energy = Math.max(0.2, p.energy - (v / 8) * (v / 8) * dt * 0.0022 * (1.3 - p.st.fis * 0.006) * (p.sprint ? SPRINT_DRAIN : 1));
       } else if (p.state === 'prep') {
@@ -141,15 +147,15 @@ export class MotionMethods {
     b.ct = 0; b.cax = b.cay = 0; b.shot = null; b.noP = p; b.noT = 0.3; this.predT = 0; p.kickAnim = 0.35;
     if (kind === 'clear') {
       // respinta: lontano dalla propria porta, alta, verso l'esterno
-      const a = Math.atan2(dir, (b.x > 0 ? 1 : -1) * (0.3 + this.rnd() * 0.5)) + (this.rnd() - 0.5) * 0.9, v = 10 + this.rnd() * 5;
+      const a = Math.atan2(dir, (b.x > 0 ? 1 : -1) * (0.3 + this.rnd() * 0.5)) + (this.rnd() - 0.5) * (1.4 - p.st.tes * 0.008), v = 8 + p.st.tes * 0.05 + this.rnd() * 4;
       b.vx = Math.cos(a) * v; b.vy = Math.sin(a) * v; b.vh = 3 + this.rnd() * 3;
-      b.kick = null; this.lastPass = null; this.stats.headers[T]++;
+      b.kick = null; this.lastPass = null; this.stats.headers[T]++; this.wearDown(p, 'tes', WEAR_TES, WEAR_TES_MIN);
       this.ev('kick', { p, kind: 'header', clear: true, v });
       return;
     }
     if (k && k.team === T && k.kicker !== p) this.lastPass = { from: k.kicker, to: p };
     const head = kind === 'header', gk = this.gk(1 - T), gy = dir * HL;
-    const skill = head ? (p.st.tir + p.st.fis) / 2 : p.st.tir;
+    const skill = head ? p.st.tes : p.st.tir;
     const side = (gk.x > b.x ? -1 : 1) * (this.rnd() < 0.75 ? 1 : -1);
     const tx = side * (GW / 2 - 0.7), th0 = head ? 0.2 + this.rnd() * 1.2 : 0.3 + this.rnd() * 1.4;
     const sig = ((head ? 4 : 3) + (100 - skill) * (head ? 0.09 : 0.08)) * (this.nearOpp(p.x, p.y, T) < 1.5 ? 1.3 : 1);
@@ -163,8 +169,25 @@ export class MotionMethods {
     this.detectShot();
     this.stats.shots[T]++; if (b.shot && b.shot.team === T && b.shot.on) this.stats.onT[T]++;
     this.useAdvantage(T);
-    if (head) this.stats.headers[T]++; else this.stats.volleys[T]++;
+    if (head) { this.stats.headers[T]++; this.wearDown(p, 'tes', WEAR_TES, WEAR_TES_MIN); } else this.stats.volleys[T]++;
     this.ev('kick', { p, kind, v });
+  }
+
+  // Contrasto aereo: `p` è il più vicino al pallone alto; se un avversario può arrivarci anche lui, vince chi ha più
+  // colpi di testa (e chi è più vicino), con un po' di caso. Ritorna chi prende il pallone.
+  aerialDuel(p) {
+    const b = this.ball, dp = hyp(p.x - b.x, p.y - b.y);
+    let o = null, dO = 0.95;
+    for (const q of this.players) {
+      if (q.team === p.team || q.off || q.state !== 'play' || q.stun > 0 || (b.noP === q && b.noT > 0) || q.pos === 'P') continue;
+      const d = hyp(q.x - b.x, q.y - b.y);
+      if (d < dO && (this.airPlay(q) || b.h < 1.7)) { dO = d; o = q; }
+    }
+    if (!o) return p;
+    const win = clamp(0.5 + AIR_TES_K * (p.st.tes - o.st.tes) / 100 + (dO - dp) * AIR_DIST_K, AIR_WIN_MIN, AIR_WIN_MAX);
+    const [w, l] = this.rnd() < win ? [p, o] : [o, p];
+    this.ev('aerial', { p: w, o: l });
+    return w;
   }
 
   slideStep(p, dt) {
@@ -172,7 +195,7 @@ export class MotionMethods {
     p.vx = p.sdx * sp; p.vy = p.sdy * sp; p.x += p.vx * dt; p.y += p.vy * dt; p.t += dt;
     if (this.phase === 'play' && !p.hit) {
       const db = hyp(b.x - p.x, b.y - p.y);
-      if (b.owner && b.owner.team !== p.team) {
+      if (b.owner && b.owner.team !== p.team && !this.duelGuard(p)) {
         const c = b.owner, dc = hyp(c.x - p.x, c.y - p.y);
         if (db < 0.95) {
           p.hit = true; c.stun = 0.55; c.tackleCd = 0.8;
@@ -271,7 +294,7 @@ export class MotionMethods {
       const c = b.owner;
       if (c.protect > 0) return;
       for (const o of this.players) {
-        if (o.team === c.team || o.off || o.state !== 'play' || o.stun > 0 || o.tackleCd > 0) continue;
+        if (o.team === c.team || o.off || o.state !== 'play' || o.stun > 0 || o.tackleCd > 0 || this.duelGuard(o)) continue;
         const d = hyp(o.x - b.x, o.y - b.y);
         if (d < 0.85 + o.st.dif * 0.0025) {
           o.contact += dt;
@@ -313,6 +336,10 @@ export class MotionMethods {
       if (air || b.h < (gk ? 2.35 : 1.7)) { bd = d; best = p; bestAir = air; }
     }
     if (!best) return;
+    if (b.h >= HEAD_LO && !(best.pos === 'P' && this.inOwnBox(best))) {
+      const w = this.aerialDuel(best);
+      if (w !== best) { best = w; bestAir = this.airPlay(w); if (!bestAir && b.h >= 1.7) return; }
+    }
     if (bestAir) { this.airHit(best, bestAir); return; }
     const p = best, sp = hyp(b.vx - p.vx, b.vy - p.vy), gk = p.pos === 'P' && this.inOwnBox(p);
     if (gk && b.shot && b.shot.team !== p.team) { this.save(p, true); return; }

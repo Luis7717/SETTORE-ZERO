@@ -5,7 +5,7 @@ import { HL } from '../src/sim.js';
 
 const rating = +(process.argv[2] || 60), N = +(process.argv[3] || 20), mode = process.argv[4] || 'bot';
 const zone = (y, T) => { const f = y * (T ? -1 : 1); return f < -17 ? 'difesa' : f < HL - 30 ? 'centro' : 'ultimi30'; };
-const T0 = () => ({ acts: 0, half: 0, entryShot: 0, actShot: 0, shots: 0, onT: 0, goals: 0, corners: 0, throws: 0, goalkicks: 0, entries: 0, lost: {}, how: {}, passes: 0, passOk: 0, heads: 0, volleys: 0, clears: 0, airGoals: 0, adv: 0, walls: 0 });
+const T0 = () => ({ acts: 0, half: 0, entryShot: 0, actShot: 0, shots: 0, onT: 0, goals: 0, corners: 0, throws: 0, goalkicks: 0, entries: 0, lost: {}, how: {}, passes: 0, passOk: 0, heads: 0, volleys: 0, clears: 0, airGoals: 0, adv: 0, walls: 0, duels: 0, drib: 0, dribOk: 0 });
 const S = [T0(), T0()];
 for (let g = 0; g < N; g++) {
   let owner = -1, lastKick = [null, null], act = null, airAt = -9;
@@ -22,6 +22,8 @@ for (let g = 0; g < N; g++) {
         if (e.type === 'kick') airAt = (e.kind === 'header' || e.kind === 'volley') && !e.clear ? mm.time : (e.kind === 'shot' ? -9 : airAt);
         if (e.type === 'goal' && mm.time - airAt < 3) S[e.team].airGoals++;
         if (e.type === 'advantage') S[e.team].adv++;
+        if (e.type === 'duel_start') S[e.p.team].duels++;
+        if (e.type === 'dribble') { S[e.p.team].drib++; if (e.ok) S[e.p.team].dribOk++; }
         if (e.type === 'restart' && e.kind === 'freekick' && mm.restart && mm.restart.wallSide) S[e.team].walls++;
       }
       const now = b.owner ? b.owner.team : -1;
@@ -52,7 +54,7 @@ const f = v => (v / N).toFixed(1);
 for (let T = 0; T < 2; T++) {
   const s = S[T];
   console.log(`${T ? 'IA   ' : mode === 'bot' ? 'UMANO' : 'IA-0 '} tiri ${f(s.shots)} (in porta ${f(s.onT)}) gol ${f(s.goals)} | azioni ${f(s.acts)}: in metà campo avversaria ${f(s.half + s.entries)}, negli ultimi30 ${f(s.entries)}, con tiro ${f(s.actShot)} | angoli ${f(s.corners)} rimesse ${f(s.throws)} rinvii ${f(s.goalkicks)} | passaggi ${f(s.passes)} riusciti ${(s.passOk / Math.max(1, s.passes) * 100).toFixed(0)}%`);
-  console.log(`   colpi di testa ${f(s.heads)} al volo ${f(s.volleys)} (gol così ${f(s.airGoals)}) respinte di testa ${f(s.clears)} | vantaggi ${f(s.adv)} punizioni con barriera ${f(s.walls)}`);
+  console.log(`   colpi di testa ${f(s.heads)} al volo ${f(s.volleys)} (gol così ${f(s.airGoals)}) respinte di testa ${f(s.clears)} | vantaggi ${f(s.adv)} punizioni con barriera ${f(s.walls)} | duelli ${f(s.duels)} dribbling ${f(s.drib)} riusciti ${f(s.dribOk)}`);
   console.log('   palle perse:', Object.entries(s.lost).map(([k, v]) => `${k} ${f(v)}`).join(', '));
   console.log('   come:', Object.entries(s.how).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k, v]) => `${k} ${f(v)}`).join(', '));
 }

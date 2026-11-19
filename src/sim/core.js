@@ -24,11 +24,21 @@ export const FORMATIONS = {
   '4-2-3-1': [['P', 0, .03], ['D', -.72, .2], ['D', -.24, .16], ['D', .24, .16], ['D', .72, .2], ['C', -.25, .35], ['C', .25, .35], ['C', -.7, .53], ['C', 0, .52], ['C', .7, .53], ['A', 0, .7]],
 };
 
+// Colpi di testa (`tes`): i giocatori dei salvataggi vecchi non ce l'hanno e lo si ricava da fisico e tiro,
+// con un aggiustamento per ruolo e una piccola variazione fissa presa dalle altre statistiche (niente numeri casuali,
+// così lo stesso giocatore ha sempre lo stesso valore). Non viene scritto nel salvataggio.
+const TES_ROLE = { P: -5, D: 8, C: -1, A: 2 };
+export function headingOf(src) {
+  if (typeof src.tes === 'number') return src.tes;
+  const vary = (((src.vel | 0) * 7 + (src.dri | 0) * 13 + (src.pas | 0) * 3) % 9) - 4;
+  return clamp(Math.round(((src.fis | 0) + (src.tir | 0)) / 2 + (TES_ROLE[src.pos] || 0) + vary), 18, 99);
+}
+
 const POSPEN = { PP: 1, DD: 1, CC: 1, AA: 1, DC: .92, CD: .92, CA: .92, AC: .92, DA: .82, AD: .82 };
 export function effStats(src, slotPos) {
   let f = POSPEN[src.pos + slotPos];
   if (f === undefined) f = 0.6;
-  const s = { vel: src.vel, tir: src.tir * f, pas: src.pas * f, dri: src.dri * f, dif: src.dif * f, fis: src.fis, por: src.por };
+  const s = { vel: src.vel, tir: src.tir * f, pas: src.pas * f, dri: src.dri * f, dif: src.dif * f, fis: src.fis, por: src.por, tes: headingOf(src) * f };
   if (slotPos === 'P' && src.pos !== 'P') s.por = Math.min(src.por, 25);
   return s;
 }

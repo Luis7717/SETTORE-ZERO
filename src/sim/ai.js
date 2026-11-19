@@ -139,6 +139,8 @@ export class AIMethods {
         }
         if (this.rnd() < want) { this.kick(p, { type: pass.safe > 0 ? pass.type : 'loft', tx: pass.tx, ty: pass.ty }); return; }
       }
+      // avversario davanti e nessun passaggio scelto: a volte si prova il dribbling (stessa regola dell'umano)
+      if (front < 5 && this.aiDribble(p)) return;
       const base = Math.atan2(gy - p.y, (dg > 30 ? p.x * 0.7 : 0) - p.x);
       let bs = -1e9, ba = base;
       for (const o of [-1.2, -0.7, -0.35, 0, 0.35, 0.7, 1.2]) {
@@ -322,7 +324,7 @@ export class AIMethods {
         } else {
           p.tx = b.x + c.vx * 0.25; p.ty = b.y + c.vy * 0.25;
           const d = hyp(p.x - b.x, p.y - b.y), sk = this.teams[T].skill;
-          if (d > 1.5 && d < 3.2 && p.tackleCd <= 0 && c.protect <= 0 && this.rnd() < this.dtT * (0.2 + 0.5 * sk)) {
+          if (d > 1.5 && d < 3.2 && p.tackleCd <= 0 && c.protect <= 0 && !this.duelGuard(p) && this.rnd() < this.dtT * (0.2 + 0.5 * sk)) {
             const dot = ((p.x - c.x) * c.fx + (p.y - c.y) * c.fy) / (hyp(p.x - c.x, p.y - c.y) || 1);
             if (dot < 0.6) { p.state = 'prep'; p.t = 0.26; p.warn = true; p.vx *= 0.5; p.vy *= 0.5; }
           }
