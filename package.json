@@ -4,6 +4,7 @@
   "description": "Tiro a Giro: calcio 3D in verticale per iPhone",
   "scripts": {
     "build": "node build.mjs",
+    "build:single": "node build.mjs --single",
     "test": "node --test test/unit/",
     "balance": "node test/balance.mjs",
     "golden:update": "node test/golden-update.mjs"

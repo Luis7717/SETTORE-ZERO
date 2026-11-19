@@ -1,0 +1,5 @@
+{
+  "_nota": "Manifesto di prova per test/loading-shot.mjs: crowd.wav esiste, sparisce.wav viene tolto dopo la build per simulare un file mancante.",
+  "match": [{ "id": "crowd", "file": "crowd.wav" }, { "id": "kick", "file": "sparisce.wav" }],
+  "music": [{ "id": "music", "file": "crowd.wav" }]
+}

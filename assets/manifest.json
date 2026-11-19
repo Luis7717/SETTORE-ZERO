@@ -1,0 +1,5 @@
+{
+  "_nota": "File pesanti caricati a pezzi (vedi src/assets.js). Percorsi relativi a questa cartella; build.mjs li copia in www/assets/. Tappe: match = all'ingresso in partita (barra di avanzamento), music = in sottofondo. Id audio riconosciuti da src/audio.js: crowd, goal, ooh, whistle, whistle_long, kick, post, net, music.",
+  "match": [],
+  "music": []
+}

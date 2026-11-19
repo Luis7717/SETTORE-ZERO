@@ -4,18 +4,22 @@ import { Input } from './input.js';
 import { Career, DIV_NAMES, KITS, POS_NAME, overall, genPlayer } from './career.js';
 import { UI } from './ui.js';
 import { Sfx } from './audio.js';
+import { Assets } from './assets.js';
+import { runLegacyMigration } from './legacy-save.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('c'), hud = $('hud'), ov = $('ov'), uiRoot = $('ui');
 const career = new Career(), view = new View(canvas), sfx = new Sfx();
+// file pesanti caricati a pezzi da www/assets/ (manifesto incorporato da build.mjs)
+const assets = new Assets({ manifest: typeof __MANIFEST__ !== 'undefined' ? __MANIFEST__ : {}, inline: window.__INLINE_ASSETS });
 const G = { state: 'menu', match: null, paused: false, ts: 1, mode: '', title: '', subs: 5, bench: [], res: null, demo: null, bigT: 0, endT: 0, selA: null, selB: null };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const hex = n => '#' + n.toString(16).padStart(6, '0');
 
 const ui = new UI(uiRoot, career, {
   click: () => { sfx.init(); sfx.resume(); sfx.click(); },
-  play: (mode, lvl) => startMatch(mode, lvl),
-  settings: () => { sfx.on = career.s.settings.sound; if (!sfx.on) sfx.crowd(0); },
+  play: (mode, lvl) => enterMatch(mode, lvl),
+  settings: () => { sfx.on = career.s.settings.sound; if (!sfx.on) { sfx.crowd(0); sfx.music(false); } else sfx.music(true); },
   act: (a, v, el) => { if (a === 'season') ui.show('season', G.res.res.season); },
 });
 const input = new Input(canvas, view, {
@@ -34,9 +38,31 @@ function startDemo() {
   view.setMatch(G.demo, 0);
 }
 function toMenu(screen, arg) {
-  G.state = 'menu'; G.match = null; input.enabled = false; input.set(null, 0); hud.style.display = 'none'; ov.style.display = 'none'; sfx.crowd(0);
+  G.state = 'menu'; G.match = null; input.enabled = false; input.set(null, 0); hud.style.display = 'none'; ov.style.display = 'none'; sfx.crowd(0); sfx.music(true);
   if (!G.demo) startDemo(); else view.setMatch(G.demo, 0);
   ui.show(screen, arg);
+}
+
+// ---------------------------------------------------------------- caricamento a pezzi
+// Tappa 'match': stadio, giocatori e suoni di gioco, con barra di avanzamento (solo se c'è qualcosa da scaricare).
+// Un file che manca o fallisce viene saltato: la partita parte lo stesso.
+let loading = false;
+async function enterMatch(mode, lvl) {
+  if (loading) return;
+  loading = true;
+  const box = $('load'), bar = $('loadbar'), need = assets.items('match').length > 0 && !assets.stages.has('match');
+  if (need) { bar.style.width = '0%'; box.style.display = 'flex'; }
+  try {
+    await assets.loadStage('match', (d, t) => { bar.style.width = (t ? Math.round(d / t * 100) : 100) + '%'; });
+    sfx.useAssets(assets);
+    if (view.useAssets) view.useAssets(assets);
+  } catch (e) { /* si gioca senza i file mancanti */ }
+  box.style.display = 'none'; loading = false;
+  startMatch(mode, lvl);
+}
+// Tappa 'music': in sottofondo dopo l'apertura del menu, senza bloccare nulla.
+function loadMusicLater() {
+  setTimeout(() => { assets.loadStage('music').then(() => { sfx.useAssets(assets); if (G.state === 'menu') sfx.music(true); }); }, 1200);
 }
 
 // ---------------------------------------------------------------- partita
@@ -52,7 +78,7 @@ function startMatch(mode, lvl) {
   ui.hide(); ov.style.display = 'none'; hud.style.display = 'block'; G.state = 'match';
   $('tn0').textContent = my.short; $('tn1').textContent = opp.short;
   $('k0').style.background = hex(my.kit.shirt); $('k1').style.background = hex(opp.kit.shirt);
-  sfx.on = s.settings.sound; sfx.init(); sfx.resume(); sfx.crowd(0.16);
+  sfx.on = s.settings.sound; sfx.init(); sfx.resume(); sfx.music(false); sfx.crowd(0.16);
   s.tut = (s.tut || 0) + 1; career.save();
   big(title, '', 1800);
 }
@@ -204,8 +230,10 @@ document.addEventListener('touchmove', e => { if (!e.target.closest('.scr') && !
 const mo = new MutationObserver(() => uiRoot.classList.toggle('clear', ui.screen === 'title'));
 mo.observe(uiRoot, { childList: true });
 
+runLegacyMigration(window); // vecchio salvataggio dell'app (origine file://), se l'app iOS lo passa
 career.load();
 if (career.s) { sfx.on = career.s.settings.sound; }
 toMenu('title');
 requestAnimationFrame(frame);
-window.__G = G; window.__career = career; window.__view = view; window.__ui = ui; window.__start = startMatch;
+loadMusicLater();
+window.__G = G; window.__career = career; window.__view = view; window.__ui = ui; window.__start = startMatch; window.__enter = enterMatch; window.__assets = assets;

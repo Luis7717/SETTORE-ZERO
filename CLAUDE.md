@@ -11,30 +11,45 @@
   Push: `git push origin gioco2:tiro-a-giro` → parte la build dell'IPA (release `tiro-a-giro-ipa`).
 
 ## Regole fisse
-- Resta **un solo file offline** (`www/index.html`), schermo **verticale**, giocabile con **un dito**.
+- Gioco **offline a più file** (regola cambiata il 2026-11-19: non più file unico, niente limite di 15 MB):
+  `www/index.html` = codice e menu, **sotto 1 MB**; modelli, texture e audio in `www/assets/` (sorgenti in `assets/`,
+  elenco in `assets/manifest.json`). **Nessun singolo file sopra i 20 MB.** `build.mjs` controlla entrambi i limiti.
+- Ordine di caricamento (`src/assets.js`): 1) menu subito; 2) all'ingresso in partita la tappa `match`
+  (stadio, giocatori, suoni) con barra di avanzamento; 3) la tappa `music` in sottofondo. Un file che manca o fallisce
+  si salta: il gioco parte lo stesso senza quel pezzo.
+- Nell'app iOS i file sono serviti su schema proprio `app://localhost/` (`WKURLSchemeHandler` in `App/main.swift`).
+- Schermo **verticale**, giocabile con **un dito**.
 - `src/sim.js` (e `src/sim/*`) = motore puro: **nessuna dipendenza grafica**, gira in Node.
 - **Ogni modifica al motore ha un test in Node** (`test/unit/*.test.mjs`).
 - Squadre, giocatori e sponsor **inventati**; grafica originale, niente copiato da altri giochi.
   Modelli 3D solo CC0 / CC-BY, incorporati nel file e citati nel README.
 - I salvataggi esistenti (`localStorage`, chiave **`tag_save_v1`**) devono continuare a funzionare:
   campi nuovi si aggiungono con valori predefiniti, mai rinominare o cambiare la chiave.
+  Passando da `file://` ad `app://` l'origine cambia: al primo avvio l'app legge il vecchio salvataggio con
+  `App/legacy.html` (messa dove stava la vecchia `index.html`) e la pagina lo copia (`src/legacy-save.js`, mai sovrascrive).
 - Il motore usa solo numeri casuali con seme (`this.rnd()` / `rng32`), **mai `Math.random`**: le partite devono essere ripetibili.
 
 ## Struttura
 - `src/sim.js` — punto d'ingresso del motore (ripubblica `src/sim/*`): fisica, IA, regole, partita (`Match`).
 - `src/render.js` grafica three.js · `src/input.js` gesti · `src/career.js` campionato, mercato, salvataggio ·
   `src/ui.js` menu · `src/main.js` collegamento e ciclo · `src/audio.js` suoni sintetizzati.
-- `build.mjs` → `www/index.html` (esbuild, tutto in un file). `App/` involucro iOS (WKWebView), `.github/workflows/` build IPA.
+- `src/assets.js` caricamento a pezzi · `src/legacy-save.js` recupero del vecchio salvataggio.
+- `build.mjs` → `www/index.html` + `www/assets/` (esbuild). `App/` involucro iOS (WKWebView + schema `app://`),
+  `.github/workflows/` build IPA (copia tutta `www/` nell'app).
 - Coordinate: x = larghezza (−32..32), y = lunghezza (−50..50); la squadra 0 attacca verso +y.
 
 ## Comandi
 - `npm install` · `npm run build` · `npm test` (test del motore con `node:test`).
+- `npm run build:single` → `dist/tiro-a-giro.html`, versione a file unico con i file incorporati, **solo per provarla nel browser**.
+- `node test/loading-shot.mjs shots` → prova del caricamento a pezzi (file mancante, barra, musica, file unico).
+- `node test/menu-time.mjs http 15` → tempo di apertura del menu. Le prove a schermo servono `www/` via http (`test/lib/serve.mjs`).
 - `npm run balance -- 60 60 20` → umano simulato contro IA: vittorie, gol, tiri, possesso.
   **I numeri di equilibrio si misurano con questo** (non IA contro IA: nella squadra umana pressa solo il controllato).
 - `node test/diag-flow.mjs 60 20 bot` → diagnosi dell'attacco: azioni, ultimi 30 m, palle perse per zona e motivo, angoli, rimesse.
 - `node test/sim-test.mjs ai 12` → IA contro IA, conteggio eventi.
 - Le regolazioni del motore sono costanti con nome in cima a `src/sim/ai.js`, `motion.js`, `match.js`.
   Le scelte fatte in autonomia e gli obiettivi non ancora raggiunti sono in `DECISIONI.md`.
+  Il lavoro in parallelo coi subagenti (compito, modello, stato, file toccati) è in `PARALLELO.md`.
 - `npm run golden:update` → rigenera l'impronta delle partite a seme fisso (`test/fixtures/golden.json`).
   Solo quando il comportamento cambia **di proposito**; mai per far passare un refactoring.
 - Prove su schermo: `node test/flow1.mjs shots`, `node test/preview-shot.mjs shots` (Puppeteer, iPhone 390×844). Chrome: variabile `CHROME`,

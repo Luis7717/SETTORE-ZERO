@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tiro a Giro</title><style>html,body{margin:0;height:100%;background:#070b14}</style></head><body>
+<script>
+// Pagina di passaggio: sta nello stesso posto della vecchia index.html (origine file://)
+// e legge il vecchio salvataggio per consegnarlo all'app, che poi apre il gioco su app://.
+(function () {
+  var v = null;
+  try { v = window.localStorage.getItem('tag_save_v1'); } catch (e) { v = null; }
+  try { window.webkit.messageHandlers.legacy.postMessage({ save: v === null ? '' : v }); } catch (e) { }
+})();
+</script></body></html>

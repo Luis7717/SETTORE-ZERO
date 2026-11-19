@@ -29,7 +29,13 @@ jobs:
             App/main.swift -o "$APP/TiroAGiro"
           cp App/Info.plist "$APP/Info.plist"
           cp App/AppIcon60x60@2x.png App/AppIcon60x60@3x.png "$APP/"
-          cp www/index.html "$APP/index.html"
+          # gioco a più file: tutta la cartella www/ (index.html + assets/) servita su app://
+          cp -R www "$APP/www"
+          test -f "$APP/www/index.html"
+          # nessun file sopra i 20 MB
+          if [ -n "$(find "$APP/www" -type f -size +20M)" ]; then echo "file oltre 20 MB"; exit 1; fi
+          # pagina di passaggio nella vecchia posizione (file://) per recuperare il salvataggio
+          cp App/legacy.html "$APP/index.html"
           printf 'APPL????' > "$APP/PkgInfo"
           codesign --force --sign - --timestamp=none "$APP"
           cd build && zip -qry ../TiroAGiro.ipa Payload

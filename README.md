@@ -4,11 +4,12 @@ Gioco di calcio 3D in verticale per iPhone, giocabile con un dito solo.
 Disegni col dito passaggi e tiri (anche a giro), difendi a mano e fai carriera
 con la tua squadra: campionato a tre divisioni, rosa, mercato.
 
-- `www/index.html` — il gioco completo (una sola pagina, funziona offline)
+- `www/index.html` — codice e menu del gioco (offline); `www/assets/` — modelli, texture e audio caricati a pezzi
 - `src/` — sorgenti: `sim.js` motore partita, `render.js` grafica 3D, `input.js` comandi,
   `career.js` campionato e mercato, `ui.js` menu, `main.js` collegamento
-- `build.mjs` — ricostruisce `www/index.html` dai sorgenti (`npm install` e poi `node build.mjs`)
-- `App/` — involucro iOS (WKWebView a schermo intero), icona e Info.plist
+- `build.mjs` — ricostruisce `www/` dai sorgenti (`npm install` e poi `npm run build`);
+  `npm run build:single` crea `dist/tiro-a-giro.html`, una versione a file unico solo per provarla nel browser
+- `App/` — involucro iOS (WKWebView a schermo intero che serve `www/` su `app://`), icona e Info.plist
 - `.github/workflows/tiro-a-giro-ipa.yml` — compila l'IPA a ogni push sul ramo `tiro-a-giro`
 - `test/` — partite automatiche e prove su schermo a misura iPhone
 
