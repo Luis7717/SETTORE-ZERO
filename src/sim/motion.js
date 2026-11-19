@@ -14,6 +14,7 @@ const SPRINT_BONUS = 0.16;  // velocità in più nello scatto a energia piena (a
 const SPRINT_DRAIN = 3.5;   // lo scatto consuma energia questo numero di volte più in fretta della corsa
 const RECOVER_V = 2.5;      // sotto questa velocità (camminata, fermo) l'energia si recupera (m/s)
 const RECOVER_RATE = 0.004; // energia recuperata al secondo camminando o da fermi
+const ADV_TIME = 2.5;       // vantaggio: entro questo tempo, se la squadra perde palla, si torna alla punizione (s)
 const FEINT_DOT = 0.5;      // la finta vale solo se la nuova direzione si scosta da quella di corsa (coseno massimo)
 const FEINT_CD = 1.2;       // tempo di ricarica della finta (s)
 const FEINT_R = 3.5;        // difensori entro questa distanza dal portatore possono cascarci (m)
@@ -161,6 +162,7 @@ export class MotionMethods {
     b.kick = { team: T, kicker: p, off: [], age: 0, type: 'shot', human: !!this.human[T] };
     this.detectShot();
     this.stats.shots[T]++; if (b.shot && b.shot.team === T && b.shot.on) this.stats.onT[T]++;
+    this.useAdvantage(T);
     if (head) this.stats.headers[T]++; else this.stats.volleys[T]++;
     this.ev('kick', { p, kind, v });
   }
@@ -238,6 +240,11 @@ export class MotionMethods {
     this.ev('foul', { by, on, card, pen: inBox });
     const ox = on.x, oy = on.y;
     if (card === 'red') { by.off = true; by.x = HW + 8; by.y = 0; by.state = 'play'; if (this.ctrl[by.team] === by) this.ctrl[by.team] = null; }
+    else if (!inBox && this.advantageOk(on, by)) {
+      this.advantage = { team: on.team, x: ox, y: oy, t: ADV_TIME };
+      this.ev('advantage', { team: on.team, p: on });
+      return;
+    }
     if (inBox) this.setRestart('penalty', on.team, 0, 0); else this.setRestart('freekick', on.team, ox, oy);
   }
 

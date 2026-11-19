@@ -10,6 +10,8 @@ const WIDE_GAP = 2; // metri dalla linea laterale degli esterni quando la squadr
 const WALL_RANGE = 30; // punizione entro questa distanza dalla porta: barriera (m)
 const WALL_DIST = 9.15; // distanza della barriera dal pallone (m)
 const WALL_GAP = 0.75; // spazio tra i giocatori in barriera (m)
+const ADV_FREE = 3; // vantaggio solo se nessun altro avversario è più vicino di così al portatore (m)
+const ADV_MIN_Y = -5; // ... e solo da qui in avanti (m nel verso d'attacco, 0 = metà campo)
 export const SPRINT_DIST = 6; // dito più lontano di così dal giocatore controllato (m) = scatto
 
 export class Match {
@@ -31,7 +33,7 @@ export class Match {
     this.ctrl = [null, null]; this.move = [null, null]; this.switchCd = [0, 0];
     this.chase = [null, null]; this.presser = [null, null]; this.cover = [null, null]; this.offLine = [HL, HL];
     this.predT = 0; this.att = -1; this.dtT = 0; this.lastPass = null; this.restart = null;
-    this.goalsLog = [];
+    this.goalsLog = []; this.advantage = null;
     this.kickoffTeam = o.kickoff ?? (this.rnd() < 0.5 ? 0 : 1);
     this.setupKickoff(this.kickoffTeam);
   }
@@ -120,7 +122,7 @@ export class Match {
   setRestart(type, team, x, y, taker) {
     const b = this.ball, dir = team ? -1 : 1, own = -dir * HL, opp = 1 - team;
     b.owner = null; b.vx = b.vy = b.vh = 0; b.h = 0; b.kick = null; b.shot = null; b.ct = 0; b.noT = 0;
-    this.phase = 'restart'; this.move = [null, null]; this.lastPass = null;
+    this.phase = 'restart'; this.move = [null, null]; this.lastPass = null; this.advantage = null;
     this.resetStates();
     let cut = false, wallSide = 0;
     const mine = this.team(team).filter(p => !p.off), theirs = this.team(opp).filter(p => !p.off);
@@ -300,6 +302,7 @@ export class Match {
     else if (type === 'shot') this.stats.shots[T]++;
     p.kickAnim = 0.35; p.stun = Math.max(p.stun, 0.12);
     this.predT = 0;
+    if (type === 'shot') this.useAdvantage(T);
     this.ev('kick', { p, kind: type, v: v0 });
   }
 
@@ -379,7 +382,7 @@ export class Match {
     if (og && b.prev && b.prev.team === forT) { scorer = b.prev; }
     const minute = Math.min(90, Math.floor((this.half - 1) * 45 + this.t / this.halfLen * 45) + 1);
     this.goalsLog.push({ team: forT, name: scorer ? scorer.name : 'Autogol', minute, scorer: scorer ? scorer.src : null, assist: assist ? assist.src : null });
-    this.phase = 'goal'; this.goalT = 3.2; this.nextKick = 1 - forT; b.owner = null; b.shot = null; b.kick = null; b.ct = 0;
+    this.advantage = null; this.phase = 'goal'; this.goalT = 3.2; this.nextKick = 1 - forT; b.owner = null; b.shot = null; b.kick = null; b.ct = 0;
     for (const p of this.players) if (!p.off) { p.cele = p.team === forT ? 1 : -1; if (p.state !== 'play') { p.state = 'play'; p.dive = null; } }
     this.ev('goal', { team: forT, scorer, assist, og: og && !scorer, minute });
   }
@@ -402,6 +405,7 @@ export class Match {
     this.updateBall(dt);
     if (this.phase === 'play') {
       this.contacts(dt);
+      if (this.phase === 'play') this.checkAdvantage(dt);
       if (this.phase === 'play') {
         this.t += dt;
         if (this.att >= 0) this.stats.poss[this.att] += dt;
@@ -413,6 +417,27 @@ export class Match {
     }
     this.updateCtrl(dt);
   }
+
+  // ------------------------------------------------------------ vantaggio
+  // Fallo su `on`: si lascia correre se la sua squadra ha ancora il pallone fuori dalla propria metà e nessun altro avversario addosso.
+  advantageOk(on, by) {
+    const b = this.ball, dir = on.team ? -1 : 1;
+    if (b.owner !== on || on.y * dir < ADV_MIN_Y) return false;
+    for (const o of this.players) if (o.team !== on.team && o !== by && !o.off && hyp(o.x - on.x, o.y - on.y) < ADV_FREE) return false;
+    return true;
+  }
+  checkAdvantage(dt) {
+    const a = this.advantage; if (!a) return;
+    const o = this.ball.owner;
+    if (o && o.team !== a.team) {
+      this.advantage = null; this.ev('advantage_back', { team: a.team });
+      this.setRestart('freekick', a.team, a.x, a.y); return;
+    }
+    a.t -= dt;
+    if (a.t <= 0) { this.advantage = null; this.ev('advantage_over', { team: a.team }); }
+  }
+  // un tiro della squadra che ha il vantaggio lo chiude: il vantaggio è stato sfruttato
+  useAdvantage(T) { if (this.advantage && this.advantage.team === T) { this.advantage = null; this.ev('advantage_over', { team: T }); } }
 
   endHalf() {
     this.resetStates(); this.ball.shot = null;
