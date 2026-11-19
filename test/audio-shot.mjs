@@ -3,7 +3,7 @@
 import { b, p, wait, errs } from './shot.mjs';
 
 await wait(1200);
-await p.evaluate(() => { document.querySelector('[data-a=create]').click(); window.__ui.show('hub'); });
+await p.evaluate(() => { window.__newCareer(); });
 await p.mouse.click(200, 400); // primo tocco: crea il contesto audio, come su iPhone
 await wait(2500); // la musica arriva in sottofondo
 await p.evaluate(() => window.__enter('friendly', 50));

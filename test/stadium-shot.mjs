@@ -6,7 +6,7 @@ import { b, p, wait, snap, errs } from './shot.mjs';
 
 mkdirSync(process.argv[2] || 'shots', { recursive: true });
 await wait(1200);
-await p.evaluate(() => { document.querySelector('[data-a=create]').click(); window.__ui.show('hub'); window.__career.s.settings.half = 90; window.__start('friendly', 50); });
+await p.evaluate(() => { window.__newCareer(); window.__career.s.settings.half = 90; window.__start('friendly', 50); });
 await wait(2500);
 await snap('s1-calcio-di-inizio');
 

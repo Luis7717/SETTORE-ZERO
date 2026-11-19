@@ -1,6 +1,6 @@
 import { b, p, wait, snap, errs } from './shot.mjs';
 await wait(1200);
-await p.evaluate(() => { document.querySelector('[data-a=create]').click(); window.__ui.show('hub'); window.__career.s.settings.half = 90; window.__start('league'); });
+await p.evaluate(() => { window.__newCareer(); window.__career.s.settings.half = 90; window.__start('league'); });
 await wait(1500);
 const lerp = (a, c, n) => Array.from({ length: n }, (_, i) => [a[0] + (c[0] - a[0]) * (i + 1) / n, a[1] + (c[1] - a[1]) * (i + 1) / n]);
 const fps = await p.evaluate(() => new Promise(r => { let n = 0; const t = performance.now(); const f = () => { n++; if (performance.now() - t > 2000) r(n / 2); else requestAnimationFrame(f); }; f(); }));

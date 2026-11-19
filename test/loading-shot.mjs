@@ -24,7 +24,7 @@ try {
   await p.goto(srv.url + 'index.html');
   await p.waitForFunction(() => window.__ui && window.__ui.screen === 'title', { timeout: 20000 });
   res.menu = true;
-  await p.evaluate(() => { document.querySelector('[data-a=create]').click(); window.__ui.show('hub'); });
+  await p.evaluate(() => { window.__newCareer(); });
   await p.waitForFunction(() => window.__assets.stages.has('music'), { timeout: 8000 });
   res.musica = await p.evaluate(async () => (await window.__assets.stages.get('music')).ok);
   const bar = p.waitForFunction(() => document.getElementById('load').style.display === 'flex', { timeout: 3000 }).then(() => true, () => false);
@@ -41,7 +41,7 @@ try {
   await q.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
   await q.goto(pathToFileURL(process.cwd() + '/dist/tiro-a-giro.html').href);
   await q.waitForFunction(() => window.__ui && window.__ui.screen === 'title', { timeout: 20000 });
-  await q.evaluate(() => { document.querySelector('[data-a=create]').click(); window.__ui.show('hub'); window.__enter('friendly', 50); });
+  await q.evaluate(() => { window.__newCareer(); window.__enter('friendly', 50); });
   await q.waitForFunction(() => window.__G.state === 'match', { timeout: 10000 });
   res.fileUnico = await q.evaluate(() => ['crowd', 'kick'].filter(id => window.__assets.has(id)));
   res.erroriFileUnico = errs2;

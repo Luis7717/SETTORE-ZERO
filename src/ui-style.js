@@ -123,7 +123,7 @@ export const UI_CSS = `
 /* scheda giocatore */
 #ui .pcard{background:linear-gradient(180deg,#16253f,#0f192c);border:1px solid #ffd93d66;border-radius:16px;padding:14px;margin:4px 0 12px;animation:uiUp .25s both;box-shadow:0 10px 28px #0007}
 #ui .pc1 b{font-size:18px;letter-spacing:-.005em}#ui .pc1 span{font-size:12.5px;line-height:1.4;margin-top:4px}
-#ui .stats{grid-template-columns:repeat(3,1fr);gap:8px 10px;margin-top:12px;text-align:left}
+#ui .stats{grid-template-columns:repeat(4,1fr);gap:8px 8px;margin-top:12px;text-align:left}
 #ui .stats>div{background:#ffffff08;border-radius:10px;padding:8px 10px 9px;position:relative}
 #ui .stats i{display:flex;justify-content:space-between;align-items:baseline;font-size:10.5px;letter-spacing:.1em;font-weight:800}
 #ui .stats b{font-size:18px;position:absolute;right:10px;top:5px}

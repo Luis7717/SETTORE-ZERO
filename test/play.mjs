@@ -1,6 +1,6 @@
 import { b, p, wait, snap, errs } from './shot.mjs';
 await wait(1500);
-await p.evaluate(() => { document.querySelector('[data-a=create]').click(); window.__ui.show('hub'); window.__career.s.settings.half = 90; window.__start('friendly', 50); window.__G.speed = 3; });
+await p.evaluate(() => { window.__newCareer(); window.__career.s.settings.half = 90; window.__start('friendly', 50); window.__G.speed = 3; });
 await wait(2500);
 const st = () => p.evaluate(() => {
   const G = window.__G, m = G.match, v = window.__view; if (!m) return null;

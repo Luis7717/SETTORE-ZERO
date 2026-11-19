@@ -25,7 +25,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
 const snap = async n => { await p.screenshot({ path: `${out}/pl-${tag}-${n}.png` }); };
 
 await wait(1200);
-await p.evaluate(() => { document.querySelector('[data-a=create]').click(); window.__ui.show('hub'); window.__career.s.settings.half = 90; return window.__enter('friendly', 50); });
+await p.evaluate(() => { window.__newCareer(); window.__career.s.settings.half = 90; return window.__enter('friendly', 50); });
 await wait(2500);
 const model = await p.evaluate(() => !!(window.__view.figs[0] && window.__view.figs[0].m3d));
 await snap('1-calcio-di-inizio');

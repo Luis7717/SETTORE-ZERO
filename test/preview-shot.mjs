@@ -6,7 +6,7 @@ const lerp = (a, c, n) => Array.from({ length: n }, (_, i) => [a[0] + (c[0] - a[
 const scr = (x, y, h) => p.evaluate((x, y, h) => window.__view.worldToScreen(x, y, h), x, y, h);
 
 await wait(1200);
-await p.evaluate(() => { document.querySelector('[data-a=create]').click(); window.__ui.show('hub'); window.__career.s.settings.half = 90; window.__start('friendly', 50); });
+await p.evaluate(() => { window.__newCareer(); window.__career.s.settings.half = 90; window.__start('friendly', 50); });
 await wait(1500);
 // portatore a centrocampo, difesa avversaria alta: la linea del fuorigioco cade nel campo visibile
 await p.evaluate(() => {

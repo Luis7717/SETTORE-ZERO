@@ -1,11 +1,13 @@
 // Menu e schermate della carriera (HTML sopra la scena 3D).
-import { FORMATIONS } from './sim.js';
+import { FORMATIONS, headingOf } from './sim.js';
 import { UI_CSS } from './ui-style.js';
 import { DIV_NAMES, POS_NAME, KITS, overall, overallAs, value, fmtMoney } from './career.js';
 
 const hex = n => '#' + n.toString(16).padStart(6, '0');
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const STATS = [['vel', 'VEL'], ['tir', 'TIR'], ['pas', 'PAS'], ['dri', 'DRI'], ['dif', 'DIF'], ['fis', 'FIS']];
+// statistiche nella scheda giocatore; 'fis' è la resistenza, 'tes' i colpi di testa (calcolati se il salvataggio è vecchio)
+const STATS = [['vel', 'VEL'], ['fis', 'RES'], ['tir', 'TIR'], ['pas', 'PAS'], ['dri', 'DRI'], ['dif', 'DIF'], ['tes', 'TES']];
+const statOf = (p, k) => (k === 'tes' ? headingOf(p) : p[k]);
 const ovrCls = o => (o >= 75 ? 'o4' : o >= 65 ? 'o3' : o >= 55 ? 'o2' : 'o1');
 
 
@@ -125,7 +127,7 @@ export class UI {
   }
   pcard(p, btn) {
     return `<div class="pcard"><div class="pc1"><b>${esc(p.name)}</b><span>${POS_NAME[p.pos]} · ${p.age} anni · valore ${fmtMoney(value(p))}${p.apps !== undefined && p.apps > 0 ? ` · ${p.apps} pres. ${p.goals} gol` : ''}</span></div>
-      <div class="stats">${(p.pos === 'P' ? [['por', 'POR'], ['pas', 'PAS'], ['fis', 'FIS'], ['vel', 'VEL']] : STATS).map(([k, n]) => `<div class="${ovrCls(p[k])}"><i>${n}</i><b>${p[k]}</b><u style="--w:${Math.max(6, Math.min(100, p[k]))}%"></u></div>`).join('')}</div>${btn || ''}</div>`;
+      <div class="stats">${(p.pos === 'P' ? [['por', 'POR'], ['pas', 'PAS'], ['fis', 'RES'], ['vel', 'VEL']] : STATS).map(([k, n]) => { const v = statOf(p, k); return `<div class="${ovrCls(v)}"><i>${n}</i><b>${v}</b><u style="--w:${Math.max(6, Math.min(100, v))}%"></u></div>`; }).join('')}</div>${btn || ''}</div>`;
   }
 
   squad() {
