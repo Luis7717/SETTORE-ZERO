@@ -1,0 +1,12 @@
+import { b, p, wait, snap, errs } from './shot.mjs';
+await wait(2500); await snap('01-title');
+await p.evaluate(() => document.querySelector('[data-a=create]')?.click());
+await wait(300); await snap('02-howto');
+await p.evaluate(() => { for (let i = 0; i < 6; i++) document.querySelector('[data-a=howto]')?.click(); });
+await wait(300); await snap('03-hub');
+await p.evaluate(() => window.__ui.show('squad')); await wait(200); await snap('04-squad');
+await p.evaluate(() => window.__ui.show('market')); await wait(200); await snap('05-market');
+await p.evaluate(() => window.__ui.show('table')); await wait(200); await snap('06-table');
+await p.evaluate(() => window.__start('league')); await wait(3500); await snap('07-match-kickoff');
+console.log(errs.join('\n') || 'nessun errore');
+await b.close();

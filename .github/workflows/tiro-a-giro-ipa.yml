@@ -1,0 +1,52 @@
+name: Tiro a Giro IPA
+
+on:
+  push:
+    branches: [tiro-a-giro]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15-intel, macos-15]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compila l'app
+        run: |
+          set -euo pipefail
+          APP=build/Payload/TiroAGiro.app
+          mkdir -p "$APP"
+          SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          xcrun --sdk iphoneos swiftc -O \
+            -target arm64-apple-ios14.0 -sdk "$SDK" \
+            App/main.swift -o "$APP/TiroAGiro"
+          cp App/Info.plist "$APP/Info.plist"
+          cp App/AppIcon60x60@2x.png App/AppIcon60x60@3x.png "$APP/"
+          cp www/index.html "$APP/index.html"
+          printf 'APPL????' > "$APP/PkgInfo"
+          codesign --force --sign - --timestamp=none "$APP"
+          cd build && zip -qry ../TiroAGiro.ipa Payload
+          ls -la ../TiroAGiro.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TiroAGiro-ipa-${{ matrix.runner }}
+          path: TiroAGiro.ipa
+
+      - name: Pubblica come release scaricabile
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view tiro-a-giro-ipa --json assets -q '.assets[].name' 2>/dev/null | grep -q TiroAGiro.ipa && [ "$(gh release view tiro-a-giro-ipa --json targetCommitish -q .targetCommitish)" = "${GITHUB_SHA}" ]; then echo "release già aggiornata"; exit 0; fi
+          gh release delete tiro-a-giro-ipa --yes --cleanup-tag || true
+          gh release create tiro-a-giro-ipa TiroAGiro.ipa \
+            --title "Tiro a Giro (IPA)" \
+            --notes "Build automatica dal commit ${GITHUB_SHA}. IPA non firmata: installala con TrollStore, Sideloadly o AltStore." \
+            --target "${GITHUB_SHA}" --prerelease || { sleep 8; gh release view tiro-a-giro-ipa > /dev/null; }
