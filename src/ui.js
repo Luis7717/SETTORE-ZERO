@@ -42,7 +42,7 @@ const PITCH = '<svg class="pitch" viewBox="0 0 400 300" aria-hidden="true" fill=
 
 export const HOWTO = [
   ['Passaggi e tiri', 'Appoggia il dito sul tuo giocatore con la palla e <b>disegna la traiettoria</b>. Il tempo rallenta mentre disegni. La palla va dove finisce la linea: su un compagno, nello spazio o in porta. Se curvi la linea, la palla gira.'],
-  ['Muoversi', '<b>Tieni premuto</b> un punto del campo: il giocatore con la palla corre lì. Tocco veloce su un compagno = passaggio diretto.'],
+  ['Muoversi', '<b>Tieni premuto</b> un punto del campo: il giocatore con la palla corre lì. Col dito <b>lontano</b> dal giocatore <b>scatta</b> (si stanca prima), vicino corre normale. Col pallone, <b>scorri veloce di lato</b> per la <b>finta</b>. Tocco veloce su un compagno = passaggio diretto.'],
   ['Difesa', 'Senza palla controlli il difensore con l\'anello giallo. <b>Tieni premuto</b> per portarlo dove vuoi: se arrivi sulla palla la rubi, se tagli la linea di passaggio la intercetti. Tocca un compagno per cambiare giocatore.'],
   ['Scivolata', '<b>Scorri veloce</b> nella direzione in cui vuoi entrare. Se prendi la palla è tua; se prendi prima l\'uomo è fallo, da dietro è cartellino. Se sbagli il tempo resti a terra.'],
   ['Portiere', 'Quando tirano il tempo rallenta: <b>scorri verso il lato del tiro</b>. Più lungo è il gesto, più lungo il tuffo; verso l\'alto per i tiri alti. I tiri centrali li blocca da solo.'],

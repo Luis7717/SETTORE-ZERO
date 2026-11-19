@@ -24,7 +24,7 @@ const ui = new UI(uiRoot, career, {
   act: (a, v, el) => { if (a === 'season') ui.show('season', G.res.res.season); },
 });
 const input = new Input(canvas, view, {
-  kick: s => G.match.userKick(0, s), move: (x, y, h) => G.match.userMove(0, x, y, h), stop: () => G.match.userStop(0),
+  kick: s => G.match.userKick(0, s), move: (x, y, h, sp) => G.match.userMove(0, x, y, h, sp), feint: (dx, dy) => G.match.userFeint(0, dx, dy), stop: () => G.match.userStop(0),
   slide: (dx, dy) => G.match.userSlide(0, dx, dy), dive: (dx, th) => G.match.userDive(0, dx, th), sw: i => G.match.userSwitch(0, G.match.players[i]),
 });
 
@@ -110,9 +110,16 @@ const HINTS = {
 const RHINT = { kickoff: 'Calcio d\'inizio: disegna il passaggio', throw: 'Rimessa: disegna il passaggio', corner: 'Calcio d\'angolo: disegna il cross', goalkick: 'Rinvio: disegna il passaggio', freekick: 'Punizione: disegna il passaggio o il tiro', penalty: 'RIGORE: disegna il tiro in porta', gk: 'Rilancio del portiere: disegna il passaggio' };
 
 function events(m) {
+  const adv = m.events.some(e => e.type === 'advantage');
   for (const e of m.events) {
     switch (e.type) {
-      case 'kick': sfx.kick(e.v); break;
+      case 'kick':
+        sfx.kick(e.v);
+        if (!e.clear && e.p.team === 0 && (e.kind === 'header' || e.kind === 'volley')) big(e.kind === 'header' ? 'Colpo di testa!' : 'Al volo!', '', 900);
+        break;
+      case 'feint': if (e.p.team === 0 && e.fooled && e.fooled.length) big('Finta!', 'g', 800); break;
+      case 'advantage': big('Vantaggio!', '', 1100); break;
+      case 'advantage_back': sfx.whistle(); big('Si torna alla punizione', '', 1300); break;
       case 'tackle': case 'block': sfx.kick(9); break;
       case 'goal':
         if (e.team === 0) { sfx.goal(); big('GOL!', 'g', 2600, (e.scorer ? e.scorer.name : 'Autogol') + ' · ' + e.minute + '\''); }
@@ -125,7 +132,7 @@ function events(m) {
         else if (e.kind === 'penalty') big('RIGORE!', e.team === 0 ? 'g' : 'b', 1800);
         break;
       case 'offside': big('Fuorigioco', '', 1300); sfx.whistle(); break;
-      case 'foul': sfx.whistle(); big(e.card === 'red' ? 'Espulso!' : e.card === 'yellow' ? 'Ammonito' : 'Fallo', e.card ? 'b' : '', 1500, e.card ? e.by.name : ''); break;
+      case 'foul': if (adv) { if (e.card) big(e.card === 'red' ? 'Espulso!' : 'Ammonito', 'b', 1500, e.by.name); break; } sfx.whistle(); big(e.card === 'red' ? 'Espulso!' : e.card === 'yellow' ? 'Ammonito' : 'Fallo', e.card ? 'b' : '', 1500, e.card ? e.by.name : ''); break;
       case 'save': if (!e.catch) { big('Parata!', e.p.team === 0 ? 'g' : '', 1000); sfx.ooh(); } break;
       case 'post': big('Palo!', '', 1000); sfx.post(); break;
       case 'half': sfx.whistle(true); showHalf(); break;
