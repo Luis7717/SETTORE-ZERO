@@ -8,9 +8,9 @@ function hudUp(){const w=cw(),rl=G.rel>0,o=S.eq.length>1?wget(S.eq[(G.wi+1)%S.eq
  hset('ar',Math.round(Math.min(100,G.ar/150*100)),v=>{$('ar').style.transform='scaleX('+v/100+')';$('arb').style.opacity=v?1:.3;});
  hset('red',Math.round((G.hurtFx*1.4+(G.hp<G.mhp*.25?.25:0))*20),v=>{$('red').style.opacity=v/20;});
  hset('wk',w.id+'|'+(w.l||0)+'|'+w.r,()=>{$('wn').innerHTML=wname(w)+(w.l?' +'+w.l:'');const i=$('wic');i.innerHTML=wIcon(w.t);i.style.color=RAR[w.r].c;});
- hset('am',rl?'R':G.ammo[w.id]+' / '+wst(w).mag,v=>{const a=$('am');a.textContent=rl?'RICARICA':v;a.className=rl?'rl':'';});
+ hset('am',rl?'R':WT[w.t].inf?'∞':G.ammo[w.id]+' / '+wst(w).mag,v=>{const a=$('am');a.textContent=rl?'RICARICA':v;a.className=rl?'rl':'';});
  hset('ok',o?o.id+'|'+o.r:'',v=>{const b=$('swap');b.style.display=o?'block':'none';if(o){$('swi').innerHTML=wIcon(o.t);b.style.setProperty('--sc',RAR[o.r].c);}});
- if(o)hset('oa',G.ammo[o.id]+'/'+wst(o).mag,v=>{$('swn').textContent=v;});
+ if(o)hset('oa',WT[o.t].inf?'∞':G.ammo[o.id]+'/'+wst(o).mag,v=>{$('swn').textContent=v;});
  const ex=G.lean>.4;hset('cov',G.mv?0:ex?1:2,v=>{const c=$('cov');c.textContent=v===0?'IN MOVIMENTO':v===1?'ESPOSTO':'AL RIPARO';c.style.color=v===1?'#ffb040':'#5fe08f';c.style.borderColor=v===1?'#ffb04088':'#5fe08f88';});
  // barra del boss (elemento HTML sotto la barra della vita: prima era disegnata sul canvas a metà schermo, sopra messaggi e sottotitoli)
  const bb=bossBar(),bh=G.boss&&!G.boss.dead?Math.max(0,Math.ceil(G.boss.hp/G.boss.mhp*100)):-1;

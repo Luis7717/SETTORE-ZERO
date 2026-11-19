@@ -19,7 +19,7 @@ function tone(f0,f1,dur,type,vol,dl){osc({t:dl||0,dur,vol,type,f0,f1:f1===f0?0:f
 function gun(p){const k=p.k||1;nz({dur:.035,vol:p.crack*k,type:'highpass',f0:1800,rev:p.rev*.6});nz({dur:p.bd,vol:p.body*k,f0:p.lp||4200,f1:260,rev:p.rev});osc({dur:p.td||.12,vol:p.thump*k,f0:p.tf||170,f1:42,rev:p.rev*.5});if(!p.lite)nz({t:.03,dur:p.bd*2.4,vol:p.body*k*.22,f0:900,f1:150,rev:p.rev});}
 function clk(t,f,v){nz({t,dur:.018,vol:v||.2,type:'bandpass',f0:f,q:2.5});}
 const GUNS={pistol:{crack:.5,body:.4,bd:.14,thump:.5,tf:190,rev:.35},revolver:{crack:.55,body:.5,bd:.19,thump:.65,tf:155,rev:.5},smg:{crack:.4,body:.3,bd:.09,thump:.35,tf:200,rev:.25,lite:1},
- shotgun:{crack:.5,body:.8,bd:.32,thump:.9,tf:120,td:.22,rev:.65,lp:3000},rifle:{crack:.6,body:.45,bd:.13,thump:.5,tf:170,rev:.4},sniper:{crack:.7,body:.85,bd:.42,thump:.9,tf:105,td:.3,rev:.95},minigun:{crack:.5,body:.38,bd:.1,thump:.5,tf:150,rev:.3,lite:1}};
+ shotgun:{crack:.5,body:.8,bd:.32,thump:.9,tf:120,td:.22,rev:.65,lp:3000},rifle:{crack:.6,body:.45,bd:.13,thump:.5,tf:170,rev:.4},sniper:{crack:.7,body:.85,bd:.42,thump:.9,tf:105,td:.3,rev:.95},minigun:{crack:.5,body:.38,bd:.1,thump:.5,tf:150,rev:.3,lite:1},gatling:{crack:.38,body:.3,bd:.065,thump:.4,tf:175,td:.08,rev:.18,lite:1}};
 function sndSyn(n){try{
  if(n.charCodeAt(0)===119&&n.charCodeAt(1)===95){const k=n.slice(2),g=GUNS[k];if(g){gun(g);if(k==='shotgun'){clk(.3,1500,.25);clk(.44,2100,.22);}else if(k==='sniper'){clk(.5,1700,.2);clk(.72,2300,.18);}return;}
   if(k==='plasma'){osc({dur:.2,vol:.22,type:'sawtooth',f0:760,f1:130,rev:.4});nz({dur:.16,vol:.2,type:'bandpass',f0:2400,f1:500,q:2,rev:.4});return;}
@@ -55,7 +55,7 @@ function sndSyn(n){try{
    Se un suono manca o non si decodifica, snd() usa la versione sintetizzata qui sopra (sndSyn). */
 const REC={buf:{},fail:{},busy:0,started:0},VOX={};
 // nome usato dal gioco -> varianti registrate (f), volume (v), voci contemporanee (lim), variazione di intonazione (pr),
-// riverbero (rev), syn:1 = suona anche lo strato sintetizzato, then = suoni da aggiungere dopo [nome,ritardo,volume]
+// intonazione di base (rt), riverbero (rev), syn:1 = suona anche lo strato sintetizzato, then = suoni da aggiungere dopo [nome,ritardo,volume]
 const SMAP={
  w_pistol:{f:['w_pistol'],v:.9,lim:4,rev:.12},
  w_revolver:{f:['w_revolver'],v:1,lim:3,rev:.15},
@@ -64,6 +64,7 @@ const SMAP={
  w_rifle:{f:['w_rifle'],v:.85,lim:5,rev:.1},
  w_sniper:{f:['w_sniper'],v:1,lim:2,rev:.2,then:[['rel',.62,.45]]},
  w_minigun:{f:['w_minigun'],v:.55,lim:6,pr:.07,rev:.06},
+ w_gatling:{f:['w_minigun'],v:.4,lim:4,rt:1.16,pr:.05,rev:.05}, // Minigun: sparo dell'AK più acuto e corto, poche voci insieme (spara ~28 colpi al secondo)
  w_plasma:{f:['plasma'],v:.6,lim:3,rev:.25},
  w_rocket:{f:['rocket'],v:.75,lim:2,rev:.25},
  eshot:{f:['eshot'],v:.5,lim:4,pr:.08,rev:.15},
@@ -115,10 +116,17 @@ function voxAdd(n,lim,s,g){const a=VOX[n]||(VOX[n]=[]);while(a.length>=lim){cons
 function recOne(k,vol,rate,dl,rev,n,lim){const b=REC.buf[k];if(!b)return false;const s=AC.createBufferSource(),g=AC.createGain();s.buffer=b;s.playbackRate.value=rate;g.gain.value=vol;s.connect(g);aout(g,rev);
  s.start(AC.currentTime+(dl||0));voxAdd(n,lim,s,g);return true;}
 function recPlay(n,m){const ok=m.f.filter(k=>REC.buf[k]);if(!ok.length)return false;const k=ok[Math.random()*ok.length|0],pr=m.pr==null?.04:m.pr,
-  rate=1+(Math.random()*2-1)*pr,vol=m.v*(1+(Math.random()*2-1)*.1);recOne(k,vol,rate,0,m.rev||0,n,m.lim||4);
+  rate=(m.rt||1)*(1+(Math.random()*2-1)*pr),vol=m.v*(1+(Math.random()*2-1)*.1);recOne(k,vol,rate,0,m.rev||0,n,m.lim||4);
  if(m.then)for(const t of m.then)recOne(t[0],t[2],rate,t[1],m.rev||0,n+'+',2);
  if(m.voice&&typeof state!=='undefined'&&state==='end')recOne(m.voice,.85,1,.25,0,'voce',1);
  return true;}
+/* ronzio del motore della Minigun: un solo oscillatore che segue i giri delle canne (k = 0..1).
+   Va richiamato a ogni fotogramma: se smette di arrivare (menu, pausa) si spegne da solo dopo un attimo. */
+let GHUM=null;
+function gatHum(k){if(!AC||!SFX)return;try{if(!GHUM){const o=AC.createOscillator(),o2=AC.createOscillator(),f=AC.createBiquadFilter(),g=AC.createGain();o.type='sawtooth';o2.type='square';f.type='lowpass';f.frequency.value=900;f.Q.value=2;g.gain.value=0;o.connect(f);o2.connect(f);f.connect(g);g.connect(SFX);o.start();o2.start();GHUM={o,o2,f,g,k:-1};}
+ if(!S.snd||k<.02)k=0;if(k===0&&GHUM.k===0)return;GHUM.k=k;const t=AC.currentTime,G_=GHUM.g.gain;
+ GHUM.o.frequency.setTargetAtTime(55+150*k,t,.03);GHUM.o2.frequency.setTargetAtTime(27+75*k,t,.03);GHUM.f.frequency.setTargetAtTime(500+1500*k,t,.03);
+ G_.cancelScheduledValues(t);G_.setTargetAtTime(.05*Math.sqrt(k),t,.04);G_.setTargetAtTime(0,t+.2,.06);}catch(e){}}
 function snd(n){if(!AC||!S.snd)return;const now=AC.currentTime;if(sndLast[n]&&now-sndLast[n]<.035)return;sndLast[n]=now;
  try{const m=SMAP[n];if(m&&recPlay(n,m)){if(m.syn)sndSyn(n);return;}}catch(e){}sndSyn(n);}
 

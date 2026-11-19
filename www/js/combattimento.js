@@ -73,7 +73,9 @@ function shotRay(d,dmg,t,mz){const far=t.range?t.range*2:140,o=cam.position,hit=
   else if(hit.e){dmgE(hit.e,dmg*fo,hit.head,end);traitHit(hit.e,dmg*fo,end);if(G.tr==='boom')boomAt(end,dmg*fo,hit.e);if(t.pierce){const h2=cast(end.clone().addScaledVector(d,.7),d,far);if(h2&&h2.e&&h2.e!==hit.e)dmgE(h2.e,dmg,h2.head,h2.h.point);}}
   else if(hit.proj)detProj(hit.proj,true);else if(hit.prop){hitProp(hit.prop,dmg*fo,end);if(G.tr==='boom')boomAt(end,dmg*fo,null);}else{if(G.tr==='boom')boomAt(end,dmg*fo,null);bits(end,2,M.spark,2,.025,.2);if(!t.beam&&hit.h.distance>1.6&&hit.h.object.material!==M.inv)decal(hit.h);}}
  if(t.beam){G.beamEnd=end.clone();}else{const a=mz.clone().lerp(end,Math.min(.5,1.6/Math.max(.1,mz.distanceTo(end))));tracer(a,end,G.wr>=2?M.trR[G.wr]:undefined);}}
-function fire(){const w=cw(),t=WT[w.t];if(G.cdw>0||G.lean<.85||!(G.ammo[w.id]>0)||G.mv)return false;if(G.tr!=='inf')G.ammo[w.id]--;G.cdw=t.rate;G.kick=t.beam?.25:1;G.mflash=.05;
+function fire(){const w=cw(),t=WT[w.t];if(G.cdw>0||G.lean<.85||!(G.ammo[w.id]>0)||G.mv)return false;if(!t.inf&&G.tr!=='inf')G.ammo[w.id]--;G.mflash=.05;
+ // Minigun (inf): colpi infiniti; la cadenza sale coi giri delle canne (G.gsp 0..1, armi-ambienti.js) e il resto del tempo si conserva, così la cadenza non dipende dagli fps
+ if(t.inf){G.gshot=G.t;const r=t.rate/(.35+.65*(G.gsp||0));G.cdw=(G.cdw>-r?G.cdw:0)+r;G.kick=.45+Math.random()*.3;}else{G.cdw=t.rate;G.kick=t.beam?.25:1;}
  if(t.beam){G.beam=.08;if((G.lz=(G.lz||0)+1)%3===0)snd('zap');}else snd('w_'+w.t);const base=aimDir(),tri=G.tr==='tri',dmg=wst(w).dmg*(tri?.6:1),mz=G.muz.getWorldPosition(new V3()),right=tri?new V3(1,0,0).applyQuaternion(cam.quaternion):null;G.boomN=2;
  for(let f=0;f<(tri?3:1);f++){const b0=tri?base.clone().addScaledVector(right,(f-1)*.075).normalize():base;
   if(t.proj){const m=new THREE.Mesh(GEO.sph,new THREE.MeshBasicMaterial({color:t.proj==='plasma'?lc(0x80e8ff):lc(0xffb060)}));m.userData.ownMat=1;const q=t.proj==='plasma'?.22:.16;m.scale.set(q,q,q*2);m.position.copy(mz);m.lookAt(mz.clone().add(b0));fxG.add(m);G.pproj.push({m,d:b0,spd:t.proj==='plasma'?38:26,dmg,r:t.splash*2.1,life:3});}

@@ -15,7 +15,7 @@ const ET={
 };
 const WV={pistol:{b:[.05,.12,.2],br:.016,bl:.13,n:1,c:0x40444c},revolver:{b:[.055,.13,.2],br:.02,bl:.2,n:1,c:0x62564c,drum:1},smg:{b:[.06,.14,.34],br:.016,bl:.16,n:1,c:0x38463e,mag:1},
  shotgun:{b:[.07,.12,.5],br:.021,bl:.42,n:2,c:0x62492e},rifle:{b:[.065,.15,.5],br:.018,bl:.3,n:1,c:0x3a424e,mag:1},sniper:{b:[.06,.14,.6],br:.017,bl:.55,n:1,c:0x303c30,scope:1},
- plasma:{b:[.1,.17,.45],br:.045,bl:.28,n:1,c:0x3a426e,glow:0x50dcff},minigun:{b:[.12,.19,.4],br:.02,bl:.5,n:3,c:0x4a4e56},rocket:{b:[.11,.15,.5],br:.07,bl:.6,n:1,c:0x4e5e3e},laser:{b:[.07,.14,.45],br:.012,bl:.4,n:1,c:0x565a64,glow:0xff3c5a}};
+ plasma:{b:[.1,.17,.45],br:.045,bl:.28,n:1,c:0x3a426e,glow:0x50dcff},minigun:{b:[.12,.19,.4],br:.02,bl:.5,n:3,c:0x4a4e56},gatling:{b:[.12,.19,.4],br:.016,bl:.5,n:3,c:0x3c4046},rocket:{b:[.11,.15,.5],br:.07,bl:.6,n:1,c:0x4e5e3e},laser:{b:[.07,.14,.45],br:.012,bl:.4,n:1,c:0x565a64,glow:0xff3c5a}};
 WT.shotgun.range=12;WT.revolver.n='Luger';WT.minigun.n='Mitragliatore AK';
 const WM={pistol:{k:'g_makarov',tz:-.045,by:.05,mz:-.13,hide:['Magazine'],wz:-.44,wx:.1,wy:-.17},revolver:{k:'g_luger',rot:1,tz:-.06,by:.055,mz:-.17,hide:['Clip'],dx:-.025,wz:-.44,wx:.1,wy:-.17},smg:{k:'g_suomi',tz:.07,by:.03,mz:-.45},shotgun:{k:'g_shotgun',tz:.39,by:.03,mz:-.41},rifle:{k:'g_m4',tz:.025,by:.03,mz:-.54},sniper:{k:'g_sniper',tz:.235,by:.03,mz:-.52},minigun:{k:'g_ak',tz:.24,by:.015,mz:-.32},plasma:{k:'g_flare',tz:0,by:.03,mz:-.15,wz:-.44,wx:.1,wy:-.17}};
 let G=null,state='hub',BEAM=null;const SEG=23,WG=new THREE.Group();WG.rotation.order='YXZ';cam.add(WG);

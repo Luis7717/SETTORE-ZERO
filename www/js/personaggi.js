@@ -135,3 +135,66 @@ function PG_shield(e){const s=e.shm;if(!s)return;const D=new THREE.MeshStandardM
  R_(D,.12,.3,.08,0,0,-.06,g);bake(g);g.traverse(m=>{m.raycast=()=>{};m.castShadow=true;});}
 const PG_spawnE0=spawnE;
 spawnE=function(type,slot,pos){const e=PG_spawnE0(type,slot,pos);if(e&&e.shm)try{PG_shield(e);}catch(err){console.warn('PG scudo',err);}return e;};
+
+/* ===== attori di scena: Maggiore Varr, Kross, Marsh (stesso Xbot, stesse animazioni idle/corsa) =====
+   mkActor (livelli.js) resta com'è: qui si rifanno i materiali del corpo e si aggancia l'equipaggiamento alle ossa.
+   Pezzi con pelle rigida (PG_kit): una mesh per materiale, materiali condivisi tra le istanze, niente ombre, non colpibili. */
+// corpo: s = tuta [colore, ruvidità, metallo], j = giunture [colore, emissivo, intensità], rim = luce di contorno
+const PG_ASTY={varr:{s:[0x2e2a36,.62,.32],j:[0x2a2432,0xff30c0,.06],rim:[0xff40c8,.14]},
+ kross:{s:[0x1a1a1f,.5,.45],j:[0x121214,0xffa818,.5],rim:[0xffb030,.07]},
+ marsh:{s:[0x3a4a4c,.7,.25],j:[0x1a2224,0x60f0e0,.5],rim:[0x60f0e0,.06]}};
+const PG_ACT={
+ // Maggiore Varr: capelli fucsia con coda alta e ciuffo asimmetrico, monocolo magenta, colletto alto, spalline con gradi,
+ // corazza sagomata, giacca da ufficiale con falde sulle cosce, cintura, fondina con pistola sulla coscia destra, stivali alti
+ varr(L){const H=PG_mat('vr_hair',0x6a1050,.78,.04),C=PG_mat('vr_coat',0x2a1a38,.72,.12),A=PG_mat('vr_arm',0x4a3c56,.38,.7,1),D=PG_mat('vr_dk',0x121016,.4,.35),G=PG_GM(),E=PG_em(0xff30c0,2.4);
+  L.push(
+   // capelli: calotta, nuca, ciuffo spazzato a sinistra, ciocca lunga sul lato sinistro (destra rasata), coda alta con anello luminoso
+   ['Head','dome',H,.255,.23,.268,0,.122,-.008],['Head','sph2',H,.224,.21,.19,0,.1,-.06],['Head','cap',H,.07,.19,.055,.045,.185,.09,-.3,0,.96],['Head','cap',H,.04,.17,.05,.106,.075,.065,0,0,.06],
+   ['Head','sph2',H,.085,.075,.085,0,.155,-.13],['Head','cap',H,.066,.32,.062,0,-.02,-.17,.26],['Head','tor',E,.11,.11,.6,0,.13,-.148,Math.PI/2+.26],
+   // fascia-visore con fessura luminosa, monocolo sull'occhio destro, auricolare
+   ['Head','c16',G,.25,.042,.248,0,.112,0],['Head','rb',E,.075,.01,.01,.04,.112,.124],
+   ['Head','c16',G,.064,.03,.064,-.044,.112,.124,Math.PI/2],['Head','c16',E,.048,.012,.048,-.044,.112,.14,Math.PI/2],['Head','rb',G,.03,.06,.06,-.116,.1,.015],['Head','sph2',E,.016,.016,.016,-.132,.1,.015],
+   // colletto alto da ufficiale
+   ['Neck','tor',C,.2,.2,1,0,.03,-.008,Math.PI/2],['Neck','rb',C,.17,.12,.025,0,.065,-.075,-.25],
+   // corazza sagomata sul petto, bordo luminoso, risvolti della giacca, gradi sul petto
+   ['Spine2','rb',A,.27,.2,.07,0,.035,.085],['Spine2','sph2',PG_mat('vr_cui',0x4a3c56,.34,.7),.25,.15,.08,0,.03,.1],['Spine2','rb',E,.24,.012,.012,0,-.068,.122],
+   ['Spine2','rb',C,.06,.22,.025,.135,.05,.105,0,0,-.22],['Spine2','rb',C,.06,.22,.025,-.135,.05,.105,0,0,.22],
+   ['Spine2','rb',E,.035,.008,.012,.085,.13,.148],['Spine2','rb',E,.035,.008,.012,.085,.115,.148],['Spine2','rb',E,.035,.008,.012,.085,.1,.148],
+   // schiena della giacca e mantellina corta
+   ['Spine2','rb',C,.32,.36,.05,0,-.03,-.085],['Spine2','rb',C,.34,.22,.025,0,.04,-.125,.12],['Spine2','rb',E,.012,.2,.008,0,.03,-.14,.12],
+   // giacca sull'addome (aperta davanti) e cintura con fibbia luminosa
+   ['Spine1','rb',C,.1,.2,.03,.095,-.03,.11],['Spine1','rb',C,.1,.2,.03,-.095,-.03,.11],['Spine1','rb',C,.3,.2,.04,0,-.03,-.1],
+   ['Hips','rb',D,.32,.055,.225,0,.05,0],['Hips','rb',E,.05,.03,.01,0,.05,.114],['Hips','rb',G,.04,.05,.03,.12,.04,.08],
+   // fondina sulla coscia destra con pistola e cinghia
+   ['RightUpLeg','c16',D,.165,.028,.155,0,-.2,0],['RightUpLeg','rb',D,.05,.17,.09,-.115,-.22,0],['RightUpLeg','rb',G,.035,.085,.045,-.12,-.1,-.022,.3],['RightUpLeg','sph2',E,.018,.018,.018,-.142,-.2,.03]);
+  // spalline con frangia luminosa, gradi sulla spallina sinistra, polsini corazzati con filo luminoso, falde della giacca, ginocchiere, stivali alti
+  PG_lr(L,'Shoulder','rb',A,.15,.03,.13,.115,.07,-.015,0,0,-.12);PG_lr(L,'Shoulder','rb',E,.016,.012,.12,.19,.06,-.015,0,0,-.12);
+  for(let i=0;i<3;i++)L.push(['LeftShoulder','rb',E,.01,.006,.075,.08+i*.03,.09-i*.0036,-.015,0,0,-.12]);
+  PG_lr(L,'ForeArm','rb',A,.1,.075,.08,.18,0,0);PG_lr(L,'ForeArm','rb',E,.2,.008,.01,.12,.04,0);
+  PG_lr(L,'UpLeg','rb',C,.19,.46,.03,0,-.2,-.095,.1);L.push(['LeftUpLeg','rb',C,.03,.44,.15,.1,-.2,-.01,0,0,.08]);
+  PG_lr(L,'Leg','rb',A,.085,.09,.05,0,-.01,.065);PG_lr(L,'Leg','c16',D,.115,.3,.125,0,-.26,0);PG_lr(L,'Leg','rb',E,.012,.012,.13,.058,-.115,0);},
+ // Kross: berretto da ufficiale con fascia d'oro e visiera, visore ambra, spalline d'oro, cappotto nero lungo
+ kross(L){const C=PG_mat('kr_coat',0x101014,.6,.2),A=PG_mat('kr_arm',0x2a2a30,.35,.75,1),O=PG_mat('kr_gold',0xc89028,.3,.9),V=PG_mat('kr_vis',0x08080a,.25,.6),E=PG_em(0xffa818,2.4);
+  L.push(['Head','c16',C,.25,.07,.27,0,.205,0],['Head','c16',C,.29,.03,.31,0,.245,.02,-.12],['Head','c16',O,.255,.03,.275,0,.18,0],['Head','rb',V,.2,.012,.09,0,.17,.14,.25],
+   ['Head','rb',E,.17,.022,.02,0,.12,.122],['Neck','tor',C,.21,.21,.9,0,.03,-.008,Math.PI/2],
+   ['Spine2','rb',A,.3,.23,.08,0,.04,.085],['Spine2','rb',O,.03,.18,.012,0,.03,.128],['Spine2','rb',C,.34,.38,.06,0,-.03,-.088],
+   ['Spine1','rb',C,.14,.2,.035,.09,-.03,.11],['Spine1','rb',C,.14,.2,.035,-.09,-.03,.11],['Spine1','rb',C,.32,.2,.04,0,-.03,-.1],['Hips','rb',O,.33,.05,.23,0,.05,0]);
+  PG_lr(L,'Shoulder','rb',O,.16,.034,.14,.115,.072,-.015,0,0,-.12);PG_lr(L,'Shoulder','rb',E,.018,.014,.13,.195,.062,-.015,0,0,-.12);PG_lr(L,'ForeArm','rb',A,.11,.08,.085,.18,0,0);
+  PG_lr(L,'UpLeg','rb',C,.2,.5,.03,0,-.22,-.095,.08);PG_lr(L,'UpLeg','rb',C,.03,.48,.16,.1,-.22,-.01,0,0,.06);PG_lr(L,'Leg','c16',C,.12,.3,.13,0,-.26,0);},
+ // Marsh (alleato): elmetto con cuffia e microfono, gilet tattico con tasche, ginocchiere
+ marsh(L){const A=PG_mat('ms_arm',0x2c5a5a,.5,.45,1),D=PG_DK(),G=PG_GM(),E=PG_em(0x60f0e0,2.2);
+  L.push(['Head','dome',A,.27,.25,.285,0,.13,-.01],['Head','rb',A,.24,.03,.06,0,.14,.12,-.2],['Head','c16',G,.06,.04,.06,.122,.1,0,0,0,Math.PI/2],['Head','rb',G,.012,.02,.09,.12,.06,.06],['Head','sph2',E,.018,.018,.018,.13,.06,.1],
+   ['Spine2','rb',A,.31,.23,.085,0,.04,.08],['Spine2','rb',A,.3,.25,.07,0,.03,-.08],['Spine1','rb',D,.07,.1,.05,-.07,.02,.15],['Spine1','rb',D,.07,.1,.05,.07,.02,.15],['Spine2','rb',E,.04,.012,.012,.09,.13,.125],
+   ['Hips','rb',D,.31,.05,.215,0,.045,0]);
+  PG_lr(L,'Leg','rb',A,.09,.09,.05,0,-.01,.065);PG_lr(L,'Arm','sph2',A,.15,.09,.15,.045,.045,0);}
+};
+function PG_actor(a){const k=a.k,sty=PG_ASTY[k],f=PG_ACT[k];if(!sty||!f)return;const inner=a.root.children.find(o=>!o.isMesh);if(!inner)return;
+ const mats=[],bones={};
+ inner.traverse(o=>{if(o.isBone)bones[o.name.replace('mixamorig','')]=o;if(!o.isMesh)return;const m=o.material;
+  if(/joint/i.test(o.name+m.name)){m.color.copy(lc(sty.j[0]));m.emissive=lc(sty.j[1]);m.emissiveIntensity=sty.j[2];m.roughness=.4;m.metalness=.6;}
+  else{m.color.copy(lc(sty.s[0]));m.roughness=sty.s[1];m.metalness=sty.s[2];}mats.push(m);});
+ const L=[];f(L);PG_kit({root:a.root},L,bones);PG_rim({},mats,sty.rim[0],sty.rim[1]);
+ // Varr un po' più snella (dopo l'equipaggiamento, così i pezzi seguono la stessa proporzione)
+ if(k==='varr')inner.scale.x*=.93;}
+const PG_mkActor0=mkActor;
+mkActor=function(k,list){const a=PG_mkActor0(k,list);try{PG_actor(a);}catch(err){console.warn('PG attore',k,err);}return a;};
