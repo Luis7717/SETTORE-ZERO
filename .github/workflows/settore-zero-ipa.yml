@@ -32,6 +32,9 @@ jobs:
           # tutto il gioco: index.html, css/, lib/, models/, js/
           cp -R www/. "$APP/"
           test -f "$APP/index.html"
+          # solo avvisi (non bloccanti): cartelle/file nuovi del caricamento a pezzi
+          test -d "$APP/assets" || echo "::warning::manca la cartella assets/ nell'app (www/assets non copiata?)"
+          test -f "$APP/migra.html" || echo "::warning::manca migra.html: i vecchi salvataggi file:// non verranno trasferiti"
           printf 'APPL????' > "$APP/PkgInfo"
           codesign --force --sign - --timestamp=none "$APP"
           cd build && zip -qry ../SettoreZero.ipa Payload
@@ -46,9 +49,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # main -> release "settore-zero-ipa"; ogni altro branch ha la sua release separata
+          # main -> release "settore-zero-ipa"; caricamento-a-pezzi -> "settore-zero-ipa-prova"; ogni altro branch ha la sua release separata
           if [ "${GITHUB_REF_NAME}" = "main" ]; then
             TAG=settore-zero-ipa; TITLE="Settore Zero (IPA)"
+          elif [ "${GITHUB_REF_NAME}" = "caricamento-a-pezzi" ]; then
+            TAG=settore-zero-ipa-prova; TITLE="Settore Zero (IPA) — PROVA caricamento a pezzi"
           else
             B=$(printf '%s' "${GITHUB_REF_NAME}" | tr -c 'A-Za-z0-9._-' '-')
             TAG="settore-zero-ipa-${B}"; TITLE="Settore Zero (IPA) — prova branch ${GITHUB_REF_NAME}"

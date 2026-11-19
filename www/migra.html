@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Settore Zero</title>
+<style>html,body{margin:0;height:100%;background:#000}</style>
+</head>
+<body>
+<script>
+// Caricata dall'app come file:// (stessa origine della vecchia versione): legge TUTTE le chiavi
+// del vecchio localStorage e le manda a Swift. Risponde sempre, anche se vuoto o in errore.
+(function () {
+  var dati = Object.create(null), errore = null;
+  try {
+    var ls = window.localStorage;
+    for (var i = 0; i < ls.length; i++) {
+      var k = ls.key(i);
+      if (k === null) continue;
+      var v = ls.getItem(k);
+      if (v !== null) dati[k] = v;
+    }
+  } catch (e) {
+    errore = String(e);
+  }
+  try {
+    window.webkit.messageHandlers.szMigraDati.postMessage(
+      JSON.stringify({ versione: 1, dati: dati, errore: errore })
+    );
+  } catch (e) {}
+})();
+</script>
+</body>
+</html>
