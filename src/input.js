@@ -1,10 +1,11 @@
 // Comandi a un dito. Traduce i tocchi in ordini per la squadra `team`.
 import { HW, HL, GW, GH, SPRINT_DIST } from './sim.js';
 
+const SLIDE_FLICK_MS = 250; // dal giocatore controllato: tratto più rapido di così = scivolata, altrimenti linea
 const NO_OFFSIDE = ['throw', 'goalkick', 'corner']; // ripartenze senza fuorigioco
 
 export class Input {
-  // out: { kick(spec), move(x,y,held,sprint), stop(), slide(dx,dy), dive(dx,th), sw(playerIndex), feint(dx,dy) }
+  // out: { kick(spec), move(x,y,held,sprint), stop(), slide(dx,dy), dive(dx,th), sw(playerIndex), feint(dx,dy), path(pts), run(playerIndex, pts) }
   // (se `out.feint` manca la finta va diretta alla partita; se `move` ignora `sprint` il motore lo ricalcola uguale)
   constructor(el, view, out) {
     this.el = el; this.view = view; this.out = out; this.match = null; this.team = 0; this.enabled = false;
@@ -35,7 +36,23 @@ export class Input {
         return;
       }
     }
+    // difesa: dito su un proprio giocatore = linea da fargli seguire (fino a 3 giocatori insieme)
+    if (hint === 'defend' || hint === 'loose') {
+      const r = this.nearOwn(x, y);
+      if (r) { this.mode = 'dpath'; this.runner = r; this.pts = [{ x: r.x, y: r.y, h: 0, sx: x, sy: y }]; return; }
+    }
     this.mode = 'move';
+  }
+
+  // proprio giocatore (non portiere, compreso quello controllato) sotto il dito
+  nearOwn(x, y) {
+    const m = this.match, T = this.team; let best = null, bd = Math.max(50, this.view.h * 0.065);
+    for (const p of m.players) {
+      if (p.team !== T || p.off || p.pos === 'P') continue;
+      const s = this.view.worldToScreen(p.x, p.y, 0.9), d = Math.hypot(x - s.x, y - s.y);
+      if (d < bd) { bd = d; best = p; }
+    }
+    return best;
   }
 
   nearMate(x, y) {
@@ -72,6 +89,13 @@ export class Input {
         const p = this.pick(x, y);
         if (p) { p.sx = x; p.sy = y; this.pts.push(p); if (this.pts.length > 150) this.pts.splice(1, 1); }
         this.showPath();
+      }
+    } else if (this.mode === 'dpath') {
+      const last = this.pts[this.pts.length - 1];
+      if (Math.hypot(x - last.sx, y - last.sy) >= 5) {
+        const g = this.view.screenToGround(x, y);
+        if (g) { this.pts.push({ x: g.x, y: g.y, h: 0, sx: x, sy: y }); if (this.pts.length > 150) this.pts.splice(1, 1); }
+        if (this.pts.length >= 2) this.view.setPath(this.pts, false, null);
       }
     } else if (this.mode === 'dive') {
       // linea dal portiere verso il punto della porta dove tuffarsi: il tuffo parte quando si alza il dito
@@ -139,6 +163,19 @@ export class Input {
       return;
     }
     if (mode === 'dive') { if (dist > 22) this.doDive(); else this.view.clearPath(); return; }
+    if (mode === 'dpath') {
+      const r = this.runner, pts = this.pts; this.runner = null; this.pts = []; this.view.clearPath();
+      // scorrimento veloce dal giocatore controllato = scivolata (come prima)
+      // (un tratto rapido e corto; una linea più lenta o lunga è una strada da correre)
+      if (r === m.ctrl[T] && dt < SLIDE_FLICK_MS && dist > Math.max(38, this.view.w * 0.1) && dist < this.view.w * 0.45) {
+        const a = this.view.screenToGround(this.sx, this.sy), c = this.view.screenToGround(this.x, this.y);
+        if (a && c) { this.out.slide(c.x - a.x, c.y - a.y); return; }
+      }
+      let len = 0; for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i].sx - pts[i - 1].sx, pts[i].sy - pts[i - 1].sy);
+      if (pts.length >= 2 && len > 28) { this.out.run(r.i, pts.slice(1).map(q => ({ x: q.x, y: q.y }))); return; }
+      if (dist < 16 && r !== m.ctrl[T]) this.out.sw(r.i); // tocco = passa a comandare quel giocatore
+      return;
+    }
     if (mode !== 'move') return;
     const hint = m.hint(T);
     if (dist < 16 && dt < 320) {

@@ -24,7 +24,7 @@ const ui = new UI(uiRoot, career, {
   act: (a, v, el) => { if (a === 'season') ui.show('season', G.res.res.season); },
 });
 const input = new Input(canvas, view, {
-  kick: s => G.match.userKick(0, s), move: (x, y, h, sp) => G.match.userMove(0, x, y, h, sp), feint: (dx, dy) => G.match.userFeint(0, dx, dy), path: pts => G.match.userPath(0, pts), stop: () => G.match.userStop(0),
+  kick: s => G.match.userKick(0, s), move: (x, y, h, sp) => G.match.userMove(0, x, y, h, sp), feint: (dx, dy) => G.match.userFeint(0, dx, dy), path: pts => G.match.userPath(0, pts), run: (i, pts) => G.match.userRun(0, G.match.players[i], pts), stop: () => G.match.userStop(0),
   slide: (dx, dy) => G.match.userSlide(0, dx, dy), dive: (dx, th) => G.match.userDive(0, dx, th), sw: i => G.match.userSwitch(0, G.match.players[i]),
 });
 
@@ -112,11 +112,12 @@ function big(text, cls, ms, small) {
 function fade() { const f = $('fade'); f.style.transition = 'none'; f.style.opacity = 0.85; requestAnimationFrame(() => requestAnimationFrame(() => { f.style.transition = 'opacity .35s'; f.style.opacity = 0; })); }
 
 const RUN_DRAW_SLOW = 0.5; // velocità del tempo mentre si disegna la strada da correre
-const GK_SLOW = 0.25;      // velocità del tempo mentre si para
+const GK_SLOW = 0.25;
+const DEF_DRAW_SLOW = 0.3; // velocità del tempo mentre si disegna una linea di difesa      // velocità del tempo mentre si para
 const DUEL_SLOW = 0.35; // velocità del tempo durante un duello col difensore
 const HINTS = {
   attack: 'Disegna la strada dal giocatore per correre · linea in porta = tiro',
-  defend: 'Tieni premuto per muovere il difensore · scorri veloce = scivolata',
+  defend: 'Disegna linee dai tuoi giocatori (fino a 3) per chiudere e intercettare · scorri veloce = scivolata',
   loose: 'Palla libera: tieni premuto per andarci',
   dive: 'PARA! Tira una linea dal portiere al punto della porta',
   duel: 'Passa a un compagno libero (anello verde) o tocca Dribbling',
@@ -232,7 +233,7 @@ function frame(now) {
       input.update();
       const dive = m.diveWin(0) && !m.autoGk[0];
       const duel = !!(m.duelFor && m.duelFor(0));
-      const target = input.drawing ? (input.runPath() ? RUN_DRAW_SLOW : 0.13) : dive ? GK_SLOW : duel ? DUEL_SLOW : 1;
+      const target = input.mode === 'dpath' ? DEF_DRAW_SLOW : input.drawing ? (input.runPath() ? RUN_DRAW_SLOW : 0.13) : dive ? GK_SLOW : duel ? DUEL_SLOW : 1;
       $('drib').style.display = duel && !input.drawing ? 'block' : 'none';
       G.ts += (target - G.ts) * Math.min(1, dt * 14);
       const sdt = dt * G.ts * (G.speed || 1), n = Math.max(1, Math.ceil(sdt / (1 / 60)));
@@ -283,4 +284,4 @@ toMenu('title');
 requestAnimationFrame(frame);
 loadMusicLater();
 window.__G = G; window.__career = career; window.__view = view; window.__ui = ui; window.__start = startMatch; window.__enter = enterMatch; window.__newCareer = (name) => { career.create(name || 'FC Prova', 0); ui.show('hub'); }; // per le prove: squadra nuova senza allenamento
- window.__assets = assets; window.__sfx = sfx;
+ window.__assets = assets; window.__sfx = sfx; window.__input = input;

@@ -11,6 +11,7 @@ const PREVIEW_COLOR = 0x7dd3ff; // puntini dell'anteprima della traiettoria
 const OFFSIDE_COLOR = 0xff5a5a; // linea del fuorigioco
 const GK_CAM_BACK = 6.5;       // parata: telecamera dietro la propria linea di porta (m)
 const GK_CAM_H = 2.6;          // parata: altezza della telecamera (m)
+const RUN_LINES = 3, RUN_PTS = 64, RUN_COLOR = 0x7dd3ff; // linee di difesa a schermo
 const DUEL_MATES = 3;           // compagni liberi evidenziati durante un duello
 const DUEL_LOW = 0.42;          // quanto si abbassa la telecamera nel duello (0 = niente, 1 = a terra)
 
@@ -122,6 +123,13 @@ export class View {
     this.target = new THREE.Sprite(new THREE.SpriteMaterial({ map: tg, depthTest: false })); this.target.scale.set(1.7, 1.7, 1); this.target.renderOrder = 21; this.target.visible = false; s.add(this.target);
     this.recv = new THREE.Mesh(this.shGeo, new THREE.MeshBasicMaterial({ map: ringT, transparent: true, depthWrite: false, color: 0x7dffb0 }));
     this.recv.scale.set(1.6, 1, 1.6); this.recv.position.y = 0.04; this.recv.visible = false; s.add(this.recv);
+    // difesa: linee disegnate che i giocatori stanno seguendo (resta solo il tratto ancora da fare)
+    this.runLines = [];
+    for (let i = 0; i < RUN_LINES; i++) {
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(RUN_PTS * 3), 3)); g.setDrawRange(0, 0);
+      const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: RUN_COLOR, transparent: true, opacity: 0.85, depthTest: false }));
+      l.renderOrder = 13; l.frustumCulled = false; l.visible = false; s.add(l); this.runLines.push(l);
+    }
     // duello: anelli verdi sotto i compagni liberi a cui passare
     this.mateRings = [];
     for (let i = 0; i < DUEL_MATES; i++) { const r = this.recv.clone(); r.material = this.recv.material; r.visible = false; s.add(r); this.mateRings.push(r); }
@@ -223,6 +231,7 @@ export class View {
     const duel = !!(m.duelFor && m.duelFor(this.me));
     this.duelK = (this.duelK || 0) + ((duel ? 1 : 0) - (this.duelK || 0)) * Math.min(1, dt * 5);
     this.showFreeMates(m, duel);
+    this.showRuns(m);
     // telecamera dietro l'azione
     const dir = this.me === 1 ? -1 : 1;
     let fx = b.x, fy = b.y;
@@ -291,6 +300,17 @@ export class View {
     f.aL.rotation.x = al; f.aR.rotation.x = ar; f.aL.rotation.z = -az; f.aR.rotation.z = az;
   }
 
+  showRuns(m) {
+    const runs = (m.runs && m.runs[this.me]) || [], s = this.flip;
+    this.runLines.forEach((l, k) => {
+      const r = runs[k]; l.visible = !!r; if (!r) return;
+      const a = l.geometry.attributes.position.array; let n = 0;
+      const put = (x, y) => { a[n * 3] = s * x; a[n * 3 + 1] = 0.08; a[n * 3 + 2] = -s * y; n++; };
+      put(r.p.x, r.p.y);
+      for (let i = r.i; i < r.path.length && n < RUN_PTS; i++) put(r.path[i].x, r.path[i].y);
+      l.geometry.attributes.position.needsUpdate = true; l.geometry.setDrawRange(0, n);
+    });
+  }
   // i compagni più liberi (lontani dagli avversari) e raggiungibili, sotto un anello verde
   showFreeMates(m, on) {
     const rings = this.mateRings; if (!rings) return;

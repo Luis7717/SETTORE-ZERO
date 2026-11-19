@@ -10,7 +10,9 @@ const SHOT_BLOCK_R = 0.6;   // un tiro forte si ferma su un difensore solo se lo
 const PARRY_OUT = 0.6;      // respinte non bloccate che finiscono oltre la linea di fondo
 const BLOCK_OUT = 0.4;      // tiri ribattuti vicino all'area che finiscono in angolo
 const TACKLE_LOOSE = 0.3;   // contrasti vinti in cui la palla schizza via invece di restare al difensore
-const PASS_DEFLECT = 0.3;   // passaggi intercettati che vengono solo deviati
+const PASS_DEFLECT = 0.3;
+// raggio difensivo sui passaggi avversari (m): INT_BASE a parità 60 contro 60, più difesa e meno passaggio lo allargano
+const INT_BASE = 0.95, INT_REF = 60, INT_DIF = 0.008, INT_PAS = 0.008, INT_MIN = 0.6, INT_MAX = 1.35;   // passaggi intercettati che vengono solo deviati
 const SPRINT_BONUS = 0.16;  // velocità in più nello scatto a energia piena (a energia bassa rende meno)
 const SPRINT_DRAIN = 3.5;   // lo scatto consuma energia questo numero di volte più in fretta della corsa
 const RECOVER_V = 2.5;      // sotto questa velocità (camminata, fermo) l'energia si recupera (m/s)
@@ -35,6 +37,16 @@ const AIR_DIST_K = 0.6;     // ... e quanto pesa essere più vicini al pallone (
 const AIR_WIN_MIN = 0.15, AIR_WIN_MAX = 0.85; // limiti della probabilità di vincere il contrasto aereo  // dopo la finta il portatore non può essere contrastato per questo tempo (s)
 
 export class MotionMethods {
+  // Raggio entro cui p tocca il pallone libero. Sui passaggi avversari è il "raggio difensivo":
+  // cresce con la difesa di p e cala con il passaggio di chi ha calciato (un buon passaggio passa più vicino).
+  reachOf(p) {
+    const k = this.ball.kick;
+    if (!k || k.team === p.team) return 0.95;
+    if (k.type === 'shot') return SHOT_BLOCK_R;
+    const pas = k.kicker && k.kicker.st ? k.kicker.st.pas : 60;
+    return clamp(INT_BASE + (p.st.dif - INT_REF) * INT_DIF - (pas - INT_REF) * INT_PAS, INT_MIN, INT_MAX);
+  }
+
   movePlayers(dt) {
     const b = this.ball, live = this.phase === 'play';
     for (const p of this.players) {
@@ -331,7 +343,7 @@ export class MotionMethods {
       const d = hyp(p.x - b.x, p.y - b.y);
       // palla appena calciata che si allontana: non si può toccare
       if (b.kick && b.kick.age < 0.3 && b.kick.team !== p.team && (p.x - b.x) * b.vx + (p.y - b.y) * b.vy < 0) continue;
-      if (d >= (gk ? 1.25 : (b.kick && b.kick.type === 'shot' && b.kick.team !== p.team ? SHOT_BLOCK_R : 0.95)) || d >= bd) continue;
+      if (d >= (gk ? 1.25 : this.reachOf(p)) || d >= bd) continue;
       const air = gk ? null : this.airPlay(p);
       if (air || b.h < (gk ? 2.35 : 1.7)) { bd = d; best = p; bestAir = air; }
     }

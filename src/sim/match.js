@@ -17,7 +17,8 @@ const SPEED_TIRED = 0.86; // a energia 0 la velocità massima scende a questa fr
 const PATH_STEP = 1.2;   // distanza minima tra due punti della strada disegnata (m)
 const PATH_REACH = 1.3;  // punto raggiunto quando il portatore è più vicino di così (m)
 const PATH_SPRINT = 6;   // scatta finché davanti resta più strada di così (m)
-const PATH_TTL = 20;     // durata massima di una strada disegnata (s)
+const PATH_TTL = 20;
+const RUNS_MAX = 3;      // giocatori senza palla con una linea da seguire, al massimo     // durata massima di una strada disegnata (s)
 export const SPRINT_DIST = 6; // dito più lontano di così dal giocatore controllato (m) = scatto
 
 export class Match {
@@ -36,7 +37,7 @@ export class Match {
     this.ball = { x: 0, y: 0, h: 0, vx: 0, vy: 0, vh: 0, cax: 0, cay: 0, ct: 0, owner: null, noP: null, noT: 0, last: null, prev: null, kick: null, shot: null };
     this.score = [0, 0]; this.half = 1; this.t = 0; this.time = 0; this.phase = 'play'; this.events = [];
     this.stats = { shots: [0, 0], onT: [0, 0], poss: [0, 0], fouls: [0, 0], corners: [0, 0], saves: [0, 0], headers: [0, 0], volleys: [0, 0] };
-    this.ctrl = [null, null]; this.move = [null, null]; this.switchCd = [0, 0];
+    this.ctrl = [null, null]; this.move = [null, null]; this.switchCd = [0, 0]; this.runs = [[], []];
     this.chase = [null, null]; this.presser = [null, null]; this.cover = [null, null]; this.offLine = [HL, HL];
     this.predT = 0; this.att = -1; this.dtT = 0; this.lastPass = null; this.restart = null;
     this.goalsLog = []; this.advantage = null;
@@ -131,7 +132,7 @@ export class Match {
     const b = this.ball, dir = team ? -1 : 1, own = -dir * HL, opp = 1 - team;
     b.owner = null; b.vx = b.vy = b.vh = 0; b.h = 0; b.kick = null; b.shot = null; b.ct = 0; b.noT = 0;
     this.endDuel('gioco fermo');
-    this.phase = 'restart'; this.move = [null, null]; this.lastPass = null; this.advantage = null;
+    this.phase = 'restart'; this.move = [null, null]; this.runs = [[], []]; this.lastPass = null; this.advantage = null;
     this.resetStates();
     let cut = false, wallSide = 0;
     const mine = this.team(team).filter(p => !p.off), theirs = this.team(opp).filter(p => !p.off);
@@ -502,6 +503,8 @@ export class Match {
       const x = clamp(q.x, -HW + 0.5, HW - 0.5), y = clamp(q.y, -HL + 0.5, HL - 0.5), l = path[path.length - 1];
       if (!l || hyp(x - l.x, y - l.y) >= PATH_STEP) path.push({ x, y });
     }
+    const e = pts[pts.length - 1], z = path[path.length - 1], ex = clamp(e.x, -HW + 0.5, HW - 0.5), ey = clamp(e.y, -HL + 0.5, HL - 0.5);
+    if (z && (z.x !== ex || z.y !== ey)) path.push({ x: ex, y: ey }); // l'ultimo punto della linea c'è sempre
     if (!path.length) return false;
     this.move[T] = { x: path[0].x, y: path[0].y, ttl: PATH_TTL, held: false, sprint: false, path, i: 0, owner: c };
     return true;
@@ -516,6 +519,40 @@ export class Match {
     for (let k = mv.i + 1; k < mv.path.length; k++) left += hyp(mv.path[k].x - mv.path[k - 1].x, mv.path[k].y - mv.path[k - 1].y);
     mv.sprint = left > PATH_SPRINT;
     if (mv.i === mv.path.length - 1 && left < PATH_REACH) this.move[T] = null;
+  }
+  // Difesa: linea disegnata da un proprio giocatore senza palla, che corre lungo quella strada.
+  // Al massimo RUNS_MAX giocatori alla volta: una linea nuova sostituisce la più vecchia (o quella dello stesso giocatore).
+  userRun(T, p, pts) {
+    const b = this.ball;
+    if (!p || p.team !== T || p.off || p.pos === 'P' || b.owner === p || this.phase !== 'play' || !Array.isArray(pts) || !pts.length) return false;
+    const path = [];
+    for (const q of pts) {
+      const x = clamp(q.x, -HW + 0.5, HW - 0.5), y = clamp(q.y, -HL + 0.5, HL - 0.5), l = path[path.length - 1];
+      if (!l || hyp(x - l.x, y - l.y) >= PATH_STEP) path.push({ x, y });
+    }
+    const e = pts[pts.length - 1], z = path[path.length - 1], ex = clamp(e.x, -HW + 0.5, HW - 0.5), ey = clamp(e.y, -HL + 0.5, HL - 0.5);
+    if (z && (z.x !== ex || z.y !== ey)) path.push({ x: ex, y: ey }); // l'ultimo punto della linea c'è sempre
+    if (!path.length) return false;
+    const runs = this.runs[T].filter(r => r.p !== p);
+    while (runs.length >= RUNS_MAX) runs.shift();
+    runs.push({ p, path, i: 0, ttl: PATH_TTL });
+    this.runs[T] = runs;
+    return true;
+  }
+  runOf(p) { return this.runs[p.team].find(r => r.p === p) || null; }
+  // chiamata da assign(): punto da raggiungere lungo la linea; false quando la linea è finita o non vale più
+  followRun(p, r) {
+    const b = this.ball;
+    if (b.owner && b.owner.team === p.team || p.state !== 'play') { this.runs[p.team] = this.runs[p.team].filter(q => q !== r); return false; }
+    r.ttl -= this.dtT;
+    while (r.i < r.path.length - 1 && hyp(r.path[r.i].x - p.x, r.path[r.i].y - p.y) < PATH_REACH) r.i++;
+    const q = r.path[r.i];
+    if (r.ttl <= 0 || (r.i === r.path.length - 1 && hyp(q.x - p.x, q.y - p.y) < PATH_REACH)) { this.runs[p.team] = this.runs[p.team].filter(z => z !== r); return false; }
+    p.tx = q.x; p.ty = q.y;
+    let left = hyp(q.x - p.x, q.y - p.y);
+    for (let k = r.i + 1; k < r.path.length; k++) left += hyp(r.path[k].x - r.path[k - 1].x, r.path[k].y - r.path[k - 1].y);
+    p.sprint = left > PATH_SPRINT;
+    return true;
   }
   // sprint: true/false dal telefono; se manca, scatto quando il dito tenuto premuto è lontano dal giocatore controllato
   userMove(T, x, y, held, sprint) {

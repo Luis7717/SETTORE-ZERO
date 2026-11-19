@@ -53,6 +53,24 @@ if (tgt) {
   res.tuffo = await p.evaluate(() => window.__G.match.gk(0).state);
 }
 await wait(1500);
+// 3) difesa: linea disegnata da un proprio giocatore (tocco vero), che poi la segue
+await p.evaluate(() => {
+  const m = window.__G.match; m.phase = 'play'; m.restart = null; m.move[0] = null; m.runs = [[], []];
+  const o = m.players[18]; m.place(o, 0, 12); o.fx = 0; o.fy = -1; m.ball.owner = o; m.ball.kick = null; m.att = 1; o.protect = 5;
+  for (const q of m.team(1)) q.stun = 5;
+  m.place(m.players[4], 4, 2); for (const q of m.team(0)) if (q.pos !== 'P' && q.i !== 4) m.place(q, -28 + q.i * 2, -20);
+  window.__outs = []; const out = window.__input.out, f = out.run; out.run = (...a) => { window.__outs.push(a[0]); return f(...a); };
+});
+await wait(300);
+{
+  const st = await p.evaluate(() => { const q = window.__G.match.players[4]; return window.__view.worldToScreen(q.x, q.y, 0.9); });
+  const en = await scr(-1, 8, 0);
+  await p.touchscreen.touchStart(st.x, st.y); await wait(30);
+  for (const q of lerp([st.x, st.y], [en.x, en.y], 8)) { await p.touchscreen.touchMove(q[0], q[1]); await wait(45); }
+  await p.touchscreen.touchEnd(); await wait(150);
+}
+res.difesa = await p.evaluate(() => ({ chiamate: window.__outs, linee: window.__G.match.runs[0].map(r => r.p.i), aSchermo: window.__view.runLines.filter(l => l.visible).length }));
+await snap('c5-linee-difesa');
 res.log = await p.evaluate(() => window.__log.slice(0, 12));
 console.log(JSON.stringify(res));
 console.log(errs.join('\n') || 'nessun errore');

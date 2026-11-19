@@ -249,6 +249,8 @@ export class AIMethods {
     if (this.phase === 'restart' && p.wall) { p.tx = p.wall.x; p.ty = p.wall.y; return; }
     const mv = hum && this.ctrl[T] === p ? this.move[T] : null;
     if (mv && mv.path) this.followPath(p, mv);
+    // linea disegnata in difesa: vale più di tutto il resto finché non è finita
+    if (hum && b.owner !== p && this.runs[T].length) { const r = this.runOf(p); if (r && this.followRun(p, r)) return; }
     if (mv && mv.sprint) p.sprint = true;
     if (b.owner === p) {
       if (hum) {
