@@ -20,6 +20,13 @@ const FEINT_R = 3.5;        // difensori entro questa distanza dal portatore pos
 const FEINT_BASE = 0.5;     // probabilità di sbilanciare un difensore a pari dribbling e difesa
 const FEINT_SKILL = 1.5;    // quanto pesa la differenza dribbling - difesa (per punto / 100)
 const FEINT_STUN = 0.7;     // durata dello sbilanciamento del difensore (s)
+const HEAD_LO = 1.3;        // da questa altezza in su il pallone si colpisce di testa (m)
+const HEAD_HI = 2.6;        // altezza massima raggiungibile di testa, saltando (m)
+const VOLLEY_LO = 0.5;      // sotto HEAD_LO e sopra questa altezza: colpo al volo (m)
+const AIR_SHOT_RANGE = 17;  // distanza massima dalla porta per colpire di testa o al volo verso la porta (m)
+const HEAD_CLEAR_ZONE = 32; // un difensore entro questa distanza dalla propria porta respinge di testa (m)
+const HEAD_V0 = 12;         // velocità base del colpo di testa (m/s), più la bravura
+const VOLLEY_V0 = 18;       // velocità base del tiro al volo (m/s), più la bravura
 const FEINT_PROTECT = 0.3;  // dopo la finta il portatore non può essere contrastato per questo tempo (s)
 
 export class MotionMethods {
@@ -109,6 +116,53 @@ export class MotionMethods {
     }
     this.ev('feint', { p, fooled });
     return true;
+  }
+
+  // Pallone alto che arriva a p: 'header' / 'volley' = colpo verso la porta (attaccante su un lancio o cross
+  // di un compagno, vicino alla porta), 'clear' = respinta di testa (difensore vicino alla propria porta), null = niente.
+  airPlay(p) {
+    const b = this.ball;
+    if (b.shot || b.h < VOLLEY_LO || b.h > HEAD_HI) return null;
+    const dir = p.team ? -1 : 1, k = b.kick, head = b.h >= HEAD_LO;
+    if (k && k.team === p.team) {
+      if (k.kicker === p || k.type !== 'loft') return null;
+      return hyp(p.x, p.y - dir * HL) < AIR_SHOT_RANGE ? (head ? 'header' : 'volley') : null;
+    }
+    return head && hyp(p.x, p.y + dir * HL) < HEAD_CLEAR_ZONE ? 'clear' : null;
+  }
+
+  airHit(p, kind) {
+    const b = this.ball, k = b.kick, T = p.team, dir = T ? -1 : 1;
+    if (k && k.team === T && k.kicker !== p && k.off.includes(p)) {
+      b.kick = null; this.ev('offside', { p }); this.setRestart('freekick', 1 - T, p.x, p.y); return;
+    }
+    if (b.last !== p) { b.prev = b.last; b.last = p; }
+    b.ct = 0; b.cax = b.cay = 0; b.shot = null; b.noP = p; b.noT = 0.3; this.predT = 0; p.kickAnim = 0.35;
+    if (kind === 'clear') {
+      // respinta: lontano dalla propria porta, alta, verso l'esterno
+      const a = Math.atan2(dir, (b.x > 0 ? 1 : -1) * (0.3 + this.rnd() * 0.5)) + (this.rnd() - 0.5) * 0.9, v = 10 + this.rnd() * 5;
+      b.vx = Math.cos(a) * v; b.vy = Math.sin(a) * v; b.vh = 3 + this.rnd() * 3;
+      b.kick = null; this.lastPass = null; this.stats.headers[T]++;
+      this.ev('kick', { p, kind: 'header', clear: true, v });
+      return;
+    }
+    if (k && k.team === T && k.kicker !== p) this.lastPass = { from: k.kicker, to: p };
+    const head = kind === 'header', gk = this.gk(1 - T), gy = dir * HL;
+    const skill = head ? (p.st.tir + p.st.fis) / 2 : p.st.tir;
+    const side = (gk.x > b.x ? -1 : 1) * (this.rnd() < 0.75 ? 1 : -1);
+    const tx = side * (GW / 2 - 0.7), th0 = head ? 0.2 + this.rnd() * 1.2 : 0.3 + this.rnd() * 1.4;
+    const sig = ((head ? 4 : 3) + (100 - skill) * (head ? 0.09 : 0.08)) * (this.nearOpp(p.x, p.y, T) < 1.5 ? 1.3 : 1);
+    const v = head ? HEAD_V0 + skill * 0.06 : VOLLEY_V0 + skill * 0.12;
+    let dx = tx - b.x, dy = gy - b.y; const D = hyp(dx, dy) || 1;
+    const a = this.gauss() * sig * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
+    [dx, dy] = [(dx * ca - dy * sa) / D, (dx * sa + dy * ca) / D];
+    const th = Math.max(0.05, th0 + this.gauss() * sig * 0.02 * D), Tt = Math.max(0.15, D / v);
+    b.vx = dx * v; b.vy = dy * v; b.vh = (th - b.h + 0.5 * G * Tt * Tt) / Tt;
+    b.kick = { team: T, kicker: p, off: [], age: 0, type: 'shot', human: !!this.human[T] };
+    this.detectShot();
+    this.stats.shots[T]++; if (b.shot && b.shot.team === T && b.shot.on) this.stats.onT[T]++;
+    if (head) this.stats.headers[T]++; else this.stats.volleys[T]++;
+    this.ev('kick', { p, kind, v });
   }
 
   slideStep(p, dt) {
@@ -240,16 +294,19 @@ export class MotionMethods {
       return;
     }
     if (b.kick) b.kick.age += dt;
-    let best = null, bd = 9;
+    let best = null, bd = 9, bestAir = null;
     for (const p of this.players) {
       if (p.off || p.state !== 'play' || p.stun > 0 || (b.noP === p && b.noT > 0)) continue;
       const gk = p.pos === 'P' && this.inOwnBox(p);
       const d = hyp(p.x - b.x, p.y - b.y);
       // palla appena calciata che si allontana: non si può toccare
       if (b.kick && b.kick.age < 0.3 && b.kick.team !== p.team && (p.x - b.x) * b.vx + (p.y - b.y) * b.vy < 0) continue;
-      if (d < (gk ? 1.25 : (b.kick && b.kick.type === 'shot' && b.kick.team !== p.team ? SHOT_BLOCK_R : 0.95)) && b.h < (gk ? 2.35 : 1.7) && d < bd) { bd = d; best = p; }
+      if (d >= (gk ? 1.25 : (b.kick && b.kick.type === 'shot' && b.kick.team !== p.team ? SHOT_BLOCK_R : 0.95)) || d >= bd) continue;
+      const air = gk ? null : this.airPlay(p);
+      if (air || b.h < (gk ? 2.35 : 1.7)) { bd = d; best = p; bestAir = air; }
     }
     if (!best) return;
+    if (bestAir) { this.airHit(best, bestAir); return; }
     const p = best, sp = hyp(b.vx - p.vx, b.vy - p.vy), gk = p.pos === 'P' && this.inOwnBox(p);
     if (gk && b.shot && b.shot.team !== p.team) { this.save(p, true); return; }
     const mate = b.kick && b.kick.team === p.team;

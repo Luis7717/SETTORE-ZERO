@@ -24,7 +24,7 @@ export class Match {
     }
     this.ball = { x: 0, y: 0, h: 0, vx: 0, vy: 0, vh: 0, cax: 0, cay: 0, ct: 0, owner: null, noP: null, noT: 0, last: null, prev: null, kick: null, shot: null };
     this.score = [0, 0]; this.half = 1; this.t = 0; this.time = 0; this.phase = 'play'; this.events = [];
-    this.stats = { shots: [0, 0], onT: [0, 0], poss: [0, 0], fouls: [0, 0], corners: [0, 0], saves: [0, 0] };
+    this.stats = { shots: [0, 0], onT: [0, 0], poss: [0, 0], fouls: [0, 0], corners: [0, 0], saves: [0, 0], headers: [0, 0], volleys: [0, 0] };
     this.ctrl = [null, null]; this.move = [null, null]; this.switchCd = [0, 0];
     this.chase = [null, null]; this.presser = [null, null]; this.cover = [null, null]; this.offLine = [HL, HL];
     this.predT = 0; this.att = -1; this.dtT = 0; this.lastPass = null; this.restart = null;
