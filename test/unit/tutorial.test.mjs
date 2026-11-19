@@ -12,9 +12,15 @@ const frame = (m, t) => { t.before(); m.step(DT); t.after(DT); m.events.length =
 
 // comandi "da telefono" che superano ogni lezione
 const DRIVE = {
-  Passaggio(m) { const c = m.ctrl[0], q = m.players[9]; if (m.ball.owner === c && c) m.userKick(0, { type: 'auto', tx: q.x, ty: q.y, curve: 0 }); },
+  // il passaggio si fa solo nel duello (come in input.js)
+  Passaggio(m) { const c = m.ctrl[0], q = m.players[9]; if (m.ball.owner === c && c && m.duelFor(0)) m.userKick(0, { type: 'auto', tx: q.x, ty: q.y, curve: 0 }); },
   Tiro(m) { const c = m.ctrl[0]; if (c && m.ball.owner === c) m.userKick(0, { type: 'shot', tx: 2, ty: 50, th: 1, curve: 0 }); },
-  'Corsa e scatto'(m, t) { const c = m.ctrl[0]; if (!c) return; const k = t.k; if (k === 0) m.userMove(0, c.x, c.y + 4, true, false); else if (k === 1) m.userMove(0, c.x + 4, c.y, true, false); else m.userMove(0, c.x, c.y + 14, true, true); },
+  // strada disegnata dal giocatore (una volta per prova)
+  'Corsa e scatto'(m, t) {
+    const c = m.ctrl[0]; if (!c || m.move[0] || m.ball.owner !== c) return;
+    const pts = []; for (let i = 1; i <= 16; i++) pts.push(t.k === 1 ? { x: c.x + i, y: c.y + i * 0.3 } : { x: c.x, y: c.y + i * (t.k === 2 ? 1.5 : 1) });
+    m.userPath(0, pts);
+  },
   Finta(m) { const c = m.ctrl[0]; if (c && m.ball.owner === c) m.userFeint(0, 1, 0); },
   'Recupera palla'(m) { if (m.ball.owner) m.userMove(0, m.ball.x, m.ball.y, true); },
   Scivolata(m) { const c = m.ctrl[0], b = m.ball; if (c && b.owner && Math.hypot(b.x - c.x, b.y - c.y) < 3) m.userSlide(0, b.x - c.x, b.y - c.y); else if (b.owner) m.userMove(0, b.x, b.y, true); },

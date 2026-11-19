@@ -56,7 +56,10 @@
   predefinito `C:/Program Files/Google/Chrome/Application/chrome.exe`. Debug in pagina: `window.__G`, `__career`, `__view`, `__ui`, `__start`.
 
 ## Gesti (tutto a un dito)
-- Dal portatore: disegna = passaggio/tiro (linea curva = a giro), il tempo rallenta.
-- Tieni premuto sul campo = corsa; tocco su un compagno = passaggio diretto.
+- Col pallone, fuori dal duello: disegna dal giocatore = **strada da correre** (con tanta strada davanti scatta); linea che finisce in porta = tiro.
+- **Duello** (portatore a 4,5 m da un difensore davanti): visuale bassa, tempo al 35%, anelli verdi sui compagni liberi.
+  Solo qui (e sulle rimesse) si passa: disegna fino al compagno o toccalo; oppure tasto **Dribbling** in basso.
+- Col pallone, scorrimento veloce di lato = finta.
 - Difesa: tieni premuto = muovi il difensore; scorrimento veloce = scivolata.
-- Portiere: scorri verso il lato del tiro.
+- Portiere: sul tiro la visuale va dietro la propria porta e il tempo rallenta; linea dal portiere al punto della porta,
+  il tuffo parte quando si alza il dito.

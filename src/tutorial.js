@@ -13,14 +13,15 @@ export const REPS = 3;    // prove per ogni meccanica
 export const LESSONS = [
   {
     title: 'Passaggio',
-    short: 'Disegna dalla palla fino al compagno libero.',
-    text: 'Appoggia il dito sul tuo giocatore con la palla e <b>disegna la traiettoria</b> fino a un compagno. Il tempo rallenta mentre disegni; i puntini azzurri mostrano dove andrà davvero la palla.',
+    short: 'Davanti al difensore disegna dalla palla fino al compagno con l\'anello verde.',
+    text: 'Si passa solo quando arrivi addosso a un difensore: la visuale si abbassa, il tempo rallenta e i compagni liberi hanno l\'anello verde. Allora <b>disegna dalla palla fino al compagno</b> (o toccalo). I puntini azzurri mostrano dove andrà davvero la palla.',
     setup(m, T, k) {
-      const c = T.carrier(m, 7, [0, -6, 4][k], [0, -4, 6][k]);
-      const mate = [[7, 14], [-20, 6], [14, 2]][k]; T.put(m, m.players[9], mate[0], mate[1]); T.clearOpp(m); return { c };
+      const c = T.carrier(m, 7, [0, -6, 4][k], [0, -4, 6][k]); T.clearOpp(m);
+      const o = m.players[16]; T.put(m, o, c.x + [0, 1, -1][k], c.y + 3.5); o.fx = 0; o.fy = -1;
+      const mate = [[7, 14], [-20, 6], [14, 2]][k]; T.put(m, m.players[9], mate[0], mate[1]); return { c, o };
     },
     check(e, m, st) { return e.type === 'control' && e.p.team === 0 && e.p !== st.c; },
-    freeze: 'opp',
+    freeze: 'opp-but-o',
   },
   {
     title: 'Tiro',
@@ -32,7 +33,7 @@ export const LESSONS = [
   },
   {
     title: 'Corsa e scatto',
-    text: '<b>Tieni premuto</b> un punto del campo: il giocatore con la palla corre lì. Con il dito <b>lontano</b> dal giocatore <b>scatta</b> (ma si stanca prima), vicino corre normale.',
+    text: 'Col pallone, <b>disegna la strada</b> partendo dal tuo giocatore: lui la segue. Con tanta strada davanti <b>scatta</b> (ma si stanca prima). Se la linea finisce dentro la porta è un tiro.',
     setup(m, T, k) { const c = T.carrier(m, 7, [0, -10, 8][k], [-14, -6, -20][k]); T.clearOpp(m); return { c, x0: c.x, y0: c.y, k }; },
     poll(m, st) {
       const c = st.c; if (m.ball.owner !== c) return false;
@@ -40,7 +41,7 @@ export const LESSONS = [
       if (st.k === 1) return Math.abs(c.x - st.x0) > 10;      // verso la fascia
       return !!c.sprint && Math.hypot(c.x - st.x0, c.y - st.y0) > 12; // scatto
     },
-    hint: ['Corri in avanti di una decina di metri.', 'Ora corri verso una fascia.', 'Ora <b>scatta</b>: tieni il dito lontano dal giocatore.'],
+    hint: ['Disegna una strada in avanti di una decina di metri.', 'Ora disegna una strada che curva verso una fascia.', 'Ora una strada lunga: il giocatore <b>scatta</b>.'],
     freeze: 'opp',
   },
   {
@@ -97,8 +98,8 @@ export const LESSONS = [
   },
   {
     title: 'Portiere',
-    short: 'Quando tira, scorri verso il lato del tiro.',
-    text: 'Quando l\'avversario tira il tempo rallenta: <b>scorri verso il lato del tiro</b> per tuffarti. Verso l\'alto per i tiri alti.',
+    short: 'Quando tira, linea dal portiere al punto della porta.',
+    text: 'Quando l\'avversario tira la visuale va dietro la tua porta e il tempo rallenta. <b>Tira una linea dal portiere al punto della porta</b> dove arriva la palla e alza il dito al momento giusto: troppo presto o troppo lontano e non ci arriva.',
     setup(m, T, k) {
       const o = m.players[20]; T.put(m, o, [4, -12, 10][k], [-31, -34, -28][k]); o.fx = 0; o.fy = -1; m.ball.owner = o; m.ball.kick = null; m.att = 1; o.aiT = 0.6;
       T.put(m, m.gk(0), 0, -49);
@@ -182,6 +183,7 @@ export class Tutorial {
     if (!ok && L.poll && L.poll(m, this.st)) ok = true;
     if (ok) { this.done = DONE_PAUSE; this.ui.text(L.title, 'Bravo!', this.k + 1, REPS, true); return; }
     // pallone uscito, gol o tempo scaduto: si rimette a posto la stessa prova
-    if (m.phase !== 'play' || this.t > STEP_TIMEOUT) this.reset();
+    const lost = this.st.c && m.ball.owner && m.ball.owner.team === 1;
+    if (m.phase !== 'play' || this.t > STEP_TIMEOUT || lost) this.reset();
   }
 }

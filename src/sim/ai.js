@@ -248,6 +248,7 @@ export class AIMethods {
     if (this.phase === 'restart' && this.restart.taker === p) { p.tx = p.x; p.ty = p.y; return; }
     if (this.phase === 'restart' && p.wall) { p.tx = p.wall.x; p.ty = p.wall.y; return; }
     const mv = hum && this.ctrl[T] === p ? this.move[T] : null;
+    if (mv && mv.path) this.followPath(p, mv);
     if (mv && mv.sprint) p.sprint = true;
     if (b.owner === p) {
       if (hum) {

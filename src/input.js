@@ -49,6 +49,9 @@ export class Input {
   }
 
   goalY() { return this.team === 0 ? HL : -HL; }
+  // passaggio permesso solo in un duello col difensore o su una rimessa; fuori la linea è la strada da correre
+  canPass() { const m = this.match; return m.phase === 'restart' || !!(m.duelFor && m.duelFor(this.team)); }
+  runPath() { const e = this.pts[this.pts.length - 1]; return this.pts.length > 0 && !this.canPass() && !(e && e.goal); }
 
   // punto del campo (o della porta) sotto il dito
   pick(x, y) {
@@ -71,7 +74,9 @@ export class Input {
         this.showPath();
       }
     } else if (this.mode === 'dive') {
-      if (Math.hypot(x - this.sx, y - this.sy) > Math.max(46, this.view.w * 0.13)) { this.doDive(); this.mode = 'done'; }
+      // linea dal portiere verso il punto della porta dove tuffarsi: il tuffo parte quando si alza il dito
+      const t = this.diveTarget(), g = this.match.gk(this.team);
+      if (t) this.view.setPath([{ x: g.x, y: g.y, h: 0 }, { x: t.x, y: this.ownGoalY(), h: t.h }], true, null);
     }
   }
 
@@ -81,6 +86,7 @@ export class Input {
     pts[0].x = b.x; pts[0].y = b.y;
     const e = pts[pts.length - 1];
     let recv = null;
+    if (this.runPath()) { this.view.setPath(pts, false, null); this.view.setPreview([], null); return; } // strada da correre
     if (!e.goal) { let bd = 5; for (const p of m.players) if (p.team === this.team && !p.off && p !== m.ctrl[this.team]) { const d = Math.hypot(p.x - e.x, p.y - e.y); if (d < bd) { bd = d; recv = p; } } }
     this.view.setPath(pts, e.goal, recv);
     // anteprima del volo vero e linea del fuorigioco (non vale su rimessa, rinvio e angolo)
@@ -100,9 +106,19 @@ export class Input {
     return { type, tx, ty, th, curve };
   }
 
+  ownGoalY() { return -this.goalY(); }
+  // punto della propria porta sotto il dito (la telecamera è dietro la porta mentre si para)
+  diveTarget() {
+    const q = this.view.screenToGoal(this.x, this.y, this.ownGoalY());
+    if (!q) return null;
+    return { x: Math.max(-GW / 2 - 1.5, Math.min(GW / 2 + 1.5, q.x)), h: Math.max(0.2, Math.min(GH + 0.4, q.h)) };
+  }
   doDive() {
-    const dx = this.x - this.sx, dy = this.y - this.sy, w = this.view.w * 0.36;
-    const s = this.view.flip;
+    this.view.clearPath();
+    const t = this.diveTarget(), g = this.match.gk(this.team);
+    if (t) { this.out.dive(t.x - g.x, t.h); return; }
+    // riserva: gesto senza punto in porta (vecchio comando: verso e lunghezza dello scorrimento)
+    const dx = this.x - this.sx, dy = this.y - this.sy, w = this.view.w * 0.36, s = this.view.flip;
     this.out.dive(s * Math.max(-1, Math.min(1, dx / w)) * 3.7, Math.max(0.2, Math.min(2.5, 1.0 - (dy / w) * 1.5)));
   }
 
@@ -115,17 +131,21 @@ export class Input {
     if (mode === 'draw') {
       this.drawing = false;
       let len = 0; for (let i = 1; i < this.pts.length; i++) len += Math.hypot(this.pts[i].sx - this.pts[i - 1].sx, this.pts[i].sy - this.pts[i - 1].sy);
-      if (this.pts.length >= 2 && len > 28) this.out.kick(this.spec());
+      if (this.pts.length >= 2 && len > 28) {
+        if (this.runPath()) this.out.path(this.pts.slice(1).map(q => ({ x: q.x, y: q.y })));
+        else this.out.kick(this.spec());
+      }
       this.pts = []; this.view.clearPath();
       return;
     }
-    if (mode === 'dive') { if (dist > 22) this.doDive(); return; }
+    if (mode === 'dive') { if (dist > 22) this.doDive(); else this.view.clearPath(); return; }
     if (mode !== 'move') return;
     const hint = m.hint(T);
     if (dist < 16 && dt < 320) {
       const mate = this.nearMate(this.x, this.y);
       if (mate) {
-        if (hint === 'attack' || hint === 'restart') this.out.kick({ type: 'auto', tx: mate.x + mate.vx * 0.45, ty: mate.y + mate.vy * 0.45, curve: 0 });
+        if ((hint === 'attack' || hint === 'restart') && this.canPass()) this.out.kick({ type: 'auto', tx: mate.x + mate.vx * 0.45, ty: mate.y + mate.vy * 0.45, curve: 0 });
+        else if (hint === 'attack' || hint === 'restart') { /* fuori dal duello niente passaggio diretto */ }
         else this.out.sw(mate.i);
       } else { const g = this.view.screenToGround(this.x, this.y); if (g) this.out.move(g.x, g.y, false); }
       return;

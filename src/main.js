@@ -24,7 +24,7 @@ const ui = new UI(uiRoot, career, {
   act: (a, v, el) => { if (a === 'season') ui.show('season', G.res.res.season); },
 });
 const input = new Input(canvas, view, {
-  kick: s => G.match.userKick(0, s), move: (x, y, h, sp) => G.match.userMove(0, x, y, h, sp), feint: (dx, dy) => G.match.userFeint(0, dx, dy), stop: () => G.match.userStop(0),
+  kick: s => G.match.userKick(0, s), move: (x, y, h, sp) => G.match.userMove(0, x, y, h, sp), feint: (dx, dy) => G.match.userFeint(0, dx, dy), path: pts => G.match.userPath(0, pts), stop: () => G.match.userStop(0),
   slide: (dx, dy) => G.match.userSlide(0, dx, dy), dive: (dx, th) => G.match.userDive(0, dx, th), sw: i => G.match.userSwitch(0, G.match.players[i]),
 });
 
@@ -111,12 +111,14 @@ function big(text, cls, ms, small) {
 }
 function fade() { const f = $('fade'); f.style.transition = 'none'; f.style.opacity = 0.85; requestAnimationFrame(() => requestAnimationFrame(() => { f.style.transition = 'opacity .35s'; f.style.opacity = 0; })); }
 
+const RUN_DRAW_SLOW = 0.5; // velocità del tempo mentre si disegna la strada da correre
+const GK_SLOW = 0.25;      // velocità del tempo mentre si para
 const DUEL_SLOW = 0.35; // velocità del tempo durante un duello col difensore
 const HINTS = {
-  attack: 'Disegna dalla palla per passare o tirare · tieni premuto per correre',
+  attack: 'Disegna la strada dal giocatore per correre · linea in porta = tiro',
   defend: 'Tieni premuto per muovere il difensore · scorri veloce = scivolata',
   loose: 'Palla libera: tieni premuto per andarci',
-  dive: 'TUFFATI! Scorri verso il tiro',
+  dive: 'PARA! Tira una linea dal portiere al punto della porta',
   duel: 'Passa a un compagno libero (anello verde) o tocca Dribbling',
 };
 const RHINT = { kickoff: 'Calcio d\'inizio: disegna il passaggio', throw: 'Rimessa: disegna il passaggio', corner: 'Calcio d\'angolo: disegna il cross', goalkick: 'Rinvio: disegna il passaggio', freekick: 'Punizione: disegna il passaggio o il tiro', penalty: 'RIGORE: disegna il tiro in porta', gk: 'Rilancio del portiere: disegna il passaggio' };
@@ -230,7 +232,7 @@ function frame(now) {
       input.update();
       const dive = m.diveWin(0) && !m.autoGk[0];
       const duel = !!(m.duelFor && m.duelFor(0));
-      const target = input.drawing ? 0.13 : dive ? 0.3 : duel ? DUEL_SLOW : 1;
+      const target = input.drawing ? (input.runPath() ? RUN_DRAW_SLOW : 0.13) : dive ? GK_SLOW : duel ? DUEL_SLOW : 1;
       $('drib').style.display = duel && !input.drawing ? 'block' : 'none';
       G.ts += (target - G.ts) * Math.min(1, dt * 14);
       const sdt = dt * G.ts * (G.speed || 1), n = Math.max(1, Math.ceil(sdt / (1 / 60)));

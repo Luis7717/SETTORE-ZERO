@@ -9,6 +9,8 @@ const HAIR = [0x1c1410, 0x4a2f1b, 0x8a5a2b, 0xd9b66a, 0x222222, 0x2b2b2b];
 const SCALE = 1.25;
 const PREVIEW_COLOR = 0x7dd3ff; // puntini dell'anteprima della traiettoria
 const OFFSIDE_COLOR = 0xff5a5a; // linea del fuorigioco
+const GK_CAM_BACK = 6.5;       // parata: telecamera dietro la propria linea di porta (m)
+const GK_CAM_H = 2.6;          // parata: altezza della telecamera (m)
 const DUEL_MATES = 3;           // compagni liberi evidenziati durante un duello
 const DUEL_LOW = 0.42;          // quanto si abbassa la telecamera nel duello (0 = niente, 1 = a terra)
 
@@ -241,7 +243,12 @@ export class View {
     if (camY < minY) { hh += Math.min(6, (minY - camY) * 0.35); camY = minY; }
     camY += (-HL - 12.5 - camY) * dk; hh += (10.5 - hh) * dk; lookY += ((this.cy * dir - HL) / 2 + 3 - lookY) * dk;
     const du = this.duelK; hh *= 1 - DUEL_LOW * du; camY += back * 0.3 * du; lookY += 8 * du;
-    const camX = this.cx * dir * (0.82 - 0.3 * a) * (1 - 0.55 * dk);
+    // parata: telecamera bassa dietro la propria porta, guarda verso chi tira
+    const gkOn = !!(m.diveWin && m.diveWin(this.me) && !(m.autoGk && m.autoGk[this.me]));
+    this.gkK = (this.gkK || 0) + ((gkOn ? 1 : 0) - (this.gkK || 0)) * Math.min(1, dt * 6);
+    const gk = this.gkK;
+    camY += (-HL - GK_CAM_BACK - camY) * gk; hh += (GK_CAM_H - hh) * gk; lookY += (b.y * dir - lookY) * gk;
+    const camX = this.cx * dir * (0.82 - 0.3 * a) * (1 - 0.55 * dk) * (1 - 0.8 * gk);
     this.cam.position.set(camX, hh, -camY);
     this.cam.lookAt(this.cx * dir * (0.9 - 0.45 * a) * (1 - 0.45 * dk), 0, -lookY);
     // rete della porta vicina più trasparente

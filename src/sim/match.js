@@ -14,6 +14,10 @@ const WALL_GAP = 0.75; // spazio tra i giocatori in barriera (m)
 const ADV_FREE = 3; // vantaggio solo se nessun altro avversario è più vicino di così al portatore (m)
 const ADV_MIN_Y = -5; // ... e solo da qui in avanti (m nel verso d'attacco, 0 = metà campo)
 const SPEED_TIRED = 0.86; // a energia 0 la velocità massima scende a questa frazione (l'energia cala più piano con più fisico = resistenza)
+const PATH_STEP = 1.2;   // distanza minima tra due punti della strada disegnata (m)
+const PATH_REACH = 1.3;  // punto raggiunto quando il portatore è più vicino di così (m)
+const PATH_SPRINT = 6;   // scatta finché davanti resta più strada di così (m)
+const PATH_TTL = 20;     // durata massima di una strada disegnata (s)
 export const SPRINT_DIST = 6; // dito più lontano di così dal giocatore controllato (m) = scatto
 
 export class Match {
@@ -487,6 +491,31 @@ export class Match {
     else if (this.phase !== 'play') return false;
     spec.human = true; this.move[T] = null;
     this.kick(p, spec); return true;
+  }
+  // corsa lungo una strada disegnata dal giocatore col pallone: pts = [{x, y}, ...] in metri.
+  // Il portatore segue i punti uno dopo l'altro; scatta finché davanti ha ancora più di PATH_SPRINT metri di strada.
+  userPath(T, pts) {
+    const c = this.ctrl[T], b = this.ball;
+    if (!c || b.owner !== c || !Array.isArray(pts) || pts.length < 1) return false;
+    const path = [];
+    for (const q of pts) {
+      const x = clamp(q.x, -HW + 0.5, HW - 0.5), y = clamp(q.y, -HL + 0.5, HL - 0.5), l = path[path.length - 1];
+      if (!l || hyp(x - l.x, y - l.y) >= PATH_STEP) path.push({ x, y });
+    }
+    if (!path.length) return false;
+    this.move[T] = { x: path[0].x, y: path[0].y, ttl: PATH_TTL, held: false, sprint: false, path, i: 0, owner: c };
+    return true;
+  }
+  // chiamata da assign(): avanza lungo la strada e aggiorna il punto da raggiungere
+  followPath(p, mv) {
+    const T = p.team;
+    if (this.ball.owner !== mv.owner || p !== mv.owner) { this.move[T] = null; return; }
+    while (mv.i < mv.path.length - 1 && hyp(mv.path[mv.i].x - p.x, mv.path[mv.i].y - p.y) < PATH_REACH) mv.i++;
+    const q = mv.path[mv.i]; mv.x = q.x; mv.y = q.y;
+    let left = hyp(q.x - p.x, q.y - p.y);
+    for (let k = mv.i + 1; k < mv.path.length; k++) left += hyp(mv.path[k].x - mv.path[k - 1].x, mv.path[k].y - mv.path[k - 1].y);
+    mv.sprint = left > PATH_SPRINT;
+    if (mv.i === mv.path.length - 1 && left < PATH_REACH) this.move[T] = null;
   }
   // sprint: true/false dal telefono; se manca, scatto quando il dito tenuto premuto è lontano dal giocatore controllato
   userMove(T, x, y, held, sprint) {
