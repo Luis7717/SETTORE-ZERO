@@ -62,7 +62,7 @@ async function enterMatch(mode, lvl) {
 }
 // Tappa 'music': in sottofondo dopo l'apertura del menu, senza bloccare nulla.
 function loadMusicLater() {
-  setTimeout(() => { assets.loadStage('music').then(() => { sfx.useAssets(assets); if (G.state === 'menu') sfx.music(true); }); }, 1200);
+  setTimeout(() => { assets.loadStage('music').then(() => { sfx.useAssets(assets); if (G.state === 'menu') sfx.music(true); }).catch(() => { /* senza musica */ }); }, 1200);
 }
 
 // ---------------------------------------------------------------- partita

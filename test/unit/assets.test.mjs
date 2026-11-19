@@ -52,3 +52,17 @@ test('versione a file unico: usa i data URL incorporati al posto della rete', as
   assert.deepEqual(log, ['data:x']);
   assert.equal(A.get('a').byteLength, 4);
 });
+
+test('una richiesta appesa scade e la tappa finisce lo stesso', async () => {
+  const A = new Assets({ manifest: { match: [{ id: 'lento', file: 'lento.bin' }] }, timeoutMs: 30, fetchFn: () => new Promise(() => {}) });
+  const r = await A.loadStage('match');
+  assert.deepEqual(r.failed, ['lento']);
+  assert.match(A.failed.get('lento'), /tempo scaduto/);
+});
+
+test('dopo un fallimento la tappa si può riprovare', async () => {
+  let n = 0;
+  const A = new Assets({ manifest: { match: [{ id: 'a', file: 'a.bin' }] }, fetchFn: async () => (++n === 1 ? { ok: false, status: 500 } : { ok: true, arrayBuffer: async () => buf(1) }) });
+  assert.deepEqual((await A.loadStage('match')).failed, ['a']);
+  assert.deepEqual((await A.loadStage('match')).ok, ['a']);
+});

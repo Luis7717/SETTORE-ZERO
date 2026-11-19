@@ -5,8 +5,9 @@
 // Pagina di passaggio: sta nello stesso posto della vecchia index.html (origine file://)
 // e legge il vecchio salvataggio per consegnarlo all'app, che poi apre il gioco su app://.
 (function () {
-  var v = null;
-  try { v = window.localStorage.getItem('tag_save_v1'); } catch (e) { v = null; }
-  try { window.webkit.messageHandlers.legacy.postMessage({ save: v === null ? '' : v }); } catch (e) { }
+  var msg;
+  try { var v = window.localStorage.getItem('tag_save_v1'); msg = { save: v === null ? '' : v }; }
+  catch (e) { msg = { error: String(e) }; } // lettura fallita: l'app riproverà al prossimo avvio
+  try { window.webkit.messageHandlers.legacy.postMessage(msg); } catch (e) { }
 })();
 </script></body></html>

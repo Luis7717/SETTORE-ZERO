@@ -8,8 +8,8 @@
 // come data: URL in `inline` e non serve nessuna richiesta.
 
 export class Assets {
-  constructor({ manifest = {}, base = 'assets/', fetchFn = null, inline = null } = {}) {
-    this.manifest = manifest; this.base = base; this.inline = inline || {};
+  constructor({ manifest = {}, base = 'assets/', fetchFn = null, inline = null, timeoutMs = 20000 } = {}) {
+    this.manifest = manifest; this.timeoutMs = timeoutMs; this.base = base; this.inline = inline || {};
     this.fetchFn = fetchFn || ((u) => fetch(u));
     this.data = new Map();      // id -> ArrayBuffer
     this.failed = new Map();    // id -> motivo
@@ -22,13 +22,19 @@ export class Assets {
 
   async fetchOne(it) {
     const url = this.inline[it.file] || this.base + it.file;
-    const r = await this.fetchFn(url);
-    if (!r || !r.ok) throw new Error('HTTP ' + (r ? r.status : '?'));
-    return r.arrayBuffer();
+    // una richiesta appesa non deve bloccare l'ingresso in partita
+    let timer;
+    const late = new Promise((_, no) => { timer = setTimeout(() => no(new Error('tempo scaduto')), this.timeoutMs); });
+    try {
+      const r = await Promise.race([this.fetchFn(url), late]);
+      if (!r || !r.ok) throw new Error('HTTP ' + (r ? r.status : '?'));
+      return await Promise.race([r.arrayBuffer(), late]);
+    } finally { clearTimeout(timer); }
   }
 
   // Carica tutti i file di una tappa. onProgress(fatti, totale, id) a ogni file concluso (anche se fallito).
-  // Non lancia mai errori: ritorna { ok: [id], failed: [id] }. Chiamate ripetute riusano la stessa promessa.
+  // Non lancia mai errori: ritorna { ok: [id], failed: [id] }. Chiamate ripetute riusano la stessa promessa;
+  // se qualche file è fallito, la volta dopo la tappa si riprova.
   loadStage(stage, onProgress) {
     if (this.stages.has(stage)) return this.stages.get(stage);
     const list = this.items(stage), total = list.length, res = { ok: [], failed: [] };
@@ -39,7 +45,7 @@ export class Assets {
       try { this.data.set(it.id, await this.fetchOne(it)); res.ok.push(it.id); }
       catch (e) { this.failed.set(it.id, String(e && e.message || e)); res.failed.push(it.id); }
       tick(it.id);
-    })).then(() => res);
+    })).then(() => { if (res.failed.length) this.stages.delete(stage); return res; });
     this.stages.set(stage, p);
     return p;
   }

@@ -67,3 +67,11 @@ restano sui loro rami finché la build su GitHub di questo blocco non è riuscit
    incorporati: il guadagno si vedrà quando arriveranno modelli e audio, che non peseranno più sull'apertura.
 7. **Prove a schermo via http**: `test/shot.mjs` ora serve `www/` con un piccolo server locale (`test/lib/serve.mjs`),
    perché con `file://` Chrome blocca il caricamento dei file in `www/assets/`.
+8. **Correzioni dopo la revisione** (revisore automatico, nessun problema critico):
+   se la vecchia origine non si lascia leggere l'app riprova al prossimo avvio invece di darla per vuota;
+   l'attesa della pagina di passaggio sale a 8 s; il vecchio salvataggio resta anche come copia di sicurezza
+   in UserDefaults (`legacySaveBackup`, mai cancellata) e comunque intatto nella vecchia origine;
+   se il processo della pagina viene chiuso dal sistema il gioco si ricarica; ogni file ha 20 s di tempo massimo
+   e una tappa con file falliti si riprova alla partita successiva.
+   Caso limite rimasto: se la pagina di passaggio non risponde entro 8 s e Luis crea una nuova carriera, il vecchio
+   salvataggio non viene copiato sopra (non si sovrascrive mai), ma resta recuperabile dalla copia di sicurezza.

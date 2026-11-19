@@ -57,13 +57,15 @@ final class WeakHandler: NSObject, WKScriptMessageHandler {
     }
 }
 
-final class GameVC: UIViewController, WKScriptMessageHandler {
+final class GameVC: UIViewController, WKScriptMessageHandler, WKNavigationDelegate {
     private var web: WKWebView!
     private var gameLoaded = false
     private let scheme = WKWebView.handlesURLScheme("app") ? "tiroagiro" : "app"
     private let defaults = UserDefaults.standard
     // Recupero del salvataggio: l'origine passa da file:// a app://, quindi localStorage cambia.
     private let kRead = "legacySaveRead", kDone = "legacySaveDone", kSave = "legacySave"
+    // copia di sicurezza del vecchio salvataggio: non viene mai cancellata
+    private let kBackup = "legacySaveBackup"
 
     override func loadView() {
         let cfg = WKWebViewConfiguration()
@@ -81,6 +83,7 @@ final class GameVC: UIViewController, WKScriptMessageHandler {
         web.scrollView.contentInsetAdjustmentBehavior = .never
         web.allowsLinkPreview = false
         web.allowsBackForwardNavigationGestures = false
+        web.navigationDelegate = self
         view = web
     }
 
@@ -96,7 +99,7 @@ final class GameVC: UIViewController, WKScriptMessageHandler {
         guard let url = Bundle.main.url(forResource: "index", withExtension: "html") else { loadGame(legacy: nil); return }
         web.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
         // se la pagina non risponde, il gioco parte lo stesso (si riproverà al prossimo avvio)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in self?.loadGame(legacy: nil) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8) { [weak self] in self?.loadGame(legacy: nil) }
     }
 
     // 2) il gioco vero su app://; se c'è un vecchio salvataggio lo passa alla pagina prima che parta
@@ -115,17 +118,26 @@ final class GameVC: UIViewController, WKScriptMessageHandler {
 
     func userContentController(_ c: WKUserContentController, didReceive m: WKScriptMessage) {
         guard let body = m.body as? [String: Any] else { return }
-        if let save = body["save"] as? String {
+        if body["error"] != nil {
+            // la vecchia origine non si è lasciata leggere: si gioca e si riprova al prossimo avvio
+            loadGame(legacy: nil)
+        } else if let save = body["save"] as? String {
             if gameLoaded { return }
             // letto dalla vecchia origine
             defaults.set(true, forKey: kRead)
-            if save.isEmpty { defaults.set(true, forKey: kDone) } else { defaults.set(save, forKey: kSave) }
+            if save.isEmpty { defaults.set(true, forKey: kDone) }
+            else { defaults.set(save, forKey: kSave); defaults.set(save, forKey: kBackup) }
             loadGame(legacy: save.isEmpty ? nil : save)
         } else if let result = body["result"] as? String, result != "error" {
             // copia riuscita (o non necessaria) nella nuova origine: non si ripete più
             defaults.set(true, forKey: kDone)
             defaults.removeObject(forKey: kSave)
         }
+    }
+
+    // se il processo della pagina viene chiuso (per esempio per memoria) si ricarica il gioco
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        if let url = URL(string: "\(scheme)://localhost/index.html") { webView.load(URLRequest(url: url)) }
     }
 
     override var prefersStatusBarHidden: Bool { true }
