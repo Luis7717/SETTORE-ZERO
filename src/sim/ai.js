@@ -18,6 +18,8 @@ const PRESS_REACT = 3.4;    // distanza dell'avversario che fa decidere in frett
 const PRESS_REACT_T = 0.06; // tempo minimo di decisione sotto pressione (s), più lento per squadre scarse
 const SHOT_POST = 0.45;     // distanza dal palo a cui mira l'IA (m): più vicino = più gol e più tiri fuori
 const HELPERS = 2;          // compagni che vengono incontro al portatore
+const AIR_REACH = 2.4;      // sui lanci vicino alle porte si va sul pallone fino a questa altezza (colpo di testa)
+const AIR_ZONE = 17;        // distanza dalla porta avversaria entro cui l'attaccante va a colpire di testa (m)
 
 export class AIMethods {
   // side: -1/1 = palo scelto; se manca, lato opposto al portiere (con un po' di casualità)
@@ -160,7 +162,7 @@ export class AIMethods {
     }
     if (r.type === 'freekick') {
       const dg = hyp(p.x, p.y - dir * HL);
-      if (dg < 27 && Math.abs(p.x) < 16) return this.aiShoot(p);
+      if (dg < 27 && Math.abs(p.x) < 16) return this.aiShoot(p, false, r.wallSide ? -r.wallSide : 0);
       if (dg < 42) return this.kick(p, { type: 'loft', tx: (this.rnd() - 0.5) * 12, ty: dir * (HL - 7 - this.rnd() * 5) });
     }
     const o = this.passOptions(p, r.type === 'throw' || r.type === 'goalkick');
@@ -209,9 +211,11 @@ export class AIMethods {
         if (p.team !== T || p.off || p.state !== 'play') continue;
         if (b.kick && b.kick.kicker === p && b.kick.age < 1.2) continue;
         const gk = p.pos === 'P', vm = this.vmax(p), hm = gk ? 2.3 : 1.5;
+        // sui lanci alti vicino alle porte si va incontro al pallone per colpirlo di testa
+        const loft = !gk && b.kick && b.kick.type === 'loft' && b.kick.kicker !== p, mate = loft && b.kick.team === T;
         let r = null;
         for (let k = 0; k < N; k++) {
-          if (ph[k] > hm) continue;
+          if (ph[k] > (loft && ph[k] <= AIR_REACH && (mate ? hyp(px[k], py[k] - dir * HL) < AIR_ZONE : hyp(px[k], py[k] + dir * HL) < AIR_ZONE + 15) ? AIR_REACH : hm)) continue;
           const t = k * 0.1, d = hyp(p.x - px[k], p.y - py[k]);
           if (d - 0.8 <= vm * Math.max(0, t - 0.12)) { r = { p, t, x: px[k], y: py[k] }; break; }
         }
@@ -232,7 +236,7 @@ export class AIMethods {
     if (this.predT <= 0) { this.predT = 0.1; this.computeChasers(); this.computeLines(); }
     for (const p of this.players) {
       if (p.off || p.state !== 'play') continue;
-      p.spdF = 1;
+      p.spdF = 1; p.sprint = false;
       this.assign(p);
     }
   }
@@ -240,7 +244,9 @@ export class AIMethods {
   assign(p) {
     const b = this.ball, T = p.team, dir = T ? -1 : 1, hum = this.human[T];
     if (this.phase === 'restart' && this.restart.taker === p) { p.tx = p.x; p.ty = p.y; return; }
+    if (this.phase === 'restart' && p.wall) { p.tx = p.wall.x; p.ty = p.wall.y; return; }
     const mv = hum && this.ctrl[T] === p ? this.move[T] : null;
+    if (mv && mv.sprint) p.sprint = true;
     if (b.owner === p) {
       if (hum) {
         if (mv) { p.tx = mv.x; p.ty = mv.y; }

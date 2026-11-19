@@ -1,10 +1,11 @@
 // Comandi a un dito. Traduce i tocchi in ordini per la squadra `team`.
-import { HW, HL, GW, GH } from './sim.js';
+import { HW, HL, GW, GH, SPRINT_DIST } from './sim.js';
 
 const NO_OFFSIDE = ['throw', 'goalkick', 'corner']; // ripartenze senza fuorigioco
 
 export class Input {
-  // out: { kick(spec), move(x,y,held), stop(), slide(dx,dy), dive(dx,th), sw(playerIndex) }
+  // out: { kick(spec), move(x,y,held,sprint), stop(), slide(dx,dy), dive(dx,th), sw(playerIndex), feint(dx,dy) }
+  // (se `out.feint` manca la finta va diretta alla partita; se `move` ignora `sprint` il motore lo ricalcola uguale)
   constructor(el, view, out) {
     this.el = el; this.view = view; this.out = out; this.match = null; this.team = 0; this.enabled = false;
     this.mode = null; this.pts = []; this.sx = 0; this.sy = 0; this.x = 0; this.y = 0; this.t0 = 0; this.id = null;
@@ -129,6 +130,12 @@ export class Input {
       } else { const g = this.view.screenToGround(this.x, this.y); if (g) this.out.move(g.x, g.y, false); }
       return;
     }
+    // col pallone: scorrimento veloce = finta (cambio di direzione secco)
+    if (hint === 'attack' && dt < 300 && dist > Math.max(38, this.view.w * 0.1)) {
+      const a = this.view.screenToGround(this.sx, this.sy), c = this.view.screenToGround(this.x, this.y);
+      const ok = a && c && (this.out.feint ? this.out.feint(c.x - a.x, c.y - a.y) : m.userFeint(T, c.x - a.x, c.y - a.y));
+      if (ok) return;
+    }
     if ((hint === 'defend' || hint === 'loose') && dt < 300 && dist > Math.max(38, this.view.w * 0.1)) {
       const a = this.view.screenToGround(this.sx, this.sy), c = this.view.screenToGround(this.x, this.y);
       if (a && c) { this.out.slide(c.x - a.x, c.y - a.y); return; }
@@ -140,7 +147,11 @@ export class Input {
   update() {
     if (this.mode === 'move' && this.id !== null && (performance.now() - this.t0 > 110 || this.moved > 12)) {
       const g = this.view.screenToGround(this.x, this.y);
-      if (g) this.out.move(g.x, g.y, true);
+      if (g) {
+        // dito lontano dal giocatore controllato = scatto; vicino = corsa normale
+        const c = this.match && this.match.ctrl[this.team];
+        this.out.move(g.x, g.y, true, !!(c && Math.hypot(g.x - c.x, g.y - c.y) > SPRINT_DIST));
+      }
     }
     if (this.mode === 'draw') {
       const m = this.match, c = m && m.ctrl[this.team];

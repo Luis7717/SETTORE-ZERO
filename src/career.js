@@ -5,6 +5,8 @@ const KEY = 'tag_save_v1';
 export const DIV_NAMES = ['Prima Divisione', 'Seconda Divisione', 'Terza Divisione'];
 const DIV_LVL = [[70, 82], [60, 70], [50, 60]];
 const DIV_INCOME = [300, 140, 70];
+// abilità in più della squadra del computer per divisione (oltre a quella che viene dalla forza dei giocatori)
+export const DIV_SKILL = [0.08, 0.04, 0];
 export const POS_NAME = { P: 'POR', D: 'DIF', C: 'CEN', A: 'ATT' };
 export const KITS = [
   ['Rosso', 0xc8102e, 0xffffff], ['Blu', 0x1746a2, 0xffffff], ['Verde', 0x0b7a3e, 0xffffff], ['Giallo', 0xf2c200, 0x1b1b1b], ['Nero', 0x1c1c22, 0xe8e8e8],
@@ -168,7 +170,9 @@ export class Career {
   }
 
   // ------------------------------------------------ squadre per la partita
-  skillOf(rating) { return clamp((rating - 42) / 48 + (this.s.settings.diff - 1) * 0.15, 0.1, 0.95); }
+  skillOf(rating, div = 2) { return clamp((rating - 42) / 48 + (this.s.settings.diff - 1) * 0.15 + (DIV_SKILL[div] || 0), 0.1, 0.95); }
+  // divisione di una squadra; per chi non è in campionato (amichevoli) la mia
+  divOf(t) { const d = t && t.id ? this.s.divs.findIndex(x => x.includes(t.id)) : -1; return d >= 0 ? d : this.div(); }
   kitOf(k, alt) {
     const c = typeof k === 'number' ? KITS[k] : KITS[0];
     return alt ? { shirt: c[2], shorts: c[1], socks: c[2], gk: { shirt: 0x2ad17a, shorts: 0x15803d, socks: 0x15803d } } : { shirt: c[1], shorts: c[2], socks: c[1], gk: { shirt: 0xffa41c, shorts: 0x222222, socks: 0xffa41c } };
@@ -182,7 +186,7 @@ export class Career {
     const s = this.s, r = rng32(t.seed + s.season * 977), fs = Object.keys(FORMATIONS), formation = fs[Math.floor(r() * fs.length)], F = FORMATIONS[formation];
     const players = F.map((f, i) => genPlayer(r, f[0], t.rating, -i - 1));
     const same = t.kit === s.kit || Math.abs(colorDist(KITS[t.kit][1], KITS[s.kit][1])) < 110;
-    return { name: t.name, short: t.short, formation, players, skill: this.skillOf(t.rating), kit: this.kitOf(t.kit, same) };
+    return { name: t.name, short: t.short, formation, players, skill: this.skillOf(t.rating, this.divOf(t)), kit: this.kitOf(t.kit, same) };
   }
 
   // ------------------------------------------------ risultati

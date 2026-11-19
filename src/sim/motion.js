@@ -10,6 +10,25 @@ const PARRY_OUT = 0.6;      // respinte non bloccate che finiscono oltre la line
 const BLOCK_OUT = 0.4;      // tiri ribattuti vicino all'area che finiscono in angolo
 const TACKLE_LOOSE = 0.3;   // contrasti vinti in cui la palla schizza via invece di restare al difensore
 const PASS_DEFLECT = 0.3;   // passaggi intercettati che vengono solo deviati
+const SPRINT_BONUS = 0.16;  // velocità in più nello scatto a energia piena (a energia bassa rende meno)
+const SPRINT_DRAIN = 3.5;   // lo scatto consuma energia questo numero di volte più in fretta della corsa
+const RECOVER_V = 2.5;      // sotto questa velocità (camminata, fermo) l'energia si recupera (m/s)
+const RECOVER_RATE = 0.004; // energia recuperata al secondo camminando o da fermi
+const ADV_TIME = 2.5;       // vantaggio: entro questo tempo, se la squadra perde palla, si torna alla punizione (s)
+const FEINT_DOT = 0.5;      // la finta vale solo se la nuova direzione si scosta da quella di corsa (coseno massimo)
+const FEINT_CD = 1.2;       // tempo di ricarica della finta (s)
+const FEINT_R = 3.5;        // difensori entro questa distanza dal portatore possono cascarci (m)
+const FEINT_BASE = 0.5;     // probabilità di sbilanciare un difensore a pari dribbling e difesa
+const FEINT_SKILL = 1.5;    // quanto pesa la differenza dribbling - difesa (per punto / 100)
+const FEINT_STUN = 0.7;     // durata dello sbilanciamento del difensore (s)
+const HEAD_LO = 1.3;        // da questa altezza in su il pallone si colpisce di testa (m)
+const HEAD_HI = 2.6;        // altezza massima raggiungibile di testa, saltando (m)
+const VOLLEY_LO = 0.5;      // sotto HEAD_LO e sopra questa altezza: colpo al volo (m)
+const AIR_SHOT_RANGE = 17;  // distanza massima dalla porta per colpire di testa o al volo verso la porta (m)
+const HEAD_CLEAR_ZONE = 32; // un difensore entro questa distanza dalla propria porta respinge di testa (m)
+const HEAD_V0 = 12;         // velocità base del colpo di testa (m/s), più la bravura
+const VOLLEY_V0 = 18;       // velocità base del tiro al volo (m/s), più la bravura
+const FEINT_PROTECT = 0.3;  // dopo la finta il portatore non può essere contrastato per questo tempo (s)
 
 export class MotionMethods {
   movePlayers(dt) {
@@ -20,9 +39,10 @@ export class MotionMethods {
       if (p.protect > 0) p.protect -= dt;
       if (p.tackleCd > 0) p.tackleCd -= dt;
       if (p.kickAnim > 0) p.kickAnim -= dt;
+      if (p.feintCd > 0) p.feintCd -= dt;
       if (p.state === 'play') {
         let dx = p.tx - p.x, dy = p.ty - p.y; const d = hyp(dx, dy);
-        const vm = this.vmax(p) * (b.owner === p ? 0.86 + p.st.dri * 0.001 : 1) * p.spdF;
+        const vm = this.vmax(p) * (b.owner === p ? 0.86 + p.st.dri * 0.001 : 1) * p.spdF * (p.sprint ? 1 + SPRINT_BONUS * (0.3 + 0.7 * p.energy) : 1);
         let sp = p.stun > 0 ? 0 : Math.min(vm, d * 3.2);
         if (d < 0.15) sp = 0;
         const wx = d > 0 ? dx / d * sp : 0, wy = d > 0 ? dy / d * sp : 0;
@@ -38,7 +58,8 @@ export class MotionMethods {
         p.fx += (lx - p.fx) * k; p.fy += (ly - p.fy) * k;
         const n = hyp(p.fx, p.fy) || 1; p.fx /= n; p.fy /= n;
         p.phase += v * dt * 1.9;
-        p.energy = Math.max(0.2, p.energy - (v / 8) * (v / 8) * dt * 0.0022 * (1.3 - p.st.fis * 0.006));
+        if (v < RECOVER_V) p.energy = Math.min(1, p.energy + RECOVER_RATE * dt);
+        else p.energy = Math.max(0.2, p.energy - (v / 8) * (v / 8) * dt * 0.0022 * (1.3 - p.st.fis * 0.006) * (p.sprint ? SPRINT_DRAIN : 1));
       } else if (p.state === 'prep') {
         p.t -= dt; p.vx *= 0.9; p.vy *= 0.9; p.x += p.vx * dt; p.y += p.vy * dt;
         if (p.t <= 0) {
@@ -68,6 +89,82 @@ export class MotionMethods {
         }
       }
     }
+  }
+
+  // Finta del portatore p verso (dx, dy): cambio di direzione secco; i difensori vicini che stavano entrando
+  // (contatto in corso, scivolata in preparazione o in avvicinamento) possono restare sbilanciati.
+  feint(p, dx, dy) {
+    const n = hyp(dx, dy); if (n < 1e-6) return false;
+    const ux = dx / n, uy = dy / n, v = hyp(p.vx, p.vy);
+    const rx = v > 1 ? p.vx / v : p.fx, ry = v > 1 ? p.vy / v : p.fy;
+    if (ux * rx + uy * ry > FEINT_DOT) return false;
+    const sp = this.vmax(p) * 0.8;
+    p.feintCd = FEINT_CD; p.vx = ux * sp; p.vy = uy * sp; p.fx = ux; p.fy = uy;
+    p.dx = p.tx = p.x + ux * 8; p.dy = p.ty = p.y + uy * 8; p.protect = Math.max(p.protect, FEINT_PROTECT);
+    const fooled = [];
+    for (const o of this.players) {
+      if (o.team === p.team || o.off || o.stun > 0 || (o.state !== 'play' && o.state !== 'prep')) continue;
+      const ox = o.x - p.x, oy = o.y - p.y, d = hyp(ox, oy);
+      if (d > FEINT_R) continue;
+      const closing = -(o.vx * ox + o.vy * oy) / (d || 1);
+      if (!(o.contact > 0 || o.state === 'prep' || closing > 1)) continue;
+      const chance = clamp(FEINT_BASE + FEINT_SKILL * (p.st.dri - o.st.dif) / 100, 0.15, 0.85);
+      if (this.rnd() < chance) {
+        o.stun = FEINT_STUN; o.contact = 0; o.vx *= 0.3; o.vy *= 0.3;
+        if (o.state === 'prep') { o.state = 'play'; o.warn = false; }
+        fooled.push(o);
+      }
+    }
+    this.ev('feint', { p, fooled });
+    return true;
+  }
+
+  // Pallone alto che arriva a p: 'header' / 'volley' = colpo verso la porta (attaccante su un lancio o cross
+  // di un compagno, vicino alla porta), 'clear' = respinta di testa (difensore vicino alla propria porta), null = niente.
+  airPlay(p) {
+    const b = this.ball;
+    if (b.shot || b.h < VOLLEY_LO || b.h > HEAD_HI) return null;
+    const dir = p.team ? -1 : 1, k = b.kick, head = b.h >= HEAD_LO;
+    if (k && k.team === p.team) {
+      if (k.kicker === p || k.type !== 'loft') return null;
+      return hyp(p.x, p.y - dir * HL) < AIR_SHOT_RANGE ? (head ? 'header' : 'volley') : null;
+    }
+    return head && hyp(p.x, p.y + dir * HL) < HEAD_CLEAR_ZONE ? 'clear' : null;
+  }
+
+  airHit(p, kind) {
+    const b = this.ball, k = b.kick, T = p.team, dir = T ? -1 : 1;
+    if (k && k.team === T && k.kicker !== p && k.off.includes(p)) {
+      b.kick = null; this.ev('offside', { p }); this.setRestart('freekick', 1 - T, p.x, p.y); return;
+    }
+    if (b.last !== p) { b.prev = b.last; b.last = p; }
+    b.ct = 0; b.cax = b.cay = 0; b.shot = null; b.noP = p; b.noT = 0.3; this.predT = 0; p.kickAnim = 0.35;
+    if (kind === 'clear') {
+      // respinta: lontano dalla propria porta, alta, verso l'esterno
+      const a = Math.atan2(dir, (b.x > 0 ? 1 : -1) * (0.3 + this.rnd() * 0.5)) + (this.rnd() - 0.5) * 0.9, v = 10 + this.rnd() * 5;
+      b.vx = Math.cos(a) * v; b.vy = Math.sin(a) * v; b.vh = 3 + this.rnd() * 3;
+      b.kick = null; this.lastPass = null; this.stats.headers[T]++;
+      this.ev('kick', { p, kind: 'header', clear: true, v });
+      return;
+    }
+    if (k && k.team === T && k.kicker !== p) this.lastPass = { from: k.kicker, to: p };
+    const head = kind === 'header', gk = this.gk(1 - T), gy = dir * HL;
+    const skill = head ? (p.st.tir + p.st.fis) / 2 : p.st.tir;
+    const side = (gk.x > b.x ? -1 : 1) * (this.rnd() < 0.75 ? 1 : -1);
+    const tx = side * (GW / 2 - 0.7), th0 = head ? 0.2 + this.rnd() * 1.2 : 0.3 + this.rnd() * 1.4;
+    const sig = ((head ? 4 : 3) + (100 - skill) * (head ? 0.09 : 0.08)) * (this.nearOpp(p.x, p.y, T) < 1.5 ? 1.3 : 1);
+    const v = head ? HEAD_V0 + skill * 0.06 : VOLLEY_V0 + skill * 0.12;
+    let dx = tx - b.x, dy = gy - b.y; const D = hyp(dx, dy) || 1;
+    const a = this.gauss() * sig * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
+    [dx, dy] = [(dx * ca - dy * sa) / D, (dx * sa + dy * ca) / D];
+    const th = Math.max(0.05, th0 + this.gauss() * sig * 0.02 * D), Tt = Math.max(0.15, D / v);
+    b.vx = dx * v; b.vy = dy * v; b.vh = (th - b.h + 0.5 * G * Tt * Tt) / Tt;
+    b.kick = { team: T, kicker: p, off: [], age: 0, type: 'shot', human: !!this.human[T] };
+    this.detectShot();
+    this.stats.shots[T]++; if (b.shot && b.shot.team === T && b.shot.on) this.stats.onT[T]++;
+    this.useAdvantage(T);
+    if (head) this.stats.headers[T]++; else this.stats.volleys[T]++;
+    this.ev('kick', { p, kind, v });
   }
 
   slideStep(p, dt) {
@@ -143,6 +240,11 @@ export class MotionMethods {
     this.ev('foul', { by, on, card, pen: inBox });
     const ox = on.x, oy = on.y;
     if (card === 'red') { by.off = true; by.x = HW + 8; by.y = 0; by.state = 'play'; if (this.ctrl[by.team] === by) this.ctrl[by.team] = null; }
+    else if (!inBox && this.advantageOk(on, by)) {
+      this.advantage = { team: on.team, x: ox, y: oy, t: ADV_TIME };
+      this.ev('advantage', { team: on.team, p: on });
+      return;
+    }
     if (inBox) this.setRestart('penalty', on.team, 0, 0); else this.setRestart('freekick', on.team, ox, oy);
   }
 
@@ -199,16 +301,19 @@ export class MotionMethods {
       return;
     }
     if (b.kick) b.kick.age += dt;
-    let best = null, bd = 9;
+    let best = null, bd = 9, bestAir = null;
     for (const p of this.players) {
       if (p.off || p.state !== 'play' || p.stun > 0 || (b.noP === p && b.noT > 0)) continue;
       const gk = p.pos === 'P' && this.inOwnBox(p);
       const d = hyp(p.x - b.x, p.y - b.y);
       // palla appena calciata che si allontana: non si può toccare
       if (b.kick && b.kick.age < 0.3 && b.kick.team !== p.team && (p.x - b.x) * b.vx + (p.y - b.y) * b.vy < 0) continue;
-      if (d < (gk ? 1.25 : (b.kick && b.kick.type === 'shot' && b.kick.team !== p.team ? SHOT_BLOCK_R : 0.95)) && b.h < (gk ? 2.35 : 1.7) && d < bd) { bd = d; best = p; }
+      if (d >= (gk ? 1.25 : (b.kick && b.kick.type === 'shot' && b.kick.team !== p.team ? SHOT_BLOCK_R : 0.95)) || d >= bd) continue;
+      const air = gk ? null : this.airPlay(p);
+      if (air || b.h < (gk ? 2.35 : 1.7)) { bd = d; best = p; bestAir = air; }
     }
     if (!best) return;
+    if (bestAir) { this.airHit(best, bestAir); return; }
     const p = best, sp = hyp(b.vx - p.vx, b.vy - p.vy), gk = p.pos === 'P' && this.inOwnBox(p);
     if (gk && b.shot && b.shot.team !== p.team) { this.save(p, true); return; }
     const mate = b.kick && b.kick.team === p.team;
