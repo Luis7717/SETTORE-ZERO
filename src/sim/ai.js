@@ -232,7 +232,7 @@ export class AIMethods {
     if (this.predT <= 0) { this.predT = 0.1; this.computeChasers(); this.computeLines(); }
     for (const p of this.players) {
       if (p.off || p.state !== 'play') continue;
-      p.spdF = 1;
+      p.spdF = 1; p.sprint = false;
       this.assign(p);
     }
   }
@@ -241,6 +241,7 @@ export class AIMethods {
     const b = this.ball, T = p.team, dir = T ? -1 : 1, hum = this.human[T];
     if (this.phase === 'restart' && this.restart.taker === p) { p.tx = p.x; p.ty = p.y; return; }
     const mv = hum && this.ctrl[T] === p ? this.move[T] : null;
+    if (mv && mv.sprint) p.sprint = true;
     if (b.owner === p) {
       if (hum) {
         if (mv) { p.tx = mv.x; p.ty = mv.y; }

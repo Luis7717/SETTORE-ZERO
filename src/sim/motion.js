@@ -10,6 +10,10 @@ const PARRY_OUT = 0.6;      // respinte non bloccate che finiscono oltre la line
 const BLOCK_OUT = 0.4;      // tiri ribattuti vicino all'area che finiscono in angolo
 const TACKLE_LOOSE = 0.3;   // contrasti vinti in cui la palla schizza via invece di restare al difensore
 const PASS_DEFLECT = 0.3;   // passaggi intercettati che vengono solo deviati
+const SPRINT_BONUS = 0.16;  // velocità in più nello scatto a energia piena (a energia bassa rende meno)
+const SPRINT_DRAIN = 3.5;   // lo scatto consuma energia questo numero di volte più in fretta della corsa
+const RECOVER_V = 2.5;      // sotto questa velocità (camminata, fermo) l'energia si recupera (m/s)
+const RECOVER_RATE = 0.004; // energia recuperata al secondo camminando o da fermi
 
 export class MotionMethods {
   movePlayers(dt) {
@@ -22,7 +26,7 @@ export class MotionMethods {
       if (p.kickAnim > 0) p.kickAnim -= dt;
       if (p.state === 'play') {
         let dx = p.tx - p.x, dy = p.ty - p.y; const d = hyp(dx, dy);
-        const vm = this.vmax(p) * (b.owner === p ? 0.86 + p.st.dri * 0.001 : 1) * p.spdF;
+        const vm = this.vmax(p) * (b.owner === p ? 0.86 + p.st.dri * 0.001 : 1) * p.spdF * (p.sprint ? 1 + SPRINT_BONUS * (0.3 + 0.7 * p.energy) : 1);
         let sp = p.stun > 0 ? 0 : Math.min(vm, d * 3.2);
         if (d < 0.15) sp = 0;
         const wx = d > 0 ? dx / d * sp : 0, wy = d > 0 ? dy / d * sp : 0;
@@ -38,7 +42,8 @@ export class MotionMethods {
         p.fx += (lx - p.fx) * k; p.fy += (ly - p.fy) * k;
         const n = hyp(p.fx, p.fy) || 1; p.fx /= n; p.fy /= n;
         p.phase += v * dt * 1.9;
-        p.energy = Math.max(0.2, p.energy - (v / 8) * (v / 8) * dt * 0.0022 * (1.3 - p.st.fis * 0.006));
+        if (v < RECOVER_V) p.energy = Math.min(1, p.energy + RECOVER_RATE * dt);
+        else p.energy = Math.max(0.2, p.energy - (v / 8) * (v / 8) * dt * 0.0022 * (1.3 - p.st.fis * 0.006) * (p.sprint ? SPRINT_DRAIN : 1));
       } else if (p.state === 'prep') {
         p.t -= dt; p.vx *= 0.9; p.vy *= 0.9; p.x += p.vx * dt; p.y += p.vy * dt;
         if (p.t <= 0) {

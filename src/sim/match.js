@@ -7,6 +7,7 @@ const PREVIEW_SEC = 2.4; // durata massima dell'anteprima della traiettoria (s)
 const SHOT_V0 = 22; // velocità base del tiro (m/s), più la bravura del tiratore
 const GK_REACT = 0.42; // tempo di reazione base del portiere del computer (s), meno la sua bravura
 const WIDE_GAP = 2; // metri dalla linea laterale degli esterni quando la squadra attacca
+export const SPRINT_DIST = 6; // dito più lontano di così dal giocatore controllato (m) = scatto
 
 export class Match {
   constructor(o) {
@@ -37,7 +38,7 @@ export class Match {
     return {
       team, i, src, name: src.name, pos: slot[0], bx: slot[1], by: slot[2], st: effStats(src, slot[0]),
       x: 0, y: 0, vx: 0, vy: 0, fx: 0, fy: dir, tx: 0, ty: 0, spdF: 1, state: 'play', t: 0, stun: 0, protect: 0,
-      contact: 0, tackleCd: 0, kickAnim: 0, energy: 1, yellow: 0, off: false, sdx: 0, sdy: 0, hit: false,
+      contact: 0, tackleCd: 0, kickAnim: 0, energy: 1, sprint: false, yellow: 0, off: false, sdx: 0, sdy: 0, hit: false,
       dive: null, phase: this.rnd() * 6, aiT: 0, dx: 0, dy: 0, reactT: 0, decided: true, warn: false,
       sox: 0, soy: 0, soT: this.rnd(), cele: 0, look: Math.floor(this.rnd() * 1000),
     };
@@ -434,7 +435,11 @@ export class Match {
     spec.human = true; this.move[T] = null;
     this.kick(p, spec); return true;
   }
-  userMove(T, x, y, held) { this.move[T] = { x: clamp(x, -HW - 1, HW + 1), y: clamp(y, -HL - 1, HL + 1), ttl: held ? 0.3 : 1.8, held: !!held }; }
+  // sprint: true/false dal telefono; se manca, scatto quando il dito tenuto premuto è lontano dal giocatore controllato
+  userMove(T, x, y, held, sprint) {
+    if (sprint === undefined) { const c = this.ctrl[T]; sprint = !!(held && c && hyp(x - c.x, y - c.y) > SPRINT_DIST); }
+    this.move[T] = { x: clamp(x, -HW - 1, HW + 1), y: clamp(y, -HL - 1, HL + 1), ttl: held ? 0.3 : 1.8, held: !!held, sprint: !!(held && sprint) };
+  }
   userStop(T) { this.move[T] = null; }
   userSlide(T, dx, dy) {
     const p = this.ctrl[T], b = this.ball;
