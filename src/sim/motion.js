@@ -14,6 +14,13 @@ const SPRINT_BONUS = 0.16;  // velocità in più nello scatto a energia piena (a
 const SPRINT_DRAIN = 3.5;   // lo scatto consuma energia questo numero di volte più in fretta della corsa
 const RECOVER_V = 2.5;      // sotto questa velocità (camminata, fermo) l'energia si recupera (m/s)
 const RECOVER_RATE = 0.004; // energia recuperata al secondo camminando o da fermi
+const FEINT_DOT = 0.5;      // la finta vale solo se la nuova direzione si scosta da quella di corsa (coseno massimo)
+const FEINT_CD = 1.2;       // tempo di ricarica della finta (s)
+const FEINT_R = 3.5;        // difensori entro questa distanza dal portatore possono cascarci (m)
+const FEINT_BASE = 0.5;     // probabilità di sbilanciare un difensore a pari dribbling e difesa
+const FEINT_SKILL = 1.5;    // quanto pesa la differenza dribbling - difesa (per punto / 100)
+const FEINT_STUN = 0.7;     // durata dello sbilanciamento del difensore (s)
+const FEINT_PROTECT = 0.3;  // dopo la finta il portatore non può essere contrastato per questo tempo (s)
 
 export class MotionMethods {
   movePlayers(dt) {
@@ -24,6 +31,7 @@ export class MotionMethods {
       if (p.protect > 0) p.protect -= dt;
       if (p.tackleCd > 0) p.tackleCd -= dt;
       if (p.kickAnim > 0) p.kickAnim -= dt;
+      if (p.feintCd > 0) p.feintCd -= dt;
       if (p.state === 'play') {
         let dx = p.tx - p.x, dy = p.ty - p.y; const d = hyp(dx, dy);
         const vm = this.vmax(p) * (b.owner === p ? 0.86 + p.st.dri * 0.001 : 1) * p.spdF * (p.sprint ? 1 + SPRINT_BONUS * (0.3 + 0.7 * p.energy) : 1);
@@ -73,6 +81,34 @@ export class MotionMethods {
         }
       }
     }
+  }
+
+  // Finta del portatore p verso (dx, dy): cambio di direzione secco; i difensori vicini che stavano entrando
+  // (contatto in corso, scivolata in preparazione o in avvicinamento) possono restare sbilanciati.
+  feint(p, dx, dy) {
+    const n = hyp(dx, dy); if (n < 1e-6) return false;
+    const ux = dx / n, uy = dy / n, v = hyp(p.vx, p.vy);
+    const rx = v > 1 ? p.vx / v : p.fx, ry = v > 1 ? p.vy / v : p.fy;
+    if (ux * rx + uy * ry > FEINT_DOT) return false;
+    const sp = this.vmax(p) * 0.8;
+    p.feintCd = FEINT_CD; p.vx = ux * sp; p.vy = uy * sp; p.fx = ux; p.fy = uy;
+    p.dx = p.tx = p.x + ux * 8; p.dy = p.ty = p.y + uy * 8; p.protect = Math.max(p.protect, FEINT_PROTECT);
+    const fooled = [];
+    for (const o of this.players) {
+      if (o.team === p.team || o.off || o.stun > 0 || (o.state !== 'play' && o.state !== 'prep')) continue;
+      const ox = o.x - p.x, oy = o.y - p.y, d = hyp(ox, oy);
+      if (d > FEINT_R) continue;
+      const closing = -(o.vx * ox + o.vy * oy) / (d || 1);
+      if (!(o.contact > 0 || o.state === 'prep' || closing > 1)) continue;
+      const chance = clamp(FEINT_BASE + FEINT_SKILL * (p.st.dri - o.st.dif) / 100, 0.15, 0.85);
+      if (this.rnd() < chance) {
+        o.stun = FEINT_STUN; o.contact = 0; o.vx *= 0.3; o.vy *= 0.3;
+        if (o.state === 'prep') { o.state = 'play'; o.warn = false; }
+        fooled.push(o);
+      }
+    }
+    this.ev('feint', { p, fooled });
+    return true;
   }
 
   slideStep(p, dt) {

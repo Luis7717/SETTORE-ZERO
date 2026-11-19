@@ -38,7 +38,7 @@ export class Match {
     return {
       team, i, src, name: src.name, pos: slot[0], bx: slot[1], by: slot[2], st: effStats(src, slot[0]),
       x: 0, y: 0, vx: 0, vy: 0, fx: 0, fy: dir, tx: 0, ty: 0, spdF: 1, state: 'play', t: 0, stun: 0, protect: 0,
-      contact: 0, tackleCd: 0, kickAnim: 0, energy: 1, sprint: false, yellow: 0, off: false, sdx: 0, sdy: 0, hit: false,
+      contact: 0, tackleCd: 0, kickAnim: 0, energy: 1, sprint: false, feintCd: 0, yellow: 0, off: false, sdx: 0, sdy: 0, hit: false,
       dive: null, phase: this.rnd() * 6, aiT: 0, dx: 0, dy: 0, reactT: 0, decided: true, warn: false,
       sox: 0, soy: 0, soT: this.rnd(), cele: 0, look: Math.floor(this.rnd() * 1000),
     };
@@ -448,6 +448,14 @@ export class Match {
     const n = hyp(dx, dy); if (n < 1e-6) return false;
     p.state = 'slide'; p.t = 0; p.sdx = dx / n; p.sdy = dy / n; p.hit = false; p.fx = p.sdx; p.fy = p.sdy; this.move[T] = null;
     this.ev('slide', { p }); return true;
+  }
+  // finta: scorrimento veloce col pallone in una direzione diversa da quella di corsa
+  userFeint(T, dx, dy) {
+    const p = this.ctrl[T], b = this.ball;
+    if (!p || b.owner !== p || this.phase !== 'play' || p.state !== 'play' || p.stun > 0 || p.feintCd > 0) return false;
+    if (!this.feint(p, dx, dy)) return false;
+    this.move[T] = { x: clamp(p.x + p.fx * 8, -HW - 1, HW + 1), y: clamp(p.y + p.fy * 8, -HL - 1, HL + 1), ttl: 0.6, held: false, sprint: false };
+    return true;
   }
   diveWin(T) { const b = this.ball, g = this.gk(T); return !!(this.human[T] && this.phase === 'play' && b.shot && b.shot.team !== T && !b.owner && g.state === 'play'); }
   userDive(T, dxm, th) {

@@ -130,6 +130,12 @@ export class Input {
       } else { const g = this.view.screenToGround(this.x, this.y); if (g) this.out.move(g.x, g.y, false); }
       return;
     }
+    // col pallone: scorrimento veloce = finta (cambio di direzione secco)
+    if (hint === 'attack' && dt < 300 && dist > Math.max(38, this.view.w * 0.1)) {
+      const a = this.view.screenToGround(this.sx, this.sy), c = this.view.screenToGround(this.x, this.y);
+      const ok = a && c && (this.out.feint ? this.out.feint(c.x - a.x, c.y - a.y) : m.userFeint(T, c.x - a.x, c.y - a.y));
+      if (ok) return;
+    }
     if ((hint === 'defend' || hint === 'loose') && dt < 300 && dist > Math.max(38, this.view.w * 0.1)) {
       const a = this.view.screenToGround(this.sx, this.sy), c = this.view.screenToGround(this.x, this.y);
       if (a && c) { this.out.slide(c.x - a.x, c.y - a.y); return; }
