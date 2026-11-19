@@ -5,7 +5,21 @@ const Z0=3,Z1=-25.16,PP={x:0,z:0,dx:0,dz:-1};
 const POSES=[{x:0,z:0,th:0,i:0,o:1},{x:-2.5,z:-.5,th:-.18,i:0,o:1},{x:2.5,z:-.5,th:.18,i:0,o:1},{x:0,z:-8.5,th:0,i:0,o:1},{x:0,z:-22.2,th:Math.PI,i:0,o:1},{x:0,z:-22.2,th:Math.PI,i:1,o:0},{x:-2.5,z:-21.7,th:Math.PI+.18,i:1,o:0},{x:2.5,z:-21.7,th:Math.PI-.18,i:1,o:0}];
 const angd=(a,b)=>Math.atan2(Math.sin(a-b),Math.cos(a-b));
 function pathLen(P){let t=0;for(let i=1;i<P.length;i++)t+=Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]);return t;}
-function pathPos(P,k,o){const tot=pathLen(P);let d=k*tot;for(let i=1;i<P.length;i++){const l=Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]);if(d<=l||i===P.length-1){const t=l?Math.min(1,d/l):1;o.x=P[i-1][0]+(P[i][0]-P[i-1][0])*t;o.z=P[i-1][1]+(P[i][1]-P[i-1][1])*t;if(l>.01){o.dx=P[i][0]-P[i-1][0];o.dz=P[i][1]-P[i-1][1];}return tot;}d-=l;}return tot;}
+/* percorsi con angoli arrotondati: ogni punto ricorda la distanza percorsa sul percorso originale,
+   così pericoli, rampe e durate restano uguali; cambia solo la traiettoria nelle curve */
+const CURVE_R=1.2,SPC=new WeakMap();
+function smoothPath(P){const sig=P.length+':'+P[0]+':'+P[P.length-1];let c=SPC.get(P);if(c&&c.sig===sig)return c;
+ const n=P.length,D=[0];for(let i=1;i<n;i++)D.push(D[i-1]+Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]));const Q=[[P[0][0],P[0][1],0]];
+ for(let i=1;i<n-1;i++){const A=P[i-1],V=P[i],B=P[i+1],l1=D[i]-D[i-1],l2=D[i+1]-D[i];if(l1<1e-3||l2<1e-3){Q.push([V[0],V[1],D[i]]);continue;}
+  const ux=(V[0]-A[0])/l1,uz=(V[1]-A[1])/l1,wx=(B[0]-V[0])/l2,wz=(B[1]-V[1])/l2,th=Math.acos(clamp(ux*wx+uz*wz,-1,1));
+  if(th<.03){Q.push([V[0],V[1],D[i]]);continue;}const t=Math.min(CURVE_R*Math.tan(Math.min(th,2.6)/2),.45*l1,.45*l2),ax=V[0]-ux*t,az=V[1]-uz*t,bx=V[0]+wx*t,bz=V[1]+wz*t,N=Math.max(4,Math.ceil(th*9));
+  for(let j=0;j<=N;j++){const s=j/N,a=(1-s)*(1-s),b=2*(1-s)*s,c2=s*s;Q.push([a*ax+b*V[0]+c2*bx,a*az+b*V[1]+c2*bz,D[i]-t+2*t*s]);}}
+ Q.push([P[n-1][0],P[n-1][1],D[n-1]]);c={sig,Q,tot:D[n-1]};SPC.set(P,c);return c;}
+function pathPos(P,k,o){const c=smoothPath(P),Q=c.Q,tot=c.tot,d=clamp(k,0,1)*tot;let j=1;while(j<Q.length-1&&Q[j][2]<d)j++;const a=Q[j-1],b=Q[j],l=b[2]-a[2],t=l>1e-6?clamp((d-a[2])/l,0,1):1;
+ o.x=a[0]+(b[0]-a[0])*t;o.z=a[1]+(b[1]-a[1])*t;let dx=b[0]-a[0],dz=b[1]-a[1];if(Math.hypot(dx,dz)<1e-3&&j<Q.length-1){dx=Q[j+1][0]-b[0];dz=Q[j+1][1]-b[1];}if(Math.hypot(dx,dz)>1e-3){o.dx=dx;o.dz=dz;}return tot;}
+/* direzione dello sguardo: verso un punto un po' più avanti sul percorso, così le curve si anticipano dolcemente */
+const YAW_MAX=4.2,LOOK_AHEAD=1.6,_PL={x:0,z:0,dx:0,dz:-1};
+function pathYaw(P,u,tot,cur){pathPos(P,Math.min(1,u+LOOK_AHEAD/Math.max(tot,.01)),_PL);const dx=_PL.x-cur.x,dz=_PL.z-cur.z;return Math.hypot(dx,dz)>.25?Math.atan2(-dx,-dz):Math.atan2(-cur.dx,-cur.dz);}
 function mkProp(st,type,mesh,o){const p=Object.assign({type,mesh,dead:false,si:st.i},o);mesh.traverse(m=>{m.userData.prop=p;});G.props.push(p);return p;}
 function mkChest(st,x,z,ry,gold,room){const g=new THREE.Group(),bm=gold?M.gold:M.wood,tm=gold?M.purple:M.steel;
  P('box',bm,.8,.42,.5,0,.21,0,g);const lid=new THREE.Group();lid.position.set(0,.42,-.25);g.add(lid);P('box',bm,.8,.16,.5,0,.08,.25,lid);
@@ -173,7 +187,7 @@ function enterRoom(i){PF.m.push('room');const old=G.stages[G.si];if(old&&old.rg.
   if(MODELS.xbot){if(st.rk==='c'||st.rk==='q'){const a=mkActor(st.rk==='c'?'varr':'kross');a.fol=7;a.root.position.set(0,0,-7);a.root.rotation.y=Math.PI;}else if(st.rk==='m'){const a=mkActor('marsh');a.fol=3.4;a.fx=1.4;a.root.position.set(1.4,0,-4.4);a.root.rotation.y=Math.PI;}}}
  else{const f=st.fl||'';if(MODELS.xbot&&(f.includes('v')||f.includes('k'))){const a=mkActor(f.includes('v')?'varr':'kross'),z=-Math.min(6.5,st.depth*.45);let x=0;for(const c of[0,1.3,-1.3,2.4,-2.4])if(!blk(st,c,z,.5)){x=c;break;}a.root.position.set(x,0,z);a.ry=a.root.rotation.y=Math.atan2(-x,-z);a.look=1;st.actor=a;}else if(st.say&&!st.boss&&!f.includes('m'))sub(st.say,4400);
   G.mv={P:st.inP,t:0,kind:'in',dur:Math.max(.7,pathLen(st.inP)/(5.2*(1+.05*pk('sp'))))};G.phase='in';if(G.lit===2)toast('Luci fuori uso: illumina con la torcia',2400);}
- const d0=st.inP[0],d1=st.inP[1];G.px=d0[0];G.pz=d0[1];PP.dx=d1[0]-d0[0];PP.dz=d1[1]-d0[1];G.yaw=G.mv.lb?Math.PI:Math.atan2(-PP.dx,-PP.dz);st.wd=.4;dots();}
+ const d0=st.inP[0],d1=st.inP[1];G.px=d0[0];G.pz=d0[1];PP.dx=d1[0]-d0[0];PP.dz=d1[1]-d0[1];G.yaw=G.mv.lb?Math.PI:pathYaw(G.mv.P,0,pathLen(G.mv.P),{x:d0[0],z:d0[1],dx:PP.dx,dz:PP.dz});st.wd=.4;dots();}
 function buildLevel(L){
  if(G&&G.stages)for(const q of G.stages)if(q.rg)clearGroup(q.rg);
  clearGroup(world);clearGroup(enG);clearGroup(prG);clearGroup(fxG);parts.length=0;holes.length=0;setTheme(chOf(L).th);
