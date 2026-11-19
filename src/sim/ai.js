@@ -162,7 +162,7 @@ export class AIMethods {
     }
     if (r.type === 'freekick') {
       const dg = hyp(p.x, p.y - dir * HL);
-      if (dg < 27 && Math.abs(p.x) < 16) return this.aiShoot(p);
+      if (dg < 27 && Math.abs(p.x) < 16) return this.aiShoot(p, false, r.wallSide ? -r.wallSide : 0);
       if (dg < 42) return this.kick(p, { type: 'loft', tx: (this.rnd() - 0.5) * 12, ty: dir * (HL - 7 - this.rnd() * 5) });
     }
     const o = this.passOptions(p, r.type === 'throw' || r.type === 'goalkick');
@@ -244,6 +244,7 @@ export class AIMethods {
   assign(p) {
     const b = this.ball, T = p.team, dir = T ? -1 : 1, hum = this.human[T];
     if (this.phase === 'restart' && this.restart.taker === p) { p.tx = p.x; p.ty = p.y; return; }
+    if (this.phase === 'restart' && p.wall) { p.tx = p.wall.x; p.ty = p.wall.y; return; }
     const mv = hum && this.ctrl[T] === p ? this.move[T] : null;
     if (mv && mv.sprint) p.sprint = true;
     if (b.owner === p) {

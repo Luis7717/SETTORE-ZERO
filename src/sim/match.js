@@ -7,6 +7,9 @@ const PREVIEW_SEC = 2.4; // durata massima dell'anteprima della traiettoria (s)
 const SHOT_V0 = 22; // velocità base del tiro (m/s), più la bravura del tiratore
 const GK_REACT = 0.42; // tempo di reazione base del portiere del computer (s), meno la sua bravura
 const WIDE_GAP = 2; // metri dalla linea laterale degli esterni quando la squadra attacca
+const WALL_RANGE = 30; // punizione entro questa distanza dalla porta: barriera (m)
+const WALL_DIST = 9.15; // distanza della barriera dal pallone (m)
+const WALL_GAP = 0.75; // spazio tra i giocatori in barriera (m)
 export const SPRINT_DIST = 6; // dito più lontano di così dal giocatore controllato (m) = scatto
 
 export class Match {
@@ -38,7 +41,7 @@ export class Match {
     return {
       team, i, src, name: src.name, pos: slot[0], bx: slot[1], by: slot[2], st: effStats(src, slot[0]),
       x: 0, y: 0, vx: 0, vy: 0, fx: 0, fy: dir, tx: 0, ty: 0, spdF: 1, state: 'play', t: 0, stun: 0, protect: 0,
-      contact: 0, tackleCd: 0, kickAnim: 0, energy: 1, sprint: false, feintCd: 0, yellow: 0, off: false, sdx: 0, sdy: 0, hit: false,
+      contact: 0, tackleCd: 0, kickAnim: 0, energy: 1, sprint: false, feintCd: 0, wall: null, yellow: 0, off: false, sdx: 0, sdy: 0, hit: false,
       dive: null, phase: this.rnd() * 6, aiT: 0, dx: 0, dy: 0, reactT: 0, decided: true, warn: false,
       sox: 0, soy: 0, soT: this.rnd(), cele: 0, look: Math.floor(this.rnd() * 1000),
     };
@@ -96,6 +99,7 @@ export class Match {
     p.dive = null; p.warn = false; p.hit = false; p.cele = 0;
   }
   resetStates() {
+    for (const p of this.players) p.wall = null;
     for (const p of this.players) if (!p.off) { p.state = 'play'; p.t = 0; p.stun = 0; p.contact = 0; p.dive = null; p.warn = false; p.cele = 0; p.vx *= 0.3; p.vy *= 0.3; }
   }
   pushAway(team, x, y, R) {
@@ -118,7 +122,7 @@ export class Match {
     b.owner = null; b.vx = b.vy = b.vh = 0; b.h = 0; b.kick = null; b.shot = null; b.ct = 0; b.noT = 0;
     this.phase = 'restart'; this.move = [null, null]; this.lastPass = null;
     this.resetStates();
-    let cut = false;
+    let cut = false, wallSide = 0;
     const mine = this.team(team).filter(p => !p.off), theirs = this.team(opp).filter(p => !p.off);
     const nearest = (list, f) => { let best = null, bd = 1e9; for (const p of list) { if (f && !f(p)) continue; const d = hyp(p.x - x, p.y - y); if (d < bd) { bd = d; best = p; } } return best; };
     if (type === 'kickoff') {
@@ -139,6 +143,7 @@ export class Match {
       x = clamp(x, -HW + 1, HW - 1); y = clamp(y, -HL + 1, HL - 1);
       taker = nearest(mine, p => p.pos !== 'P'); this.place(taker, x - 0, y - dir * 0.3);
       this.pushAway(opp, x, y, 8.5);
+      wallSide = this.buildWall(team, x, y);
     } else if (type === 'gk') {
       for (const o of theirs) if (Math.abs(o.x) < BOX_W / 2 + 1 && o.y * dir < -HL + BOX_D + 1) { o.y = dir * (-HL + BOX_D + 2); o.vx = o.vy = 0; }
     } else if (type === 'goalkick') {
@@ -184,10 +189,26 @@ export class Match {
     taker.vx = taker.vy = 0;
     for (const p of this.players) if (!p.off && p !== taker) this.faceTo(p, b.x, b.y);
     this.att = team;
-    this.restart = { type, team, taker, x: b.x, y: b.y, t: 0, wait: 1.1 + this.rnd() * 0.7 + (type === 'penalty' ? 0.8 : 0) + (cut ? 0.5 : 0) };
+    this.restart = { type, team, taker, x: b.x, y: b.y, t: 0, wait: 1.1 + this.rnd() * 0.7 + (type === 'penalty' ? 0.8 : 0) + (cut ? 0.5 : 0) + (wallSide ? 0.6 : 0), wallSide };
     this.predT = 0;
     this.updateCtrl(0, true);
     this.ev('restart', { kind: type, team, cut });
+  }
+  // Barriera della squadra che difende sulla punizione di `team` dal punto (x, y): 2-5 giocatori a 9,15 m,
+  // sulla linea tra pallone e palo vicino. Ritorna il lato coperto (-1/1), 0 se la punizione è troppo lontana.
+  buildWall(team, x, y) {
+    const dir = team ? -1 : 1, gy = dir * HL, dg = hyp(x, gy - y);
+    if (dg > WALL_RANGE || y * dir > HL - 1) return 0;
+    const side = Math.abs(x) > 2 ? Math.sign(x) : (this.rnd() < 0.5 ? -1 : 1);
+    const n = Math.abs(x) > 20 ? 2 : dg < 20 ? 5 : dg < 25 ? 4 : 3;
+    const ax = side * GW / 4, ux0 = ax - x, uy0 = gy - y, un = hyp(ux0, uy0) || 1, ux = ux0 / un, uy = uy0 / un;
+    const cx = x + ux * WALL_DIST, cy = y + uy * WALL_DIST, nx = -uy, ny = ux;
+    const pool = this.team(1 - team).filter(p => !p.off && p.pos !== 'P').sort((a, c) => hyp(a.x - cx, a.y - cy) - hyp(c.x - cx, c.y - cy)).slice(0, n);
+    pool.forEach((p, k) => {
+      const o = (k - (n - 1) / 2) * WALL_GAP;
+      this.place(p, cx + nx * o, cy + ny * o); this.faceTo(p, x, y); p.wall = { x: p.x, y: p.y };
+    });
+    return side;
   }
   setupKickoff(team) { this.setRestart('kickoff', team, 0, 0); }
 
