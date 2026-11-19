@@ -1,5 +1,8 @@
 // Suoni: file veri da www/assets/ quando ci sono (caricati a pezzi, vedi assets.js),
 // altrimenti suoni sintetizzati. Un file che manca non blocca nulla: si usa il sintetizzato.
+// il file del pubblico è più piano del rumore sintetizzato: lo si alza per avere lo stesso livello
+const CROWD_SAMPLE_GAIN = 3.5;
+const KICK_SAMPLE_GAIN = 3; // la registrazione del calcio è molto piano
 const SAMPLE_IDS = ['crowd', 'goal', 'ooh', 'whistle', 'whistle_long', 'kick', 'post', 'net', 'music'];
 
 export class Sfx {
@@ -21,7 +24,7 @@ export class Sfx {
     const c = this.ctx; if (!c) return;
     if (this.crowdSrc) { try { this.crowdSrc.stop(); } catch (_) { } this.crowdSrc.disconnect(); }
     const src = c.createBufferSource(); src.buffer = sample || this.noise; src.loop = true;
-    if (sample) src.connect(this.crowdG);
+    if (sample) { const boost = c.createGain(); boost.gain.value = CROWD_SAMPLE_GAIN; src.connect(boost); boost.connect(this.crowdG); }
     else { const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 700; f.Q.value = 0.6; src.connect(f); f.connect(this.crowdG); }
     src.start(); this.crowdSrc = src;
   }
@@ -65,7 +68,7 @@ export class Sfx {
     g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
     s.connect(f); f.connect(g); g.connect(c.destination); s.start(t, Math.random() * 2, dur + 0.05);
   }
-  kick(v) { const k = Math.min(1, (v || 15) / 30); if (this.play('kick', 0.4 + k * 0.6, 0.9 + k * 0.2)) return; this.tone(150, 0.09, 'sine', 0.25 + k * 0.3, 55); this.burst(0.05, 1800, 0.12 + k * 0.15); }
+  kick(v) { const k = Math.min(1, (v || 15) / 30); if (this.play('kick', (0.4 + k * 0.6) * KICK_SAMPLE_GAIN, 0.9 + k * 0.2)) return; this.tone(150, 0.09, 'sine', 0.25 + k * 0.3, 55); this.burst(0.05, 1800, 0.12 + k * 0.15); }
   whistle(long) { if (this.play(long ? 'whistle_long' : 'whistle', 0.7)) return; const d = long ? 0.7 : 0.28; this.tone(2850, d, 'square', 0.05); this.tone(3020, d, 'square', 0.05); }
   post() { if (this.play('post', 0.8)) return; this.tone(820, 0.35, 'triangle', 0.3, 760); }
   goal() {

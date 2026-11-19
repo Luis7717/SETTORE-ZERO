@@ -1,6 +1,7 @@
 // Grafica 3D: stadio, giocatori, palla, linea disegnata. Coordinate three: X = x, Y = altezza, Z = -y.
 import * as THREE from 'three';
 import { W, L, HW, HL, GW, GH, BOX_W, BOX_D, SIX_W, SIX_D, PEN_D, CIRCLE } from './sim.js';
+import { buildStadium } from './stadium.js';
 
 const SKIN = [0xf1c9a5, 0xd9a47a, 0xa9744f, 0x6b4630];
 const HAIR = [0x1c1410, 0x4a2f1b, 0x8a5a2b, 0xd9b66a, 0x222222, 0x2b2b2b];
@@ -40,7 +41,6 @@ export class View {
 
   buildWorld() {
     const s = this.scene;
-    s.background = canvasTex(8, 256, (g, w, h) => { const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#0a1630'); gr.addColorStop(0.55, '#20406e'); gr.addColorStop(1, '#6f95c4'); g.fillStyle = gr; g.fillRect(0, 0, w, h); });
     s.add(new THREE.HemisphereLight(0xdfeaff, 0x30502a, 1.15));
     const sun = new THREE.DirectionalLight(0xffffff, 1.5); sun.position.set(30, 60, 20); s.add(sun);
 
@@ -71,56 +71,8 @@ export class View {
     });
     const pitch = new THREE.Mesh(new THREE.PlaneGeometry(W + MX * 2, L + MY * 2), new THREE.MeshLambertMaterial({ map: tex }));
     pitch.rotation.x = -Math.PI / 2; s.add(pitch);
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshLambertMaterial({ color: 0x1d3a22 }));
-    ground.rotation.x = -Math.PI / 2; ground.position.y = -0.05; s.add(ground);
-
-    // cartelloni (marchi inventati)
-    const words = ['TIRO A GIRO', 'CAFFÈ BORGO', 'GELATERIA STELLA', 'FORNO DEL CORSO', 'RADIO CURVA', 'PIZZERIA DA NINO', 'OFFICINA ROSSI'];
-    const cols = ['#0b3d91', '#b3122b', '#0f7a55', '#e0a100', '#5b2a86', '#c44e00', '#14606e'];
-    const adTex = canvasTex(2048, 64, (g, w, h) => {
-      let x = 0, i = 0; g.font = 'bold 40px system-ui, sans-serif'; g.textBaseline = 'middle';
-      while (x < w) { const tw = 292; g.fillStyle = cols[i % cols.length]; g.fillRect(x, 0, tw, h); g.fillStyle = '#fff'; g.textAlign = 'center'; g.fillText(words[i % words.length], x + tw / 2, h / 2 + 2, tw - 20); x += tw; i++; }
-    });
-    adTex.wrapS = THREE.RepeatWrapping;
-    const adMat = new THREE.MeshBasicMaterial({ map: adTex });
-    const ad = (len, x, z, ry) => { const t = adTex.clone(); t.repeat.x = len / 70; t.needsUpdate = true; const m = new THREE.Mesh(new THREE.PlaneGeometry(len, 1.1), new THREE.MeshBasicMaterial({ map: t })); m.position.set(x, 0.55, z); m.rotation.y = ry; s.add(m); };
-    ad(L + 10, -HW - 5, 0, Math.PI / 2); ad(L + 10, HW + 5, 0, -Math.PI / 2);
-    ad(W + 10, 0, -HL - 6.5, 0);
-
-    // tribune
-    const crowd = canvasTex(512, 256, (g, w, h) => {
-      g.fillStyle = '#1a2233'; g.fillRect(0, 0, w, h);
-      const cc = ['#d94b4b', '#e8e8e8', '#3d7bd9', '#f0c23c', '#2f2f38', '#58b368', '#e88a3c', '#c9c9d4', '#8a5ad6'];
-      for (let y = 0; y < h; y += 8) for (let x = (y / 8) % 2 * 3; x < w; x += 6) {
-        if (Math.random() < 0.12) continue;
-        g.fillStyle = cc[(Math.random() * cc.length) | 0]; g.fillRect(x, y + 3, 4, 5);
-        g.fillStyle = SKINC[(Math.random() * 4) | 0]; g.fillRect(x + 1, y, 2, 3);
-      }
-    });
-    crowd.wrapS = crowd.wrapT = THREE.RepeatWrapping;
-    this.crowdMats = [];
-    const stand = (len, x, z, ry, far) => {
-      const t = crowd.clone(); t.repeat.set(len / 26, 1.6); t.needsUpdate = true;
-      const mat = new THREE.MeshBasicMaterial({ map: t, color: 0xb8c0cc });
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(len, 24), mat);
-      m.rotation.order = 'YXZ'; m.rotation.y = ry; m.rotation.x = -0.62;
-      m.position.set(x, 8.5, z); s.add(m);
-      const roof = new THREE.Mesh(new THREE.BoxGeometry(len, 0.6, 12), new THREE.MeshLambertMaterial({ color: 0x1b2433 }));
-      roof.rotation.y = ry; const k = far ? 1 : 1;
-      roof.position.set(x + Math.sin(ry) * -9 * k, 19.5, z + Math.cos(ry) * -9 * k); s.add(roof);
-      const base = new THREE.Mesh(new THREE.PlaneGeometry(len, 3), new THREE.MeshLambertMaterial({ color: 0x232c3d }));
-      base.rotation.y = ry; base.position.set(x + Math.sin(ry) * 8.6, 1.2, z + Math.cos(ry) * 8.6); s.add(base);
-      this.crowdMats.push(mat);
-      return m;
-    };
-    stand(L + 50, -HW - 17, 0, Math.PI / 2); stand(L + 50, HW + 17, 0, -Math.PI / 2);
-    stand(W + 60, 0, -HL - 19, 0);
-    this.backStand = stand(W + 60, 0, HL + 30, Math.PI);
-    // torri faro
-    for (const [x, z] of [[-HW - 26, -HL - 26], [HW + 26, -HL - 26]]) {
-      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 34), new THREE.MeshLambertMaterial({ color: 0x556070 })); p.position.set(x, 17, z); s.add(p);
-      const l = new THREE.Mesh(new THREE.BoxGeometry(7, 4, 0.6), new THREE.MeshBasicMaterial({ color: 0xfff6d8 })); l.position.set(x, 35, z); l.lookAt(0, 0, 0); s.add(l);
-    }
+    // stadio intorno al campo (tribune, pubblico, tetto, cartelloni, cielo): src/stadium.js
+    const st = buildStadium(s); this.stadium = st; this.crowdMats = st.crowdMats; this.backStand = st.backStand;
 
     // porte
     const postM = new THREE.MeshLambertMaterial({ color: 0xffffff });
@@ -223,6 +175,8 @@ export class View {
   update(dt) {
     const m = this.match; if (!m) return;
     const s = this.flip, b = m.ball; this.t += dt;
+    // pubblico: si anima quando il pallone si avvicina a una porta e soprattutto dopo un gol
+    this.stadium.update(dt, m.phase === 'goal' ? 1 : Math.max(0, (Math.abs(b.y) - 25) / 25) * 0.4);
     this.zoom += (this.zoomT - this.zoom) * Math.min(1, dt * 7);
     for (let i = 0; i < 22; i++) this.pose(m.players[i], this.figs[i], dt);
     // palla
@@ -355,4 +309,3 @@ export class View {
   }
   clearPath() { this.path.visible = false; this.arrow.visible = false; this.target.visible = false; this.recv.visible = false; this.preview.visible = false; this.offside.visible = false; }
 }
-const SKINC = ['#f1c9a5', '#d9a47a', '#a9744f', '#6b4630'];

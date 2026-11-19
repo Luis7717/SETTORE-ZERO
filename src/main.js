@@ -236,4 +236,4 @@ if (career.s) { sfx.on = career.s.settings.sound; }
 toMenu('title');
 requestAnimationFrame(frame);
 loadMusicLater();
-window.__G = G; window.__career = career; window.__view = view; window.__ui = ui; window.__start = startMatch; window.__enter = enterMatch; window.__assets = assets;
+window.__G = G; window.__career = career; window.__view = view; window.__ui = ui; window.__start = startMatch; window.__enter = enterMatch; window.__assets = assets; window.__sfx = sfx;
