@@ -45,6 +45,8 @@ function drawOv(){const g=og;g.setTransform(ODPR,0,0,ODPR,0,0);g.clearRect(0,0,i
     g.font='900 30px -apple-system,system-ui,sans-serif';g.lineWidth=5;g.strokeStyle='#000';const tx={L:'SCHIVA A SINISTRA',R:'SCHIVA A DESTRA',U:'SALTA!',D:'ABBASSATI!'}[q.dir];g.strokeText(tx,cx,cy+78);g.fillStyle='#fff';g.fillText(tx,cx,cy+78);g.font='800 15px -apple-system,system-ui,sans-serif';g.strokeText(q.nm+' IN ARRIVO',cx,cy-52);g.fillStyle='#ff6a5a';g.fillText(q.nm+' IN ARRIVO',cx,cy-52);}}}
  else if(G.qres&&G.qres.t>0){G.qres.t-=.016;g.font='900 28px '+HFONT;g.fillStyle=G.qres.good?'#5fe08f':'#ff5a5a';g.fillText(G.qres.good?'OK!':'MANCATO',innerWidth/2,innerHeight*.5);}
  if(G.mv)return;
+ // cannocchiale del cecchino (mirini.js): sotto gli avvisi dei nemici, che restano visibili; la fascia d'allarme va ridisegnata sopra
+ if(SCP.e>0){scopeDraw(g);if(G.warn>0&&G.warnTxt)warnBanner(g,G.warnTxt);}
  // avviso danni: anello rosso che si chiude = sta per sparare (riparati), "!" sopra la testa, freccia sul bordo se è fuori schermo
  const W=innerWidth,H=innerHeight,pp=.5+.5*Math.sin(G.t*14);
  for(const e of G.en){if(e.dead)continue;const s=proj2(ePos(e,TV,true));if(!s)continue;const r=clamp(260/Math.max(2,-e.root.position.z),14,34),aimg=e.state==='aim'||e.state==='wind'||e.state==='tele',firing=e.state==='fire',lock=e.state==='watch'&&e.rc>=0,
@@ -58,19 +60,18 @@ function drawOv(){const g=og;g.setTransform(ODPR,0,0,ODPR,0,0);g.clearRect(0,0,i
  g.font='800 15px '+HFONT;g.textAlign='center';
  for(let i=G.dn.length-1;i>=0;i--){const d=G.dn[i];d.life-=.016;if(d.life<=0){G.dn.splice(i,1);continue;}const s=proj2(d.p);if(!s)continue;g.globalAlpha=Math.min(1,d.life*2.5);g.fillStyle='#000';g.fillText(d.txt,s[0]+1,s[1]-(1-d.life)*40+1);g.fillStyle=d.c;g.fillText(d.txt,s[0],s[1]-(1-d.life)*40);}
  g.globalAlpha=1;
- // mirino: cerchio con tacche e contorno scuro (si legge anche su sfondi chiari); diventa rosso/oro quando colpisci
- if(G.lean>.5&&(aim.down||G.cdw>-.4)){const x=aim.cx,y=aim.cy,hm=G.hitM>0,r=hm?14:19,col=hm?(G.hitHead?'#ffd65a':'#ff4040'):'rgba(255,255,255,.92)',tk=()=>{g.beginPath();g.arc(x,y,r,0,7);for(const[a,b]of[[1,0],[-1,0],[0,1],[0,-1]]){g.moveTo(x+a*(r+3),y+b*(r+3));g.lineTo(x+a*(r+9),y+b*(r+9));}g.stroke();};
-  g.lineWidth=4;g.strokeStyle='rgba(0,0,0,.45)';tk();g.lineWidth=2;g.strokeStyle=col;tk();g.fillStyle=col;g.fillRect(x-1.5,y-1.5,3,3);
+ // mirino: uno diverso per ogni arma (mirini.js), con contorno scuro per leggerlo su ogni sfondo; rosso/oro quando colpisci
+ if(G.lean>.5&&(aim.down||G.cdw>-.4)){const x=aim.cx,y=aim.cy;mirDraw(g,x,y);
   if(!(G.ammo[cw().id]>0)){g.lineWidth=4;g.strokeStyle='rgba(0,0,0,.7)';g.strokeText('RILASCIA PER RICARICARE',x,y-38);g.fillStyle='#ffb040';g.fillText('RILASCIA PER RICARICARE',x,y-38);}}
  if(G.slow>0){g.fillStyle='rgba(80,170,255,'+(.12*Math.min(1,G.slow))+')';g.fillRect(0,0,innerWidth,innerHeight);}}
 
 /* ===== flow ===== */
-function startLevel(L){ainit();resize();MENU=null;WG.visible=true;$('sub').classList.remove('on');pfReset(L);for(const k in HU)delete HU[k];buildLevel(L);warm();state='play';ui.style.display='none';hud.style.display='block';$('toast').innerHTML='';$('adv').style.display='none';$('fade').style.opacity=0;aim.down=false;aim.hold=0;cov.down=false;$('covz').classList.remove('on');ndc.set(0,0);dots();last=performance.now();MU.track=null;musicStart('level');
+function startLevel(L){ainit();resize();MENU=null;WG.visible=true;$('sub').classList.remove('on');pfReset(L);for(const k in HU)delete HU[k];buildLevel(L);warm();state='play';ui.style.display='none';hud.style.display='block';$('toast').innerHTML='';$('adv').style.display='none';$('fade').style.opacity=0;aim.down=false;aim.hold=0;cov.down=false;$('covz').classList.remove('on');ndc.set(0,0);scopeOff(false);dots();last=performance.now();MU.track=null;musicStart('level');
  toast('<b>'+lvTxt(L)+'</b>'+(L===1?'<br>Tieni premuto: esci dal riparo e spari · rilascia: ti ripari e ricarichi':L%5===0?'<br><span style="color:#ff3ac8">Mira al nucleo luminoso</span>':''),L===1?5500:3200);}
-function pause(){if(state!=='play')return;state='pause';if(AC)MUS.gain.setTargetAtTime(0,AC.currentTime,.05);ui.className='ov';ui.style.display='flex';
+function pause(){if(state!=='play')return;state='pause';scopeOff(true);if(AC)MUS.gain.setTargetAtTime(0,AC.currentTime,.05);ui.className='ov';ui.style.display='flex';
  ui.innerHTML=`<div class="pan"><h2>PAUSA</h2><button class="b p big" data-a="resume">RIPRENDI</button><button class="b big" data-a="diag">Diagnostica prestazioni</button><button class="b big" data-a="tsnd">Audio: ${S.snd?'ON':'OFF'}</button><button class="b big" data-a="tmus">Musica: ${S.mus===0?'OFF':'ON'}</button><button class="b big" data-a="tgfx">Grafica: ${S.gfx===0?'LEGGERA':'ALTA'}</button>
  <button class="b d big" data-a="quit">TORNA ALLA BASE</button><p class="tip">Uscendo conservi i crediti e le armi trovate finora.</p></div>`;}
-function endLevel(won){state='end';qsHide();G.qte=null;cineOff();$('sub').classList.remove('on');const L=G.L,fin=won&&L>=NLV,bossW=won&&L%5===0;let b=0,rows='';musicStop();snd(won?'win':'lose');$('fade').style.opacity=0;
+function endLevel(won){state='end';scopeOff(true);qsHide();G.qte=null;cineOff();$('sub').classList.remove('on');const L=G.L,fin=won&&L>=NLV,bossW=won&&L%5===0;let b=0,rows='';musicStop();snd(won?'win':'lose');$('fade').style.opacity=0;
  const row=(k,v,c)=>`<div class="st${c?' '+c:''}"><span>${k}</span><b>${v}</b></div>`;
  if(won){b=40+10*L;rows+=row('Livello completato','+'+b+' ◈');if(G.hp>=G.mhp*.75){b+=20*L;rows+=row('Quasi illeso','+'+20*L+' ◈');}if(G.snum&&G.sfound>=G.snum){b+=30*L;rows+=row('Tutti i segreti trovati','+'+30*L+' ◈');}S.maxL=Math.min(NLV,Math.max(S.maxL,L+1));if(fin)S.done=1;}
  const tot=won?G.earn+b:Math.floor(G.earn/2);S.cr+=tot;save();hud.style.display='none';ui.className='ov';ui.style.display='flex';

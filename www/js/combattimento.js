@@ -26,11 +26,13 @@ function buildWeapon(){const w=cw(),v=WV[w.t];const g=WG;clearGroup(g);const wm=
  G.muz=new THREE.Object3D();G.muz.position.set(0,bh*.15,-bd-v.bl-.02);g.add(G.muz);
  const fm=new THREE.SpriteMaterial({map:M.glowT,color:v.glow||0xffd080,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending});G.mfs=new THREE.Sprite(fm);G.mfs.userData.ownMat=1;G.mfs.position.copy(G.muz.position);G.mfs.visible=false;g.add(G.mfs);
  if(!BEAM)BEAM=new THREE.Mesh(GEO.box,M.beam);BEAM.visible=false;fxG.add(BEAM);}
-function swapW(){if(S.eq.length<2)return;G.wi=(G.wi+1)%S.eq.length;G.rel=0;G.cdw=.3;G.beam=0;buildWeapon();snd('rel');for(const id of['swap','wp']){const e=$(id);e.classList.remove('go');void e.offsetWidth;e.classList.add('go');}hudUp();}
+function swapW(){if(S.eq.length<2)return;scopeOff(false);G.wi=(G.wi+1)%S.eq.length;G.rel=0;G.cdw=.3;G.beam=0;buildWeapon();snd('rel');for(const id of['swap','wp']){const e=$(id);e.classList.remove('go');void e.offsetWidth;e.classList.add('go');}hudUp();}
 function cast(o,d,far){RC.set(o,d);RC.far=far||140;const hs=RC.intersectObjects([world,enG,prG],true);for(const h of hs){const u=h.object.userData;if(u.e){if(u.e.dead)continue;if(u.px){const h2=hs.find(q=>q.object.userData.e===u.e&&q.object.userData.head&&q.distance<h.distance+1.6);if(h2)return{h:h2,e:u.e,head:true,shield:false};}return{h,e:u.e,head:!!u.head,shield:!!u.shield};}if(u.proj){if(u.proj.dead)continue;return{h,proj:u.proj};}if(u.prop){if(u.prop.type==='chest'&&(u.prop.dead||u.prop.locked))return{h};return{h,prop:u.prop};}return{h};}return null;}
 function proj2(v){PV.copy(v).project(cam);return PV.z>1?null:[(PV.x*.5+.5)*innerWidth,(-PV.y*.5+.5)*innerHeight];}
 function ePos(e,o,head){o.copy(e.root.position);o.y+=head?e.hy:e.cy;return o;}
 function aimDir(){RC.setFromCamera(ndc,cam);const d=RC.ray.direction.clone(),h=cast(cam.position,d);if(h&&(h.e||h.proj))return d;
+ // col cannocchiale niente aiuto alla mira: il colpo va esattamente al centro del reticolo
+ if(SCP.e>.5)return d;
  let best=null,bd=38;const chk=p=>{const s=proj2(p);if(!s)return;const q=Math.hypot(s[0]-aim.cx,s[1]-aim.cy);if(q<bd){bd=q;best=p.clone();}};
  for(const e of G.en)if(!e.dead){chk(ePos(e,TV,true));chk(ePos(e,TV,false));}for(const p of G.eproj)if(!p.dead)chk(p.m.position);
  return best?best.sub(cam.position).normalize():d;}

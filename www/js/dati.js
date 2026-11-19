@@ -138,6 +138,13 @@ let S=load();
 function load(){try{const s=JSON.parse(localStorage.getItem('sz_save'));if(s&&s.inv&&s.inv.length&&s.eq&&s.eq.length){s.inv.forEach(w=>{if(w.r===5&&(!w.x||(w.x==='inf'&&WT[w.t]&&WT[w.t].inf)))w.x=rollTrait(w.t);if(WT[w.t]&&WT[w.t].mo&&w.r<5){const ks=Object.keys(WT).filter(k=>!WT[k].mo&&WT[k].s==='heavy');w.t=ks.length?ks[w.id%ks.length]:'rifle';}});s.eq=s.eq.slice(0,2);s.maxL=Math.min(s.maxL||1,NLV);return s;}}catch(e){}
  return{cr:0,inv:[{id:1,t:'pistol',r:0,l:0}],eq:[1],perks:{},maxL:1,nid:2,auto:0,snd:1};}
 function save(){try{localStorage.setItem('sz_save',JSON.stringify(S));}catch(e){}}
+/* ricomincia da capo: azzera i progressi (crediti, armi, potenziamenti, livelli, casse, capitoli visti)
+   ma tiene le preferenze (audio, musica, grafica, mira automatica). S viene svuotato e riempito sul posto
+   così chi tiene un riferimento all'oggetto vede subito il nuovo stato. */
+const PREF_KEYS=['snd','mus','gfx','auto'];
+function resetSave(){const keep={};for(const k of PREF_KEYS)if(S[k]!==undefined)keep[k]=S[k];
+ try{localStorage.removeItem('sz_save');}catch(e){}
+ const fresh=Object.assign(load(),keep);for(const k of Object.keys(S))delete S[k];Object.assign(S,fresh);save();}
 const pk=k=>S.perks[k]||0;
 const wget=id=>S.inv.find(w=>w.id===id);
 /* caricatore infinito: nei confronti vale Infinity (non si scarica e non parte mai la ricarica), nei testi diventa '∞' (menu, carta del baule) */

@@ -8,7 +8,7 @@ function qsShow(dir,lab){const hz=dir==='L'||dir==='R',len=hz?236:196;QS.len=len
 function qsHide(){QS.el.style.display='none';QS.id=null;}
 function qsGrab(){if(!aim.down)return;QS.id=aim.id;QS.sx=aim.rx;QS.sy=aim.ry;aim.down=false;aim.id=null;aim.hold=0;}
 function qsMove(e){const d=QS.dir,dl=d==='R'?e.clientX-QS.sx:d==='L'?QS.sx-e.clientX:d==='D'?e.clientY-QS.sy:QS.sy-e.clientY;QS.p=clamp(dl/QS.len,0,1);qsKnob();if(QS.p>=.8)qteEnd(true);}
-function qteStart(dir,T,ok,defer,lab){if(G.qte||state!=='play')return false;G.qte={dir,t:T,T,ok,defer};qsShow(dir,lab);if(dir!=='T')qsGrab();snd('tele');return true;}
+function qteStart(dir,T,ok,defer,lab){if(G.qte||state!=='play')return false;G.qte={dir,t:T,T,ok,defer};scopeOff(false);/* niente cannocchiale durante le QTE (mirini.js) */qsShow(dir,lab);if(dir!=='T')qsGrab();snd('tele');return true;}
 function startDodge(dir){G.dg={dir,t:0,d:.62};G.inv=.75;snd('throw');}
 function qteEnd(good){const q=G.qte;if(!q)return;G.qte=null;qsHide();G.qres={good,t:.6};if(good){snd('pick');if(!q.defer)startDodge(q.dir);if(q.ok)q.ok();}else snd('lose0');}
 function swipe(x,y){if(!G||!G.qte)return;if(!G.sw){G.sw={x,y};return;}const dx=x-G.sw.x,dy=y-G.sw.y;if(Math.hypot(dx,dy)<34)return;const dir=Math.abs(dx)>Math.abs(dy)?(dx<0?'L':'R'):(dy<0?'U':'D');G.sw={x,y};qteEnd(dir===G.qte.dir);}

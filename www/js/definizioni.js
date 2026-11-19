@@ -20,4 +20,6 @@ WT.shotgun.range=12;WT.revolver.n='Luger';WT.minigun.n='Mitragliatore AK';
 const WM={pistol:{k:'g_makarov',tz:-.045,by:.05,mz:-.13,hide:['Magazine'],wz:-.44,wx:.1,wy:-.17},revolver:{k:'g_luger',rot:1,tz:-.06,by:.055,mz:-.17,hide:['Clip'],dx:-.025,wz:-.44,wx:.1,wy:-.17},smg:{k:'g_suomi',tz:.07,by:.03,mz:-.45},shotgun:{k:'g_shotgun',tz:.39,by:.03,mz:-.41},rifle:{k:'g_m4',tz:.025,by:.03,mz:-.54},sniper:{k:'g_sniper',tz:.235,by:.03,mz:-.52},minigun:{k:'g_ak',tz:.24,by:.015,mz:-.32},plasma:{k:'g_flare',tz:0,by:.03,mz:-.15,wz:-.44,wx:.1,wy:-.17}};
 let G=null,state='hub',BEAM=null;const SEG=23,WG=new THREE.Group();WG.rotation.order='YXZ';cam.add(WG);
 const aim={down:false,id:null,cx:0,cy:0,hold:0},cov={down:false,id:null},keys={},ndc=new THREE.Vector2(0,0);
+// SRN: punto mirato in coordinate normalizzate usato per orientare la camera (= ndc, tranne col cannocchiale: vedi mirini.js)
+const SRN=new THREE.Vector2(0,0);
 const RC=new THREE.Raycaster(),TV=new V3(),TV2=new V3(),PV=new V3();
