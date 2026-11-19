@@ -1,0 +1,38 @@
+// Settore Zero — involucri e arredi delle sale, sale a L e su più piani
+'use strict';
+/* ===== involucri e arredi procedurali per le sale ===== */
+function roomShell(rg,ci){const m=corrM(ci),g=new THREE.Group(),len=Z0-Z1,n=Math.round(len/2.82),tl=len/n;rg.add(g);
+ for(let i=0;i<n;i++){const z=Z0-(i+.5)*tl;for(const x of[-2.45,2.45]){nsh(P('box',m.f,4.9,.3,tl+.04,x,-.15,z,g));nsh(P('box',m.c,4.9,.3,tl+.04,x,5.65,z,g));}
+  for(const sx of[-1,1]){nsh(P('box',m.w,.3,5.5,tl,sx*5.05,2.75,z,g));nsh(R_(m.r,.16,.6,tl,sx*4.86,1.2,z,g));nsh(P('box',m.e,.05,.05,tl*.8,sx*4.84,.07,z,g));nsh(C_(m.s,.2,tl+.04,sx*4.6,4.7,z,g,'z'));}
+  if(i%2===0){for(const sx of[-1,1])nsh(R_(m.r,.4,5.5,.4,sx*4.72,2.75,z-tl/2,g));nsh(R_(m.r,9.8,.36,.4,0,5.32,z-tl/2,g));}else for(const x of[-2.3,2.3])nsh(P('box',m.e2,1.8,.05,.34,x,5.47,z,g));}
+ for(const zz of[Z0+.15,Z1-.15])nsh(P('box',m.w,10.4,5.6,.3,0,2.75,zz,g));bake(g);g.traverse(o=>{o.raycast=()=>{};});}
+function colonna(st,rg0,m,xr,zr){const rg=new THREE.Group();rg0.add(rg);rg0.add(box(.96,5.5,.96,M.inv,xr,2.75,zr));setTimeout(()=>rg.traverse(o=>{o.raycast=()=>{};}),0);R_(m.w,.9,5.5,.9,xr,2.75,zr,rg).castShadow=true;for(const y of[.25,2.2,5.2])R_(m.r,1.1,.3,1.1,xr,y,zr,rg);for(const a of[[.47,0],[-.47,0],[0,.47],[0,-.47]])nsh(P('box',m.e,.06,2.6,.06,xr+a[0],3.7,zr+a[1],rg));st.obs.push({x:xr,z:zr,hx:.48,hz:.48,h:6});}
+function macchina(st,rg0,m,zr){const rg=new THREE.Group();rg0.add(rg);rg0.add(box(2.3,5.5,2.3,M.inv,0,2.75,zr));setTimeout(()=>rg.traverse(o=>{o.raycast=()=>{};}),0);C_(m.r,2.7,.4,0,.2,zr,rg);C_(m.w,2.1,5.2,0,2.9,zr,rg).castShadow=true;for(const y of[1,2.9,4.8])P('tor',m.s,2.35,2.35,2.4,0,y,zr,rg).rotation.x=Math.PI/2;const c=nsh(C_(m.e,2.16,.7,0,1.95,zr,rg));c.raycast=()=>{};nsh(C_(m.e,2.16,.3,0,3.85,zr,rg)).raycast=()=>{};
+ for(let i=0;i<4;i++){const a=i*1.5708+.785;mCab(rg,m.r,[[Math.cos(a)*1.05,4.6,zr+Math.sin(a)*1.05],[Math.cos(a)*1.7,5,zr+Math.sin(a)*1.7],[Math.cos(a)*2.4,5.45,zr+Math.sin(a)*2.4]],.12);}st.obs.push({x:0,z:zr,hx:1.25,hz:1.25,h:6});}
+/* ===== sale larghe: a L e su più piani ===== */
+POSES.push({x:-3,z:0,th:-.3,i:0,o:1},{x:3,z:0,th:.3,i:0,o:1});
+function wallRun(g,m,ax,az,bx,bz,nx,nz){const len=Math.hypot(bx-ax,bz-az),n=Math.max(1,Math.round(len/2.82)),tl=len/n,alx=Math.abs(bx-ax)>.01;
+ for(let i=0;i<n;i++){const t=(i+.5)/n,x=ax+(bx-ax)*t,z=az+(bz-az)*t;nsh(P('box',m.w,alx?tl:.3,5.5,alx?.3:tl,x-nx*.15,2.75,z-nz*.15,g));nsh(R_(m.r,alx?tl:.16,.6,alx?.16:tl,x+nx*.03,1.2,z+nz*.03,g));nsh(P('box',m.e,alx?tl*.8:.05,.05,alx?.05:tl*.8,x+nx*.12,.07,z+nz*.12,g));
+  if(i%2===0)nsh(R_(m.r,.4,5.5,.4,ax+(bx-ax)*(i/n)+nx*.05,2.75,az+(bz-az)*(i/n)+nz*.05,g));}}
+function wideShell(st,rg){const m=corrM(chI(G.L)),g=new THREE.Group(),x0=st.x0,x1=st.x1,len=Z0-Z1,n=Math.round(len/2.82),tl=len/n,nx=Math.round((x1-x0)/4.7),tw=(x1-x0)/nx,iv=M.inv,mx=(x0+x1)/2,wd=x1-x0+1,mz=(Z0+Z1)/2;rg.add(g);
+ for(let i=0;i<n;i++)for(let j=0;j<nx;j++){const z=Z0-(i+.5)*tl,x=x0+(j+.5)*tw;if(st.carve.some(b=>x>b[0]+.5&&x<b[2]-.5&&z>b[1]+.5&&z<b[3]-.5))continue;nsh(P('box',m.f,tw+.03,.3,tl+.04,x,-.15,z,g));nsh(P('box',m.c,tw+.03,.3,tl+.04,x,5.65,z,g));if((i+j)%2)nsh(P('box',m.e2,1.8,.05,.34,x,5.47,z,g));else nsh(R_(m.r,tw,.3,.36,x,5.34,z,g));}
+ wallRun(g,m,x0,Z0,x0,Z1,1,0);wallRun(g,m,x1,Z0,x1,Z1,-1,0);wallRun(g,m,x0,Z0,x1,Z0,0,-1);wallRun(g,m,x0,Z1,x1,Z1,0,1);
+ for(const b of st.carve){const cx=(b[0]+b[2])/2,cz=(b[1]+b[3])/2,w=b[2]-b[0],d=b[3]-b[1];wallRun(g,m,b[0],b[1],b[0],b[3],-1,0);wallRun(g,m,b[2],b[1],b[2],b[3],1,0);wallRun(g,m,b[0],b[3],b[2],b[3],0,1);wallRun(g,m,b[0],b[1],b[2],b[1],0,-1);st.obs.push({x:cx,z:cz,hx:w/2,hz:d/2,h:6});rg.add(box(w,5.5,d,iv,cx,2.75,cz));}
+ bake(g);g.traverse(o=>{o.raycast=()=>{};});rg.add(box(wd,.3,len+1,iv,mx,-.15,mz),box(wd,.3,len+1,iv,mx,5.65,mz),box(.4,5.5,len+1,iv,x0-.2,2.75,mz),box(.4,5.5,len+1,iv,x1+.2,2.75,mz),box(wd,5.5,.4,iv,mx,2.75,Z0+.2),box(wd,5.5,.4,iv,mx,2.75,Z1-.2));}
+function wideDress(st,rg,L,fz,taken,LZ){const ci=chI(L),m=corrM(ci);for(const lz of LZ)for(const sx of[-1,1])taken.add(sx+'_'+lz);
+ const rail=(xr,zr,y)=>{const cv=box(1.7,1.1,.25,M.hazard,xr,y+.55,zr,1.1);cv.castShadow=true;rg.add(cv);const cq=st.r2c(xr,zr),pr=mkProp(st,'crate',cv,{hp:null,cp:new V3(cq[0],y+.55,cq[1])}),sq=st.r2c(xr,zr-fz*.75);st.slots.push({x:sq[0],z:sq[1],y,cover:pr,used:null,el:1});st.obs.push({x:xr,z:zr,hx:.85,hz:.13,h:y+1});},
+  dec=(wx,sx,zr)=>{if(Math.random()<.25)return;const g=new THREE.Group();g.position.x=wx-sx*4.7;rg.add(g);decor(g,ci,sx,zr);},decZ=(x)=>{const g=new THREE.Group();g.position.set(x,0,Z1+4.7);g.rotation.y=Math.PI/2;rg.add(g);decor(g,ci,1,0);},
+  stack=(x,z,s2)=>{const c=box(1.25,1.25,1.25,rnd(2)?M.mcrate:M.mcrateB,x,.625,z,1);c.castShadow=true;c.rotation.y=rr(-.2,.2);rg.add(c);if(s2){const c2=box(.8,.7,.8,M.mcrate,x+rr(-.1,.1),1.6,z,1);c2.rotation.y=rr(0,1);rg.add(c2);}st.obs.push({x,z,hx:.7,hz:.7,h:s2?1.95:1.25});},
+  chev=(x,y,z,ry,rz,n,dir)=>{const g=new THREE.Group();g.position.set(x,y,z);g.rotation.set(rz?0:-Math.PI/2,ry,0,'YXZ');rg.add(g);for(let i=0;i<n;i++)for(const d of[-1,1]){const c=nsh(P('box',m.e,.12,.7,.04,i*.8,d*.24,0,g));c.rotation.z=-d*.78*(dir||1);c.raycast=()=>{};}};
+ if(st.kind<8){const s=st.kind===6?1:-1,cx=s*6.2,cz=(Z1-21.2)/2,hz=(-21.2-Z1)/2,dk=box(4,1.4,hz*2,m.r,cx,.7,cz,2);dk.castShadow=true;rg.add(dk);rg.add(box(4.1,.12,hz*2+.1,M.hazard,cx,1.42,cz,2));st.obs.push({x:cx,z:cz,hx:2,hz,h:1.4});rail(s*5.3,-21.8,1.4);rail(s*7.1,-23.7,1.4);
+  R_(m.r,.8,5.5,.8,s*3.2,2.75,-11.5,rg).castShadow=true;for(const a of[[.42,0],[-.42,0],[0,.42],[0,-.42]])nsh(P('box',m.e,.07,4.6,.07,s*3.2+a[0],2.6,-11.5+a[1],rg));rg.add(box(1,.5,1,M.hazard,s*3.2,.25,-11.5,1));st.obs.push({x:s*3.2,z:-11.5,hx:.5,hz:.5,h:6});
+  chev(s>0?4.2:-5.8,3.7,Z1+.22,0,1,3,-s);chev(s>0?9:-10.6,3.7,Z1+.22,0,1,3,-s);for(const[x,z,hx,hz]of[[.3,-13.5,.5,-.87],[4,-16.6,.9,-.45],[7.6,-17.6,1,-.1]])chev(s*x,.03,z,Math.atan2(hz,-s*hx),0,2);
+  stack(s*4.6,-16.4,1);stack(s*9.6,-19.6,0);stack(-s*4,-8.2,1);stack(-s*4,-18.6,0);st.spawn=[[s*9.6,-13.8],[s*11.6,-16.2],[s*12.1,-13.4]];
+  for(const zr of LZ){if(Math.abs(zr+8.2)>1.4&&Math.abs(zr+18.6)>1.4)dec(-s*4.7,-s,zr);if(zr>-10.5)dec(s*3.2,s,zr);}for(const zr of[-14,-18,-22])dec(s*13.3,s,zr);decZ(s*9);decZ(s*12.6);}
+ else{const zb=Z1+3.3;rg.add(box(19.2,.3,3.3,m.r,0,3.35,Z1+1.65,3),box(19.2,.16,.12,M.hazard,0,3.5,zb,3));for(const x of[-5.7,-2.8,2.8,5.7])rail(x,zb-.35,3.5);
+  for(const x of[-8.4,-4.3,4.3,8.4]){R_(m.w,.6,3.2,.6,x,1.6,zb-.2,rg).castShadow=true;R_(m.r,.8,.3,.8,x,.15,zb-.2,rg);for(const a of[-.32,.32])nsh(P('box',m.e,.05,2.4,.05,x+a,1.7,zb+.12,rg));st.obs.push({x,z:zb-.2,hx:.3,hz:.3,h:3.2});}
+  for(const s of[-1,1]){const r=box(2,.22,7.4,m.f,s*8.5,1.72,zb+3.4,2);r.rotation.x=Math.atan2(3.5,6.6);r.castShadow=true;rg.add(r);rg.add(box(.12,.9,7,M.hazard,s*7.5,2.2,zb+3.4,2));st.obs.push({x:s*8.5,z:zb+3.3,hx:1.05,hz:3.4,h:1.7});
+   for(const zr of[-2,-6])dec(s*4.7,s,zr);for(const zr of[-10,-14])dec(s*9.6,s,zr);decZ(s*3.4);decZ(s*6.8);stack(s*6.6,-10.2,1);stack(s*5.6,Z1+1.2,0);
+   R_(m.r,.8,5.5,.8,s*4.7,2.75,-8.5,rg).castShadow=true;for(const a of[[.42,0],[-.42,0],[0,.42],[0,-.42]])nsh(P('box',m.e,.07,4.6,.07,s*4.7+a[0],2.6,-8.5+a[1],rg));}
+  const ch=P('tor',m.r,5,5,2.2,0,4.9,-12.5,rg);ch.rotation.x=Math.PI/2;ch.castShadow=false;ch.raycast=()=>{};const ch2=nsh(P('tor',m.e,4.4,4.4,1.2,0,4.86,-12.5,rg));ch2.rotation.x=Math.PI/2;ch2.raycast=()=>{};for(let i=0;i<4;i++){const a=i*1.5708+.785;nsh(C_(m.r,.06,.7,Math.cos(a)*2.4,5.2,-12.5+Math.sin(a)*2.4,rg)).raycast=()=>{};}
+  for(const zz of[-6,-10,-14])for(const sx of[-1,1])nsh(P('box',M.hazard,.14,.02,2.2,sx*1.6,.02,zz,rg)).raycast=()=>{};}}

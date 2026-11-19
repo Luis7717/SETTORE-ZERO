@@ -24,13 +24,19 @@
 - Nemici dietro i muri che non si possono colpire.
 
 ## Struttura tecnica
-- `www/index.html` — tutto il gioco in un solo file (~10 MB):
-  - riga ~148: three.js (minificato) · righe ~150-4280: GLTFLoader / SkeletonUtils
-  - riga ~4281: `const ASSET={...}` — modelli 3D .glb incorporati in base64 (**non aprirla per intero**: è 9,6 MB su una riga)
-  - righe ~4283-fine: codice del gioco (campagna `LV`, nemici `ET`, armi `WT`/`RAR`/`TRAITS`, audio e musica sintetizzati con Web Audio, menu `MENU`/`drawHub`)
-  - Salvataggio in `localStorage` (`load()`/`save()`).
-- `App/main.swift` — involucro iOS: una WKWebView a schermo intero che carica `index.html`.
+- `www/` — il gioco (three.js, JavaScript), caricato nell'ordine scritto in `www/index.html`:
+  - `index.html` — solo struttura della pagina e lista degli script (l'**ordine conta**)
+  - `css/style.css` — stile di menu e HUD
+  - `lib/three.min.js` (three.js), `lib/loaders.js` (GLTFLoader, SkeletonUtils)
+  - `models/*.js` — un modello 3D per file: `ASSET.nome="<glb in base64>";` (**non aprirli**: sono enormi)
+  - `js/*.js` — codice del gioco, script classici (niente moduli) che condividono le variabili globali:
+    `dati` (trama, 45 livelli `LV`, armi `WT`/`RAR`/`TRAITS`, salvataggio `localStorage`), `audio` (suoni e musica sintetizzati),
+    `grafica`, `definizioni` (nemici `ET`, armi), `livelli`, `nemici` (IA), `combattimento`, `comandi` (tocco, slider),
+    `aggiornamento` (ciclo di gioco), `hud`, `colossi` (boss), `modelli`, `corridoi`, `sale`, `menu` (avvio del gioco, va per ultimo)
+  - Attenzione: alcune funzioni sono ridefinite in file successivi (es. `buildRun`, `runHaz`, `escFx` in `corridoi.js`): vale l'ultima.
+- `App/main.swift` — involucro iOS: una WKWebView a schermo intero che carica `index.html` (può leggere tutta la cartella).
 - `App/Info.plist`, icone `AppIcon60x60@2x/3x.png`.
-- `.github/workflows/settore-zero-ipa.yml` — a ogni push su `main` compila con `swiftc` su macOS,
-  firma "ad-hoc", crea `SettoreZero.ipa` e la pubblica nella release `settore-zero-ipa` (non firmata: TrollStore/Sideloadly/AltStore).
-- Per leggere il codice del gioco senza gli asset: `sed -n '4283,$p' www/index.html`.
+- `.github/workflows/settore-zero-ipa.yml` — a ogni push compila con `swiftc` su macOS, copia tutta `www/` nell'app,
+  firma "ad-hoc" e crea `SettoreZero.ipa` (non firmata: TrollStore/Sideloadly/AltStore).
+  Release: da `main` → `settore-zero-ipa`; da un altro branch → `settore-zero-ipa-<branch>` (non tocca quella di main).
+- Per provare in locale: `python -m http.server` dentro `www/` e apri `http://127.0.0.1:8000`.

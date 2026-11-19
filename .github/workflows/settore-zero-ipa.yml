@@ -2,7 +2,7 @@ name: Settore Zero IPA
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
   workflow_dispatch:
 
 permissions:
@@ -29,7 +29,9 @@ jobs:
             App/main.swift -o "$APP/SettoreZero"
           cp App/Info.plist "$APP/Info.plist"
           cp App/AppIcon60x60@2x.png App/AppIcon60x60@3x.png "$APP/"
-          cp www/index.html "$APP/index.html"
+          # tutto il gioco: index.html, css/, lib/, models/, js/
+          cp -R www/. "$APP/"
+          test -f "$APP/index.html"
           printf 'APPL????' > "$APP/PkgInfo"
           codesign --force --sign - --timestamp=none "$APP"
           cd build && zip -qry ../SettoreZero.ipa Payload
@@ -44,9 +46,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view settore-zero-ipa --json assets -q '.assets[].name' 2>/dev/null | grep -q SettoreZero.ipa && [ "$(gh release view settore-zero-ipa --json targetCommitish -q .targetCommitish)" = "${GITHUB_SHA}" ]; then echo "release già aggiornata"; exit 0; fi
-          gh release delete settore-zero-ipa --yes --cleanup-tag || true
-          gh release create settore-zero-ipa SettoreZero.ipa \
-            --title "Settore Zero (IPA)" \
-            --notes "Build automatica dal commit ${GITHUB_SHA}. IPA non firmata: installala con TrollStore, Sideloadly o AltStore." \
-            --target "${GITHUB_SHA}" --prerelease || { sleep 8; gh release view settore-zero-ipa > /dev/null; }
+          # main -> release "settore-zero-ipa"; ogni altro branch ha la sua release separata
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then
+            TAG=settore-zero-ipa; TITLE="Settore Zero (IPA)"
+          else
+            B=$(printf '%s' "${GITHUB_REF_NAME}" | tr -c 'A-Za-z0-9._-' '-')
+            TAG="settore-zero-ipa-${B}"; TITLE="Settore Zero (IPA) — prova branch ${GITHUB_REF_NAME}"
+          fi
+          if gh release view "$TAG" --json assets -q '.assets[].name' 2>/dev/null | grep -q SettoreZero.ipa && [ "$(gh release view "$TAG" --json targetCommitish -q .targetCommitish)" = "${GITHUB_SHA}" ]; then echo "release già aggiornata"; exit 0; fi
+          gh release delete "$TAG" --yes --cleanup-tag || true
+          gh release create "$TAG" SettoreZero.ipa \
+            --title "$TITLE" \
+            --notes "Build automatica dal commit ${GITHUB_SHA} (branch ${GITHUB_REF_NAME}). IPA non firmata: installala con TrollStore, Sideloadly o AltStore." \
+            --target "${GITHUB_SHA}" --prerelease || { sleep 8; gh release view "$TAG" > /dev/null; }
