@@ -60,7 +60,7 @@ export const LESSONS = [
   {
     title: 'Recupera palla',
     short: "Disegna una linea dal tuo giocatore fino all'avversario.",
-    text: "In difesa <b>disegna una linea dai tuoi giocatori</b> (fino a 3 insieme): corrono lungo la strada che tracci. Mandali addosso all'avversario o sulla linea del passaggio per intercettarlo: ogni difensore prende la palla dentro un piccolo raggio, più largo se è bravo in difesa e più stretto se chi passa è bravo nei passaggi.",
+    text: "In difesa <b>disegna una linea dai tuoi giocatori</b> (tutti tranne il portiere): corrono lungo la strada che tracci. Mandali addosso all'avversario o sulla linea del passaggio per intercettarlo: ogni difensore prende la palla dentro un piccolo raggio, più largo se è bravo in difesa e più stretto se chi passa è bravo nei passaggi.",
     setup(m, T, k) {
       const o = m.players[20]; T.put(m, o, [0, -14, 12][k], [6, 10, 2][k]); o.fx = 0; o.fy = -1; m.ball.owner = o; m.ball.kick = null; m.att = 1;
       const me = m.players[7]; T.put(m, me, o.x + 1, o.y - 8); m.ctrl[0] = me;

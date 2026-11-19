@@ -117,7 +117,7 @@ const DEF_DRAW_SLOW = 0.3; // velocità del tempo mentre si disegna una linea di
 const DUEL_SLOW = 0.35; // velocità del tempo durante un duello col difensore
 const HINTS = {
   attack: 'Disegna la strada dal giocatore per correre · linea in porta = tiro',
-  defend: 'Disegna linee dai tuoi giocatori (fino a 3) per chiudere e intercettare · scorri veloce = scivolata',
+  defend: 'Disegna linee dai tuoi giocatori per chiudere e intercettare · scorri veloce = scivolata',
   loose: 'Palla libera: tieni premuto per andarci',
   dive: 'PARA! Tira una linea dal portiere al punto della porta',
   duel: 'Passa a un compagno libero (anello verde) o tocca Dribbling',

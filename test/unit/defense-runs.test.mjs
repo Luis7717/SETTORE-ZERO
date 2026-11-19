@@ -26,14 +26,14 @@ test('in difesa un giocatore corre lungo la linea disegnata da lui', () => {
   assert.equal(m.runOf(d), null, 'linea finita');
 });
 
-test('al massimo tre linee insieme: la quarta sostituisce la più vecchia', () => {
+test('tutti i giocatori di movimento possono avere una linea, il portiere no', () => {
   const { m } = scene();
-  const ps = [2, 3, 4, 5].map(i => m.players[i]);
-  ps.forEach((p, k) => m.userRun(0, p, [{ x: k * 5, y: -20 }]));
-  assert.equal(m.runs[0].length, 3);
-  assert.equal(m.runOf(ps[0]), null, 'la più vecchia è sparita');
-  m.userRun(0, ps[1], [{ x: 0, y: -30 }]);
-  assert.equal(m.runs[0].length, 3, 'una nuova linea dello stesso giocatore sostituisce la sua');
+  const outfield = m.team(0).filter(p => p.pos !== 'P');
+  outfield.forEach((p, k) => assert.equal(m.userRun(0, p, [{ x: -20 + k * 4, y: -20 }]), true));
+  assert.equal(m.runs[0].length, 10);
+  assert.equal(m.userRun(0, m.gk(0), [{ x: 0, y: -40 }]), false, 'il portiere no');
+  m.userRun(0, outfield[1], [{ x: 0, y: -30 }]);
+  assert.equal(m.runs[0].length, 10, 'una nuova linea dello stesso giocatore sostituisce la sua');
 });
 
 test('quando la propria squadra prende palla le linee di difesa si cancellano', () => {

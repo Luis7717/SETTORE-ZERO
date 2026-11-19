@@ -11,7 +11,7 @@ const PREVIEW_COLOR = 0x7dd3ff; // puntini dell'anteprima della traiettoria
 const OFFSIDE_COLOR = 0xff5a5a; // linea del fuorigioco
 const GK_CAM_BACK = 6.5;       // parata: telecamera dietro la propria linea di porta (m)
 const GK_CAM_H = 2.6;          // parata: altezza della telecamera (m)
-const RUN_LINES = 3, RUN_PTS = 64, RUN_COLOR = 0x7dd3ff; // linee di difesa a schermo
+const RUN_LINES = 10, RUN_PTS = 64, RUN_COLOR = 0x7dd3ff; // linee di difesa a schermo
 const DUEL_MATES = 3;           // compagni liberi evidenziati durante un duello
 const DUEL_LOW = 0.42;          // quanto si abbassa la telecamera nel duello (0 = niente, 1 = a terra)
 

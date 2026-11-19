@@ -17,8 +17,7 @@ const SPEED_TIRED = 0.86; // a energia 0 la velocità massima scende a questa fr
 const PATH_STEP = 1.2;   // distanza minima tra due punti della strada disegnata (m)
 const PATH_REACH = 1.3;  // punto raggiunto quando il portatore è più vicino di così (m)
 const PATH_SPRINT = 6;   // scatta finché davanti resta più strada di così (m)
-const PATH_TTL = 20;
-const RUNS_MAX = 3;      // giocatori senza palla con una linea da seguire, al massimo     // durata massima di una strada disegnata (s)
+const PATH_TTL = 20;     // durata massima di una strada disegnata (s)
 export const SPRINT_DIST = 6; // dito più lontano di così dal giocatore controllato (m) = scatto
 
 export class Match {
@@ -521,7 +520,7 @@ export class Match {
     if (mv.i === mv.path.length - 1 && left < PATH_REACH) this.move[T] = null;
   }
   // Difesa: linea disegnata da un proprio giocatore senza palla, che corre lungo quella strada.
-  // Al massimo RUNS_MAX giocatori alla volta: una linea nuova sostituisce la più vecchia (o quella dello stesso giocatore).
+  // Tutti i giocatori di movimento possono avere la loro linea (il portiere no); una nuova linea dello stesso giocatore sostituisce la sua.
   userRun(T, p, pts) {
     const b = this.ball;
     if (!p || p.team !== T || p.off || p.pos === 'P' || b.owner === p || this.phase !== 'play' || !Array.isArray(pts) || !pts.length) return false;
@@ -534,7 +533,6 @@ export class Match {
     if (z && (z.x !== ex || z.y !== ey)) path.push({ x: ex, y: ey }); // l'ultimo punto della linea c'è sempre
     if (!path.length) return false;
     const runs = this.runs[T].filter(r => r.p !== p);
-    while (runs.length >= RUNS_MAX) runs.shift();
     runs.push({ p, path, i: 0, ttl: PATH_TTL });
     this.runs[T] = runs;
     return true;

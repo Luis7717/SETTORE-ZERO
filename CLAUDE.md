@@ -60,7 +60,7 @@
 - **Duello** (portatore a 4,5 m da un difensore davanti): visuale bassa, tempo al 35%, anelli verdi sui compagni liberi.
   Solo qui (e sulle rimesse) si passa: disegna fino al compagno o toccalo; oppure tasto **Dribbling** in basso.
 - Col pallone, scorrimento veloce di lato = finta.
-- Difesa: dito su un proprio giocatore e disegna = linea da seguire (fino a 3 insieme); tratto rapido e corto dal
+- Difesa: dito su un proprio giocatore e disegna = linea da seguire (tutti tranne il portiere); tratto rapido e corto dal
   controllato o scorrimento veloce dal campo = scivolata; tieni premuto sul campo = muovi il controllato. Raggio di
   intercetto = difesa del difensore contro passaggio di chi passa.
 - Portiere: sul tiro la visuale va dietro la propria porta e il tempo rallenta; linea dal portiere al punto della porta,

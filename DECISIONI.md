@@ -225,3 +225,5 @@ restano sui loro rami finché la build su GitHub di questo blocco non è riuscit
    difesa del difensore, −0,008 m per ogni punto di passaggio di chi passa, tra 0,6 e 1,35 m. Vale per tutti (anche il
    computer), quindi l'impronta a seme fisso è stata rigenerata. Diagnosi (12 partite, bot): passaggi riusciti umano 88%,
    computer 94%; gol umano 0,7, computer 0,5.
+
+4. **Correzione di Luis (2026-11-20)**: niente limite di 3 linee: tutti i giocatori di movimento possono avere la loro linea, il portiere no.
