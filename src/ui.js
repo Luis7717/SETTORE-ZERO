@@ -1,11 +1,44 @@
 // Menu e schermate della carriera (HTML sopra la scena 3D).
 import { FORMATIONS } from './sim.js';
+import { UI_CSS } from './ui-style.js';
 import { DIV_NAMES, POS_NAME, KITS, overall, overallAs, value, fmtMoney } from './career.js';
 
 const hex = n => '#' + n.toString(16).padStart(6, '0');
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const STATS = [['vel', 'VEL'], ['tir', 'TIR'], ['pas', 'PAS'], ['dri', 'DRI'], ['dif', 'DIF'], ['fis', 'FIS']];
 const ovrCls = o => (o >= 75 ? 'o4' : o >= 65 ? 'o3' : o >= 55 ? 'o2' : 'o1');
+
+
+let uid = 0;
+const lum = n => { const r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255; return (0.299 * r + 0.587 * g + 0.114 * b) / 255; };
+// stemma originale: scudo con banda diagonale e sigla (colori maglia)
+const crest = (kit, short, cls = '') => {
+  const k = KITS[kit] || KITS[0], id = 'cr' + (++uid), ink = lum(k[1]) > 0.55 ? '#111827' : '#ffffff';
+  return `<svg class="crest ${cls}" viewBox="0 0 40 48" aria-hidden="true"><defs><clipPath id="${id}"><path d="M3 3h34v22c0 11-9 17-17 21C12 42 3 36 3 25z"/></clipPath></defs><g clip-path="url(#${id})"><rect width="40" height="48" fill="${hex(k[1])}"/><path d="M-4 30L44 6v14L-4 44z" fill="${hex(k[2])}" opacity=".9"/></g><path d="M3 3h34v22c0 11-9 17-17 21C12 42 3 36 3 25z" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2"/>${short ? `<text x="20" y="24" text-anchor="middle" font-size="11" font-weight="900" font-family="system-ui,sans-serif" fill="${ink}" stroke="${lum(k[1]) > 0.55 ? '#fff' : '#000'}" stroke-opacity=".35" stroke-width=".6" paint-order="stroke">${esc(short)}</text>` : ''}</svg>`;
+};
+const shirt = k => `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M13 4q7 5 14 0l10 5 4 9-6 3-2-3v18H9V18l-2 3-6-3 4-9z" fill="${hex(k[1])}" stroke="#fff" stroke-opacity=".5" stroke-width="1.4" stroke-linejoin="round"/><path d="M13 4q7 5 14 0" fill="none" stroke="${hex(k[2])}" stroke-width="2.6"/><path d="M1 18l6 3M39 18l-6 3" stroke="${hex(k[2])}" stroke-width="3"/></svg>`;
+const ico = d => `<svg viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+const ICONS = {
+  squad: ico('<path d="M8 3l-5 3 2 4 3-1v11h8V9l3 1 2-4-5-3c-1 2-2 3-4 3S9 5 8 3z"/>'),
+  market: ico('<path d="M4 8h14M14 4l4 4-4 4M20 16H6m4-4l-4 4 4 4"/>'),
+  table: ico('<path d="M5 20V10M12 20V4M19 20v-7"/>'),
+  calendar: ico('<rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/>'),
+  friendly: ico('<circle cx="12" cy="12" r="9"/><path d="M12 8l3.5 2.5-1.3 4h-4.4l-1.3-4z"/>'),
+  vs: ico('<circle cx="8" cy="8" r="3"/><circle cx="16" cy="9" r="3"/><path d="M2.5 20c0-4 2.5-6 5.5-6s5.5 2 5.5 6M14 14.5c.7-.3 1.4-.5 2-.5 3 0 5.5 2 5.5 6"/>'),
+  howto: ico('<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 115 0c0 1.7-2.5 2-2.5 4M12 17h.01"/>'),
+  settings: ico('<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.2"/><circle cx="9" cy="17" r="2.2"/>'),
+};
+const PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5z" fill="currentColor"/></svg>';
+const HOW_ILL = [
+  '<path d="M16 62C28 14 58 14 62 48"/><path d="M52 42l10 8 6-12"/><circle cx="16" cy="62" r="6"/>',
+  '<circle cx="40" cy="40" r="7"/><circle cx="40" cy="40" r="19" opacity=".6"/><circle cx="40" cy="40" r="31" opacity=".3"/>',
+  '<path d="M40 8l25 10v22c0 16-12 26-25 32C27 66 15 56 15 40V18z"/><path d="M28 40l8 8 16-16"/>',
+  '<path d="M14 58L60 26"/><path d="M45 24l17 1-6 16"/><circle cx="14" cy="58" r="5"/>',
+  '<path d="M10 66V22h60v44"/><path d="M10 34h60M30 22v12M50 22v12" opacity=".35"/><circle cx="40" cy="52" r="8"/>',
+];
+const TROPHY = '<svg class="trophy" viewBox="0 0 64 64" aria-hidden="true"><path d="M18 8h28v14c0 9-6 16-14 16s-14-7-14-16z" fill="#ffd93d"/><path d="M18 12H8c0 9 4 14 12 15M46 12h10c0 9-4 14-12 15" fill="none" stroke="#ffd93d" stroke-width="3.5"/><path d="M28 38h8v8h-8z" fill="#e0b412"/><rect x="20" y="46" width="24" height="8" rx="3" fill="#ffd93d"/><path d="M24 14v10" stroke="#fff" stroke-opacity=".5" stroke-width="3" stroke-linecap="round"/></svg>';
+const BALL = '<svg class="ballmark" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="29" fill="#f6f8fc"/><path d="M32 19l11 8-4 13H25l-4-13z" fill="#111827"/><path d="M32 19V6M43 27l13-4M39 40l8 11M25 40l-8 11M21 27L8 23" stroke="#111827" stroke-width="2.4" fill="none" stroke-linecap="round"/><circle cx="32" cy="32" r="29" fill="none" stroke="#ffd93d" stroke-width="3"/></svg>';
+const PITCH = '<svg class="pitch" viewBox="0 0 400 300" aria-hidden="true" fill="none" stroke="#ffffff" stroke-opacity=".12" stroke-width="2"><rect x="20" y="10" width="360" height="280" rx="8"/><path d="M20 150h360"/><circle cx="200" cy="150" r="46"/><rect x="120" y="10" width="160" height="56"/><rect x="120" y="234" width="160" height="56"/></svg>';
 
 export const HOWTO = [
   ['Passaggi e tiri', 'Appoggia il dito sul tuo giocatore con la palla e <b>disegna la traiettoria</b>. Il tempo rallenta mentre disegni. La palla va dove finisce la linea: su un compagno, nello spazio o in porta. Se curvi la linea, la palla gira.'],
@@ -18,21 +51,26 @@ export const HOWTO = [
 export class UI {
   constructor(root, career, api) {
     this.root = root; this.c = career; this.api = api; this.screen = ''; this.sel = null; this.tabDiv = null; this.mfilter = 'T'; this.kit = 0; this.msg = '';
+    if (typeof document !== 'undefined') { const st = document.createElement('style'); st.textContent = UI_CSS; document.head.appendChild(st); }
     root.addEventListener('click', e => {
       const t = e.target.closest('[data-a]'); if (!t) return;
       api.click(); this.act(t.dataset.a, t.dataset.v, t);
     });
   }
   hide() { this.root.style.display = 'none'; this.screen = ''; }
-  show(name, arg) { this.screen = name; this.arg = arg; this.root.style.display = 'block'; this.root.innerHTML = '<div class="scr">' + this[name](arg) + '</div>'; this.root.firstChild.scrollTop = this.keepScroll || 0; this.keepScroll = 0; }
-  redraw() { const sc = this.root.firstChild ? this.root.firstChild.scrollTop : 0; this.keepScroll = sc; this.show(this.screen, this.arg); }
+  show(name, arg) {
+    this.screen = name; this.arg = arg; this.root.style.display = 'block';
+    const s = this.c.s, k = s ? KITS[s.kit] : KITS[this.kit]; if (k) { this.root.style.setProperty('--k1', hex(k[1])); this.root.style.setProperty('--k2', hex(k[2])); }
+    const fresh = !this.quiet; this.quiet = false;
+    this.root.innerHTML = '<div class="scr' + (fresh ? ' in' : '') + '">' + this[name](arg) + '</div>'; this.root.firstChild.scrollTop = this.keepScroll || 0; this.keepScroll = 0; }
+  redraw() { this.quiet = true; const sc = this.root.firstChild ? this.root.firstChild.scrollTop : 0; this.keepScroll = sc; this.show(this.screen, this.arg); }
   toast(m) { this.msg = m; this.redraw(); this.msg = ''; }
 
   act(a, v, el) {
     const c = this.c, s = c.s;
     switch (a) {
       case 'go': this.sel = null; this.show(v); break;
-      case 'kit': this.kit = +v; this.nameVal = this.root.querySelector('#club') ? this.root.querySelector('#club').value : ''; this.show('title', 'new'); break;
+      case 'kit': this.quiet = true; this.kit = +v; this.nameVal = this.root.querySelector('#club') ? this.root.querySelector('#club').value : ''; this.show('title', 'new'); break;
       case 'new': this.show('title', 'new'); break;
       case 'create': { const n = (this.root.querySelector('#club').value || '').trim().slice(0, 18) || 'FC Tiro a Giro'; c.create(n, this.kit); this.show('howto', 0); break; }
       case 'howto': if (+v >= HOWTO.length) this.show('hub'); else this.show('howto', +v); break;
@@ -56,32 +94,28 @@ export class UI {
   // ------------------------------------------------ schermate
   title(mode) {
     const has = !!this.c.s;
-    if (mode !== 'new' && has) return `<div class="hero"><div class="logo">TIRO<span>A</span>GIRO</div><p class="sub">Disegna la giocata. Vinci il campionato.</p></div>
+    if (mode !== 'new' && has) return `<div class="hero">${PITCH}${BALL}<div class="logo">TIRO<span>A</span>GIRO</div><p class="sub">Disegna la giocata. Vinci il campionato.</p><div class="claim"><i>CAMPIONATO</i><i>MERCATO</i><i>A UN DITO</i></div></div>
       <button class="btn big" data-a="continue">Continua carriera</button><button class="btn ghost" data-a="new">Nuova carriera</button>`;
-    return `<div class="hero small"><div class="logo">TIRO<span>A</span>GIRO</div></div>
-      <div class="card"><label>Nome della tua squadra</label><input id="club" maxlength="18" placeholder="es. Atletico Sole" value="${esc(this.nameVal || '')}">
-      <label>Colori</label><div class="kits">${KITS.map((k, i) => `<div class="kit ${i === this.kit ? 'on' : ''}" data-a="kit" data-v="${i}" style="background:linear-gradient(135deg,${hex(k[1])} 60%,${hex(k[2])} 60%)"></div>`).join('')}</div></div>
+    return `<div class="hero small">${PITCH}${BALL}<div class="logo">TIRO<span>A</span>GIRO</div></div>
+      <div class="card"><div class="newhead">${crest(this.kit, '')}<div class="dim">Crea la tua squadra e parti dalla Terza Divisione.</div></div>
+      <label>Nome della tua squadra</label><input id="club" maxlength="18" placeholder="es. Atletico Sole" value="${esc(this.nameVal || '')}" autocomplete="off">
+      <label>Colori <b>${KITS[this.kit][0]}</b></label><div class="kits">${KITS.map((k, i) => `<div class="kit ${i === this.kit ? 'on' : ''}" data-a="kit" data-v="${i}" role="button" aria-label="${k[0]}">${shirt(k)}</div>`).join('')}</div></div>
       <button class="btn big" data-a="create">Inizia dalla Terza Divisione</button>${has ? '<button class="btn ghost" data-a="continue">Annulla</button><p class="note">Una nuova carriera sostituisce quella salvata.</p>' : ''}`;
   }
 
-  head(title, back = 'hub') { return `<div class="top"><button class="back" data-a="go" data-v="${back}">‹</button><h2>${title}</h2><div class="money">${fmtMoney(this.c.s.money)}</div></div>${this.msg ? `<div class="flash">${esc(this.msg)}</div>` : ''}`; }
+  head(title, back = 'hub') { const k = this.c.s.kit; return `<div class="top"><button class="back" data-a="go" data-v="${back}" aria-label="Indietro">‹</button><h2>${title}</h2><div class="money">${fmtMoney(this.c.s.money)}</div></div>${this.msg ? `<div class="flash">${esc(this.msg)}</div>` : ''}`; }
 
   hub() {
     const c = this.c, s = c.s, nm = c.nextMatch(), d = c.div(), tab = c.table(d), pos = tab.findIndex(t => t.id === 'me') + 1;
-    const kit = KITS[s.kit];
-    return `<div class="clubbar"><div class="crest" style="background:linear-gradient(135deg,${hex(kit[1])} 55%,${hex(kit[2])} 55%)"></div><div><h1>${esc(s.club)}</h1><div class="dim">${DIV_NAMES[d]} · Stagione ${s.season} · ${pos}° posto</div></div><div class="money">${fmtMoney(s.money)}</div></div>
-    ${nm ? `<div class="card next"><div class="dim">Giornata ${nm.day} di 18 · ${nm.home ? 'in casa' : 'in trasferta'}</div>
-      <div class="vs"><div><b>${esc(s.club)}</b><span>forza ${c.myRating()}</span></div><i>vs</i><div><b>${esc(nm.opp.name)}</b><span>forza ${nm.opp.rating}</span></div></div>
-      <button class="btn big" data-a="play">GIOCA</button></div>` : ''}
-    ${s.last ? `<div class="last dim">Ultima: ${esc(s.club)} ${s.last.my} – ${s.last.op} ${esc(s.last.opp)}</div>` : ''}
-    <div class="grid"><button class="tile" data-a="go" data-v="squad"><b>Rosa</b><span>Formazione e titolari</span></button>
-    <button class="tile" data-a="go" data-v="market"><b>Mercato</b><span>Compra e vendi</span></button>
-    <button class="tile" data-a="go" data-v="table"><b>Classifica</b><span>${pos}° su 10</span></button>
-    <button class="tile" data-a="go" data-v="calendar"><b>Calendario</b><span>Risultati e prossime</span></button>
-    <button class="tile" data-a="go" data-v="friendly"><b>Amichevole</b><span>Allenati senza rischi</span></button>
-    <button class="tile" data-a="go" data-v="vsfriend"><b>1 contro 1</b><span>Sfida un amico</span></button>
-    <button class="tile" data-a="howto" data-v="0"><b>Come si gioca</b><span>I comandi</span></button>
-    <button class="tile" data-a="go" data-v="settings"><b>Impostazioni</b><span>Durata, difficoltà</span></button></div>`;
+    const tile = (a, v, ic, t, sub) => `<button class="tile" data-a="${a}" data-v="${v}"><span class="ic">${ICONS[ic]}</span><b>${t}</b><span>${sub}</span></button>`;
+    const me = s.teams.me, last = s.last ? (s.last.my > s.last.op ? 'w' : s.last.my < s.last.op ? 'l' : 'd') : '';
+    return `<div class="clubbar">${crest(s.kit, me.short)}<div><h1>${esc(s.club)}</h1><div class="dim">${DIV_NAMES[d]} · Stagione ${s.season} · <b style="color:var(--gold)">${pos}°</b> posto</div></div></div>
+    ${nm ? `<div class="card next"><div class="nx-top"><span class="lbl">Giornata ${nm.day} di 18</span><span class="pill ${nm.home ? 'gold' : ''}">${nm.home ? 'In casa' : 'In trasferta'}</span></div>
+      <div class="vs"><div>${crest(s.kit, me.short, 'lg')}<b>${esc(s.club)}</b><span>forza <em>${c.myRating()}</em></span></div><i>VS</i><div>${crest(nm.opp.kit, nm.opp.short, 'lg')}<b>${esc(nm.opp.name)}</b><span>forza <em>${nm.opp.rating}</em></span></div></div>
+      <div class="prog"><i style="width:${Math.round((nm.day - 1) / 18 * 100)}%"></i></div>
+      <button class="btn big play" data-a="play">${PLAY}Gioca</button></div>` : ''}
+    ${s.last ? `<div class="last"><span class="wl ${last}">${last === 'w' ? 'V' : last === 'l' ? 'S' : 'P'}</span><span>Ultima: ${esc(s.club)} <b style="color:var(--txt)">${s.last.my} – ${s.last.op}</b> ${esc(s.last.opp)}</span></div>` : ''}
+    <div class="grid">${tile('go', 'squad', 'squad', 'Rosa', 'Formazione e titolari')}${tile('go', 'market', 'market', 'Mercato', 'Compra e vendi')}${tile('go', 'table', 'table', 'Classifica', pos + '° su 10')}${tile('go', 'calendar', 'calendar', 'Calendario', 'Risultati e prossime')}${tile('go', 'friendly', 'friendly', 'Amichevole', 'Allenati senza rischi')}${tile('go', 'vsfriend', 'vs', '1 contro 1', 'Sfida un amico')}${tile('howto', 0, 'howto', 'Come si gioca', 'I comandi')}${tile('go', 'settings', 'settings', 'Impostazioni', 'Durata, difficoltà')}</div>`;
   }
 
   prow(p, slotPos, extra = '') {
@@ -90,13 +124,13 @@ export class UI {
   }
   pcard(p, btn) {
     return `<div class="pcard"><div class="pc1"><b>${esc(p.name)}</b><span>${POS_NAME[p.pos]} · ${p.age} anni · valore ${fmtMoney(value(p))}${p.apps !== undefined && p.apps > 0 ? ` · ${p.apps} pres. ${p.goals} gol` : ''}</span></div>
-      <div class="stats">${(p.pos === 'P' ? [['por', 'POR'], ['pas', 'PAS'], ['fis', 'FIS'], ['vel', 'VEL']] : STATS).map(([k, n]) => `<div><i>${n}</i><b class="${ovrCls(p[k])}">${p[k]}</b></div>`).join('')}</div>${btn || ''}</div>`;
+      <div class="stats">${(p.pos === 'P' ? [['por', 'POR'], ['pas', 'PAS'], ['fis', 'FIS'], ['vel', 'VEL']] : STATS).map(([k, n]) => `<div class="${ovrCls(p[k])}"><i>${n}</i><b>${p[k]}</b><u style="--w:${Math.max(6, Math.min(100, p[k]))}%"></u></div>`).join('')}</div>${btn || ''}</div>`;
   }
 
   squad() {
     const c = this.c, s = c.s, F = FORMATIONS[s.formation], sp = this.sel !== null ? c.player(this.sel) : null;
     return this.head('Rosa') + `<div class="chips">${Object.keys(FORMATIONS).map(f => `<button class="chip ${f === s.formation ? 'on' : ''}" data-a="form" data-v="${f}">${f}</button>`).join('')}<button class="chip" data-a="auto">Migliori 11</button></div>
-    <p class="note">Tocca due giocatori per scambiarli. Forza della squadra: <b>${c.myRating()}</b></p>
+    <p class="note">Tocca due giocatori per scambiarli. Forza della squadra: <b style="color:var(--gold)">${c.myRating()}</b></p>
     ${sp ? this.pcard(sp, `<button class="btn ghost sm" data-a="sell" data-v="${sp.id}">Vendi per ${fmtMoney(c.sellPrice(sp))}</button>`) : ''}
     <h3>Titolari</h3>${s.lineup.map((id, i) => this.prow(c.player(id), F[i][0])).join('')}
     <h3>Panchina</h3>${c.bench().sort((a, b) => 'PDCA'.indexOf(a.pos) - 'PDCA'.indexOf(b.pos) || overall(b) - overall(a)).map(p => this.prow(p)).join('')}`;
@@ -113,8 +147,9 @@ export class UI {
   table() {
     const c = this.c, d = this.tabDiv === null ? c.div() : this.tabDiv, t = c.table(d);
     return this.head('Classifica') + `<div class="chips">${DIV_NAMES.map((n, i) => `<button class="chip ${i === d ? 'on' : ''}" data-a="tab" data-v="${i}">${n.split(' ')[0]}</button>`).join('')}</div>
-    <table class="tbl"><tr><th></th><th class="l">Squadra</th><th>G</th><th>V</th><th>N</th><th>P</th><th>DR</th><th>Pt</th></tr>
-    ${t.map((r, i) => `<tr class="${r.id === 'me' ? 'me' : ''} ${i < 2 && d > 0 ? 'up' : ''} ${i >= 8 && d < 2 ? 'dn' : ''} ${i === 0 && d === 0 ? 'up' : ''}"><td>${i + 1}</td><td class="l">${esc(c.team(r.id).name)}</td><td>${r.p}</td><td>${r.w}</td><td>${r.d}</td><td>${r.l}</td><td>${r.gf - r.ga > 0 ? '+' : ''}${r.gf - r.ga}</td><td><b>${r.pts}</b></td></tr>`).join('')}</table>
+    <table class="tbl"><tr><th></th><th class="l">SQUADRA</th><th>G</th><th>V</th><th>N</th><th>P</th><th>DR</th><th>PT</th></tr>
+    ${t.map((r, i) => { const tm = c.team(r.id), k = KITS[tm.kit] || KITS[0], dr = r.gf - r.ga; return `<tr class="${r.id === 'me' ? 'me' : ''} ${i < 2 && d > 0 ? 'up' : ''} ${i >= 8 && d < 2 ? 'dn' : ''} ${i === 0 && d === 0 ? 'up' : ''}"><td>${i + 1}</td><td class="l"><span><b style="background:linear-gradient(135deg,${hex(k[1])} 55%,${hex(k[2])} 55%)"></b><em>${esc(tm.name)}</em></span></td><td>${r.p}</td><td>${r.w}</td><td>${r.d}</td><td>${r.l}</td><td>${dr > 0 ? '+' : ''}${dr}</td><td><b>${r.pts}</b></td></tr>`; }).join('')}</table>
+    <div class="legend">${d > 0 || d === 0 ? `<span><i style="background:var(--good)"></i>${d > 0 ? 'Promozione' : 'Titolo'}</span>` : ''}${d < 2 ? '<span><i style="background:var(--bad)"></i>Retrocessione</span>' : ''}</div>
     <p class="note">${d > 0 ? 'Le prime due salgono di divisione. ' : 'La prima vince il titolo. '}${d < 2 ? 'Le ultime due retrocedono.' : ''}</p>`;
   }
 
@@ -122,13 +157,14 @@ export class UI {
     const c = this.c, s = c.s, d = c.div();
     return this.head('Calendario') + s.fix[d].map((round, i) => {
       const m = round.find(x => x[0] === 'me' || x[1] === 'me'), home = m[0] === 'me', opp = c.team(home ? m[1] : m[0]), r = (s.res || [])[i];
-      return `<div class="prow ${i === s.day ? 'sel' : ''}"><span class="pos">${i + 1}</span><span class="pn">${home ? 'Casa' : 'Fuori'} · ${esc(opp.name)}</span><span class="age">forza ${opp.rating}</span><span class="ovr ${r ? (r[0] > r[1] ? 'o4' : r[0] < r[1] ? 'bad' : 'o2') : ''}">${r ? r[0] + '–' + r[1] : ''}</span></div>`;
+      return `<div class="prow ${i === s.day ? 'sel' : ''}"><span class="cal">${i + 1}</span><span class="pn">${home ? 'Casa' : 'Fuori'} · ${esc(opp.name)}</span><span class="age">forza ${opp.rating}</span><span class="ovr ${r ? (r[0] > r[1] ? 'o3' : r[0] < r[1] ? 'bad' : 'o2') : ''}" style="min-width:52px">${r ? r[0] + '–' + r[1] : '·'}</span></div>`;
     }).join('');
   }
 
   friendly() {
+    const opt = (v, n, lv) => `<button class="btn opp" data-a="friendly" data-v="${v}"><span>${n}</span><span class="lv">${[1, 2, 3].map(i => `<i class="${i <= lv ? 'on' : ''}"></i>`).join('')}</span></button>`;
     return this.head('Amichevole') + `<p class="note">Partita di prova: non conta per il campionato e non cambia i soldi.</p>
-    <button class="btn" data-a="friendly" data-v="46">Avversario facile</button><button class="btn" data-a="friendly" data-v="58">Avversario medio</button><button class="btn" data-a="friendly" data-v="72">Avversario forte</button>`;
+    ${opt(46, 'Avversario facile', 1)}${opt(58, 'Avversario medio', 2)}${opt(72, 'Avversario forte', 3)}`;
   }
   vsfriend() {
     return this.head('1 contro 1') + `<div class="card"><p>La sfida tra due iPhone vicini (senza internet) arriva con il prossimo aggiornamento.</p><p class="dim">Il motore di gioco è già pronto per due giocatori: manca il collegamento tra i telefoni.</p></div>`;
@@ -145,15 +181,15 @@ export class UI {
 
   howto(i) {
     const [t, x] = HOWTO[i];
-    return `<div class="how"><div class="dim">${i + 1} / ${HOWTO.length}</div><h1>${t}</h1><p>${x}</p><button class="btn big" data-a="howto" data-v="${i + 1}">${i + 1 < HOWTO.length ? 'Avanti' : 'Ho capito'}</button>${this.c.s ? '<button class="btn ghost" data-a="go" data-v="hub">Salta</button>' : ''}</div>`;
+    return `<div class="how"><div class="stepbar"><div class="dots">${HOWTO.map((_, n) => `<i class="${n === i ? 'on' : ''}"></i>`).join('')}</div><div class="dim">${i + 1} / ${HOWTO.length}</div></div><div class="ill"><svg viewBox="0 0 80 80">${HOW_ILL[i]}</svg></div><h1>${t}</h1><p>${x}</p><button class="btn big" data-a="howto" data-v="${i + 1}">${i + 1 < HOWTO.length ? 'Avanti' : 'Ho capito'}</button>${this.c.s ? '<button class="btn ghost" data-a="go" data-v="hub">Salta</button>' : ''}</div>`;
   }
 
   // dopo la partita
   post(r) {
-    const s = this.c.s, m = r.m;
+    const s = this.c.s, m = r.m, vd = m.score[0] > m.score[1] ? ['w', 'VITTORIA'] : m.score[0] < m.score[1] ? ['l', 'SCONFITTA'] : ['d', 'PAREGGIO'];
     const sc = m.goalsLog.map(g => `<div class="${g.team === 0 ? 'gl' : 'gr'}">${g.team === 0 ? `${esc(g.name)} ${g.minute}'` : `${g.minute}' ${esc(g.name)}`}</div>`).join('');
-    const st = (n, a, b) => `<div class="st"><b>${a}</b><span>${n}</span><b>${b}</b></div>`, ps = m.stats.poss[0] + m.stats.poss[1] || 1;
-    return `<div class="res"><div class="dim">${r.title}</div><div class="score"><span>${esc(m.teams[0].short)}</span><b>${m.score[0]} – ${m.score[1]}</b><span>${esc(m.teams[1].short)}</span></div><div class="scorers">${sc}</div>
+    const st = (n, a, b) => { const fa = parseFloat(a) || 0, fb = parseFloat(b) || 0; return `<div class="st"><b>${a}</b><span>${n}</span><b>${b}</b><div class="bar"><i style="--f:${fa || (fb ? 0.01 : 1)}"></i><i style="--f:${fb || (fa ? 0.01 : 1)}"></i></div></div>`; }, ps = m.stats.poss[0] + m.stats.poss[1] || 1;
+    return `<div class="res"><div class="dim">${r.title}</div><div class="scoreboard"><div class="score"><span>${esc(m.teams[0].short)}</span><b>${m.score[0]} – ${m.score[1]}</b><span>${esc(m.teams[1].short)}</span></div><div class="verdict ${vd[0]}">${vd[1]}</div><div class="scorers">${sc}</div></div>
     ${st('Tiri', m.stats.shots[0], m.stats.shots[1])}${st('In porta', m.stats.onT[0], m.stats.onT[1])}${st('Possesso', Math.round(m.stats.poss[0] / ps * 100) + '%', Math.round(m.stats.poss[1] / ps * 100) + '%')}${st('Angoli', m.stats.corners[0], m.stats.corners[1])}${st('Falli', m.stats.fouls[0], m.stats.fouls[1])}</div>
     ${r.res ? `<div class="card"><div class="st"><span>Incasso partita</span><b class="good">+${fmtMoney(r.res.income)}</b></div><div class="st"><span>Stipendi</span><b class="bad">−${fmtMoney(r.res.wages)}</b></div><div class="st"><span>Cassa</span><b>${fmtMoney(s.money)}</b></div>
       ${r.res.grown.length ? `<p class="note">Migliorati: ${r.res.grown.map(esc).join(', ')}</p>` : ''}
@@ -162,6 +198,6 @@ export class UI {
   }
   season(r) {
     const t = r.outcome === 'up' ? 'PROMOSSI!' : r.outcome === 'down' ? 'Retrocessi' : r.outcome === 'champ' ? 'CAMPIONI!' : 'Stagione finita';
-    return `<div class="how"><h1>${t}</h1><p>Hai chiuso al <b>${r.pos}° posto</b> in ${DIV_NAMES[r.div]}.</p><p>Premio di fine stagione: <b>${fmtMoney(r.prize + r.bonus)}</b></p><p>La prossima stagione giochi in <b>${DIV_NAMES[r.newDiv]}</b>. I giocatori hanno un anno in più: controlla la rosa e il mercato.</p><button class="btn big" data-a="continue">Avanti</button></div>`;
+    return `<div class="how season">${r.outcome === 'down' ? '' : TROPHY}<h1>${t}</h1><p>Hai chiuso al <b>${r.pos}° posto</b> in ${DIV_NAMES[r.div]}.</p><p>Premio di fine stagione: <b>${fmtMoney(r.prize + r.bonus)}</b></p><p>La prossima stagione giochi in <b>${DIV_NAMES[r.newDiv]}</b>. I giocatori hanno un anno in più: controlla la rosa e il mercato.</p><button class="btn big" data-a="continue">Avanti</button></div>`;
   }
 }
