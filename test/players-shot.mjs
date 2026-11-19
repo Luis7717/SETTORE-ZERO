@@ -1,5 +1,5 @@
 // Prova a schermo dei giocatori 3D (Puppeteer, iPhone 390×844, servito via http come nell'app).
-// Schermate: calcio d'inizio, azione in corsa, tiro, scivolata, tuffo del portiere, esultanza, primo piano.
+// Schermate: calcio d'inizio, azione in corsa, tiro, scivolata, tuffo del portiere, esultanza, primo piano, schiena (numero e cognome).
 // Stampa draw call e triangoli (scena intera e solo giocatori) e fps medi su 5 s di gioco.
 // Uso: npm run build && node test/players-shot.mjs shots          (con il modello)
 //      node test/players-shot.mjs shots --senza-modello             (il file del modello risponde 404: figure a box)
@@ -41,6 +41,8 @@ const measure = () => p.evaluate(() => {
   return { calls: all.calls, tri: all.tri, plCalls: pl.calls, plTri: pl.tri };
 });
 const stats = await measure();
+// tempo per creare le 22 figure (texture dipinte e geometrie): quanto pesa all'ingresso in partita
+const setMs = await p.evaluate(() => { const v = window.__view, t0 = performance.now(); v.setMatch(window.__G.match, 0); return performance.now() - t0; });
 
 // azione: la squadra avversaria ha palla a centrocampo, tutti corrono
 await p.evaluate(() => {
@@ -108,10 +110,14 @@ await p.evaluate(() => {
   v.update = () => {}; v.cam.position.set(0.5, 1.6, 5.5); v.cam.lookAt(0.5, 1.1, 0); v.render();
 });
 await wait(300); await snap('7-primo-piano');
+// da dietro: cognome e numero sulla schiena, stemma degli altri
+await p.evaluate(() => { const v = window.__view, q = window.__G.match.players[9], s = v.flip, x = s * q.x, z = -s * q.y, yaw = v.figs[9].g.rotation.y; v.cam.position.set(x - Math.sin(yaw) * 3.4 + 0.6, 2.0, z - Math.cos(yaw) * 3.4); v.cam.lookAt(x, 1.3, z); v.render(); });
+await wait(200); await snap('8-schiena');
 
 console.log(`modello 3D in uso: ${model ? 'sì' : 'no (figure a box)'}`);
 for (const [n, x] of [['calcio d\'inizio', stats], ['azione', run]])
   console.log(`${n}: scena ${x.calls} draw call, ${x.tri} triangoli · giocatori ${x.plCalls} draw call, ${x.plTri} triangoli`);
+console.log(`creazione delle 22 figure: ${setMs.toFixed(0)} ms`);
 console.log(`view.update: ${updMs.toFixed(2)} ms a fotogramma (JavaScript)`);
 console.log(`fps medi su 5 s: ${fps.toFixed(1)} (Chrome headless con SwiftShader, solo per confronto)`);
 console.log(errs.join('\n') || 'nessun errore');

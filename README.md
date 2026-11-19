@@ -6,7 +6,8 @@ con la tua squadra: campionato a tre divisioni, rosa, mercato.
 
 - `www/index.html` — codice e menu del gioco (offline); `www/assets/` — modelli, texture e audio caricati a pezzi
 - `src/` — sorgenti: `sim.js` motore partita, `render.js` grafica 3D, `input.js` comandi,
-  `career.js` campionato e mercato, `ui.js` menu, `main.js` collegamento
+  `career.js` campionato e mercato, `ui.js` menu, `editor.js` editor di stemma e campione,
+  `looks.js` aspetto dei giocatori e stile della divisa, `crest.js` stemmi, `main.js` collegamento
 - `build.mjs` — ricostruisce `www/` dai sorgenti (`npm install` e poi `npm run build`);
   `npm run build:single` crea `dist/tiro-a-giro.html`, una versione a file unico solo per provarla nel browser
 - `App/` — involucro iOS (WKWebView a schermo intero che serve `www/` su `app://`), icona e Info.plist
@@ -29,7 +30,10 @@ Sideloadly o AltStore.
 ## Note
 
 Squadre, giocatori e sponsor sono inventati. Grafica 3D con three.js (licenza MIT).
-Modello dei giocatori: Kenney, "Animated Characters: Protagonists" (CC0, https://kenney.nl).
+Modello dei giocatori: Kenney, "Animated Characters: Protagonists" (CC0, https://kenney.nl). Capelli, viso, maglie,
+numeri e stemmi sono disegnati dal codice del gioco (`src/players3d.js`, `src/crest.js`): niente file in più.
+All'inizio di una carriera si sceglie lo stemma della squadra e si crea il proprio campione (viso, occhi, capelli, divisa);
+l'aspetto di ogni giocatore si cambia dalla Rosa ("Aspetto"), stile della divisa e stemma dalle Impostazioni.
 Suoni: Freesound, tutti CC0 (autori e link in `assets/CREDITI.md`).
 
 ## Scarica

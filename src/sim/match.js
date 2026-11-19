@@ -3,6 +3,7 @@ import { W, L, HW, HL, GW, GH, BOX_W, BOX_D, SIX_W, SIX_D, PEN_D, CIRCLE, G, ROL
 import { AIMethods } from './ai.js';
 import { MotionMethods } from './motion.js';
 import { DuelMethods } from './duel.js';
+import { lookOf } from '../looks.js';
 
 const PREVIEW_SEC = 2.4; // durata massima dell'anteprima della traiettoria (s)
 const SHOT_V0 = 22; // velocità base del tiro (m/s), più la bravura del tiratore
@@ -52,9 +53,13 @@ export class Match {
       x: 0, y: 0, vx: 0, vy: 0, fx: 0, fy: dir, tx: 0, ty: 0, spdF: 1, state: 'play', t: 0, stun: 0, protect: 0,
       contact: 0, tackleCd: 0, kickAnim: 0, energy: 1, sprint: false, feintCd: 0, dribCd: 0, wear: { dri: 1, tes: 1 }, wall: null, yellow: 0, off: false, sdx: 0, sdy: 0, hit: false,
       dive: null, phase: this.rnd() * 6, aiT: 0, dx: 0, dy: 0, reactT: 0, decided: true, warn: false,
-      sox: 0, soy: 0, soT: this.rnd(), cele: 0, look: Math.floor(this.rnd() * 1000),
+      sox: 0, soy: 0, soT: this.rnd(), cele: 0, look: this.lookFor(src),
     };
   }
+
+  // aspetto del giocatore sorgente (stesso a ogni partita); il numero casuale si consuma lo stesso,
+  // così le partite a seme fisso restano identiche a prima (test/unit/golden.test.mjs)
+  lookFor(src) { this.rnd(); return lookOf(src); }
 
   team(t) { return t ? this.players.slice(11) : this.players.slice(0, 11); }
   gk(t) { return this.players[t * 11]; }
@@ -606,7 +611,7 @@ export class Match {
   }
   substitute(T, idx, src) {
     const p = this.team(T)[idx]; if (!p || p.off) return false;
-    p.src = src; p.name = src.name; p.st = effStats(src, p.pos); p.energy = 1; p.wear = { dri: 1, tes: 1 }; p.dribCd = 0; p.yellow = 0; p.look = Math.floor(this.rnd() * 1000);
+    p.src = src; p.name = src.name; p.st = effStats(src, p.pos); p.energy = 1; p.wear = { dri: 1, tes: 1 }; p.dribCd = 0; p.yellow = 0; p.look = this.lookFor(src);
     if (this.duel && (this.duel.p === p || this.duel.o === p)) this.endDuel('gioco fermo');
     this.ev('sub', { p }); return true;
   }

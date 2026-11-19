@@ -18,3 +18,6 @@ li citiamo lo stesso). Sono le anteprime MP3 di Freesound, ritagliate senza rico
 | File | Origine | Autore | Licenza | Lavorazione |
 |------|---------|--------|---------|-------------|
 | models/player.glb | Kenney "Animated Characters 1" (ora "Animated Characters: Protagonists"), https://kenney.nl/assets/animated-characters-protagonists | Kenney (www.kenney.nl) | **CC0 1.0** (pubblico dominio) | `characterMedium.fbx` + clip `idle`, `run`, `jump` convertiti in glTF con FBX2glTF (pacchetto npm `fbx2gltf`), uniti in un solo file con gltf-transform, semplificati da 1604 a 720 triangoli (meshoptimizer); texture di partenza `skaterMaleA.png` (il gioco ne usa la testa e ridipinge maglia, pantaloncini, calzettoni e scarpe coi colori delle squadre, `src/players3d.js`) |
+
+Capelli (mesh agganciata all'osso della testa), viso, maglie, numeri e stemmi non vengono da file esterni: li genera e
+li dipinge il codice del gioco (`src/players3d.js`, `src/crest.js`), disegni originali.

@@ -227,3 +227,47 @@ restano sui loro rami finché la build su GitHub di questo blocco non è riuscit
    computer 94%; gol umano 0,7, computer 0,5.
 
 4. **Correzione di Luis (2026-11-20)**: niente limite di 3 linee: tutti i giocatori di movimento possono avere la loro linea, il portiere no.
+
+## Editor e dettaglio giocatori — 2026-11-20
+
+Richiesta di Luis: giocatori molto più dettagliati, editor all'inizio (occhi e colore, tagli di capelli, stile della
+maglia, maniche, calzettoni…), poi nome e numero sulla schiena e uno stemma inventato per ogni squadra con il suo editor.
+
+1. **Modello**: resta il Kenney "Animated Characters: Protagonists" (CC0) già nel gioco (`assets/models/player.glb`,
+   124 KB, 720 triangoli). La versione non semplificata (1.604 triangoli) non si è potuta scaricare: il sito di Kenney dà il
+   file solo da una sessione del browser. Il dettaglio in più viene da:
+   - **capelli veri**: una calotta generata dal codice attorno alla testa (raggi dal centro della testa contro i suoi
+     triangoli, più lo spessore del taglio), agganciata all'osso `Head` e **fusa nella stessa geometria** del corpo:
+     resta **1 draw call per giocatore**. 17 tagli (calvo e rasato solo dipinti; coda e chignon con un pezzo in più).
+     Da 720 a 1.380 triangoli per giocatore (il più pesante: "Lunghi"). Geometrie in cache per taglio e vestibilità.
+   - **texture 512×512 per giocatore** (era 256 condivisa): viso con occhi (6 forme, 7 colori, iride, pupilla, riflesso),
+     sopracciglia (6), barba (7), naso, bocca, orecchie, cute sotto i capelli con attaccatura morbida che segue il taglio;
+     maglia con motivo, colletto, maniche, stemma sul petto, **cognome e numero sulla schiena**; pantaloncini con banda,
+     calzettoni bassi/alti/ripiegati, scarpe colorate con fascia, guanti per il portiere. Nell'editor la texture è 1024.
+   - **maglia larga o aderente**: il busto si gonfia o si stringe un poco lungo le normali (geometria a parte in cache).
+2. **Aspetto persistente**: `p.look = { skin, hair, hairColor, eyes, eyeColor, brows, beard, boots }` (indici in
+   `src/looks.js`). Senza `look` (salvataggi vecchi, mercato, demo) l'aspetto si calcola da id e nome, sempre uguale, e
+   **non si scrive** nel salvataggio. Il motore (`Match.lookFor`) usa l'aspetto del giocatore sorgente e consuma lo stesso
+   numero casuale di prima: l'impronta a seme fisso non cambia. Avversari: aspetto dal seme della squadra.
+3. **Stile della divisa** (`s.kitStyle`): maglia aderente/larga, maniche corte/lunghe/senza, colletto girocollo/a V/polo,
+   motivo tinta unita/righe verticali/orizzontali/banda diagonale/metà e metà, pantaloncini corti/lunghi, calzettoni
+   alti/bassi/ripiegati. Predefinito: tutto al primo valore. Portiere: maniche lunghe, tinta unita, guanti.
+   Avversari: stile dal seme.
+4. **Numeri di maglia** (`p.num`): ai salvataggi vecchi vengono assegnati al caricamento, per ruolo (portieri 1, 12, 22;
+   difensori 2-6…; centrocampisti 8, 10, 7…; attaccanti 9, 11…) senza doppioni; chi viene comprato ne riceve uno libero.
+   Il campione sceglie il suo: se era di un altro, l'altro ne prende uno libero. Avversari: 1-11 per posizione.
+   Sulla schiena il cognome in maiuscolo; colore nel secondario della squadra se si legge, altrimenti bianco o nero.
+5. **Stemma** (`s.crest = { shape, pattern, icon }`, `src/crest.js`): 10 sagome, 10 motivi, 20 simboli disegnati qui
+   (pallone, stella, leone, aquila, torre, corona, fulmine, quercia, onda, sole, ancora, chiave, spiga, lupo, cavallo,
+   ruota, montagna, fiamma, giglio, toro). Colori dalla maglia. Senza `s.crest` si calcola dal nome del club.
+   Squadre del computer: dal loro seme. Sostituisce il vecchio stemma in hub, prossima partita, classifica, calendario,
+   risultato; piccolo sul petto della maglia in partita.
+6. **Editor**: dopo nome e colori della squadra → "Lo stemma" (Forma, Motivo, Simbolo) → "Crea il tuo campione"
+   (Viso, Capelli, Divisa, Nome e ruolo) con anteprima 3D che ruota (renderer three.js dedicato nel canvas della
+   schermata, spento uscendo; si gira col dito; primo piano per viso e capelli). La carriera nasce solo alla conferma
+   finale; il campione entra in rosa come un giovane forte della Terza Divisione (livello `CHAMP_LEVEL` = 62, età 17-21).
+   Rosa → scheda giocatore → "Aspetto" (Viso, Capelli, Scarpe). Impostazioni → "Stile della divisa" e "Stemma".
+7. **Numeri** (`node test/players-shot.mjs`, Chrome headless con SwiftShader, 390×844): prima scena 61 draw call /
+   32.294 triangoli (giocatori 37 / 15.870), dopo 57 / 42.208 (giocatori 33 / 25.776); fps 26,9 → 25,9 (solo confronto);
+   `view.update` 0,34 → 0,31 ms. Memoria in più: 22 texture 512 (~1,4 MB l'una con le mipmap, ~30 MB in tutto).
+   **Da provare sull'iPhone**: fps, tempo d'ingresso in partita (22 texture dipinte), leggibilità di numeri e visi.
