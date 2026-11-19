@@ -133,7 +133,7 @@ function mkDoor(rg,wz,s){const T=doorTpl(),d={l:[],k:0,o:0,g:0,rg,pl:[new THREE.
  T.forEach((t,i)=>{const g=new THREE.Group();for(const c of t.children){let m=mm.get(c.material);if(!m){m=c.material.clone();m.clippingPlanes=d.pl;mm.set(c.material,m);}const me=new THREE.Mesh(c.geometry,m);me.castShadow=false;g.add(me);}g.position.set(0,0,z);g.userData.sx=i?1:-1;rg.add(g);d.l.push(g);});
  d.lamp=P('box',M.doorL,.7,.12,.05,0,3.56,z+s*.05,rg);d.lamp.castShadow=false;return d;}
 const DPL=new V3(),DPN=new V3(),DPM=new THREE.Matrix3();
-function updDoor(dt){const st=G.stages[G.si];if(st&&st.door0&&st.door0.cl){animDoor(st.door0,dt);if(st.door0.k===0){st.door0.cl=0;dropBehind();}}const d=st&&st.door;if(!d)return;if(d.o&&!d.pv){d.pv=1;showNext();}if(d.o&&!d.so){d.so=1;snd('metal');}const g=d.o||d.g;if(g!==d.gg){d.gg=g;d.lamp.material=g?dmat('dgo',0x30ff70,{emissiveIntensity:2.2}):M.doorL;}animDoor(d,dt);}
+function updDoor(dt){updPre(dt);const st=G.stages[G.si];if(st&&st.door0&&st.door0.cl){animDoor(st.door0,dt);if(st.door0.k===0){st.door0.cl=0;dropBehind();}}const d=st&&st.door;if(!d)return;if(d.o&&!d.pv){d.pv=1;showNext();}if(d.o&&!d.so){d.so=1;snd('metal');}const g=d.o||d.g;if(g!==d.gg){d.gg=g;d.lamp.material=g?dmat('dgo',0x30ff70,{emissiveIntensity:2.2}):M.doorL;}animDoor(d,dt);}
 function animDoor(d,dt){const k0=d.k;d.k=clamp(d.k+(d.o?1:-1)*dt*1.7,0,1);if(d.k===k0&&d.cp)return;
  if(!d.cp||d.k!==k0){d.cp=1;d.rg.updateWorldMatrix(true,false);const mw=d.rg.matrixWorld;DPM.getNormalMatrix(mw);for(let i=0;i<2;i++){const sx=i?-1:1;DPN.set(sx,0,0).applyMatrix3(DPM).normalize();DPL.set(-sx*1.452,0,0).applyMatrix4(mw);d.pl[i].setFromNormalAndCoplanarPoint(DPN,DPL);}}
  const e=d.k<.12?0:(d.k-.12)/.88,q=e*e*(3-2*e),off=(d.k<.12?d.k/.12*.035:.035)+q*1.68;for(const m of d.l)m.position.x=m.userData.sx*off;}
@@ -185,7 +185,7 @@ function enterRoom(i){PF.m.push('room');const old=G.stages[G.si];if(old&&old.rg.
  G.lit=st.run?(st.rk==='e'||st.rk==='m'?1:0):st.lit||0;G.py=0;G.lookP=0;G.lookT=null;renderer.toneMappingExposure=G.lit===2?.6:1.12;hemi.intensity=G.lit===2?.035:G.lit===1?.26:.38;if(HM.Vent_light){const dm=G.lit===2;HM.Vent_light.emissiveIntensity=dm?.05:1;HM.Wall_blue.emissiveIntensity=dm?.3:1;for(const k in HM)HM[k].envMapIntensity=dm?.1:1;}syncClip();G.qte=null;G.dg=null;G.wnd=null;G.sl=1;qsHide();for(const a of G.acts)enG.remove(a.root);G.acts=[];cineOff();st.actor=null;
  if(st.run){const esc=st.rk==='e'||st.rk==='m';G.mv={P:st.inP,t:0,el:0,kind:'run',lb:esc?1.5:0,dur:pathLen(st.inP)/((esc?5.5:5)+Math.min(1.5,G.L*.035))};G.phase='run';if(esc)hud.classList.add('cine');
   sub(st.say||'BASE:'+RUNTXT[chI(G.L)],3800);toast('Trascina il cursore fino in fondo',2600);
-  if(MODELS.xbot){if(st.rk==='c'||st.rk==='q'){const a=mkActor(st.rk==='c'?'varr':'kross');a.fol=7;a.root.position.set(0,0,-7);a.root.rotation.y=Math.PI;}else if(st.rk==='m'){const a=mkActor('marsh');a.fol=3.4;a.fx=1.4;a.root.position.set(1.4,0,-4.4);a.root.rotation.y=Math.PI;}}}
+  if(MODELS.xbot){const pa=G.pa;G.pa=null;if(pa&&pa.st===st&&pa.on){const a=pa.a;if(a.root.parent)a.root.parent.remove(a.root);enG.add(a.root);G.acts.push(a);a.fol=pa.d;a.w=1;a.ry=a.root.rotation.y;if(pa.fx!==undefined)a.fx=pa.fx;}else{dropPre(pa);if(st.rk==='c'||st.rk==='q'){const a=mkActor(st.rk==='c'?'varr':'kross');a.fol=7;a.root.position.set(0,0,-7);a.root.rotation.y=Math.PI;}else if(st.rk==='m'){const a=mkActor('marsh');a.fol=3.4;a.fx=1.4;a.root.position.set(1.4,0,-4.4);a.root.rotation.y=Math.PI;}}}}
  else{const f=st.fl||'';if(MODELS.xbot&&(f.includes('v')||f.includes('k'))){const a=mkActor(f.includes('v')?'varr':'kross'),z=-Math.min(6.5,st.depth*.45);let x=0;for(const c of[0,1.3,-1.3,2.4,-2.4])if(!blk(st,c,z,.5)){x=c;break;}a.root.position.set(x,0,z);a.ry=a.root.rotation.y=Math.atan2(-x,-z);a.look=1;st.actor=a;}else if(st.say&&!st.boss&&!f.includes('m'))sub(st.say,4400);
   G.mv={P:st.inP,t:0,kind:'in',dur:Math.max(.7,pathLen(st.inP)/(5.2*(1+.05*pk('sp'))))};G.phase='in';if(G.lit===2)toast('Luci fuori uso: illumina con la torcia',2400);}
  const d0=st.inP[0],d1=st.inP[1];G.px=d0[0];G.pz=d0[1];PP.dx=d1[0]-d0[0];PP.dz=d1[1]-d0[1];G.yaw=G.mv.lb?Math.PI:pathYaw(G.mv.P,0,pathLen(G.mv.P),{x:d0[0],z:d0[1],dx:PP.dx,dz:PP.dz});st.wd=.4;dots();}
@@ -240,7 +240,17 @@ function clipMode(st,mode){const k=st.clip;if(!k)return;st.rg.updateMatrixWorld(
 function syncClip(){for(const st of G.stages||[])if(st.clip)for(const[m,c]of st.clip.mats){if(m.emissiveIntensity!==undefined)c.emissiveIntensity=m.emissiveIntensity;if(m.envMapIntensity!==undefined)c.envMapIntensity=m.envMapIntensity;}}
 /* la sala precedente, riportata nelle coordinate della nuova stanza (trasformazione inversa del collegamento) */
 function keepBehind(a,lk){const w=G.pb||(G.pb=new THREE.Group()),c=Math.cos(lk.beta),s=Math.sin(lk.beta),p=lk.p;w.rotation.set(0,-lk.beta,0);w.position.set(-(p.x*c-p.z*s),-p.y,-(p.x*s+p.z*c));w.add(a.rg);world.add(w);w.updateMatrixWorld(true);clipMode(a,'out');if(a.door){a.door.cp=0;animDoor(a.door,0);}}
+/* chi scappa nel corridoio successivo: compare appena oltre la porta quando parti verso l'uscita e corre avanti,
+   così entrando lo trovi già davanti a te (la distanza raggiunta diventa la sua distanza nell'inseguimento) */
+const PRE_D0=1.5,PRE_V=3.6,PRE_D=7,PRE_V2=.6,PRE_MAX=10;
+function preActor(b,w){dropPre(G.pa);G.pa=null;if(!b.run||!MODELS.xbot||!b.inP)return;const k=b.rk==='c'?'varr':b.rk==='q'?'kross':b.rk==='m'?'marsh':null;if(!k)return;
+ const a=mkActor(k,[]);enG.remove(a.root);w.add(a.root);a.root.visible=false;a.act.run.setEffectiveWeight(1);a.act.idle.setEffectiveWeight(0);G.pa={a,st:b,d:PRE_D0,on:0,fx:k==='marsh'?1.4:undefined,tot:pathLen(b.inP)};}
+function dropPre(pa){if(pa&&pa.a.root.parent)pa.a.root.parent.remove(pa.a.root);}
+function updPre(dt){const pa=G.pa;if(!pa)return;const a=G.stages[G.si],m=G.mv;
+ if(!pa.on){if(!(m&&(m.kind==='out'||m.kind==='run')&&a&&a.door&&a.door.o))return;pa.on=1;pa.a.root.visible=true;}
+ pa.d=Math.min(PRE_MAX,pa.d+dt*(pa.d<PRE_D?PRE_V:PRE_V2));const st=pa.st;pathPos(st.inP,Math.min(1,pa.d/pa.tot),PA);const l=Math.hypot(PA.dx,PA.dz)||1,o=pa.fx!==undefined?pa.fx:Math.sin(G.t*1.4)*.8;
+ pa.a.root.position.set(PA.x-PA.dz/l*o,runY(st,pa.d),PA.z+PA.dx/l*o);pa.a.root.rotation.y=Math.atan2(PA.dx,PA.dz);pa.a.mx.update(dt);}
 function dropBehind(){const w=G.pb;if(!w)return;for(const ch of w.children.slice())w.remove(ch);if(w.parent)w.parent.remove(w);}
-function showNext(){const b=G.stages[G.si+1],a=G.stages[G.si];if(!b||!b.link||!b.rg)return;const w=G.pw||(G.pw=new THREE.Group());w.rotation.set(0,b.link.beta,0);w.position.copy(b.link.p);
+function showNext(){const b=G.stages[G.si+1],a=G.stages[G.si];if(!b||!b.link||!b.rg)return;const w=G.pw||(G.pw=new THREE.Group());w.rotation.set(0,b.link.beta,0);w.position.copy(b.link.p);preActor(b,w);
  const o=b.r2c(0,0);b.rg.rotation.y=-b.pose.th;b.rg.position.set(o[0],0,o[1]);w.add(b.rg);world.add(w);w.updateMatrixWorld(true);clipMode(a,'out');clipMode(b,'in');if(a.door&&a.door.bk)a.door.bk.visible=false;
  const d0=b.door0;if(d0){d0.hid=1;for(const m of d0.l)m.visible=false;if(d0.bk)d0.bk.visible=false;}renderer.shadowMap.needsUpdate=true;}
