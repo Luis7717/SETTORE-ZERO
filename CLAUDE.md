@@ -63,8 +63,10 @@
   linea fino a un compagno (entro 5 m) o tocco = passaggio, altrove = strada da correre.
 - La finta è stata tolta (2026-11-20).
 - Difesa: dito su un proprio giocatore e disegna = linea da seguire (tutti tranne il portiere); tieni premuto sul campo =
-  muovi il controllato. Senza linea i giocatori restano **fermi** (la CPU non difende al posto della persona). La
-  scivolata del giocatore è stata tolta (2026-11-20; l'IA avversaria la usa ancora). Raggio di
+  muovi il controllato. Le linee di difesa sono lunghe al massimo 14 m; finita la linea il giocatore torna alla CPU.
+  Senza linea la CPU difende (2026-11-20): uno (due vicino alla nostra porta) pressa il portatore, gli altri rientrano
+  dietro la palla nella loro posizione; la linea disegnata ha sempre la precedenza. Contrasto un po' "magnetico" per chi
+  muove la persona; un passaggio avversario intercettato dà il possesso. La scivolata del giocatore è stata tolta. Raggio di
   intercetto = difesa del difensore contro passaggio di chi passa.
 - Portiere: sul tiro la visuale va dietro la propria porta e il tempo rallenta; linea dal portiere al punto della porta,
   il tuffo parte quando si alza il dito.
