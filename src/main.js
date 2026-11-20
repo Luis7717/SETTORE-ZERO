@@ -107,9 +107,9 @@ function fade() { const f = $('fade'); f.style.transition = 'none'; f.style.opac
 const RUN_DRAW_SLOW = 0.25; // velocità del tempo mentre si disegna la strada da correre
 const GK_SLOW = 0.1;
 const DEF_DRAW_SLOW = 0.13; // velocità del tempo mentre si disegna una linea di difesa      // velocità del tempo mentre si para
-const PASS_DRAW_SLOW = 0.08; // velocità del tempo mentre si disegna un passaggio o un tiro
-const DUEL_SLOW = 0.15; // velocità del tempo durante un duello col difensore
-const ZONE_SLOW = 0.17; // velocità del tempo negli ultimi 20 m prima della porta avversaria (area di tiro)
+const PASS_DRAW_SLOW = 0.04; // velocità del tempo mentre si disegna un passaggio o un tiro (Luis 2026-11-20: più lento)
+const DUEL_SLOW = 0.08; // velocità del tempo durante un duello col difensore (era 0,15)
+const ZONE_SLOW = 0.1; // (era 0,17) velocità del tempo negli ultimi 20 m prima della porta avversaria (area di tiro)
 const HINTS = {
   attack: 'Disegna la strada dal giocatore per correre · linea in porta = tiro',
   defend: 'Disegna linee dai tuoi giocatori: solo chi ha una linea si muove',
