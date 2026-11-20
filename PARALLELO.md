@@ -31,7 +31,7 @@ nuovi finché quel blocco non è finito e la build su GitHub non è riuscita. La
   (campo, luci, tonemapping, ombre), `src/stadium.js`, `test/unit/hair.test.mjs`, `test/hair-shot.mjs`.
 - 17 tagli rifatti come calotte lisce dipinte (stessi indici: salvataggi validi). Triangoli scena circa 41k → 50k, draw call invariati (57).
 
-## 13-16 — Grafica in stile più realistico, a pezzi (2026-11-20) · tutti Opus · IN CORSO
+## 13-16 — Grafica in stile più realistico, a pezzi (2026-11-20) · tutti Opus · FATTO, tutti uniti
 | # | Pezzo | Worktree / ramo | File |
 |---|---|---|---|
 | 13 | Giocatori: modello con proporzioni realistiche, divise, capelli, pose, editor | `TAG-wt-gfx2` / `wt-gfx2` | `players3d.js`, `hair3d.js`, `editor.js`, `assets/models` |
@@ -39,3 +39,5 @@ nuovi finché quel blocco non è finito e la build su GitHub non è riuscita. La
 | 15 | Stadio, pubblico, bandiere, cartelloni | `TAG-wt-stadio` / `wt-stadio` | `stadium.js` |
 | 16 | Pallone, porte e rete, bandierine, effetti, linee disegnate | `TAG-wt-effetti` / `wt-effetti` | nuovo `props.js`, chiamate in `render.js` |
 Telecamera: la tengo io. L'unione in `gioco2` la faccio io, un pezzo alla volta, con test e schermate dopo ognuno.
+- Uniti in `gioco2`: 14 campo `ad4cffa`, 13 giocatori `9661147` (Quaternius Universal Base Characters, CC0, `assets/models/athlete.glb` 656 KB, ripiego sul Kenney),
+  16 pallone/porte/effetti `9ccc115` (`src/props.js`), 15 stadio `dcb131d` (`stadium*.js`). Conflitti solo negli import e nella telecamera di `render.js`, risolti a mano.

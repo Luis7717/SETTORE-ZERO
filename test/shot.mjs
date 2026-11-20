@@ -9,7 +9,7 @@ const errs = [];
 p.on('pageerror', e => errs.push('PAGEERR ' + e.message));
 p.on('console', m => { if (m.type() === 'error') errs.push('CONSOLE ' + m.text()); });
 // servito via http come nell'app (schema app://): con file:// i file in www/assets non si caricherebbero
-const srv = await serve('www');
+const srv = await serve(process.env.WWW || 'www'); // WWW: un'altra cartella da provare (es. una build vecchia)
 b.on('disconnected', () => srv.close());
 await p.goto(srv.url + 'index.html');
 const wait = ms => new Promise(r => setTimeout(r, ms));
