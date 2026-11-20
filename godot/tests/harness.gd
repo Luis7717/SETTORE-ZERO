@@ -1,0 +1,187 @@
+# Strumenti comuni per i test del motore (porting di test/lib/harness.mjs e test/lib/scene.mjs):
+# squadre finte, "umano simulato", partite complete e scene costruite a mano.
+extends RefCounted
+
+const SimMatchScript := preload("../sim/match.gd")
+const SimRngScript := preload("../sim/rng.gd")
+const C := preload("../sim/core.gd")
+const R := preload("../sim/records.gd")
+
+const DT := 1.0 / 60.0
+
+
+static func skillOf(rating: float) -> float:
+	return maxf(0.1, minf(0.95, (rating - 42.0) / 48.0))
+
+
+# Squadra con statistiche intorno a `rating` (stesso schema di balance.mjs). skill < 0 = ricavata dal rating.
+static func mkTeam(name: String, rating: float, seed_value: int, formation: String = "4-4-2", skill: float = -1.0) -> Dictionary:
+	var r := SimRngScript.new(seed_value)
+	var F: Array = C.FORMATIONS[formation]
+	var players: Array = []
+	for i in F.size():
+		var s: Array = F[i]
+		var p := {"name": name + str(i), "pos": s[0]}
+		for key: String in ["vel", "tir", "pas", "dri", "dif", "fis"]:
+			p[key] = int(C.round_(rating + (r.next() - 0.5) * 10.0))
+		p["por"] = int(C.round_(rating + (r.next() - 0.5) * 10.0)) + 4 if s[0] == "P" else 20
+		players.append(p)
+	return {"name": name, "formation": formation, "skill": skill if skill >= 0.0 else skillOf(rating), "players": players}
+
+
+# partite create dai test: alla fine il runner le chiude con disposeAll() (riferimenti circolari tra giocatori)
+static var live: Array = []
+
+
+static func newMatch(seed_value: int, halfLen: float, human: Array, teamA: Dictionary, teamB: Dictionary) -> SimMatchScript:
+	var m := SimMatchScript.new({"seed": seed_value, "halfLen": halfLen, "human": human, "teams": [teamA, teamB]})
+	live.append(m)
+	return m
+
+
+static func disposeAll() -> void:
+	for m: SimMatchScript in live:
+		m.dispose()
+	live.clear()
+
+
+# "Giocatore medio" che comanda la squadra 0 con gli stessi comandi del telefono (makeBot in harness.mjs):
+# con la palla usa le scelte dell'IA, in difesa pressa col solo giocatore controllato,
+# in porta si tuffa con un ritardo e un errore casuali.
+class Bot:
+	extends RefCounted
+	var r: SimRngScript
+	var press: bool
+	var diveAt: float = -1.0
+
+	func _init(seed_value: int, press_: bool = true) -> void:
+		r = SimRngScript.new(seed_value)
+		press = press_
+
+	func stepBot(m: SimMatchScript) -> void:
+		var c: R.Player = m.ctrl[0]
+		var b := m.ball
+		if c != null:
+			if b.owner == c:
+				if m.phase == "restart":
+					if m.restart.t > 1.2:
+						m.human[0] = false
+						m.aiRestart()
+						m.human[0] = true
+				else:
+					m.dtT = 1.0 / 60.0
+					m.human[0] = false
+					m.carrierAI(c)
+					m.human[0] = true
+					if b.owner == c:
+						m.userMove(0, c.tx, c.ty, true)
+			elif b.owner != null and b.owner.team == 1:
+				if press and r.next() < 0.9:
+					m.userMove(0, b.x + b.owner.vx * 0.25, b.y + b.owner.vy * 0.25, true)
+			elif b.owner == null and m.manualDef(0) and press:
+				m.userMove(0, b.x + b.vx * 0.3, b.y + b.vy * 0.3, true)
+		if m.diveWin(0):
+			if diveAt < 0.0:
+				diveAt = m.time + 0.12 + r.next() * 0.16
+			if m.time >= diveAt:
+				var s := b.shot
+				var g := m.gk(0)
+				var dxm: float = (s.cx - g.x) * (0.8 + r.next() * 0.6)
+				dxm += (-C.sign_(s.cx - g.x) * 3.0) if r.next() < 0.12 else 0.0
+				m.userDive(0, dxm, s.ch + (r.next() - 0.5) * 0.8)
+				diveAt = -1.0
+		else:
+			diveAt = -1.0
+
+
+# Gioca una partita intera a passi di 1/60 s (playMatch in harness.mjs).
+# opt: seed, my, op, mode ('bot' = umano simulato contro IA, 'ai' = IA contro IA), halfLen, fA, fB, maxSteps.
+# onStep(m) viene chiamato a ogni passo prima che gli eventi vengano svuotati. Ritorna {m, steps}.
+static func playMatch(opt: Dictionary, onStep: Callable = Callable()) -> Dictionary:
+	var sd: int = opt.get("seed", 1)
+	var mode: String = opt.get("mode", "bot")
+	var m := newMatch(sd, opt.get("halfLen", 150.0), [true, false] if mode == "bot" else [false, false],
+		mkTeam("A", opt.get("my", 60.0), sd * 7 + 1, opt.get("fA", "4-4-2")), mkTeam("B", opt.get("op", 60.0), sd * 13 + 5, opt.get("fB", "4-4-2")))
+	var bot: Bot = Bot.new(sd + 9) if mode == "bot" else null
+	var maxSteps: int = opt.get("maxSteps", 60 * 60 * 30)
+	var steps := 0
+	while m.phase != "full" and steps < maxSteps:
+		m.step(DT)
+		steps += 1
+		if m.phase == "half":
+			m.startSecondHalf()
+		if bot != null:
+			bot.stepBot(m)
+		if onStep.is_valid():
+			onStep.call(m)
+		m.events.clear()
+	return {"m": m, "steps": steps}
+
+
+# ------------------------------------------------------------ scene (test/lib/scene.mjs)
+# partita in gioco, tutti i giocatori "parcheggiati" lontano e fermi, tranne quelli rimessi in campo con wake
+static func scene(sd: int = 1, human: Array = [true, false], my: float = 60.0, op: float = 60.0) -> SimMatchScript:
+	var m := newMatch(sd, 9999.0, human, mkTeam("A", my, sd * 7 + 1), mkTeam("B", op, sd * 13 + 5))
+	m.phase = "play"
+	m.restart = null
+	var b := m.ball
+	b.owner = null
+	b.kick = null
+	b.shot = null
+	b.x = 0.0
+	b.y = 0.0
+	b.h = 0.0
+	b.vx = 0.0
+	b.vy = 0.0
+	b.vh = 0.0
+	for k in m.players.size():
+		park(m.players[k], k)
+	m.events.clear()
+	return m
+
+
+static func park(p: R.Player, k: int) -> void:
+	p.x = (1.0 if k % 2 else -1.0) * 31.0
+	p.y = -45.0 + k * 4.3
+	p.vx = 0.0
+	p.vy = 0.0
+	p.tx = p.x
+	p.ty = p.y
+	p.state = "play"
+	p.stun = 999.0
+	p.contact = 0.0
+
+
+static func wake(p: R.Player, x: float, y: float) -> void:
+	p.x = x
+	p.y = y
+	p.vx = 0.0
+	p.vy = 0.0
+	p.tx = x
+	p.ty = y
+	p.stun = 0.0
+	p.state = "play"
+	p.contact = 0.0
+	p.tackleCd = 0.0
+	p.protect = 0.0
+
+
+static func give(m: SimMatchScript, p: R.Player) -> void:
+	var b := m.ball
+	b.owner = p
+	b.last = p
+	b.x = p.x + p.fx * 0.6
+	b.y = p.y + p.fy * 0.6
+	p.protect = 0.0
+
+
+# passi da 1/60 s; onStep(m) prima di ogni passo; ritorna gli eventi visti
+static func run(m: SimMatchScript, sec: float, onStep: Callable = Callable()) -> Array:
+	var evs: Array = []
+	for i in int(C.round_(sec * 60.0)):
+		if onStep.is_valid():
+			onStep.call(m)
+		m.step(DT)
+		evs.append_array(m.events)
+		m.events.clear()
+	return evs

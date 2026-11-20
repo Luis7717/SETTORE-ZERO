@@ -704,3 +704,20 @@ in `godot/` (dettagli in `godot/README.md`). Scelte fatte in autonomia:
 Verificato sul PC (Windows, RTX 3070): importazione senza errori, scena senza schermo senza errori, schermate
 390×844 (campo, giocatore da vicino, porta, campo intero), prova dei tocchi automatica, export iOS (progetto Xcode) ed
 export Windows. **Non verificato**: la build su GitHub (niente push in questa fase) e tutto ciò che riguarda l'iPhone.
+
+## 2026-11-20 — Godot: motore in GDScript
+Il motore puro (`src/sim.js` + `src/sim/*`) è portato riga per riga in `godot/sim/` (GDScript, Godot 4.7.2), stessi nomi
+di costanti, metodi e campi; dettagli e corrispondenza dei file in `godot/sim/README.md`.
+- **Stessa partita del JS, bit per bit.** Numeri casuali (`rng32`, maschere a 32 bit) e `Math.hypot` rifatti esatti.
+  `sin`/`cos`/`atan2` di Godot (libreria C del sistema) differiscono da V8 di 1 ulp in parte dei casi (su 2000 valori:
+  sin 61, cos 81, atan2 381) e lo stato divergeva dal JS già al passo 128-510 (2-9 s), pur con eventi e punteggio
+  uguali nelle partite di prova. Scelta: portare fdlibm (le funzioni di V8) in `godot/sim/fmath.gd` invece di
+  tollerare lo scarto: così 7 partite intere (78 482 passi) sono identiche al JS a ogni passo, e la partita è la stessa
+  su Windows, Mac e iPhone (librerie C diverse). Costo ~2 µs a chiamata, già dentro le misure qui sotto.
+- **Verifica:** `node test/export-trace.mjs` scrive i riferimenti JS in `godot/tests/fixtures/` (da rilanciare a ogni
+  modifica del motore JS); `godot --headless --path godot -s res://tests/run_tests.gd` li confronta e porta 81 test di
+  `test/unit` (difesa, attacco, scatto, duello e dribbling, regole, portiere, barriera, vantaggio, colpi di testa):
+  88 test verdi. I test di grafica, menu, carriera e tutorial non sono portati (elenco nel README).
+- **Velocità** (PC di sviluppo): GDScript ~1 800 passi/s (0,56 ms a passo, 99% sotto 1,5 ms, massimo 3,1 ms), Node ~29 000.
+  Un passo a fotogramma è ~3% dei 16,7 ms; su iPhone stimati 0,5-1 ms a passo. **Da misurare sul telefono.**
+- `m.dispose()` a fine partita: i riferimenti circolari tra giocatori (`supC`, `beatBy`) Godot non li libera da solo.
