@@ -1,4 +1,6 @@
-# Fine partita e risultati della giornata (post() di src/ui.js). arg = {m, res, title} come G.res del web:
+# Fine partita e risultati della giornata (post() di src/ui.js). Nome "dopo_partita": ci arriva App dopo la partita
+# con arg = App.ultimo_esito = {esito: {gol_a, gol_b, marcatori, statistiche, me, squadre?}, res, titolo, tipo};
+# accetta anche il formato del web {m, res, title} (prove):
 #   m     = la partita (SimMatch o Dictionary): score, goalsLog [{team, name, minute}], stats {shots, onT, poss,
 #           corners, fouls}, teams [{short, kit: {crest: {shape, pattern, icon, c1, c2}}}]
 #   res   = risultato di Carriera.finishMatch (incasso, stipendi, migliorati, altri risultati, season) o null
@@ -13,6 +15,8 @@ func prepara() -> void:
 
 func costruisci() -> void:
 	var r: Dictionary = arg if arg is Dictionary else {}
+	if r.has("esito"):
+		r = da_esito(r)
 	var m: Variant = r.get("m")
 	if m == null:
 		corpo.add_child(U.bottone("CONTINUA", "BtnGrande", func() -> void: vai("hub")))
@@ -71,6 +75,48 @@ func costruisci() -> void:
 			vai("fine_stagione", stagione)
 		else:
 			vai("hub")))
+
+
+## App.ultimo_esito → {m, res, title}. Le squadre: esito.squadre se la partita le passa, altrimenti la mia dalla
+## carriera e l'avversario dall'ultima partita registrata (s.last.opp) o generico per le amichevoli
+func da_esito(a: Dictionary) -> Dictionary:
+	var e: Dictionary = a.esito
+	var me := int(e.get("me", 0))
+	var teams: Array = e.get("squadre", [])
+	if teams.size() < 2:
+		var mia := _squadra_mia()
+		var loro := _squadra_avversaria(str(a.get("tipo", "")))
+		teams = [mia, loro] if me == 0 else [loro, mia]
+	var m := {"score": [int(e.get("gol_a", 0)), int(e.get("gol_b", 0))], "teams": teams,
+		"goalsLog": e.get("marcatori", []), "stats": e.get("statistiche", {})}
+	return {"m": m, "res": a.get("res"), "title": a.get("titolo", "")}
+
+
+func _squadra_mia() -> Dictionary:
+	var c := carriera()
+	var s := stato()
+	if s.is_empty():
+		return {"short": "MIA", "kit": {}}
+	var k := D.kit(s.kit)
+	var cr: Dictionary = c.crest().duplicate()
+	cr.c1 = int(k[1])
+	cr.c2 = int(k[2])
+	return {"short": str(s.teams.me.get("short", "MIA")), "kit": {"crest": cr}}
+
+
+func _squadra_avversaria(tipo: String) -> Dictionary:
+	var c := carriera()
+	var s := stato()
+	var last: Variant = s.get("last")
+	if tipo == "campionato" and last is Dictionary:
+		for t: Dictionary in s.teams.values():
+			if t.name == last.get("opp"):
+				var k := D.kit(t.get("kit", 0))
+				var cr: Dictionary = c.teamCrest(t).duplicate()
+				cr.c1 = int(k[1])
+				cr.c2 = int(k[2])
+				return {"short": str(t.short), "kit": {"crest": cr}}
+	return {"short": "AMI", "kit": {}}
 
 
 func _squadra(t: Variant, destra: bool) -> Control:

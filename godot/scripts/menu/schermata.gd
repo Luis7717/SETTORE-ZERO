@@ -67,15 +67,21 @@ func _init() -> void:
 
 ## chiamata da App.vai (o da chi apre la schermata) prima di aggiungerla all'albero, oppure dopo: ridisegna
 func apri(a: Variant = null) -> void:
+	if _costruita and typeof(a) == typeof(arg) and a == arg:
+		return   # App.vai: arg già letto dal meta in _ready, niente doppia costruzione
 	arg = a
 	_arg_dato = true
 	if _costruita:
+		prepara()
 		mostra(true)
 
 
 func _ready() -> void:
 	theme = load(T.PERCORSO) if ResourceLoader.exists(T.PERCORSO) else T.crea_tema()
-	if not _arg_dato and prossimo_arg != null:
+	if not _arg_dato and has_meta("arg"):
+		arg = get_meta("arg")   # App.vai mette l'argomento nel meta prima di aggiungere la scena
+		_arg_dato = true
+	elif not _arg_dato and prossimo_arg != null:
 		arg = prossimo_arg
 	prossimo_arg = null
 	if prossimo_msg != "":

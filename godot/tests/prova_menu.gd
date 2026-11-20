@@ -36,7 +36,7 @@ const TUTTE := [
 	["17_impostazioni", "impostazioni", null, ""],
 	["18_come_si_gioca", "come_si_gioca", 0, ""],
 	["19_come_si_gioca_5", "come_si_gioca", 4, ""],
-	["20_fine_partita", "fine_partita", "PROVA", ""],
+	["20_dopo_partita", "dopo_partita", "PROVA", ""],
 	["21_fine_stagione", "fine_stagione", {"pos": 2, "prize": 504, "bonus": 210, "outcome": "up", "div": 2, "newDiv": 1}, ""],
 	["22_editor_aspetto", "editor", {"flow": "look", "id": "rosa:0"}, ""],
 	["23_editor_divisa", "editor", {"flow": "kit"}, ""],
