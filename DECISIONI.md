@@ -315,3 +315,10 @@ maglia, maniche, calzettoni…), poi nome e numero sulla schiena e uno stemma in
   un po' più lontani. Prima si corre verso il difensore, poi nel duello si passa.
 - Telecamera di gioco (verticale): `CAM_BACK` 16 m dietro il pallone e `CAM_H` 10,5 m d'altezza (prima 22 e 16,5);
   l'allargamento su rimesse e disegno pesa meno (+6/+5 m invece di +10/+11). Giocatori più grandi a schermo.
+
+## 2026-11-20 — Rallenty ancora più lento, visuale del duello verso i compagni
+- Rallenty −5 punti: duello 15%, area di tiro 17%, parata 10%, mentre si disegna la corsa 25%, linea di difesa 13%,
+  mentre si disegna un passaggio o tiro 8% (`PASS_DRAW_SLOW`, prima 13%).
+- Visuale del duello (`duelSide` in `render.js`): se c'è almeno un compagno davanti (entro 35 m, cono di ~45°) resta
+  dritta, un po' più alta e lontana di prima (`DUEL_LOW` 0,3, `DUEL_BACK`); se no gira intorno al portatore verso il
+  lato con più compagni, dell'85% dell'angolo verso la loro media, al massimo ~70°. Prova: `node test/duel-side-shot.mjs shots`.

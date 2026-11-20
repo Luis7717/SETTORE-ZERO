@@ -17,7 +17,11 @@ const GK_CAM_H = 2.6;          // parata: altezza della telecamera (m)
 const RUN_LINES = 10, RUN_PTS = 64, RUN_COLOR = 0x7dd3ff; // linee di difesa a schermo
 const CAM_BACK = 16;           // telecamera di gioco (schermo verticale): distanza dietro il pallone (m)
 const CAM_H = 10.5;            // ... e altezza (m); più bassa e vicina = giocatori più grandi
-const DUEL_LOW = 0.42;          // quanto si abbassa la telecamera nel duello (0 = niente, 1 = a terra)
+const DUEL_LOW = 0.3;           // quanto si abbassa la telecamera nel duello (0 = niente, 1 = a terra)
+const DUEL_BACK = 0.12;         // nel duello la telecamera si allontana di questa frazione della distanza normale
+const DUEL_AHEAD_R = 35;        // duello: compagni "davanti" entro questa distanza (m) e in un cono di ~45°
+const DUEL_SIDE_MAX = 1.2;      // duello senza compagni davanti: la visuale gira intorno al portatore verso i compagni, al massimo di tanto (rad, ~70°)
+const DUEL_SIDE_K = 0.85;       // ... di questa frazione dell'angolo tra "avanti" e la media dei compagni di quel lato
 
 function canvasTex(w, h, draw) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
@@ -235,6 +239,8 @@ export class View {
     // duello col difensore: telecamera più bassa e più avanti (si passa a qualunque compagno)
     const duel = !!(m.duelFor && m.duelFor(this.me));
     this.duelK = (this.duelK || 0) + ((duel ? 1 : 0) - (this.duelK || 0)) * Math.min(1, dt * 5);
+    const side = duel ? this.duelSide(m) : 0;
+    this.sideK = (this.sideK || 0) + (side - (this.sideK || 0)) * Math.min(1, dt * 8);
     this.showRuns(m);
     // telecamera dietro l'azione
     const dir = this.me === 1 ? -1 : 1;
@@ -255,15 +261,22 @@ export class View {
     let camY = this.cy * dir - back, hh = hgt, lookY = this.cy * dir + ahead;
     if (camY < minY) { hh += Math.min(6, (minY - camY) * 0.35); camY = minY; }
     camY += (-HL - 12.5 - camY) * dk; hh += (10.5 - hh) * dk; lookY += ((this.cy * dir - HL) / 2 + 3 - lookY) * dk;
-    const du = this.duelK; hh *= 1 - DUEL_LOW * du; camY += back * 0.3 * du; lookY += 8 * du;
+    const du = this.duelK; hh *= 1 - DUEL_LOW * du; camY += back * (0.3 - DUEL_BACK) * du; lookY += 8 * du;
     // parata: telecamera bassa dietro la propria porta, guarda verso chi tira
     const gkOn = !!(m.diveWin && m.diveWin(this.me) && !(m.autoGk && m.autoGk[this.me]));
     this.gkK = (this.gkK || 0) + ((gkOn ? 1 : 0) - (this.gkK || 0)) * Math.min(1, dt * 6);
     const gk = this.gkK;
     camY += (-HL - GK_CAM_BACK - camY) * gk; hh += (GK_CAM_H - hh) * gk; lookY += (b.y * dir - lookY) * gk;
     const camX = this.cx * dir * (0.82 - 0.3 * a) * (1 - 0.55 * dk) * (1 - 0.8 * gk);
-    this.cam.position.set(camX, hh, -camY);
-    this.cam.lookAt(this.cx * dir * (0.9 - 0.45 * a) * (1 - 0.45 * dk), 0, -lookY);
+    let px = camX, py = camY, lx = this.cx * dir * (0.9 - 0.45 * a) * (1 - 0.45 * dk), ly = lookY;
+    const phi = this.sideK * du; // duello senza compagni davanti: la visuale gira intorno al portatore verso i compagni
+    if (Math.abs(phi) > 1e-3) {
+      const ox = this.cx * dir, oy = this.cy * dir, cs = Math.cos(phi), sn = Math.sin(phi);
+      const rot = (x, y) => [ox + (x - ox) * cs + (y - oy) * sn, oy - (x - ox) * sn + (y - oy) * cs];
+      [px, py] = rot(px, py); [lx, ly] = rot(lx, ly);
+    }
+    this.cam.position.set(px, hh, -py);
+    this.cam.lookAt(lx, 0, -ly);
     // rete della porta vicina più trasparente
     for (const nm of this.netMats) if (nm.userData.d !== undefined) nm.opacity = (nm.userData.d * s < 0) ? 0.22 : 0.6;
   }
@@ -315,6 +328,31 @@ export class View {
       l.geometry.attributes.position.needsUpdate = true; l.geometry.setDrawRange(0, n);
     });
   }
+  // duello: 0 se c'è almeno un compagno davanti al portatore (la visuale resta dritta), altrimenti l'angolo (rad)
+  // di cui girare la visuale verso il lato dello schermo con più compagni a cui passare (+ destra, − sinistra)
+  duelSide(m) {
+    const c = m.ctrl[this.me]; if (!c) return 0;
+    const dir = this.me === 1 ? -1 : 1; let ahead = 0, right = 0, left = 0;
+    for (const p of m.players) {
+      if (p.team !== this.me || p.off || p === c || p.pos === 'P') continue;
+      const dx = (p.x - c.x) * dir, dy = (p.y - c.y) * dir, d = Math.hypot(dx, dy);
+      if (d > DUEL_AHEAD_R) continue;
+      if (dy > 2 && Math.abs(dx) < dy) ahead++;
+      else if (dy > -10) { if (dx > 0) right++; else left++; }
+    }
+    if (ahead || right === left) return 0;
+    // angolo verso la media dei compagni del lato scelto (+ = verso destra dello schermo)
+    let sx = 0, sy = 0, n = 0;
+    for (const p of m.players) {
+      if (p.team !== this.me || p.off || p === c || p.pos === 'P') continue;
+      const dx = (p.x - c.x) * dir, dy = (p.y - c.y) * dir;
+      if (Math.hypot(dx, dy) > DUEL_AHEAD_R || dy <= -10 || (right > left ? dx <= 0 : dx >= 0)) continue;
+      sx += dx; sy += dy; n++;
+    }
+    const a = Math.atan2(Math.abs(sx / n), sy / n) * DUEL_SIDE_K;
+    return (right > left ? 1 : -1) * Math.min(DUEL_SIDE_MAX, a);
+  }
+
   render() { fitSun(this.lights, this.cam, this.flip); this.r.render(this.scene, this.cam); }
 
   // ---------------------------------------------------- conversioni schermo/campo

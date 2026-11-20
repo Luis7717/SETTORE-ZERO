@@ -112,11 +112,12 @@ function big(text, cls, ms, small) {
 }
 function fade() { const f = $('fade'); f.style.transition = 'none'; f.style.opacity = 0.85; requestAnimationFrame(() => requestAnimationFrame(() => { f.style.transition = 'opacity .35s'; f.style.opacity = 0; })); }
 
-const RUN_DRAW_SLOW = 0.3; // velocità del tempo mentre si disegna la strada da correre
-const GK_SLOW = 0.15;
-const DEF_DRAW_SLOW = 0.18; // velocità del tempo mentre si disegna una linea di difesa      // velocità del tempo mentre si para
-const DUEL_SLOW = 0.2; // velocità del tempo durante un duello col difensore
-const ZONE_SLOW = 0.22; // velocità del tempo negli ultimi 20 m prima della porta avversaria (area di tiro)
+const RUN_DRAW_SLOW = 0.25; // velocità del tempo mentre si disegna la strada da correre
+const GK_SLOW = 0.1;
+const DEF_DRAW_SLOW = 0.13; // velocità del tempo mentre si disegna una linea di difesa      // velocità del tempo mentre si para
+const PASS_DRAW_SLOW = 0.08; // velocità del tempo mentre si disegna un passaggio o un tiro
+const DUEL_SLOW = 0.15; // velocità del tempo durante un duello col difensore
+const ZONE_SLOW = 0.17; // velocità del tempo negli ultimi 20 m prima della porta avversaria (area di tiro)
 const HINTS = {
   attack: 'Disegna la strada dal giocatore per correre · linea in porta = tiro',
   defend: 'Disegna linee dai tuoi giocatori: solo chi ha una linea si muove',
@@ -236,7 +237,7 @@ function frame(now) {
       input.update();
       const dive = m.diveWin(0) && !m.autoGk[0];
       const duel = !!(m.duelFor && m.duelFor(0)), zone = !duel && !!(m.inZone && m.inZone(0));
-      const target = input.mode === 'dpath' ? DEF_DRAW_SLOW : input.drawing ? (input.runPath() ? RUN_DRAW_SLOW : 0.13) : dive ? GK_SLOW : duel ? DUEL_SLOW : zone ? ZONE_SLOW : 1;
+      const target = input.mode === 'dpath' ? DEF_DRAW_SLOW : input.drawing ? (input.runPath() ? RUN_DRAW_SLOW : PASS_DRAW_SLOW) : dive ? GK_SLOW : duel ? DUEL_SLOW : zone ? ZONE_SLOW : 1;
       $('drib').style.display = duel && !input.drawing ? 'block' : 'none';
       G.ts += (target - G.ts) * Math.min(1, dt * 14);
       const sdt = dt * G.ts * (G.speed || 1), n = Math.max(1, Math.ceil(sdt / (1 / 60)));
