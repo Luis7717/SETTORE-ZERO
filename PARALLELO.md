@@ -52,3 +52,11 @@ Il terminale si è chiuso a metà (un'altra sessione ha chiuso processi per nome
 | 20a | Braccia nascoste dietro il busto da fermo (difetto del 17) | `TAG-wt-braccia` / `wt-braccia` | fatto: stessa causa del 20b, resta solo il test della posa (`827c427`), unito | `src/body/busto.js` |
 | 20b | Macchia color pelle sui pantaloncini (difetto del 18) | `TAG-wt-macchia` / `wt-macchia` | fatto (`a739d31`, unito `f9f41e2`): erano le dita che bucavano i pantaloncini; corretto `IDLE_FIX.arms` in `src/athlete3d.js` | `src/body/gambe.js` |
 Massimo 2 subagenti insieme (richiesta di Luis del 2026-11-20).
+
+## 21-24 — Prove di Luis sull'iPhone (2026-11-20) · Opus
+| # | Compito | Worktree / ramo | Stato |
+|---|---|---|---|
+| 21 | Forme degli occhi visibili | `TAG-wt-occhi` / `wt-occhi` | fatto (`3ac24cf`), unito |
+| 22 | Telecamera: porta intera in parata, visuale larga nel rallenty (`src/camfit.js`) | `TAG-wt-camera` / `wt-camera` | fatto (`5ce3685`), unito |
+| 23 | Motore: difesa che rientra e pressa, attacco largo, linee di difesa corte, contrasto magnetico, intercetto, scatto | `TAG-wt-tattica` / `wt-tattica` | in corso |
+| 24 | Menu principale col campione che si allena; menu opachi senza color-mix | coordinatore, in `gioco2` | fatto |
