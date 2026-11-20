@@ -66,6 +66,6 @@ Limite di 2 subagenti insieme tolto più tardi lo stesso giorno (richiesta di Lu
 | 29 | Telecamera girata col dito nel rallenty, passaggio solo disegnato | `TAG-wt-camuser` / `wt-camuser` | fatto (`d94cefc`), unito |
 | 24 | Menu principale col campione che si allena; menu opachi senza color-mix | coordinatore, in `gioco2` | fatto |
 | 30 | Dribbling del tutorial: difensore che si attacca al portatore | `TAG-wt-dribble` / `wt-dribble` | fatto (`03f0be3`), unito |
-| 31 | Stadio che manca su iPhone, memoria dei canvas, riga Diagnostica | `TAG-wt-ios` / `wt-ios` | in corso |
+| 31 | Stadio che manca su iPhone, memoria dei canvas, riga Diagnostica | `TAG-wt-ios` / `wt-ios` | fatto (`2b95e95`), unito |
 | 32 | Godot fase 1: progetto, build IPA (`tiro-a-giro-godot-ipa`), scena di prova | `TAG-wt-godot-base` / `wt-godot-base` | in corso |
 | 33 | Godot: motore portato in GDScript con prova di equivalenza | `TAG-wt-godot-sim` / `wt-godot-sim` | in corso |

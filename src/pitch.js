@@ -28,6 +28,8 @@ function canvasTex(w, h, draw, aniso) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   draw(c.getContext('2d'), w, h);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = aniso;
+  // ridisegno dopo che il canvas è stato svuotato (src/canvas-mem.js); i disegni del campo hanno il seme fisso
+  t.userData.rebuild = () => { c.width = w; c.height = h; draw(c.getContext('2d'), w, h); return c; };
   return t;
 }
 
@@ -99,6 +101,7 @@ function detailTex(aniso) {
     for (const ox of [0, -n, n]) for (const oy of [0, -n, n]) { g.beginPath(); g.moveTo(x + ox, y + oy); g.lineTo(x + ox + Math.cos(a) * l, y + oy + Math.sin(a) * l); g.stroke(); }
   }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.NoColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = aniso;
+  t.userData.rebuild = () => detailTex(aniso).image; // stesso seme: stesso disegno
   return t;
 }
 
@@ -119,7 +122,7 @@ export function buildPitch(scene, renderer) {
   mat.customProgramCacheKey = () => 'tag-pitch';
   const pitch = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), mat);
   pitch.rotation.x = -Math.PI / 2; pitch.receiveShadow = SHADOWS; scene.add(pitch);
-  return { mesh: pitch, ms: performance.now() - t0 };
+  return { mesh: pitch, ms: performance.now() - t0, textures: [tex, det] }; // render.js ne svuota i canvas dopo il caricamento
 }
 
 // ---------------------------------------------------------------- luci, ombre, tonemapping

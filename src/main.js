@@ -11,6 +11,10 @@ import { MenuBg } from './menu-bg.js';
 import { normalizeKitStyle, lookFromSeed } from './looks.js';
 import { crestFromSeed } from './crest.js';
 import { userCamOn } from './camuser.js';
+import { installErrorLog, trackCanvases, diagLines } from './diag.js';
+
+// prima di tutto: errori globali in window.__errs e conteggio dei canvas (riga Diagnostica in pausa)
+installErrorLog(); trackCanvases();
 
 const $ = id => document.getElementById(id);
 const canvas = $('c'), hud = $('hud'), ov = $('ov'), uiRoot = $('ui');
@@ -169,7 +173,13 @@ function overlay(html) { ov.innerHTML = html; ov.style.display = 'block'; }
 function showPause() {
   G.paused = true; input.cancel();
   overlay(`<div class="ovh">Pausa</div><button class="btn big" data-o="resume">Riprendi</button><button class="btn" data-o="subs">Cambi (${G.subs} rimasti)</button><button class="btn ghost" data-o="quit">${G.mode === 'league' ? 'Abbandona (sconfitta 0–3)' : 'Esci dall\'amichevole'}</button>
-  <div class="card"><p class="note"><b>Attacco</b>: disegna dalla palla per passare o tirare, tieni premuto per correre.<br><b>Difesa</b>: disegna linee dai tuoi giocatori, oppure tieni premuto per muovere il difensore.<br><b>Portiere</b>: scorri verso il lato del tiro.</p></div>`);
+  <div class="card"><p class="note"><b>Attacco</b>: disegna dalla palla per passare o tirare, tieni premuto per correre.<br><b>Difesa</b>: disegna linee dai tuoi giocatori, oppure tieni premuto per muovere il difensore.<br><b>Portiere</b>: scorri verso il lato del tiro.</p></div>${diagHtml()}`);
+}
+// riga piccola per capire dall'iPhone cosa non va (stadio, memoria dei canvas, WebGL, ultimi errori): da fotografare
+function diagHtml() {
+  let lines;
+  try { lines = diagLines(view.diagInfo()); } catch (e) { lines = ['diagnostica non disponibile: ' + (e && e.message)]; }
+  return `<div id="diag" style="margin:16px 2px 0;font-size:11px;line-height:1.4;color:#7f91b0;word-break:break-word"><b>Diagnostica</b> · ${lines.map(esc).join('<br>')}</div>`;
 }
 function showHalf() {
   const m = G.match; G.paused = true; input.cancel();
@@ -306,5 +316,6 @@ if (career.s) { sfx.on = career.s.settings.sound; }
 toMenu('title');
 requestAnimationFrame(frame);
 loadMusicLater();
+window.__diag = () => diagLines(view.diagInfo());
 window.__G = G; window.__career = career; window.__view = view; window.__ui = ui; window.__start = startMatch; window.__enter = enterMatch; window.__newCareer = (name) => { career.create(name || 'FC Prova', 0); ui.show('hub'); }; // per le prove: squadra nuova senza allenamento
  window.__assets = assets; window.__sfx = sfx; window.__input = input;
