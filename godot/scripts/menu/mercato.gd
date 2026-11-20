@@ -23,8 +23,7 @@ func prepara() -> void:
 func _lista() -> Array:
 	var s := stato()
 	var l: Array = s.market.filter(func(p: Dictionary) -> bool: return filtro == "T" or p.pos == filtro)
-	l.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return D.overall(a) > D.overall(b))
-	return l
+	return D.ordina(l, func(a: Dictionary, b: Dictionary) -> int: return D.overall(b) - D.overall(a))
 
 
 func costruisci() -> void:
@@ -89,10 +88,10 @@ func _bottone_compra(p: Dictionary, s: Dictionary) -> Control:
 			b.text = "Conferma"
 			b.theme_type_variation = "BtnAvviso"
 			return
-		var err: Variant = carriera().buy(p.id)
+		var err := D.errore(carriera().buy(p.id))
 		_conferma = null
 		aperto = null
-		toast(str(err) if err != null else "Acquistato!"))
+		toast(err if err != "" else "Acquistato!"))
 	return b
 
 

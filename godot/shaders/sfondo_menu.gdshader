@@ -7,13 +7,16 @@ uniform vec4 centro : source_color = vec4(0.09, 0.14, 0.27, 1.0);
 uniform vec4 mezzo : source_color = vec4(0.039, 0.071, 0.141, 1.0);
 uniform vec4 bordo : source_color = vec4(0.02, 0.035, 0.07, 1.0);
 uniform float punto_mezzo = 0.48;
+// ellisse: centro (in frazioni del riquadro) e semiassi; il palco dell'editor usa (0.5, 0.38) e (0.7, 0.8)
+uniform vec2 fuoco = vec2(0.5, -0.05);
+uniform vec2 raggio = vec2(1.2, 0.6);
 
 float rumore(vec2 p) {
 	return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
 }
 
 void fragment() {
-	vec2 q = vec2((UV.x - 0.5) / 1.2, (UV.y + 0.05) / 0.6);
+	vec2 q = (UV - fuoco) / raggio;
 	float d = length(q);
 	vec3 c = d < punto_mezzo ? mix(centro.rgb, mezzo.rgb, d / punto_mezzo)
 		: mix(mezzo.rgb, bordo.rgb, clamp((d - punto_mezzo) / (1.0 - punto_mezzo), 0.0, 1.0));

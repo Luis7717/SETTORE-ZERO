@@ -3,11 +3,14 @@
 #   $G --path godot res://tests/prova_menu.tscn -- --schermata=rosa --foto=shots/rosa.png [--dopo=1]
 #       [--azioni="tocca:200,400;aspetta:0.5;foto:shots/b.png;trascina:200,700,200,200,300"]
 #   $G --path godot res://tests/prova_menu.tscn -- --fps=hub        FPS mentre si scorre su e giù col dito finto
-# Carriera: quella vera dell'autoload App se c'è, altrimenti la finta di tests/menu_carriera_finta.gd.
+# Carriera: quella vera (Carriera) caricata da tests/fixtures/carriera_menu.json, una carriera del web con
+# 3 giornate giocate (godot/tools/dati_menu_web.mjs); salva in user://prova_menu.json, mai sul salvataggio vero.
 # Opzioni: --senza-carriera, --tacca=47,34 (area sicura di un iPhone con la tacca).
 extends Node
 
-const Finta := preload("res://tests/menu_carriera_finta.gd")
+const JS := preload("res://scripts/carriera/js.gd")
+const FIXTURE := "res://tests/fixtures/carriera_menu.json"
+const SALVA_PROVA := "user://prova_menu.json"
 const CARTELLA := "res://scenes/menu/%s.tscn"
 const ATTESA := 0.9              # s: entrata finita e texture pronte
 const LIMITE := 90.0             # s: oltre, la prova si chiude da sola (--limite=SEC)
@@ -41,6 +44,7 @@ const TUTTE := [
 ]
 
 var carriera: Object = null
+var ultimo_risultato: Variant = null
 var schermo: Node = null
 var _args := {}
 
@@ -72,12 +76,21 @@ func _ready() -> void:
 
 
 func _carriera_nuova() -> void:
-	var app := get_node_or_null("/root/App")
-	if app != null and app.get("carriera") != null and not _args.has("finta"):
-		carriera = app.carriera
-	else:
-		carriera = null if _args.has("senza-carriera") else Finta.new()
+	carriera = null if _args.has("senza-carriera") else carriera_di_prova()
 	MenuSchermata.carriera_prova = carriera
+	var app := get_node_or_null("/root/App")
+	if app != null and app.get("carriera") != null:
+		app.set("carriera", carriera)
+
+
+## carriera vera (Carriera) con lo stato della carriera di prova del web; salva su un file a parte
+func carriera_di_prova() -> Carriera:
+	var dati: Dictionary = JS.int_numbers(JSON.parse_string(FileAccess.get_file_as_string(FIXTURE)))
+	var c := Carriera.new()
+	c.percorso = SALVA_PROVA
+	c.s = c.completa(dati.s)
+	ultimo_risultato = dati.lastRes
+	return c
 
 
 ## apre una schermata come farebbe App.vai (scena + apri(arg))
@@ -134,7 +147,7 @@ func risultato_prova() -> Dictionary:
 		"goalsLog": [{"team": 0, "name": "L. Mancini", "minute": 23}, {"team": 1, "name": "D. Okoye", "minute": 51}, {"team": 0, "name": "M. Ferri", "minute": 77}],
 		"stats": {"shots": [9, 5], "onT": [5, 2], "poss": [61.0, 39.0], "corners": [4, 2], "fouls": [3, 6]},
 	}
-	var res: Variant = carriera.get("ultimo_risultato") if carriera != null else null
+	var res: Variant = ultimo_risultato if carriera != null else null
 	return {"m": m, "res": res, "title": "Terza Divisione · Giornata %d" % int(s.get("day", 3))}
 
 
@@ -233,8 +246,12 @@ func _fps(nome: String) -> void:
 	var f0 := Engine.get_frames_drawn()
 	var peggiore := 0.0
 	var prima := t0
+	var sc: Variant = schermo.get("scorri")
+	var massimo := 0
 	for k in 3:
 		await trascina(Vector2(200, 700), Vector2(200, 200), 0.35)
+		if sc != null:
+			massimo = maxi(massimo, sc.scroll_vertical)
 		for i in 30:
 			await get_tree().process_frame
 			var ora := Time.get_ticks_usec()
@@ -247,5 +264,4 @@ func _fps(nome: String) -> void:
 			peggiore = maxf(peggiore, (ora - prima) / 1000.0)
 			prima = ora
 	var sec := (Time.get_ticks_usec() - t0) / 1e6
-	var sc: Variant = schermo.get("scorri")
-	print("FPS %s: %.1f medi, fotogramma peggiore %.1f ms, scorrimento finale %s" % [nome, (Engine.get_frames_drawn() - f0) / sec, peggiore, str(sc.scroll_vertical) if sc != null else "-"])
+	print("FPS %s: %.1f medi, fotogramma peggiore %.1f ms, scorrimento col dito fino a %d px, alla fine %s" % [nome, (Engine.get_frames_drawn() - f0) / sec, peggiore, massimo, str(sc.scroll_vertical) if sc != null else "-"])

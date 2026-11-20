@@ -60,7 +60,7 @@ static func ricco(html: String, dim: float = 17.0, colore: Color = T.TXT, oro :=
 	r.add_theme_font_size_override("normal_font_size", int(round(dim)))
 	r.add_theme_font_size_override("bold_font_size", int(round(dim)))
 	r.add_theme_color_override("default_color", colore)
-	r.add_theme_constant_override("line_separation", int(round(dim * 0.45)))
+	r.add_theme_constant_override("line_separation", int(round(dim * 0.12)))
 	r.text = html_a_bbcode(html, oro)
 	return r
 
@@ -155,7 +155,9 @@ static func bottone(t: String, variante := "", cb := Callable(), altezza := -1.0
 
 
 static func chip(t: String, on: bool, cb := Callable()) -> Button:
-	return bottone(t, "ChipOn" if on else "Chip", cb)
+	var b := bottone(t, "ChipOn" if on else "Chip", cb)
+	b.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING   # il chip è largo quanto la scritta
+	return b
 
 
 ## pulsante che si rimpicciolisce un po' sotto il dito e torna come prima al rilascio
@@ -238,8 +240,8 @@ static func sezione(t: String, em := "") -> Control:
 	riga.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	h.add_child(riga)
 	var box := MarginContainer.new()
-	box.add_theme_constant_override("margin_top", 22)
-	box.add_theme_constant_override("margin_bottom", 8)
+	box.add_theme_constant_override("margin_top", 12)
+	box.add_theme_constant_override("margin_bottom", 0)
 	box.add_theme_constant_override("margin_left", 2)
 	box.mouse_filter = Control.MOUSE_FILTER_PASS
 	box.add_child(h)
@@ -255,6 +257,7 @@ static func valutazione(o: int, cls: String, larghezza := 42.0, altezza := 34.0,
 		fg = T.BAD
 	var p := pannello_stile(T.stile(bg, 10, Color(0, 0, 0, 0), 0, Vector4.ZERO))
 	p.custom_minimum_size = Vector2(larghezza, altezza)
+	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var l := testo(str(o) if o >= 0 else "·", dim, fg, T.PESO_NERO, HORIZONTAL_ALIGNMENT_CENTER)
 	p.add_child(l)
 	return p
@@ -264,6 +267,7 @@ static func valutazione(o: int, cls: String, larghezza := 42.0, altezza := 34.0,
 static func ruolo(pos: String, nome: String, larghezza := 42.0, altezza := 34.0, dim := 11.5) -> PanelContainer:
 	var p := pannello_stile(T.stile(T.POS_BG.get(pos, T.PANEL2), 10, Color(0, 0, 0, 0), 0, Vector4(4, 0, 4, 0)))
 	p.custom_minimum_size = Vector2(larghezza, altezza)
+	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	p.add_child(testo(nome, dim, Color.WHITE, T.PESO_NERO, HORIZONTAL_ALIGNMENT_CENTER))
 	return p
 

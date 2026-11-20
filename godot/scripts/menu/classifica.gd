@@ -3,7 +3,7 @@
 extends MenuSchermata
 
 const COLONNE := ["G", "V", "N", "P", "DR", "PT"]
-const LARGHEZZA_NUM := 26.0
+const LARGHEZZA_NUM := 20.0
 
 var divisione: Variant = null
 

@@ -30,6 +30,10 @@ const VIBRAZIONE_MS := 12
 static var carriera_prova: Object = null
 ## argomento per la prossima schermata aperta senza App (change_scene non passa argomenti)
 static var prossimo_arg: Variant = null
+## messaggio da mostrare in alto nella prossima schermata ("Stemma salvato")
+static var prossimo_msg := ""
+## se valida, vai() e gioca() chiamano questa (nome, arg) invece di App o del cambio di scena (test)
+static var deviazione: Callable = Callable()
 ## ultima schermata pronta (per le prove)
 static var ultima: MenuSchermata = null
 
@@ -39,11 +43,15 @@ var ferma := false               # true = niente scorrimento (Rosa): il contenut
 var con_testata := true
 var titolo := ""
 var indietro := "hub"            # dove porta il pulsante ‹ ("" = niente pulsante)
+var soldi := true                # soldi a destra nella barra in alto
+var pillola := ""                # scritta a destra nella barra in alto al posto dei soldi ("1 di 2")
 
 var sicura := Rect2()            # area sicura in punti dell'interfaccia
 var sfondo: Control
 var colonna: VBoxContainer
 var testata: PanelContainer
+var fisso_sopra: VBoxContainer   # sotto la barra, fuori dallo scorrimento (anteprima e schede dell'editor)
+var fisso_sotto: VBoxContainer   # in fondo, fuori dallo scorrimento (pulsanti dell'editor)
 var scorri: ScrollContainer
 var margine: MarginContainer
 var corpo: VBoxContainer
@@ -70,6 +78,9 @@ func _ready() -> void:
 	if not _arg_dato and prossimo_arg != null:
 		arg = prossimo_arg
 	prossimo_arg = null
+	if prossimo_msg != "":
+		msg = prossimo_msg
+		prossimo_msg = ""
 	U.al_tocco = _tocco
 	prepara()
 	_monta()
@@ -113,6 +124,9 @@ func stato() -> Dictionary:
 
 
 func vai(nome: String, a: Variant = null) -> void:
+	if deviazione.is_valid():
+		deviazione.call(nome, a)
+		return
 	var ap := app()
 	if ap != null and ap.has_method("vai"):
 		ap.vai(nome, a)
@@ -127,6 +141,9 @@ func vai(nome: String, a: Variant = null) -> void:
 
 ## partite: "campionato", "amichevole" (v = forza avversario), "allenamento"
 func gioca(tipo: String, v: Variant = null) -> void:
+	if deviazione.is_valid():
+		deviazione.call("gioca:" + tipo, v)
+		return
 	var ap := app()
 	var metodo: String = {"campionato": "gioca_campionato", "amichevole": "gioca_amichevole", "allenamento": "allenamento"}.get(tipo, "")
 	if ap != null and ap.has_method(metodo):
@@ -168,6 +185,8 @@ func _monta() -> void:
 	testata = U.pannello("Barra")
 	testata.visible = con_testata
 	colonna.add_child(testata)
+	fisso_sopra = U.vbox(0)
+	colonna.add_child(fisso_sopra)
 	margine = MarginContainer.new()
 	margine.mouse_filter = Control.MOUSE_FILTER_PASS
 	margine.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -188,6 +207,8 @@ func _monta() -> void:
 		scorri.mouse_filter = Control.MOUSE_FILTER_PASS
 		scorri.add_child(margine)
 		colonna.add_child(scorri)
+	fisso_sotto = U.vbox(0)
+	colonna.add_child(fisso_sotto)
 	_area_cambiata()
 
 
@@ -264,9 +285,11 @@ func mostra(fresco: bool) -> void:
 	for n in corpo.get_children():
 		corpo.remove_child(n)
 		n.queue_free()
-	for n in testata.get_children():
-		testata.remove_child(n)
-		n.queue_free()
+	for box: Control in [testata, fisso_sopra, fisso_sotto]:
+		for n in box.get_children():
+			box.remove_child(n)
+			if not n.has_meta("resta"):   # resta = nodo che la schermata rimette (anteprima 3D dell'editor)
+				n.queue_free()
 	testata.visible = con_testata
 	if con_testata:
 		_costruisci_testata()
@@ -307,11 +330,16 @@ func _costruisci_testata() -> void:
 	var t := U.corto(titolo, 21, T.TXT, T.PESO_NERO)
 	riga.add_child(t)
 	var s := stato()
-	if s.has("money"):
-		var soldi := U.pannello("Soldi")
-		soldi.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		soldi.add_child(U.testo(D.fmt_money(float(s.money)), 14, T.GOOD, T.PESO_NERO))
-		riga.add_child(soldi)
+	if pillola != "":
+		var pl := U.pannello("Pillola")
+		pl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		pl.add_child(U.testo(pillola.to_upper(), 11.5, Color("#c9d6ee"), T.PESO_NERO))
+		riga.add_child(pl)
+	elif soldi and s.has("money"):
+		var box := U.pannello("Soldi")
+		box.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		box.add_child(U.testo(D.fmt_money(float(s.money)), 14, T.GOOD, T.PESO_NERO))
+		riga.add_child(box)
 	var m := MarginContainer.new()
 	m.add_theme_constant_override("margin_top", int(sicura.position.y))
 	m.add_child(riga)

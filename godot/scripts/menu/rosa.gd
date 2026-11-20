@@ -252,14 +252,14 @@ func _vendi(id: Variant, b: Button) -> void:
 		b.text = "Conferma vendita"
 		b.theme_type_variation = "BtnAvviso"
 		return
-	var err: Variant = carriera().sell(id)
+	var err := D.errore(carriera().sell(id))
 	sel = null
 	tgt = null
 	just = null
 	_vendi_ok = null
 	_scorri_panchina = 0
-	if err != null:
-		toast(str(err))
+	if err != "":
+		toast(err)
 	else:
 		ridisegna()
 
@@ -279,6 +279,8 @@ func _controlli() -> Control:
 	forza.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	info.add_child(forza)
 	var best := U.bottone("Migliori 11", "Chip", _migliori)
+	best.custom_minimum_size.x = 112
+	best.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	best.add_theme_stylebox_override("normal", T.stile(T.PANEL2, 999, T.LINE2, 1, Vector4(16, 10, 16, 10)))
 	info.add_child(best)
 	v.add_child(info)
@@ -412,7 +414,7 @@ func _lato(p: Dictionary, at: Dictionary, destra: bool) -> Control:
 	var n := U.corto(Rosa.short_name(p.name), 14, T.TXT, T.PESO_NERO)
 	n.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT if destra else HORIZONTAL_ALIGNMENT_LEFT
 	nv.add_child(n)
-	var col := MenuTema.STAT[D.ovr_cls(at.o)]
+	var col: Color = MenuTema.STAT[D.ovr_cls(at.o)]
 	var pallino := "[color=#cfe0ff]●[/color]" if destra else "[color=#ffd93d]●[/color]"
 	var riga := U.bb("%s%s %s [color=#%s][b]%d[/b][/color]%s" % ["[right]" if destra else "", pallino, at.where, col.to_html(false), int(at.o), "[/right]" if destra else ""], 11, T.DIM)
 	riga.autowrap_mode = TextServer.AUTOWRAP_OFF
