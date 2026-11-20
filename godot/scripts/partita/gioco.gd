@@ -51,7 +51,7 @@ const TITOLO := "Amichevole"
 
 const HINTS := {
 	"attack": "Disegna la strada dal giocatore per correre · linea in porta = tiro",
-	"defend": "Disegna linee dai tuoi giocatori: solo chi ha una linea si muove",
+	"defend": "Difende la CPU: disegna una linea da un tuo giocatore per guidarlo tu",
 	"loose": "Palla libera: disegna una linea da un tuo giocatore per andarci",
 	"dive": "PARA! Tira una linea dal portiere al punto della porta",
 	"duel": "Disegna fino a un compagno per passare · oppure tocca Dribbling",

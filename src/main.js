@@ -116,7 +116,7 @@ const DUEL_SLOW = 0.08; // velocità del tempo durante un duello col difensore (
 const ZONE_SLOW = 0.1; // (era 0,17) velocità del tempo negli ultimi 20 m prima della porta avversaria (area di tiro)
 const HINTS = {
   attack: 'Disegna la strada dal giocatore per correre · linea in porta = tiro',
-  defend: 'Disegna linee dai tuoi giocatori: solo chi ha una linea si muove',
+  defend: 'Difende la CPU: disegna una linea da un tuo giocatore per guidarlo tu',
   loose: 'Palla libera: disegna una linea da un tuo giocatore per andarci',
   dive: 'PARA! Tira una linea dal portiere al punto della porta',
   duel: 'Disegna fino a un compagno per passare · oppure tocca Dribbling',
