@@ -1,19 +1,22 @@
-import { Match, FORMATIONS, HW, HL, rng32 } from './sim.js';
+import { Match, HW, HL } from './sim.js';
 import { View } from './render.js';
 import { Input } from './input.js';
-import { Career, DIV_NAMES, KITS, POS_NAME, overall, genPlayer } from './career.js';
+import { Career, DIV_NAMES, KITS, POS_NAME, overall } from './career.js';
 import { UI } from './ui.js';
 import { Sfx } from './audio.js';
 import { Assets } from './assets.js';
 import { runLegacyMigration } from './legacy-save.js';
 import { Tutorial } from './tutorial.js';
+import { MenuBg } from './menu-bg.js';
+import { normalizeKitStyle, lookFromSeed } from './looks.js';
+import { crestFromSeed } from './crest.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('c'), hud = $('hud'), ov = $('ov'), uiRoot = $('ui');
 const career = new Career(), view = new View(canvas), sfx = new Sfx();
 // file pesanti caricati a pezzi da www/assets/ (manifesto incorporato da build.mjs)
 const assets = new Assets({ manifest: typeof __MANIFEST__ !== 'undefined' ? __MANIFEST__ : {}, inline: window.__INLINE_ASSETS });
-const G = { state: 'menu', match: null, paused: false, ts: 1, mode: '', title: '', subs: 5, bench: [], res: null, demo: null, bigT: 0, endT: 0, selA: null, selB: null };
+const G = { state: 'menu', match: null, paused: false, ts: 1, mode: '', title: '', subs: 5, bench: [], res: null, bigT: 0, endT: 0, selA: null, selB: null };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const hex = n => '#' + n.toString(16).padStart(6, '0');
 
@@ -29,20 +32,9 @@ const input = new Input(canvas, view, {
   dive: (dx, th) => G.match.userDive(0, dx, th), sw: i => G.match.userSwitch(0, G.match.players[i]),
 });
 
-// ---------------------------------------------------------------- menu con partita dimostrativa sullo sfondo
-function demoTeam(name, kit, seed) {
-  const r = rng32(seed), F = FORMATIONS['4-3-3'];
-  return { name, short: name.slice(0, 3), formation: '4-3-3', skill: 0.6, players: F.map((f, i) => genPlayer(r, f[0], 66, -i - 1)), kit: career.kitOf.call(career, kit, false) };
-}
-function startDemo() {
-  const a = demoTeam('AAA', 3, 11), b = demoTeam('BBB', 1, 29);
-  G.demo = new Match({ seed: (Math.random() * 1e9) | 0, halfLen: 99999, human: [false, false], teams: [a, b] });
-  view.setMatch(G.demo, 0);
-}
 function toMenu(screen, arg) {
   G.tut = null; showTut(null, '');
   G.state = 'menu'; G.match = null; input.enabled = false; input.set(null, 0); hud.style.display = 'none'; ov.style.display = 'none'; sfx.crowd(0); sfx.music(true);
-  if (!G.demo) startDemo(); else view.setMatch(G.demo, 0);
   ui.show(screen, arg);
 }
 
@@ -77,10 +69,9 @@ function startMatch(mode, lvl) {
   else { opp = career.aiMatchTeam({ name: 'Amichevole', short: 'AMI', kit: (s.kit + 4) % KITS.length, rating: lvl, seed: (Math.random() * 1e9) | 0 }); title = 'Amichevole'; }
   G.mode = mode; G.title = title; G.subs = 5; G.bench = my.bench.slice(); G.res = null; G.paused = false; G.ts = 1; G.endT = 0;
   G.match = new Match({ seed: (Math.random() * 1e9) | 0, halfLen: mode === 'tutorial' ? 99999 : s.settings.half, human: [true, false], autoGk: [!!s.settings.autoGk, false], teams: [my, opp] });
-  G.demo = null;
   showTut(null, ''); G.tut = null;
   view.setMatch(G.match, 0); input.set(G.match, 0); input.enabled = true;
-  ui.hide(); ov.style.display = 'none'; hud.style.display = 'block'; G.state = 'match';
+  ui.hide(); menuBg.hide(); uiRoot.classList.remove('champbg'); ov.style.display = 'none'; hud.style.display = 'block'; G.state = 'match';
   $('tn0').textContent = my.short; $('tn1').textContent = opp.short;
   $('k0').style.background = hex(my.kit.shirt); $('k1').style.background = hex(opp.kit.shirt);
   sfx.on = s.settings.sound; sfx.init(); sfx.resume(); sfx.music(false); sfx.crowd(0.16);
@@ -267,9 +258,6 @@ function frame(now) {
     view.rdt = G.paused ? 0 : dt; // tempo vero per la telecamera
     view.update(G.paused ? 0 : dt * Math.max(G.ts, 0.25));
     view.render();
-  } else if (G.demo && ui.screen === 'title') {
-    const d = G.demo; d.step(dt); d.events.length = 0; if (d.phase === 'half') d.startSecondHalf();
-    view.rdt = null; view.update(dt); view.render();
   }
 }
 
@@ -278,8 +266,20 @@ window.addEventListener('orientationchange', () => setTimeout(() => view.resize(
 document.addEventListener('gesturestart', e => e.preventDefault());
 document.addEventListener('touchmove', e => { if (!e.target.closest('.scr') && !e.target.closest('#ov')) e.preventDefault(); }, { passive: false });
 
-// osservatore dello sfondo trasparente solo nella schermata iniziale
-const mo = new MutationObserver(() => uiRoot.classList.toggle('clear', ui.screen === 'title'));
+// sfondo del menu principale (schermata iniziale e hub): il campione che si allena, in trasparenza (src/menu-bg.js)
+const menuBg = new MenuBg($('menubg'), assets);
+function champOnMenu() {
+  const s = career.s;
+  if (!s) { const k = KITS[ui.kit] || KITS[0]; return { kit: { shirt: k[1], shorts: k[2], socks: k[1], style: normalizeKitStyle(null), crest: { ...crestFromSeed(ui.kit * 7 + 3), c1: k[1], c2: k[2] } }, look: lookFromSeed(ui.kit * 7 + 3), num: 10, name: '' }; }
+  const p = s.squad.find(q => q.champ) || s.squad.find(q => q.id === s.lineup[s.lineup.length - 1]) || s.squad[0];
+  const team = career.myMatchTeam();
+  return { kit: p.pos === 'P' ? team.kit.gk : team.kit, look: p.look, num: p.num, name: p.name };
+}
+const mo = new MutationObserver(() => {
+  const on = G.state === 'menu' && (ui.screen === 'title' || ui.screen === 'hub');
+  uiRoot.classList.toggle('champbg', on);
+  if (on) menuBg.show(champOnMenu()); else menuBg.hide();
+});
 mo.observe(uiRoot, { childList: true });
 
 runLegacyMigration(window); // vecchio salvataggio dell'app (origine file://), se l'app iOS lo passa

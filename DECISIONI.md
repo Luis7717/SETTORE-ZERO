@@ -342,3 +342,16 @@ maglia, maniche, calzettoni…), poi nome e numero sulla schiena e uno stemma in
   da davanti il giocatore sembrava senza braccia e le dita spuntavano dai pantaloncini come una macchia color pelle.
   Due test lo controllano (`gambe.test.mjs`, `busto.test.mjs`). Non controllato: le mani durante la corsa.
 - **Da provare sull'iPhone**: giocatore fermo da davanti, di lato e da dietro; visi e capelli sulla testa nuova.
+
+## 2026-11-20 — Menu principale col campione che si allena, editor opaco
+- **Menu principale** (schermata iniziale e hub): tolta la partita dimostrativa sullo sfondo. Al suo posto il campione
+  della carriera (o, senza carriera, un giocatore coi colori scelti) che si allena in trasparenza: palleggi, un
+  giochetto (a ogni giro il successivo dei sei), corsa palla al piede, tiro (`src/menu-routine.js`, funzione pura con
+  test; `src/menu-bg.js`, renderer dedicato in un canvas fisso dietro il menu, acceso solo su quelle due schermate).
+  Schede del menu semitrasparenti lì sopra. Il modello sta nella tappa `match`, che quindi si scarica in sottofondo già
+  al menu (come faceva l'editor): il menu è usabile subito, il campione compare appena pronto.
+- **Menu trasparenti sull'iPhone**: `color-mix()` con `var()` dentro, sui Safari che non lo conoscono, rendeva vuoto lo
+  sfondo (non basta una regola di riserva prima: la regola diventa invalida solo al calcolo). Ora i colori della
+  squadra mescolati sono variabili CSS calcolate in JS (`teamMixVars`). Si vedeva la partita dietro i menu e le
+  opzioni dell'editor scorrevano dietro l'anteprima.
+- **Forme degli occhi** visibili: palpebre dipinte nella finestra davvero visibile del bulbo (`src/body/occhi.js`).

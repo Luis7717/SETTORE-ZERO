@@ -30,7 +30,7 @@ function canvasTex(w, h, draw, aniso = 4) {
 // ---------------------------------------------------------------- pallone
 // Disegno originale a 32 pannelli (12 pentagoni blu notte bordati d'arancio, 20 esagoni bianchi un po' bombati),
 // calcolato punto per punto sulla sfera e scritto nella texture equirettangolare usata da SphereGeometry.
-function ballTexture() {
+export function ballTexture() {
   const W = 512, H = 256, f = (1 + Math.sqrt(5)) / 2, C = [];
   const add = (x, y, z, pent) => { const l = Math.hypot(x, y, z); C.push([x / l, y / l, z / l, pent]); };
   for (const a of [1, -1]) for (const b of [f, -f]) { add(0, a, b, 1); add(a, b, 0, 1); add(b, 0, a, 1); }
