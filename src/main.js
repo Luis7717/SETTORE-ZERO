@@ -18,6 +18,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 const hex = n => '#' + n.toString(16).padStart(6, '0');
 
 const ui = new UI(uiRoot, career, {
+  assets, // l'editor del campione carica da qui il modello per l'anteprima
   click: () => { sfx.init(); sfx.resume(); sfx.click(); },
   play: (mode, lvl) => enterMatch(mode, lvl),
   settings: () => { sfx.on = career.s.settings.sound; if (!sfx.on) { sfx.crowd(0); sfx.music(false); } else sfx.music(true); },
@@ -118,7 +119,7 @@ const DUEL_SLOW = 0.35; // velocità del tempo durante un duello col difensore
 const HINTS = {
   attack: 'Disegna la strada dal giocatore per correre · linea in porta = tiro',
   defend: 'Disegna linee dai tuoi giocatori per chiudere e intercettare · scorri veloce = scivolata',
-  loose: 'Palla libera: tieni premuto per andarci',
+  loose: 'Palla libera: disegna una linea da un tuo giocatore per andarci',
   dive: 'PARA! Tira una linea dal portiere al punto della porta',
   duel: 'Passa a un compagno libero (anello verde) o tocca Dribbling',
 };
