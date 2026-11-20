@@ -297,3 +297,6 @@ maglia, maniche, calzettoni…), poi nome e numero sulla schiena e uno stemma in
 - **Rallenty più lento**: duello 20% (era 35%), area di tiro 22% (era 40%), parata 15% (era 25%), mentre si disegna
   la corsa 30% (era 50%), mentre si disegna una linea di difesa 18% (era 30%).
 - Bot dei test: insegue col dito anche il pallone libero (come farebbe una persona). Impronta golden rigenerata.
+- **Scivolata tolta anche all'IA** (richiesta successiva): il pressatore avversario ruba palla solo col contatto.
+  Il motore della scivolata resta (prove a schermo e test dei falli). Effetto: i falli venivano quasi solo dalle
+  scivolate, quindi ora punizioni, cartellini e rigori per fallo saranno rarissimi. Impronta golden rigenerata.

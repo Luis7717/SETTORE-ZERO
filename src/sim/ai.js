@@ -334,12 +334,8 @@ export class AIMethods {
           const ux = -c.x, uy = own - c.y, n = hyp(ux, uy) || 1;
           p.tx = c.x + ux / n * 2.6; p.ty = c.y + uy / n * 2.6;
         } else {
+          // niente scivolate (tolte anche all'IA il 2026-11-20): il pressatore ruba palla solo col contatto
           p.tx = b.x + c.vx * 0.25; p.ty = b.y + c.vy * 0.25;
-          const d = hyp(p.x - b.x, p.y - b.y), sk = this.teams[T].skill;
-          if (d > 1.5 && d < 3.2 && p.tackleCd <= 0 && c.protect <= 0 && !this.duelGuard(p) && this.rnd() < this.dtT * (0.2 + 0.5 * sk)) {
-            const dot = ((p.x - c.x) * c.fx + (p.y - c.y) * c.fy) / (hyp(p.x - c.x, p.y - c.y) || 1);
-            if (dot < 0.6) { p.state = 'prep'; p.t = 0.26; p.warn = true; p.vx *= 0.5; p.vy *= 0.5; }
-          }
         }
         return;
       }

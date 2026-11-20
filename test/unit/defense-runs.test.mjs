@@ -110,3 +110,10 @@ test('una linea disegnata fin sull’avversario col pallone porta al contrasto',
   for (let i = 0; i < 6 * 60 && !won; i++) { hold(m, c); c.stun = 0; c.vx = c.vy = 0; m.step(DT); won = m.events.some(e => e.type === 'tackle' && e.p === d); m.events.length = 0; }
   assert.ok(won, 'il difensore arriva sull’avversario e contrasta');
 });
+
+test('nessuna scivolata: in una partita intera l’IA non entra mai in scivolata', async () => {
+  const { playMatch } = await import('../lib/harness.mjs');
+  let slides = 0;
+  for (const seed of [1, 2]) playMatch({ seed, mode: 'ai', onStep: m => { for (const e of m.events) if (e.type === 'slide') slides++; } });
+  assert.equal(slides, 0);
+});
