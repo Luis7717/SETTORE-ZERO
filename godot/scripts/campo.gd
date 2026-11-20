@@ -4,6 +4,8 @@ extends Node3D
 
 const Coord := preload("res://scripts/coord.gd")
 const SHADER_ERBA := preload("res://shaders/erba.gdshader")
+const SHADER_RETE := preload("res://shaders/rete.gdshader")
+const SHADER_BANDIERINA := preload("res://shaders/bandierina.gdshader")
 
 const MX := 10.0               # margine d'erba oltre le linee laterali (m)
 const MY := 12.0               # margine d'erba oltre le linee di porta (m)
@@ -14,6 +16,10 @@ const RETE_FONDO := 2.0         # profondità della rete a terra (m)
 const RETE_ALTO := 1.0          # profondità della rete all'altezza della traversa (m)
 const RETE_MAGLIA := 0.14       # lato di una maglia della rete (m)
 const BANDIERINA_H := 1.5       # altezza dell'asta della bandierina (m)
+const RETE_CELLA := 0.3         # lato dei quadratini in cui è divisa la rete, per farla gonfiare (m)
+const RETE_LIBERA := 0.7        # a questa distanza dal bordo di un telo la rete si muove già del tutto (m)
+
+var _reti := {}                 # lato (1 / −1) → ShaderMaterial della rete
 
 
 func _ready() -> void:
@@ -93,7 +99,10 @@ func _costruisci_porta(lato: float) -> void:
 	var rete := MeshInstance3D.new()
 	rete.name = "Rete"
 	rete.mesh = _mesh_rete(gy, lato)
-	rete.material_override = _materiale_rete()
+	var mat := _materiale_rete()
+	mat.set_shader_parameter("fuori", Vector3(0, 0, -lato))
+	_reti[lato] = mat
+	rete.material_override = mat
 	rete.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	porta.add_child(rete)
 
@@ -131,40 +140,50 @@ func _mesh_rete(gy: float, lato: float) -> ArrayMesh:
 	_quad(st, Vector3(-hx, y0, gh), Vector3(hx, y0, gh), Vector3(hx, ya, gh), Vector3(-hx, ya, gh))
 	for x in [-hx, hx]:
 		_quad(st, Vector3(x, y0, 0.0), Vector3(x, yf, 0.0), Vector3(x, ya, gh), Vector3(x, y0, gh))
-	st.generate_normals()
 	return st.commit()
 
 
-# quadrilatero con UV in metri / maglia (punti del gioco x, y, h)
+# quadrilatero diviso in quadratini (punti del gioco x, y, h), UV in metri / maglia;
+# COLOR.r = libertà del vertice (0 sul bordo, attaccato al telaio o al terreno)
 func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> void:
-	var pts := [a, b, c, d]
+	var lu := maxf(a.distance_to(b), d.distance_to(c))
+	var lv := maxf(a.distance_to(d), b.distance_to(c))
+	var nu := maxi(1, ceili(lu / RETE_CELLA))
+	var nv := maxi(1, ceili(lv / RETE_CELLA))
 	var u_dir: Vector3 = (b - a).normalized()
 	var v_dir: Vector3 = (d - a).normalized()
-	var g := []
-	var uv := []
-	for p: Vector3 in pts:
-		g.append(Coord.a_godot(p.x, p.y, p.z))
-		uv.append(Vector2((p - a).dot(u_dir), (p - a).dot(v_dir)) / RETE_MAGLIA)
-	for i in [0, 1, 2, 0, 2, 3]:
-		st.set_uv(uv[i])
-		st.add_vertex(g[i])
+	var punto := func(i: int, j: int) -> Vector3:
+		var u := float(i) / nu
+		var v := float(j) / nv
+		return a.lerp(b, u).lerp(d.lerp(c, u), v)
+	for j in nv:
+		for i in nu:
+			var ids := [[i, j], [i + 1, j], [i + 1, j + 1], [i, j], [i + 1, j + 1], [i, j + 1]]
+			for q: Array in ids:
+				var p: Vector3 = punto.call(q[0], q[1])
+				var bordo := minf(minf(float(q[0]) / nu, 1.0 - float(q[0]) / nu) * lu, minf(float(q[1]) / nv, 1.0 - float(q[1]) / nv) * lv)
+				st.set_color(Color(clampf(bordo / RETE_LIBERA, 0.0, 1.0), 0, 0))
+				st.set_uv(Vector2((p - a).dot(u_dir), (p - a).dot(v_dir)) / RETE_MAGLIA)
+				st.add_vertex(Coord.a_godot(p.x, p.y, p.z))
 
 
-func _materiale_rete() -> StandardMaterial3D:
+func _materiale_rete() -> ShaderMaterial:
 	var lato := 16
 	var img := Image.create(lato, lato, false, Image.FORMAT_RGBA8)
 	img.fill(Color(1, 1, 1, 0))
 	img.fill_rect(Rect2i(0, 0, lato, 2), Color(1, 1, 1, 1))
 	img.fill_rect(Rect2i(0, 0, 2, lato), Color(1, 1, 1, 1))
 	img.generate_mipmaps()
-	var m := StandardMaterial3D.new()
-	m.albedo_texture = ImageTexture.create_from_image(img)
-	m.albedo_color = Color(0.95, 0.95, 0.95, 0.9)
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.cull_mode = BaseMaterial3D.CULL_DISABLED
-	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	var m := ShaderMaterial.new()
+	m.shader = SHADER_RETE
+	m.set_shader_parameter("maglia", ImageTexture.create_from_image(img))
+	m.set_shader_parameter("colore", Color(0.95, 0.95, 0.95, 0.9))
 	return m
+
+
+## materiale della rete della porta a y = lato·50 (lato 1 o −1), per farla gonfiare e cambiarne la trasparenza
+func materiale_rete(lato: float) -> ShaderMaterial:
+	return _reti.get(1.0 if lato > 0.0 else -1.0)
 
 
 # ---------------------------------------------------------------- bandierine
@@ -177,12 +196,17 @@ func _costruisci_bandierina(sx: float, sy: float) -> void:
 	asta_mat.albedo_color = Color(0.95, 0.95, 0.95)
 	_tubo(b, Vector3.ZERO, Vector3(0, BANDIERINA_H, 0), 0.022, asta_mat)
 	var telo := MeshInstance3D.new()
+	telo.name = "Telo"
 	var q := QuadMesh.new()
 	q.size = Vector2(0.42, 0.3)
+	q.subdivide_width = 8
+	q.subdivide_depth = 2
 	telo.mesh = q
-	var tm := StandardMaterial3D.new()
-	tm.albedo_color = Color("#ffcc1a")
-	tm.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var tm := ShaderMaterial.new()
+	tm.shader = SHADER_BANDIERINA
+	tm.set_shader_parameter("colore", Color("#ffcc1a"))
 	telo.material_override = tm
 	telo.position = Vector3(-sx * 0.21, BANDIERINA_H - 0.15, 0.0)
 	b.add_child(telo)
+	telo.set_instance_shader_parameter("asta", sx * 0.21)   # il lato attaccato all'asta (x locale)
+	telo.set_instance_shader_parameter("fase", (sx + 2.0 * sy) * 1.7)

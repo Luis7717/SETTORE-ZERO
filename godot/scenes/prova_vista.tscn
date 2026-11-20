@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/partita/prova_vista.gd" id="1_prova"]
+
+[node name="ProvaVista" type="Node"]
+script = ExtResource("1_prova")
