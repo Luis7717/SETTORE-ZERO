@@ -19,6 +19,9 @@ const GK_CAM_BACK = 6.5;       // parata: telecamera dietro la propria linea di 
 const GK_CAM_H = 2.6;          // parata: altezza della telecamera (m)
 const RUN_LINES = 10, RUN_PTS = 64, RUN_COLOR = 0x7dd3ff; // linee di difesa a schermo
 const CAM_BACK = 16;           // telecamera di gioco (schermo verticale): distanza dietro il pallone (m)
+const NEAR_X0 = 4, NEAR_XW = 8;  // vicino alla porta: da |x| > 4 m la telecamera si avvicina meno, da 12 m per niente
+const DEF_BACK = 6, DEF_UP = 6, DEF_LOOK = 12; // difesa: telecamera più indietro e più alta, sguardo verso la propria porta (m)
+const CAM_SNAP = 12;           // oltre questo salto del pallone (m) la telecamera non insegue: va subito lì
 const CAM_H = 10.5;            // ... e altezza (m); più bassa e vicina = giocatori più grandi
 const DUEL_LOW = 0.3;           // quanto si abbassa la telecamera nel duello (0 = niente, 1 = a terra)
 const DUEL_BACK = 0.12;         // nel duello la telecamera si allontana di questa frazione della distanza normale
@@ -190,7 +193,7 @@ export class View {
     const s = this.flip, b = m.ball; this.t += dt;
     // pubblico: si anima quando il pallone si avvicina a una porta e soprattutto dopo un gol
     if (this.stadium) this.stadium.update(dt, m.phase === 'goal' ? 1 : Math.max(0, (Math.abs(b.y) - 25) / 25) * 0.4, m);
-    this.zoom += (this.zoomT - this.zoom) * Math.min(1, dt * 7);
+    this.zoom += (this.zoomT - this.zoom) * Math.min(1, (this.rdt != null ? this.rdt : dt) * 7);
     for (let i = 0; i < 22; i++) {
       const p = m.players[i]; let f = this.figs[i];
       if (f.src !== p.src) { this.scene.remove(f.g); this.scene.remove(f.sh); if (f.m3d) this.p3d.dispose(f); f = this.figs[i] = this.figFor(p); } // cambio: entra un altro giocatore
@@ -222,19 +225,28 @@ export class View {
     const dir = this.me === 1 ? -1 : 1;
     let fx = b.x, fy = b.y;
     if (m.phase === 'restart' && m.restart) { fx = m.restart.x; fy = m.restart.y; }
-    const k = Math.min(1, dt * 4.5);
-    this.cx += (fx - this.cx) * k; this.cy += (fy - this.cy) * k;
+    const rdt = this.rdt != null ? this.rdt : dt; // tempo vero: la telecamera non rallenta col rallenty
+    const k = Math.min(1, rdt * 4.5);
+    // salto lungo del pallone (nuova prova del tutorial, ripartenza spostata): la telecamera ci va subito
+    if (Math.hypot(fx - this.cx, fy - this.cy) > CAM_SNAP) { this.cx = fx; this.cy = fy; this.near = 0; }
+    else { this.cx += (fx - this.cx) * k; this.cy += (fy - this.cy) * k; }
     // vicino alla porta avversaria la telecamera scende e si avvicina: la porta diventa grande
     const mine = b.owner && b.owner.team === this.me && m.phase !== 'goal';
-    const nearT = mine ? Math.max(0, Math.min(1, (this.cy * dir - 14) / 18)) : 0;
-    this.near = (this.near || 0) + (nearT - (this.near || 0)) * Math.min(1, dt * 3);
+    // ... ma solo con la palla verso il centro: sulla fascia la telecamera vicina lascerebbe fuori il portatore
+    const wide = Math.max(0, Math.min(1, 1 - (Math.abs(this.cx) - NEAR_X0) / NEAR_XW));
+    const nearT = mine ? Math.max(0, Math.min(1, (this.cy * dir - 14) / 18)) * wide : 0;
+    this.near = (this.near || 0) + (nearT - (this.near || 0)) * Math.min(1, rdt * 3);
     const a = this.near, z = this.zoom * (1 - 0.75 * a), port = this.w < this.h;
     const back = ((port ? CAM_BACK : 26) + z * 6) * (1 - 0.3 * a), hgt = ((port ? CAM_H : 13) + z * 5) * (1 - 0.4 * a), ahead = 9 + z * 4 + a * 9;
     // difesa vicino alla propria porta: inquadratura da dietro la porta, bassa, per leggere i tiri
-    const defT = !mine ? Math.max(0, Math.min(1, (-this.cy * dir - 14) / 16)) : 0;
+    const defT = 0; // in difesa la telecamera non si avvicina (inquadratura larga per muovere più difensori)
     this.defk = (this.defk || 0) + (defT - (this.defk || 0)) * Math.min(1, dt * 3);
     const dk = this.defk, minY = -HL - 15.5;
-    let camY = this.cy * dir - back, hh = hgt, lookY = this.cy * dir + ahead;
+    // senza palla: inquadratura più alta e più indietro, che guarda verso la propria porta dove stanno i difensori
+    const defW = !mine && m.phase === 'play' ? 1 : 0;
+    this.defW = (this.defW || 0) + (defW - (this.defW || 0)) * Math.min(1, rdt * 2.5);
+    const dw = this.defW;
+    let camY = this.cy * dir - back - DEF_BACK * dw, hh = hgt + DEF_UP * dw, lookY = this.cy * dir + ahead - DEF_LOOK * dw;
     if (camY < minY) { hh += Math.min(6, (minY - camY) * 0.35); camY = minY; }
     camY += (-HL - 12.5 - camY) * dk; hh += (10.5 - hh) * dk; lookY += ((this.cy * dir - HL) / 2 + 3 - lookY) * dk;
     const du = this.duelK; hh *= 1 - DUEL_LOW * du; camY += back * (0.3 - DUEL_BACK) * du; lookY += 8 * du;

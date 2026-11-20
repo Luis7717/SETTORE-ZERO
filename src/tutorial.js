@@ -123,7 +123,7 @@ export class Tutorial {
   reset() {
     const m = this.m, L = this.lesson;
     this.t = 0; this.done = 0;
-    m.phase = 'play'; m.restart = null; m.move = [null, null]; m.lastPass = null; m.resetStates();
+    m.phase = 'play'; m.restart = null; m.move = [null, null]; m.runs = [[], []]; m.lastPass = null; m.resetStates();
     // in allenamento niente espulsioni né stanchezza: ogni prova riparte con tutti in campo
     for (const p of m.players) { p.off = false; p.yellow = 0; p.energy = 1; p.vx = p.vy = 0; p.stun = 0; }
     m.ctrl[0] = null;

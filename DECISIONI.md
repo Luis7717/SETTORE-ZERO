@@ -322,3 +322,14 @@ maglia, maniche, calzettoni…), poi nome e numero sulla schiena e uno stemma in
 - Visuale del duello (`duelSide` in `render.js`): se c'è almeno un compagno davanti (entro 35 m, cono di ~45°) resta
   dritta, un po' più alta e lontana di prima (`DUEL_LOW` 0,3, `DUEL_BACK`); se no gira intorno al portatore verso il
   lato con più compagni, dell'85% dell'angolo verso la loro media, al massimo ~70°. Prova: `node test/duel-side-shot.mjs shots`.
+
+## 2026-11-20 — Telecamera in difesa larga, tutorial sistemato
+- In difesa (avversario col pallone o pallone libero) la telecamera **non si avvicina**: zoom largo, più indietro di
+  `DEF_BACK` 6 m, più alta di `DEF_UP` 6 m e con lo sguardo 12 m più verso la propria porta, per vedere e muovere più
+  difensori. Tolta l'inquadratura bassa da dietro la propria porta quando l'avversario si avvicina (resta solo quella della parata).
+- La telecamera segue col **tempo vero** (`view.rdt`), non col tempo rallentato: nel rallenty non resta più indietro.
+  Se il pallone salta di più di 12 m (nuova prova del tutorial) ci va subito.
+- Vicino alla porta avversaria la telecamera si avvicina solo con la palla verso il centro: sulla fascia
+  (|x| > 4 m, del tutto da 12 m) resta normale, così il portatore non esce dallo schermo (tutorial Tiro, prova 2).
+- Tutorial: ogni prova cancella le linee di difesa rimaste (`m.runs`) e il gesto in corso; prima in "Recupera palla" il
+  giocatore poteva partire da solo su una linea vecchia. Prova a schermo: `node test/tut-lessons-shot.mjs shots`.

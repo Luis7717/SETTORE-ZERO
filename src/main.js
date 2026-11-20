@@ -191,7 +191,7 @@ function showSubs() {
 }
 ov.addEventListener('click', e => {
   const t = e.target.closest('[data-o]'); if (!t) return; const a = t.dataset.o, m = G.match; sfx.click();
-  if (a === 'tutgo') { ov.style.display = 'none'; G.paused = false; if (G.tut) G.tut.go(); return; }
+  if (a === 'tutgo') { ov.style.display = 'none'; G.paused = false; input.cancel(); if (G.tut) G.tut.go(); return; }
   if (a === 'tutskip') { career.s.tutDone = true; career.save(); finish(); return; }
   if (a === 'resume') { ov.style.display = 'none'; G.paused = false; }
   else if (a === 'second') { ov.style.display = 'none'; G.paused = false; m.startSecondHalf(); }
@@ -250,7 +250,7 @@ function frame(now) {
       events(m);
       const myRestart = m.phase === 'restart' && m.restart && m.restart.team === 0;
       const mine = m.ball.owner && m.ball.owner.team === 0;
-      view.setZoom(input.drawing || myRestart ? 1 : m.phase === 'restart' ? 0.5 : mine ? 0.4 : 0.15);
+      view.setZoom(input.drawing || myRestart || !mine ? 1 : m.phase === 'restart' ? 0.5 : 0.4); // senza palla: larga, per muovere più difensori
       $('slow').className = G.ts < 0.6 ? 'on' : '';
       if (G.endT && now > G.endT) { G.endT = 0; finish(false); return; }
     }
@@ -264,11 +264,12 @@ function frame(now) {
       if (txt !== lastHint) { lastHint = txt; const el = $('hint'); el.className = h === 'dive' || (h === 'restart' && m.restart.type === 'penalty') ? 'hot' : ''; el.innerHTML = txt ? `<span>${txt}</span>` : ''; }
     }
     if (G.bigT && now > G.bigT) { G.bigT = 0; $('big').className = ''; }
+    view.rdt = G.paused ? 0 : dt; // tempo vero per la telecamera
     view.update(G.paused ? 0 : dt * Math.max(G.ts, 0.25));
     view.render();
   } else if (G.demo && ui.screen === 'title') {
     const d = G.demo; d.step(dt); d.events.length = 0; if (d.phase === 'half') d.startSecondHalf();
-    view.update(dt); view.render();
+    view.rdt = null; view.update(dt); view.render();
   }
 }
 

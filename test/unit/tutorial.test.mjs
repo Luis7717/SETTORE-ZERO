@@ -85,3 +85,14 @@ test('passaggio: il difensore parte lontano, il duello si apre solo dopo essersi
     assert.equal(m.duelFor(0), false, `prova ${k}: niente duello subito`);
   }
 });
+
+test('ogni prova riparte senza linee rimaste dalla prova o dalla lezione prima', () => {
+  const m = newMatch(), r = recorder(), t = new Tutorial(m, r.ui);
+  while (t.lesson.title !== 'Recupera palla') t.nextLesson();
+  m.userRun(0, m.players[7], [{ x: 10, y: 10 }]); m.userRun(0, m.players[4], [{ x: -10, y: 0 }]);
+  t.go();
+  assert.equal(m.runs[0].length, 0, 'nessuna linea all’inizio della prova');
+  const me = m.ctrl[0], x0 = me.x, y0 = me.y;
+  for (let i = 0; i < 60; i++) { t.before(); m.step(DT); t.after(DT); m.events.length = 0; }
+  assert.ok(Math.hypot(me.x - x0, me.y - y0) < 0.5, 'il giocatore non parte da solo');
+});
