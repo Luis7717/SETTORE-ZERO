@@ -916,7 +916,7 @@ Interfaccia dei menu in Godot (`godot/scenes/menu/`, `godot/scripts/menu/`, dett
    occhi, barba, stile della maglia): per questo accanto c'è il viso disegnato (che invece li mostra tutti).
 6. **Sfondo 3D anche dietro la casa della carriera** (come il web), con un velo scuro al 55% perché le schede si
    leggano; nel menu principale velo al 20%.
-7. **Testo del duello**: "tocca **Scatto** per bruciarlo in velocità" (il tasto non è più Dribbling).
+7. **Come si gioca** con lo stesso testo del web aggiornato (tasto **Scatto**, non più Dribbling).
 8. **Mercato ordinato come il web** anche a pari valutazione (ordinamento stabile di V8, `MenuDati.ordina`).
 
 Verificato sul PC (Windows, Godot 4.7.2): test senza schermo verdi (13 dei menu: visi, stemmi, semi, soldi, Rosa
