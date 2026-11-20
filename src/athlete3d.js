@@ -24,7 +24,10 @@ const HAIR_DROP = -0.35;              // centro del riferimento spostato in bass
 const EYE_PX = [896, 896, 128, 128];  // tassello degli occhi (deve coincidere con EYE_RECT di tools/make-athlete.mjs)
 const DETAIL_K = { skin: 0.95, cloth: 0.4 }; // quanto si vede la mappa di dettaglio su pelle e su stoffa
 const SPRINT_FROM = 6.5, SPRINT_FULL = 8.5;  // m/s: da qui il clip di scatto prende il posto della corsa
-const IDLE_FIX = { legs: 0.12, arms: 0.28 }; // rad: quanto si chiudono gambe e braccia nel clip "fermo"
+// rad: quanto si chiudono gambe e braccia nel clip "fermo". Braccia: con le braccia lunghe di PROPORZIONI.md (dita a
+// metà coscia) chiuderle (era 0,28) mette la mano dentro la coscia e le dita bucano i pantaloncini (macchia color
+// pelle davanti alla coscia): si aprono appena (valore negativo), la mano resta fuori dalla stoffa (test/unit/gambe.test.mjs).
+const IDLE_FIX = { legs: 0.12, arms: -0.05 };
 const AA = 0.005;                     // m: larghezza dei bordi morbidi (righe, scollo)
 const SHORTS_LOOSE = 0.008;           // m: quanto sono larghi i pantaloncini
 const NECK_R = 0.072;                 // m: raggio dello scollo attorno al collo
