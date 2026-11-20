@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Match, HL, effStats, headingOf, rng32, DUEL_GUARD, DUEL_MAX } from '../../src/sim.js';
+import { Match, HL, effStats, headingOf, rng32, DUEL_R, DUEL_GUARD, DUEL_MAX, ZONE_DIST } from '../../src/sim.js';
 import { genPlayer } from '../../src/career.js';
 import { scene, wake, give, run } from '../lib/scene.mjs';
 import { mkTeam } from '../lib/harness.mjs';
@@ -14,9 +14,9 @@ function setup(seed, { dist = 3, dri = 60, dif = 60, ox = 0 } = {}) {
 }
 const hold = (m, p) => () => m.userMove(0, p.x, p.y, true); // dito fermo sul portatore: resta dov'è
 
-test('duello: si apre con un avversario davanti entro 4,5 m, solo per la squadra umana', () => {
+test('duello: si apre con un avversario davanti entro DUEL_R (7 m), solo per la squadra umana', () => {
   // Arrange
-  const { m, p, o } = setup(1, { dist: 3.5 });
+  const { m, p, o } = setup(1, { dist: 6.5 });
   // Act
   const ev = run(m, 1 / 60, hold(m, p));
   // Assert
@@ -30,7 +30,7 @@ test('duello: si apre con un avversario davanti entro 4,5 m, solo per la squadra
 
 test('duello: non si apre con l\'avversario alle spalle o lontano', () => {
   // Arrange / Act
-  const a = setup(2, { dist: -3 }), b = setup(3, { dist: 6 });
+  const a = setup(2, { dist: -3 }), b = setup(3, { dist: DUEL_R + 1.5 });
   run(a.m, 0.2, hold(a.m, a.p)); run(b.m, 0.05, hold(b.m, b.p));
   // Assert
   assert.equal(a.m.duelFor(0), false, 'alle spalle');
@@ -235,4 +235,22 @@ test('stanchezza: correndo la velocità massima cala, più piano con più resist
   // Assert
   assert.ok(a.energy < 1 && c.energy < a.energy, `energia: fis 90 ${a.energy.toFixed(2)}, fis 30 ${c.energy.toFixed(2)}`);
   assert.ok(m.vmax(c) < m.vmax(a) && m.vmax(a) < v0);
+});
+
+test('area di tiro: negli ultimi 20 m il portatore umano può passare, prima no', () => {
+  // Arrange
+  const { m, p } = setup(30, { dist: -5 });
+  // Act / Assert
+  p.y = HL - ZONE_DIST - 2; assert.equal(m.inZone(0), false, 'a 22 m dalla porta');
+  assert.equal(m.passFor(0), false);
+  p.y = HL - ZONE_DIST + 1; assert.equal(m.inZone(0), true, 'a 19 m dalla porta');
+  assert.equal(m.passFor(0), true);
+  assert.equal(m.inZone(1), false, 'non per la squadra avversaria');
+  m.human[0] = false; assert.equal(m.inZone(0), false, 'solo per la squadra umana');
+});
+
+test('area di tiro: vale solo per la porta avversaria e col pallone tra i piedi', () => {
+  const { m, p } = setup(31, { dist: -5 });
+  p.y = -HL + 5; assert.equal(m.inZone(0), false, 'vicino alla propria porta');
+  p.y = HL - 5; m.ball.owner = null; assert.equal(m.inZone(0), false, 'pallone libero');
 });

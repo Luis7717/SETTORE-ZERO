@@ -18,12 +18,6 @@ const SPRINT_DRAIN = 3.5;   // lo scatto consuma energia questo numero di volte 
 const RECOVER_V = 2.5;      // sotto questa velocità (camminata, fermo) l'energia si recupera (m/s)
 const RECOVER_RATE = 0.004; // energia recuperata al secondo camminando o da fermi
 const ADV_TIME = 2.5;       // vantaggio: entro questo tempo, se la squadra perde palla, si torna alla punizione (s)
-const FEINT_DOT = 0.5;      // la finta vale solo se la nuova direzione si scosta da quella di corsa (coseno massimo)
-const FEINT_CD = 1.2;       // tempo di ricarica della finta (s)
-const FEINT_R = 3.5;        // difensori entro questa distanza dal portatore possono cascarci (m)
-const FEINT_BASE = 0.5;     // probabilità di sbilanciare un difensore a pari dribbling e difesa
-const FEINT_SKILL = 1.5;    // quanto pesa la differenza dribbling - difesa (per punto / 100)
-const FEINT_STUN = 0.7;     // durata dello sbilanciamento del difensore (s)
 const HEAD_LO = 1.3;        // da questa altezza in su il pallone si colpisce di testa (m)
 const HEAD_HI = 2.6;        // altezza massima raggiungibile di testa, saltando (m)
 const VOLLEY_LO = 0.5;      // sotto HEAD_LO e sopra questa altezza: colpo al volo (m)
@@ -31,10 +25,9 @@ const AIR_SHOT_RANGE = 17;  // distanza massima dalla porta per colpire di testa
 const HEAD_CLEAR_ZONE = 32; // un difensore entro questa distanza dalla propria porta respinge di testa (m)
 const HEAD_V0 = 12;         // velocità base del colpo di testa (m/s), più la bravura
 const VOLLEY_V0 = 18;       // velocità base del tiro al volo (m/s), più la bravura
-const FEINT_PROTECT = 0.3;
 const AIR_TES_K = 1.5;      // contrasto aereo: quanto pesa la differenza di colpi di testa (per punto / 100)
 const AIR_DIST_K = 0.6;     // ... e quanto pesa essere più vicini al pallone (per metro)
-const AIR_WIN_MIN = 0.15, AIR_WIN_MAX = 0.85; // limiti della probabilità di vincere il contrasto aereo  // dopo la finta il portatore non può essere contrastato per questo tempo (s)
+const AIR_WIN_MIN = 0.15, AIR_WIN_MAX = 0.85; // limiti della probabilità di vincere il contrasto aereo
 
 export class MotionMethods {
   // Raggio entro cui p tocca il pallone libero. Sui passaggi avversari è il "raggio difensivo":
@@ -55,7 +48,6 @@ export class MotionMethods {
       if (p.protect > 0) p.protect -= dt;
       if (p.tackleCd > 0) p.tackleCd -= dt;
       if (p.kickAnim > 0) p.kickAnim -= dt;
-      if (p.feintCd > 0) p.feintCd -= dt;
       if (p.dribCd > 0) p.dribCd -= dt;
       if (p.state === 'play') {
         let dx = p.tx - p.x, dy = p.ty - p.y; const d = hyp(dx, dy);
@@ -107,34 +99,6 @@ export class MotionMethods {
         }
       }
     }
-  }
-
-  // Finta del portatore p verso (dx, dy): cambio di direzione secco; i difensori vicini che stavano entrando
-  // (contatto in corso, scivolata in preparazione o in avvicinamento) possono restare sbilanciati.
-  feint(p, dx, dy) {
-    const n = hyp(dx, dy); if (n < 1e-6) return false;
-    const ux = dx / n, uy = dy / n, v = hyp(p.vx, p.vy);
-    const rx = v > 1 ? p.vx / v : p.fx, ry = v > 1 ? p.vy / v : p.fy;
-    if (ux * rx + uy * ry > FEINT_DOT) return false;
-    const sp = this.vmax(p) * 0.8;
-    p.feintCd = FEINT_CD; p.vx = ux * sp; p.vy = uy * sp; p.fx = ux; p.fy = uy;
-    p.dx = p.tx = p.x + ux * 8; p.dy = p.ty = p.y + uy * 8; p.protect = Math.max(p.protect, FEINT_PROTECT);
-    const fooled = [];
-    for (const o of this.players) {
-      if (o.team === p.team || o.off || o.stun > 0 || (o.state !== 'play' && o.state !== 'prep')) continue;
-      const ox = o.x - p.x, oy = o.y - p.y, d = hyp(ox, oy);
-      if (d > FEINT_R) continue;
-      const closing = -(o.vx * ox + o.vy * oy) / (d || 1);
-      if (!(o.contact > 0 || o.state === 'prep' || closing > 1)) continue;
-      const chance = clamp(FEINT_BASE + FEINT_SKILL * (p.st.dri - o.st.dif) / 100, 0.15, 0.85);
-      if (this.rnd() < chance) {
-        o.stun = FEINT_STUN; o.contact = 0; o.vx *= 0.3; o.vy *= 0.3;
-        if (o.state === 'prep') { o.state = 'play'; o.warn = false; }
-        fooled.push(o);
-      }
-    }
-    this.ev('feint', { p, fooled });
-    return true;
   }
 
   // Pallone alto che arriva a p: 'header' / 'volley' = colpo verso la porta (attaccante su un lancio o cross

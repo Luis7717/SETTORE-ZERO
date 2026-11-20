@@ -25,7 +25,7 @@ const ui = new UI(uiRoot, career, {
   act: (a, v, el) => { if (a === 'season') ui.show('season', G.res.res.season); },
 });
 const input = new Input(canvas, view, {
-  kick: s => G.match.userKick(0, s), move: (x, y, h, sp) => G.match.userMove(0, x, y, h, sp), feint: (dx, dy) => G.match.userFeint(0, dx, dy), path: pts => G.match.userPath(0, pts), run: (i, pts) => G.match.userRun(0, G.match.players[i], pts), stop: () => G.match.userStop(0),
+  kick: s => G.match.userKick(0, s), move: (x, y, h, sp) => G.match.userMove(0, x, y, h, sp), path: pts => G.match.userPath(0, pts), run: (i, pts) => G.match.userRun(0, G.match.players[i], pts), stop: () => G.match.userStop(0),
   slide: (dx, dy) => G.match.userSlide(0, dx, dy), dive: (dx, th) => G.match.userDive(0, dx, th), sw: i => G.match.userSwitch(0, G.match.players[i]),
 });
 
@@ -116,12 +116,14 @@ const RUN_DRAW_SLOW = 0.5; // velocità del tempo mentre si disegna la strada da
 const GK_SLOW = 0.25;
 const DEF_DRAW_SLOW = 0.3; // velocità del tempo mentre si disegna una linea di difesa      // velocità del tempo mentre si para
 const DUEL_SLOW = 0.35; // velocità del tempo durante un duello col difensore
+const ZONE_SLOW = 0.4;  // velocità del tempo negli ultimi 20 m prima della porta avversaria (area di tiro)
 const HINTS = {
   attack: 'Disegna la strada dal giocatore per correre · linea in porta = tiro',
   defend: 'Disegna linee dai tuoi giocatori per chiudere e intercettare · scorri veloce = scivolata',
   loose: 'Palla libera: disegna una linea da un tuo giocatore per andarci',
   dive: 'PARA! Tira una linea dal portiere al punto della porta',
-  duel: 'Passa a un compagno libero (anello verde) o tocca Dribbling',
+  duel: 'Disegna fino a un compagno o toccalo per passare · oppure tocca Dribbling',
+  zone: 'Area di tiro: linea in porta = tiro · fino a un compagno = passaggio',
 };
 const RHINT = { kickoff: 'Calcio d\'inizio: disegna il passaggio', throw: 'Rimessa: disegna il passaggio', corner: 'Calcio d\'angolo: disegna il cross', goalkick: 'Rinvio: disegna il passaggio', freekick: 'Punizione: disegna il passaggio o il tiro', penalty: 'RIGORE: disegna il tiro in porta', gk: 'Rilancio del portiere: disegna il passaggio' };
 
@@ -133,7 +135,6 @@ function events(m) {
         sfx.kick(e.v);
         if (!e.clear && e.p.team === 0 && (e.kind === 'header' || e.kind === 'volley')) big(e.kind === 'header' ? 'Colpo di testa!' : 'Al volo!', '', 900);
         break;
-      case 'feint': if (e.p.team === 0 && e.fooled && e.fooled.length) big('Finta!', 'g', 800); break;
       case 'advantage': big('Vantaggio!', '', 1100); break;
       case 'advantage_back': sfx.whistle(); big('Si torna alla punizione', '', 1300); break;
       case 'tackle': case 'block': sfx.kick(9); break;
@@ -233,8 +234,8 @@ function frame(now) {
     if (!G.paused) {
       input.update();
       const dive = m.diveWin(0) && !m.autoGk[0];
-      const duel = !!(m.duelFor && m.duelFor(0));
-      const target = input.mode === 'dpath' ? DEF_DRAW_SLOW : input.drawing ? (input.runPath() ? RUN_DRAW_SLOW : 0.13) : dive ? GK_SLOW : duel ? DUEL_SLOW : 1;
+      const duel = !!(m.duelFor && m.duelFor(0)), zone = !duel && !!(m.inZone && m.inZone(0));
+      const target = input.mode === 'dpath' ? DEF_DRAW_SLOW : input.drawing ? (input.runPath() ? RUN_DRAW_SLOW : 0.13) : dive ? GK_SLOW : duel ? DUEL_SLOW : zone ? ZONE_SLOW : 1;
       $('drib').style.display = duel && !input.drawing ? 'block' : 'none';
       G.ts += (target - G.ts) * Math.min(1, dt * 14);
       const sdt = dt * G.ts * (G.speed || 1), n = Math.max(1, Math.ceil(sdt / (1 / 60)));
@@ -255,7 +256,7 @@ function frame(now) {
       hudT = now + 100;
       $('sc').textContent = m.score[0] + ' – ' + m.score[1]; $('clock').textContent = m.minute() + '\'';
       drawRadar(m);
-      const h = m.duelFor && m.duelFor(0) ? 'duel' : m.hint(0); let txt = h === 'restart' ? RHINT[m.restart.type] : (HINTS[h] || '');
+      const h = m.duelFor && m.duelFor(0) ? 'duel' : m.inZone && m.inZone(0) ? 'zone' : m.hint(0); let txt = h === 'restart' ? RHINT[m.restart.type] : (HINTS[h] || '');
       if ((career.s.tut || 0) > 4 && (h === 'attack' || h === 'defend' || h === 'loose')) txt = '';
       if (G.tut) txt = '';
       if (txt !== lastHint) { lastHint = txt; const el = $('hint'); el.className = h === 'dive' || (h === 'restart' && m.restart.type === 'penalty') ? 'hot' : ''; el.innerHTML = txt ? `<span>${txt}</span>` : ''; }

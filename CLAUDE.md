@@ -57,9 +57,11 @@
 
 ## Gesti (tutto a un dito)
 - Col pallone, fuori dal duello: disegna dal giocatore = **strada da correre** (con tanta strada davanti scatta); linea che finisce in porta = tiro.
-- **Duello** (portatore a 4,5 m da un difensore davanti): visuale bassa, tempo al 35%, anelli verdi sui compagni liberi.
-  Solo qui (e sulle rimesse) si passa: disegna fino al compagno o toccalo; oppure tasto **Dribbling** in basso.
-- Col pallone, scorrimento veloce di lato = finta.
+- **Duello** (portatore a 7 m da un difensore davanti): visuale bassa, tempo al 35%. Si passa a qualunque compagno:
+  disegna fino al compagno o toccalo; oppure tasto **Dribbling** in basso.
+- **Area di tiro** (ultimi 20 m prima della porta avversaria, col pallone): tempo al 40%; linea in porta = tiro,
+  linea fino a un compagno (entro 5 m) o tocco = passaggio, altrove = strada da correre.
+- La finta è stata tolta (2026-11-20).
 - Difesa: dito su un proprio giocatore e disegna = linea da seguire (tutti tranne il portiere); tratto rapido e corto dal
   controllato o scorrimento veloce dal campo = scivolata; tieni premuto sul campo = muovi il controllato. Raggio di
   intercetto = difesa del difensore contro passaggio di chi passa.

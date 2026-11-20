@@ -3,10 +3,11 @@ import { HW, HL, GW, GH, SPRINT_DIST } from './sim.js';
 
 const SLIDE_FLICK_MS = 250; // dal giocatore controllato: tratto più rapido di così = scivolata, altrimenti linea
 const NO_OFFSIDE = ['throw', 'goalkick', 'corner']; // ripartenze senza fuorigioco
+const PASS_SNAP = 5; // la linea che finisce entro tanti metri da un compagno è un passaggio a lui (m)
 
 export class Input {
-  // out: { kick(spec), move(x,y,held,sprint), stop(), slide(dx,dy), dive(dx,th), sw(playerIndex), feint(dx,dy), path(pts), run(playerIndex, pts) }
-  // (se `out.feint` manca la finta va diretta alla partita; se `move` ignora `sprint` il motore lo ricalcola uguale)
+  // out: { kick(spec), move(x,y,held,sprint), stop(), slide(dx,dy), dive(dx,th), sw(playerIndex), path(pts), run(playerIndex, pts) }
+  // (se `move` ignora `sprint` il motore lo ricalcola uguale)
   constructor(el, view, out) {
     this.el = el; this.view = view; this.out = out; this.match = null; this.team = 0; this.enabled = false;
     this.mode = null; this.pts = []; this.sx = 0; this.sy = 0; this.x = 0; this.y = 0; this.t0 = 0; this.id = null;
@@ -36,7 +37,7 @@ export class Input {
         return;
       }
     }
-    // difesa: dito su un proprio giocatore = linea da fargli seguire (fino a 3 giocatori insieme)
+    // difesa: dito su un proprio giocatore = linea da fargli seguire (tutti tranne il portiere)
     if (hint === 'defend' || hint === 'loose') {
       const r = this.nearOwn(x, y);
       if (r) { this.mode = 'dpath'; this.runner = r; this.pts = [{ x: r.x, y: r.y, h: 0, sx: x, sy: y }]; return; }
@@ -66,9 +67,23 @@ export class Input {
   }
 
   goalY() { return this.team === 0 ? HL : -HL; }
-  // passaggio permesso solo in un duello col difensore o su una rimessa; fuori la linea è la strada da correre
-  canPass() { const m = this.match; return m.phase === 'restart' || !!(m.duelFor && m.duelFor(this.team)); }
-  runPath() { const e = this.pts[this.pts.length - 1]; return this.pts.length > 0 && !this.canPass() && !(e && e.goal); }
+  // passaggio permesso in un duello col difensore, nell'area di tiro (ultimi 20 m) o su una rimessa
+  canPass() { const m = this.match; return m.phase === 'restart' || !!(m.passFor && m.passFor(this.team)); }
+  // compagno (chiunque, tranne il portatore) vicino a un punto del campo
+  mateAt(x, y, R = PASS_SNAP) {
+    const m = this.match; let best = null, bd = R;
+    for (const p of m.players) if (p.team === this.team && !p.off && p !== m.ctrl[this.team]) { const d = Math.hypot(p.x - x, p.y - y); if (d < bd) { bd = d; best = p; } }
+    return best;
+  }
+  // la linea è una strada da correre? No se finisce in porta, se si è in duello o rimessa (ogni linea è un passaggio),
+  // e nell'area di tiro se finisce su un compagno (altrimenti si corre lì)
+  runPath() {
+    const m = this.match, e = this.pts[this.pts.length - 1];
+    if (!e || e.goal) return false;
+    if (m.phase === 'restart' || (m.duelFor && m.duelFor(this.team))) return false;
+    if (m.inZone && m.inZone(this.team)) return !this.mateAt(e.x, e.y);
+    return true;
+  }
 
   // punto del campo (o della porta) sotto il dito
   pick(x, y) {
@@ -111,7 +126,7 @@ export class Input {
     const e = pts[pts.length - 1];
     let recv = null;
     if (this.runPath()) { this.view.setPath(pts, false, null); this.view.setPreview([], null); return; } // strada da correre
-    if (!e.goal) { let bd = 5; for (const p of m.players) if (p.team === this.team && !p.off && p !== m.ctrl[this.team]) { const d = Math.hypot(p.x - e.x, p.y - e.y); if (d < bd) { bd = d; recv = p; } } }
+    if (!e.goal) recv = this.mateAt(e.x, e.y);
     this.view.setPath(pts, e.goal, recv);
     // anteprima del volo vero e linea del fuorigioco (non vale su rimessa, rinvio e angolo)
     const c = m.ctrl[this.team];
@@ -182,16 +197,10 @@ export class Input {
       const mate = this.nearMate(this.x, this.y);
       if (mate) {
         if ((hint === 'attack' || hint === 'restart') && this.canPass()) this.out.kick({ type: 'auto', tx: mate.x + mate.vx * 0.45, ty: mate.y + mate.vy * 0.45, curve: 0 });
-        else if (hint === 'attack' || hint === 'restart') { /* fuori dal duello niente passaggio diretto */ }
+        else if (hint === 'attack' || hint === 'restart') { /* fuori da duello e area di tiro niente passaggio diretto */ }
         else this.out.sw(mate.i);
       } else { const g = this.view.screenToGround(this.x, this.y); if (g) this.out.move(g.x, g.y, false); }
       return;
-    }
-    // col pallone: scorrimento veloce = finta (cambio di direzione secco)
-    if (hint === 'attack' && dt < 300 && dist > Math.max(38, this.view.w * 0.1)) {
-      const a = this.view.screenToGround(this.sx, this.sy), c = this.view.screenToGround(this.x, this.y);
-      const ok = a && c && (this.out.feint ? this.out.feint(c.x - a.x, c.y - a.y) : m.userFeint(T, c.x - a.x, c.y - a.y));
-      if (ok) return;
     }
     if ((hint === 'defend' || hint === 'loose') && dt < 300 && dist > Math.max(38, this.view.w * 0.1)) {
       const a = this.view.screenToGround(this.sx, this.sy), c = this.view.screenToGround(this.x, this.y);

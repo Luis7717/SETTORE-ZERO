@@ -12,7 +12,6 @@ const OFFSIDE_COLOR = 0xff5a5a; // linea del fuorigioco
 const GK_CAM_BACK = 6.5;       // parata: telecamera dietro la propria linea di porta (m)
 const GK_CAM_H = 2.6;          // parata: altezza della telecamera (m)
 const RUN_LINES = 10, RUN_PTS = 64, RUN_COLOR = 0x7dd3ff; // linee di difesa a schermo
-const DUEL_MATES = 3;           // compagni liberi evidenziati durante un duello
 const DUEL_LOW = 0.42;          // quanto si abbassa la telecamera nel duello (0 = niente, 1 = a terra)
 
 function canvasTex(w, h, draw) {
@@ -130,9 +129,6 @@ export class View {
       const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: RUN_COLOR, transparent: true, opacity: 0.85, depthTest: false }));
       l.renderOrder = 13; l.frustumCulled = false; l.visible = false; s.add(l); this.runLines.push(l);
     }
-    // duello: anelli verdi sotto i compagni liberi a cui passare
-    this.mateRings = [];
-    for (let i = 0; i < DUEL_MATES; i++) { const r = this.recv.clone(); r.material = this.recv.material; r.visible = false; s.add(r); this.mateRings.push(r); }
 
     // linea disegnata
     this.pathMax = 160;
@@ -235,10 +231,9 @@ export class View {
       const k = 1.9 + Math.sin(this.t * 6) * 0.12; this.ring.scale.set(k, 1, k);
       this.marker.visible = true; this.marker.position.set(s * c.x, 2.75 + Math.sin(this.t * 5) * 0.08, -s * c.y);
     } else { this.ring.visible = false; this.marker.visible = false; }
-    // duello col difensore: telecamera più bassa e più avanti, compagni liberi evidenziati
+    // duello col difensore: telecamera più bassa e più avanti (si passa a qualunque compagno)
     const duel = !!(m.duelFor && m.duelFor(this.me));
     this.duelK = (this.duelK || 0) + ((duel ? 1 : 0) - (this.duelK || 0)) * Math.min(1, dt * 5);
-    this.showFreeMates(m, duel);
     this.showRuns(m);
     // telecamera dietro l'azione
     const dir = this.me === 1 ? -1 : 1;
@@ -319,23 +314,6 @@ export class View {
       l.geometry.attributes.position.needsUpdate = true; l.geometry.setDrawRange(0, n);
     });
   }
-  // i compagni più liberi (lontani dagli avversari) e raggiungibili, sotto un anello verde
-  showFreeMates(m, on) {
-    const rings = this.mateRings; if (!rings) return;
-    let list = [];
-    if (on) {
-      const c = m.ctrl[this.me];
-      for (const p of m.players) {
-        if (p.team !== this.me || p.off || p === c || p.pos === 'P') continue;
-        const d = Math.hypot(p.x - c.x, p.y - c.y); if (d > 32) continue;
-        list.push({ p, free: m.nearOpp(p.x, p.y, p.team) - d * 0.05 });
-      }
-      list.sort((u, v) => v.free - u.free); list = list.slice(0, DUEL_MATES);
-    }
-    const s = this.flip;
-    rings.forEach((r, i) => { const it = list[i]; r.visible = !!it; if (it) r.position.set(s * it.p.x, 0.05, -s * it.p.y); });
-  }
-
   render() { this.r.render(this.scene, this.cam); }
 
   // ---------------------------------------------------- conversioni schermo/campo

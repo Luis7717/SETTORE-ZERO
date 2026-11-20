@@ -3,9 +3,9 @@
 import { HW, HL, clamp, hyp } from './core.js';
 
 // Regolazioni (misurate con test/diag-flow.mjs e i test in test/unit/duel.test.mjs)
-export const DUEL_R = 4.5;     // un avversario davanti più vicino di così al portatore apre il duello (m)
+export const DUEL_R = 7;       // un avversario davanti più vicino di così al portatore apre il duello (m)
 const DUEL_FRONT = 0.35;       // "davanti": coseno minimo tra verso di corsa e direzione dell'avversario (~70°)
-const DUEL_END_R = 6.5;        // il duello si chiude ("lontano") se l'avversario si allontana oltre (m)
+const DUEL_END_R = 9.5;        // il duello si chiude ("lontano") se l'avversario si allontana oltre (m)
 const DUEL_BEHIND = -0.2;      // ... o se resta alle spalle (coseno sotto questo valore)
 export const DUEL_GUARD = 0.6; // per questo tempo di partita il difensore del duello non può rubare palla (s)
 export const DUEL_MAX = 2.5;   // durata massima del duello (s)
@@ -23,10 +23,19 @@ const DRIB_CD = 1.2;           // tempo tra due tentativi di dribbling dello ste
 export const AI_DRIB_R = 3.2;  // l'IA tenta il dribbling solo con l'avversario davanti entro questa distanza (m)
 const AI_DRIB_TRY = 0.22;      // probabilità di tentare a pari dribbling e difesa (cresce col vantaggio)
 export const WEAR_DRI = 0.03, WEAR_DRI_MIN = 0.8; // ogni dribbling riuscito: -3% di dribbling, fino all'80%
+export const ZONE_DIST = 20;   // negli ultimi metri prima della porta avversaria: area di tiro (rallenty, si può passare)
 export const WEAR_TES = 0.02, WEAR_TES_MIN = 0.85; // ogni colpo di testa vinto: -2% di colpi di testa, fino all'85%
 
 export class DuelMethods {
   duelFor(T) { return !!(this.duel && this.duel.team === T); }
+  // area di tiro: il portatore controllato della squadra umana T è negli ultimi ZONE_DIST m prima della porta avversaria
+  inZone(T) {
+    const c = this.ball.owner;
+    if (!c || c.team !== T || !this.human[T] || this.ctrl[T] !== c || this.phase !== 'play' || c.state !== 'play') return false;
+    return (T === 0 ? HL - c.y : c.y + HL) <= ZONE_DIST;
+  }
+  // si può passare (duello col difensore o area di tiro)
+  passFor(T) { return this.duelFor(T) || this.inZone(T); }
   // il difensore del duello non può ancora rubare palla
   duelGuard(o) { const d = this.duel; return !!(d && d.o === o && d.t < DUEL_GUARD); }
 

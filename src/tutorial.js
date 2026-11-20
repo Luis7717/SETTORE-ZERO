@@ -13,8 +13,8 @@ export const REPS = 3;    // prove per ogni meccanica
 export const LESSONS = [
   {
     title: 'Passaggio',
-    short: 'Davanti al difensore disegna dalla palla fino al compagno con l\'anello verde.',
-    text: 'Si passa solo quando arrivi addosso a un difensore: la visuale si abbassa, il tempo rallenta e i compagni liberi hanno l\'anello verde. Allora <b>disegna dalla palla fino al compagno</b> (o toccalo). I puntini azzurri mostrano dove andrà davvero la palla.',
+    short: 'Davanti al difensore disegna dalla palla fino a un compagno, uno qualunque.',
+    text: 'Si passa quando ti avvicini a un difensore (la visuale si abbassa e il tempo rallenta) e negli ultimi 20 metri prima della porta. Allora <b>disegna dalla palla fino a un compagno</b>, chiunque sia (o toccalo). I puntini azzurri mostrano dove andrà davvero la palla.',
     setup(m, T, k) {
       const c = T.carrier(m, 7, [0, -6, 4][k], [0, -4, 6][k]); T.clearOpp(m);
       const o = m.players[16]; T.put(m, o, c.x + [0, 1, -1][k], c.y + 3.5); o.fx = 0; o.fy = -1;
@@ -43,19 +43,6 @@ export const LESSONS = [
     },
     hint: ['Disegna una strada in avanti di una decina di metri.', 'Ora disegna una strada che curva verso una fascia.', 'Ora una strada lunga: il giocatore <b>scatta</b>.'],
     freeze: 'opp',
-  },
-  {
-    title: 'Finta',
-    short: 'Col pallone scorri veloce di lato.',
-    text: 'Col pallone, <b>scorri veloce di lato</b> (non in avanti): il tuo giocatore cambia direzione di colpo e il difensore che sta entrando può restare sbilanciato.',
-    needs: 'userFeint',
-    setup(m, T, k) {
-      const c = T.carrier(m, 7, [0, -12, 12][k], [0, 4, -4][k]); T.clearOpp(m);
-      const o = m.players[16]; T.put(m, o, c.x + [0, 2, -2][k], c.y + 6); o.fx = 0; o.fy = -1;
-      return { c, o };
-    },
-    check(e) { return e.type === 'feint' && e.p.team === 0; },
-    freeze: 'opp-but-o',
   },
   {
     title: 'Recupera palla',

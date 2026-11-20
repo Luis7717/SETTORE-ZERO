@@ -21,7 +21,6 @@ const DRIVE = {
     const pts = []; for (let i = 1; i <= 16; i++) pts.push(t.k === 1 ? { x: c.x + i, y: c.y + i * 0.3 } : { x: c.x, y: c.y + i * (t.k === 2 ? 1.5 : 1) });
     m.userPath(0, pts);
   },
-  Finta(m) { const c = m.ctrl[0]; if (c && m.ball.owner === c) m.userFeint(0, 1, 0); },
   // linea disegnata dal proprio giocatore fino al portatore avversario
   'Recupera palla'(m) { const c = m.ctrl[0], b = m.ball; if (c && b.owner && b.owner.team === 1 && !m.runOf(c)) m.userRun(0, c, [{ x: (c.x + b.x) / 2, y: (c.y + b.y) / 2 }, { x: b.x, y: b.y }]); },
   Scivolata(m) { const c = m.ctrl[0], b = m.ball; if (c && b.owner && Math.hypot(b.x - c.x, b.y - c.y) < 3) m.userSlide(0, b.x - c.x, b.y - c.y); else if (b.owner) m.userMove(0, b.x, b.y, true); },

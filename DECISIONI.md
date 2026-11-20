@@ -271,3 +271,14 @@ maglia, maniche, calzettoni…), poi nome e numero sulla schiena e uno stemma in
    32.294 triangoli (giocatori 37 / 15.870), dopo 57 / 42.208 (giocatori 33 / 25.776); fps 26,9 → 25,9 (solo confronto);
    `view.update` 0,34 → 0,31 ms. Memoria in più: 22 texture 512 (~1,4 MB l'una con le mipmap, ~30 MB in tutto).
    **Da provare sull'iPhone**: fps, tempo d'ingresso in partita (22 texture dipinte), leggibilità di numeri e visi.
+
+## 2026-11-20 — Finta tolta, duello prima, area di tiro, passaggio a chiunque
+- **Finta tolta** su richiesta: niente gesto, niente lezione nel tutorial (ora 7 lezioni), tolti `userFeint`/`feint` dal motore e il loro test.
+- **Duello prima**: `DUEL_R` da 4,5 a 7 m (chiusura per lontananza da 6,5 a 9,5 m). Umano simulato: circa 52 duelli a partita (prima circa 40).
+- **Area di tiro**: negli ultimi `ZONE_DIST` = 20 m prima della porta avversaria, col pallone tra i piedi del controllato,
+  il tempo va al 40% (`ZONE_SLOW`) e si può passare: linea in porta = tiro, linea che finisce entro 5 m da un compagno
+  (o tocco sul compagno) = passaggio, linea altrove = strada da correre (così si può ancora entrare in area palla al piede).
+  Il duello ha la precedenza (35%, tasto Dribbling). Metodi `inZone(T)`, `passFor(T)` in `src/sim/duel.js`, con test.
+- **Anelli verdi tolti**: nel duello e nell'area di tiro si passa a qualunque compagno. Resta solo il cerchio sul
+  ricevitore mentre il dito sta disegnando il passaggio, come conferma di chi riceverà.
+- Impronta golden rigenerata (cambia il raggio del duello).
