@@ -24,7 +24,9 @@ const softMin = (a, b, k) => (a + b - Math.sqrt((a - b) * (a - b) + k * k)) / 2;
 const SHORT = [[0, 31], [45, 25], [85, 8], [105, 5], [180, -20]];   // attaccatura di un taglio corto
 const BUZZ = [[0, 30], [45, 24], [85, 8], [105, 5], [180, -20]];    // rasato (dipinto)
 const QUIFF = (el, az) => smooth(70, 5, Math.abs(az - 6)) * smooth(30, 60, el) * (1 - 0.75 * smooth(72, 92, el));
-const AFRO_C = [0, 0.18, -0.14], AFRO_R = 1.43;                     // sfera dell'afro: centro e raggio (in R)
+// sfera dell'afro (in R): centro più in alto e indietro del riferimento, raggio da testa vera (≈ 3 cm in cima,
+// 2 cm ai lati, appena sopra la fronte); dove la testa sporge oltre la sfera (nuca) resta uno spessore minimo
+const AFRO_C = [0, 0.2, -0.2], AFRO_R = 1.24, AFRO_MIN = 0.17;
 const afroT = (L) => { const d = L[0] * AFRO_C[0] + L[1] * AFRO_C[1] + L[2] * AFRO_C[2], c2 = AFRO_C[0] ** 2 + AFRO_C[1] ** 2 + AFRO_C[2] ** 2; return d + Math.sqrt(Math.max(0, d * d - c2 + AFRO_R * AFRO_R)); };
 
 // Tagli, nello stesso ordine di HAIR_STYLES in looks.js (gli indici sono nei salvataggi).
@@ -35,8 +37,8 @@ export const HAIR = [
   null,                                                                                     // 0 calvo
   { buzz: BUZZ, paint: 'none' },                                                            // 1 rasato
   { line: SHORT, th: (el) => 0.04 + 0.03 * smooth(20, 70, el), paint: 'fade', taper: [0.5, 0.2] }, // 2 corti
-  { line: [[0, 33], [45, 27], [85, 9], [105, 6], [180, -18]], th: (el) => 0.05 + 0.26 * smooth(22, 66, el), paint: 'brush', taper: [0.5, 0.2],
-    post: (p, el, az, top) => { p[1] = softMin(p[1], top + 0.2, 0.05); } },                                   // 3 spazzola (sopra piatta)
+  { line: [[0, 33], [45, 27], [85, 9], [105, 6], [180, -18]], th: (el) => 0.05 + 0.2 * smooth(22, 66, el), paint: 'brush', taper: [0.5, 0.2],
+    post: (p, el, az, top) => { p[1] = softMin(p[1], top + 0.14, 0.06); } },                                   // 3 spazzola (sopra piatta)
   { line: SHORT, th: (el, az) => 0.05 + 0.025 * smooth(20, 70, el) + 0.3 * QUIFF(el, az), paint: 'fine',
     post: (p, el, az) => { const q = QUIFF(el, az); p[2] += 0.16 * q; p[1] += 0.05 * q; } }, // 4 ciuffo
   { line: [[0, 28], [45, 22], [85, 6], [105, 3], [180, -20]], part: -38, paint: 'part', cols: 44,
@@ -46,7 +48,7 @@ export const HAIR = [
   { line: [[0, 27], [45, 21], [85, 2], [110, -2], [180, -26]], cols: 40, rows: 12, paint: 'curly', taper: [0.55, 0.3],
     th: (el, az, v, b, L) => 0.12 + 0.05 * smooth(0, 60, el) + 0.07 * lumps(L, 7) },       // 8 ricci
   { line: [[0, 23], [45, 17], [85, -6], [110, -9], [180, -30]], cols: 40, rows: 12, paint: 'afro', taper: [0.25, 0.4],
-    th: (el, az, v, b, L) => Math.max(0.08, afroT(L) - b) + 0.03 * lumps(L, 8) },           // 9 afro
+    th: (el, az, v, b, L) => -softMin(-AFRO_MIN, b - afroT(L), 0.08) + 0.025 * lumps(L, 9) }, // 9 afro
   { line: [[0, 19], [34, 18], [64, -32], [120, -36], [180, -38]], hang: -4, drop: 1.0, flare: 0.1, cols: 44, paint: 'fine', taper: [0.45, 0.25],
     th: (el) => 0.085 + 0.025 * smooth(20, 70, el) },                                       // 10 caschetto
   { line: [[0, 26], [30, 22], [66, -44], [120, -62], [180, -70]], hang: -4, drop: 1.15, flare: 0.14, cols: 44, rows: 11, part: 0, paint: 'part', taper: [0.5, 0.2],
@@ -253,30 +255,48 @@ function bun(out, base) {
   }, (i, j) => [lerp(TEX_EXTRA[0], TEX_EXTRA[1], j / cols), BUN[i][2]], true, i => add(o, ax, BUN[i][1]));
 }
 
-// punte: coni morbidi inclinati all'indietro, sopra una base corta
-const SPIKES = [[86, 0, 0.36], [64, 0, 0.4], [64, 52, 0.36], [64, -52, 0.36], [62, 115, 0.32], [62, -115, 0.32], [60, 180, 0.3], [40, 22, 0.32], [40, -22, 0.32], [38, 72, 0.28], [38, -72, 0.28], [34, 135, 0.26], [34, -135, 0.26]];
+// punte: ciuffetti a cuneo (sezione schiacciata, punta che piega all'indietro), tanti e corti, appoggiati sulla base
+// [el, az, lunghezza in R]: più lunghi in cima e davanti, corti verso la nuca e le tempie
+const SPIKES = [[84, 0, 0.35], [68, -26, 0.35], [68, 26, 0.35], [66, 90, 0.29], [66, -90, 0.29], [70, 160, 0.26], [62, 135, 0.25], [62, -135, 0.25],
+  [50, 0, 0.32], [48, -45, 0.29], [48, 45, 0.29], [44, 110, 0.22], [44, -110, 0.22], [46, 180, 0.20], [34, -20, 0.23], [34, 20, 0.23], [30, 70, 0.17], [30, -70, 0.17]];
 function spikes(out, base) {
-  for (const [el, az, len] of SPIKES) {
-    const L = dirL(el, az), b = base(L), root = [L[0] * (b - 0.02), L[1] * (b - 0.02), L[2] * (b - 0.02)];
-    const ax = norm(add(add(L, [0, 0.7, 0]), [0, 0, -1], 0.3)), B = norm(cross(ax, Math.abs(ax[0]) > 0.9 ? [0, 1, 0] : [1, 0, 0])), A = cross(B, ax), cols = 6;
-    const ring = (h, r, sh) => (j) => { const a = 2 * Math.PI * j / cols; return add(add(add(add(root, ax, h), A, r * Math.cos(a)), B, r * Math.sin(a)), [0, 0, -1], sh); };
-    const rings = [ring(0, 0.15, 0), ring(len * 0.5, 0.085, 0.03), ring(len, 0, 0.07)];
+  const cols = 5;
+  SPIKES.forEach(([el, az, len], k) => {
+    const L = dirL(el, az), b = base(L), root = [L[0] * (b - 0.03), L[1] * (b - 0.03), L[2] * (b - 0.03)];
+    const ax = norm(add(add(L, [0, 0.55, 0]), [0, 0, -1], 0.22)), B = norm(cross(ax, Math.abs(ax[0]) > 0.9 ? [0, 1, 0] : [1, 0, 0])), A = cross(B, ax);
+    const tw = 0.6 + 0.25 * Math.sin(k * 2.3);   // schiacciamento diverso per ciuffo: niente file di coni uguali
+    const ring = (h, r, sh) => (j) => { const a = 2 * Math.PI * j / cols; return add(add(add(add(root, ax, h), A, r * Math.cos(a)), B, r * tw * Math.sin(a)), [0, 0, -1], sh); };
+    const rings = [ring(0, 0.2, 0), ring(len * 0.45, 0.1, 0.04), ring(len, 0, 0.12)];
     grid(out, 2, cols, (i, j) => rings[i](j), (i, j) => [lerp(TEX_EXTRA[0], TEX_EXTRA[1], j / cols), lerp(0.2, 1, i / 2)], true, () => root);
-  }
+  });
 }
 
 // ---------------------------------------------------------------- cute sotto i capelli (zona testa della texture)
 // alpha della tinta dei capelli sulla pelle in direzione (el, az): attaccatura morbida o nuca rasata a puntini
-export function scalpPaint(style, el, az, noise) {
+// basette: giro (gradi, davanti all'orecchio che sta a 109..125) e punta in basso
+const BURN_AZ = [97, 107], BURN_EL = -12, NAPE_EL = [-34, -27];   // nuca: sotto NAPE_EL niente tinta (collo pulito)
+export function scalpPaint(style, el, az, noise, burns = false) {
   const st = HAIR[style]; if (!st) return 0;
   let a = 0;
-  if (st.line) a = smooth(prof(az, st.line) - 6, prof(az, st.line) + 0.5, el);
+  const A = Math.abs(az), soft = lerp(5, 11, smooth(100, 170, A));   // sulla nuca la sfumatura è più lunga (taglio sfumato)
+  if (st.line) a = smooth(prof(az, st.line) - soft, prof(az, st.line) + 0.5, el);
   if (st.buzz) a = Math.max(a, smooth(-4, 2, el - prof(az, st.buzz)) * (0.5 + 0.35 * noise));
+  // basette: striscia davanti all'orecchio (giro BURN_AZ), dall'attaccatura fin verso metà orecchio, bordi morbidi
+  const burn = smooth(BURN_AZ[0] - 4, BURN_AZ[0] + 2, A) * smooth(BURN_AZ[1] + 3, BURN_AZ[1] - 3, A) * smooth(BURN_EL - 5, BURN_EL + 4, el);
+  if (burns) a = Math.max(a, burn * (st.buzz ? 0.5 + 0.35 * noise : 0.8)) * smooth(NAPE_EL[0], NAPE_EL[1], el);
   if (st.strip) {
     const L = dirL(el, az), w = Math.asin(Math.max(-1, Math.min(1, L[0]))) / DEG; let ph = Math.atan2(L[1], L[2]) / DEG; if (ph < -90) ph += 360;
     a = Math.max(a, smooth(st.strip.w + 3, st.strip.w - 3, Math.abs(w)) * smooth(st.strip.from - 4, st.strip.from + 2, ph) * smooth(st.strip.to + 4, st.strip.to - 2, ph));
   }
   return a;
+}
+
+// stessa tinta della cute per un punto della testa vera (modello realistico): head = riferimento dei capelli
+// {c, up, fwd, right} (oggetti {x,y,z}), i = indice del texel per il rumore; con le basette
+export function scalpAt(head, style, x, y, z, i) {
+  const dx = x - head.c.x, dy = y - head.c.y, dz = z - head.c.z, h = head;
+  const ly = dx * h.up.x + dy * h.up.y + dz * h.up.z, lx = dx * h.right.x + dy * h.right.y + dz * h.right.z, lz = dx * h.fwd.x + dy * h.fwd.y + dz * h.fwd.z;
+  return scalpPaint(style, Math.atan2(ly, Math.hypot(lx, lz)) / DEG, Math.atan2(lx, lz) / DEG, (Math.imul(i, 2654435761) >>> 0) / 4294967296, true);
 }
 
 // ---------------------------------------------------------------- tinta (canvas 2D, coordinate su 1024)
@@ -297,7 +317,7 @@ export function paintHairTex(g, style, hairC, skin, rect) {
   // calotta: più chiara in cima, lucentezza a metà, scura verso il bordo (profondità)
   const sx = X(0), sw = X(0.8) - sx, top = Y(0), edge = Y(TEX_EDGE + 0.04);
   const gr = g.createLinearGradient(0, Y(TEX_TOP), 0, Y(TEX_EDGE));
-  gr.addColorStop(0, mixHex(hairC, '#000000', 0.06)); gr.addColorStop(0.42, mixHex(hairC, shine, 0.35)); gr.addColorStop(0.72, hairC); gr.addColorStop(1, dark);
+  gr.addColorStop(0, mixHex(hairC, '#000000', 0.06)); gr.addColorStop(0.42, mixHex(hairC, shine, 0.35)); gr.addColorStop(0.72, hairC); gr.addColorStop(1, mixHex(hairC, '#000000', 0.18)); // bordo come la cute dipinta sotto: niente riga scura all'attaccatura
   g.fillStyle = gr; g.fillRect(sx, top, sw, edge - top);
   const r = rand(97 + style * 31);
   const shellH = Y(TEX_EDGE) - Y(TEX_TOP);
@@ -343,7 +363,7 @@ export function paintHairTex(g, style, hairC, skin, rect) {
   if (kind === 'part' && st.part != null) {
     const ln = prof(st.part, st.line), C = st.cols || HAIR_SHELL_COLS, vOf = e => (e - ln) / (90 - ln);
     const u = lerp(TEX_SHELL[0], TEX_SHELL[1], Math.round((st.part + 180) / 360 * C) / C);
-    g.strokeStyle = mixHex(skin, hairC, 0.25); g.lineWidth = 1.6; g.beginPath(); g.moveTo(X(u), Y(lerp(TEX_EDGE, TEX_TOP, vOf(ln + 2)))); g.lineTo(X(u), Y(lerp(TEX_EDGE, TEX_TOP, vOf(80)))); g.stroke();
+    g.strokeStyle = mixHex(skin, hairC, 0.55); g.lineWidth = 1.1; g.beginPath(); g.moveTo(X(u), Y(lerp(TEX_EDGE, TEX_TOP, vOf(ln + 2)))); g.lineTo(X(u), Y(lerp(TEX_EDGE, TEX_TOP, vOf(80)))); g.stroke();
   }
   // risvolto interno: scuro
   g.fillStyle = mixHex(dark, deep, 0.4); g.fillRect(sx, Y(TEX_UNDER - 0.03), sw, Y(1) + 16 - Y(TEX_UNDER - 0.03));
