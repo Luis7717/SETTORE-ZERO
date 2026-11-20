@@ -30,3 +30,12 @@ nuovi finché quel blocco non è finito e la build su GitHub non è riuscita. La
 - Worktree `TAG-wt-gfx`, ramo `wt-gfx`, commit `0aa1784`. File: `src/hair3d.js` (nuovo), `src/players3d.js`, `src/render.js`
   (campo, luci, tonemapping, ombre), `src/stadium.js`, `test/unit/hair.test.mjs`, `test/hair-shot.mjs`.
 - 17 tagli rifatti come calotte lisce dipinte (stessi indici: salvataggi validi). Triangoli scena circa 41k → 50k, draw call invariati (57).
+
+## 13-16 — Grafica in stile più realistico, a pezzi (2026-11-20) · tutti Opus · IN CORSO
+| # | Pezzo | Worktree / ramo | File |
+|---|---|---|---|
+| 13 | Giocatori: modello con proporzioni realistiche, divise, capelli, pose, editor | `TAG-wt-gfx2` / `wt-gfx2` | `players3d.js`, `hair3d.js`, `editor.js`, `assets/models` |
+| 14 | Campo: erba, luci, tonemapping, ombre | `TAG-wt-campo` / `wt-campo` | `render.js` (solo campo/luci/ombre), nuovi file |
+| 15 | Stadio, pubblico, bandiere, cartelloni | `TAG-wt-stadio` / `wt-stadio` | `stadium.js` |
+| 16 | Pallone, porte e rete, bandierine, effetti, linee disegnate | `TAG-wt-effetti` / `wt-effetti` | nuovo `props.js`, chiamate in `render.js` |
+Telecamera: la tengo io. L'unione in `gioco2` la faccio io, un pezzo alla volta, con test e schermate dopo ognuno.
