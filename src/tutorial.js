@@ -59,7 +59,7 @@ export const LESSONS = [
     check(e) { return e.type === 'tackle' && e.p.team === 0; },
     poll(m) { return !!(m.ball.owner && m.ball.owner.team === 0); },
     // l'avversario resta fermo col pallone (prima lo perdeva da solo passando a vuoto); i tuoi si muovono solo con la linea
-    freeze: 'opp',
+    freeze: 'opp', noAutoDef: true,
   },
   {
     title: 'Dribbling',
@@ -124,6 +124,7 @@ export class Tutorial {
     const m = this.m, L = this.lesson;
     this.t = 0; this.done = 0;
     m.phase = 'play'; m.restart = null; m.move = [null, null]; m.runs = [[], []]; m.lastPass = null; m.resetStates();
+    m.autoDef = [!L.noAutoDef, true]; // in "Recupera palla" la CPU non difende: si impara a disegnare la linea
     // in allenamento niente espulsioni né stanchezza: ogni prova riparte con tutti in campo
     for (const p of m.players) { p.off = false; p.yellow = 0; p.energy = 1; p.vx = p.vy = 0; p.stun = 0; }
     m.ctrl[0] = null;

@@ -1,5 +1,5 @@
 // Comandi a un dito. Traduce i tocchi in ordini per la squadra `team`.
-import { HW, HL, GW, GH, SPRINT_DIST } from './sim.js';
+import { HW, HL, GW, GH, SPRINT_DIST, RUN_MAX_LEN, clipLen } from './sim.js';
 
 const NO_OFFSIDE = ['throw', 'goalkick', 'corner']; // ripartenze senza fuorigioco
 const PASS_SNAP = 5; // la linea che finisce entro tanti metri da un compagno è un passaggio a lui (m)
@@ -109,7 +109,8 @@ export class Input {
       if (Math.hypot(x - last.sx, y - last.sy) >= 5) {
         const g = this.view.screenToGround(x, y);
         if (g) { this.pts.push({ x: g.x, y: g.y, h: 0, sx: x, sy: y }); if (this.pts.length > 150) this.pts.splice(1, 1); }
-        if (this.pts.length >= 2) this.view.setPath(this.pts, false, null);
+        // la linea di difesa si vede già tagliata alla lunghezza massima (il motore la taglia allo stesso modo)
+        if (this.pts.length >= 2) this.view.setPath([this.pts[0], ...clipLen(this.pts[0].x, this.pts[0].y, this.pts.slice(1), RUN_MAX_LEN)], false, null);
       }
     } else if (this.mode === 'dive') {
       // linea dal portiere verso il punto della porta dove tuffarsi: il tuffo parte quando si alza il dito

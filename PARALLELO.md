@@ -58,5 +58,6 @@ Massimo 2 subagenti insieme (richiesta di Luis del 2026-11-20).
 |---|---|---|---|
 | 21 | Forme degli occhi visibili | `TAG-wt-occhi` / `wt-occhi` | fatto (`3ac24cf`), unito |
 | 22 | Telecamera: porta intera in parata, visuale larga nel rallenty (`src/camfit.js`) | `TAG-wt-camera` / `wt-camera` | fatto (`5ce3685`), unito |
-| 23 | Motore: difesa che rientra e pressa, attacco largo, linee di difesa corte, contrasto magnetico, intercetto, scatto | `TAG-wt-tattica` / `wt-tattica` | in corso |
+| 23 | Motore: difesa che rientra e pressa, attacco largo, linee di difesa corte, contrasto magnetico, intercetto, scatto | `TAG-wt-tattica` / `wt-tattica` | fatto (`6564220`), unito |
+| 25 | Schermata Rosa sul campo con carte, panchina e confronto | `TAG-wt-rosa` / `wt-rosa` | in corso |
 | 24 | Menu principale col campione che si allena; menu opachi senza color-mix | coordinatore, in `gioco2` | fatto |

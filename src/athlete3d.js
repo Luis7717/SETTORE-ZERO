@@ -23,7 +23,10 @@ const HAIR_TILT = 10 * Math.PI / 180;                 // inclinazione all'indiet
 const HAIR_DROP = -0.35;              // centro del riferimento spostato in basso (in raggi; negativo = più in alto)
 const EYE_PX = [896, 896, 128, 128];  // tassello degli occhi (deve coincidere con EYE_RECT di tools/make-athlete.mjs)
 const DETAIL_K = { skin: 0.95, cloth: 0.4 }; // quanto si vede la mappa di dettaglio su pelle e su stoffa
-const SPRINT_FROM = 6.5, SPRINT_FULL = 8.5;  // m/s: da qui il clip di scatto prende il posto della corsa
+// m/s: da qui il clip di scatto prende il posto della corsa. Col giocatore che scatta davvero (p.sprint) il clip arriva
+// presto; senza scatto solo a velocità che la corsa normale quasi non raggiunge, così corsa e scatto si distinguono a schermo
+const SPRINT_FROM = 7.6, SPRINT_FULL = 9.5;
+const SPRINT_ON_FROM = 5.0, SPRINT_ON_FULL = 6.6;
 // rad: quanto si chiudono gambe e braccia nel clip "fermo". Braccia: con le braccia lunghe di PROPORZIONI.md (dita a
 // metà coscia) chiuderle (era 0,28) mette la mano dentro la coscia e le dita bucano i pantaloncini (macchia color
 // pelle davanti alla coscia): si aprono appena (valore negativo), la mano resta fuori dalla stoffa (test/unit/gambe.test.mjs).
@@ -48,6 +51,8 @@ const BONE_CLASS = { pelvis: C_TORSO, spine_01: C_TORSO, spine_02: C_TORSO, spin
   neck_01: C_NECK, Head: C_HEAD, upperarm_l: C_ARM, upperarm_r: C_ARM, lowerarm_l: C_ARM, lowerarm_r: C_ARM, hand_l: C_HAND, hand_r: C_HAND,
   thigh_l: C_LEG, thigh_r: C_LEG, calf_l: C_LEG, calf_r: C_LEG, foot_l: C_FOOT, foot_r: C_FOOT, ball_l: C_FOOT, ball_r: C_FOOT };
 const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+// peso del clip di scatto (0..1) a velocità v (m/s); sprinting = il motore dice che il giocatore sta scattando
+export const sprintMix = (v, sprinting) => sprinting ? smooth(SPRINT_ON_FROM, SPRINT_ON_FULL, v) : smooth(SPRINT_FROM, SPRINT_FULL, v);
 const frac = x => x - Math.floor(x);
 
 export class Athlete3D extends Players3D {
@@ -373,9 +378,9 @@ export class Athlete3D extends Players3D {
   }
 
   // corsa e scatto: sopra SPRINT_FROM il clip di scatto prende il posto di quello di corsa
-  blend(A, wIdle, wRun, wJump, v, cele) {
+  blend(A, wIdle, wRun, wJump, v, cele, sprinting) {
     this.wIdle = wJump > 0 ? 0 : wIdle;
-    const sp = A.sprint ? smooth(SPRINT_FROM, SPRINT_FULL, v) : 0;
+    const sp = A.sprint ? sprintMix(v, sprinting) : 0;
     if (A.idle) A.idle.setEffectiveWeight(wIdle);
     if (A.run) { A.run.setEffectiveWeight(wRun * (1 - sp)); A.run.timeScale = Math.min(1.6, Math.max(0.6, v / RUN_REF)); }
     if (A.sprint) { A.sprint.setEffectiveWeight(wRun * sp); A.sprint.timeScale = Math.min(1.3, Math.max(0.8, v / SPRINT_REF)); }

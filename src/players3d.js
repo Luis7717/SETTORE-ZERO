@@ -474,7 +474,7 @@ export class Players3D {
   }
 
   // pesi delle clip (la sottoclasse aggiunge lo scatto)
-  blend(A, wIdle, wRun, wJump, v, cele) {
+  blend(A, wIdle, wRun, wJump, v, cele) { // (sprinting: solo la sottoclasse ha il clip di scatto)
     if (A.idle) A.idle.setEffectiveWeight(wIdle);
     if (A.run) { A.run.setEffectiveWeight(wRun); A.run.timeScale = Math.min(1.5, Math.max(0.55, v / RUN_REF)); }
     if (A.sprint) A.sprint.setEffectiveWeight(0);
@@ -495,7 +495,7 @@ export class Players3D {
     const header = p.kickAnim > 0 && nearBall && b.h > HEAD_H;
     if (st === 'slide' || st === 'down' || (st === 'dive' && p.dive)) { wIdle = 1; wRun = 0; }
     else if (cele || header) { wIdle = 0; wRun = 0; wJump = 1; }
-    this.blend(A, wIdle, wRun, wJump, v, cele);
+    this.blend(A, wIdle, wRun, wJump, v, cele, !!p.sprint);
     f.mixer.update(dt);
 
     if (st === 'slide') {

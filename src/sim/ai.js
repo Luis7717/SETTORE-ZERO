@@ -20,6 +20,25 @@ const SHOT_POST = 0.45;     // distanza dal palo a cui mira l'IA (m): più vicin
 const HELPERS = 2;          // compagni che vengono incontro al portatore
 const AIR_REACH = 2.4;      // sui lanci vicino alle porte si va sul pallone fino a questa altezza (colpo di testa)
 const AIR_ZONE = 17;        // distanza dalla porta avversaria entro cui l'attaccante va a colpire di testa (m)
+// Squadra umana senza palla: la CPU pressa il portatore con un giocatore (due vicino alla nostra porta) e gli altri
+// rientrano nella posizione di squadra. Le linee disegnate e il dito della persona hanno sempre la precedenza.
+const HUM_PRESS_ZONE = 33;  // portatore entro questi metri dalla nostra linea di fondo (nostra trequarti): pressano in due
+const HUM_PRESS_KEEP = 4;   // chi sta già pressando conta come più vicino di così: niente scambi continui tra due quasi alla pari (m)
+const HUM_BEHIND_D = 2;     // i difensori restano almeno così dietro la palla (m)
+const HUM_BEHIND_C = -1;    // i centrocampisti al massimo 1 m davanti alla palla (m)
+const HUM_MID_LANE = 0.3;   // quanto i centrocampisti si stringono sulla linea palla-porta (chiudono il centro)
+const HUM_SCREEN = 4;       // chi non pressa resta almeno a questa distanza dal portatore, in copertura (m)
+const HUM_MARK_R = 7.5;     // si marca l'avversario più vicino al proprio posto entro questa distanza (m)
+const HUM_RECOVER = 8;      // più lontano di così dal proprio posto, verso la propria porta: rientro con lo scatto (m)
+const HUM_MAGNET_R = 3;     // giocatore mosso dalla persona (linea o dito) entro questa distanza dal pallone: va dritto sul pallone (m)
+const HUM_STICK_T = 1.5;    // linea finita vicino al pallone: il giocatore resta attaccato al pallone per questo tempo (s)
+// Squadra umana in attacco: compagni senza palla larghi, in profondità e lontani tra loro
+const SPACE_MIN = 9;        // distanza minima voluta tra due compagni (m)
+const SPACE_PUSH = 0.7;     // parte della distanza mancante recuperata spostando il punto di arrivo (0..1)
+const SPACE_PEN = 0.35;     // penalità per metro mancante nella scelta dello spazio libero
+const DEEP_FROM = -30;      // con la palla da qui in avanti (m nel verso d'attacco) le punte attaccano la profondità
+const HELP_KEEP = 4;        // chi è già d'appoggio conta come più vicino di così al portatore: niente cambi continui di compito (m)
+const SUPPORT_FAR = [15, 18]; // il secondo compagno d'appoggio si offre più lontano (m), il primo resta a 8-11 m
 
 export class AIMethods {
   // side: -1/1 = palo scelto; se manca, lato opposto al portiere (con un po' di casualità)
@@ -186,9 +205,19 @@ export class AIMethods {
     }
     this.helpers = [[], []];
     if (b.owner) {
-      const c = b.owner, near = this.players.filter(q => q.team === c.team && q !== c && !q.off && q.pos !== 'P' && q.state === 'play')
-        .sort((q1, q2) => hyp(q1.x - c.x, q1.y - c.y) - hyp(q2.x - c.x, q2.y - c.y));
+      const c = b.owner, was = (this.human[c.team] && this.helpWas) || [], dist = q => hyp(q.x - c.x, q.y - c.y) - (was.includes(q) ? HELP_KEEP : 0);
+      const near = this.players.filter(q => q.team === c.team && q !== c && !q.off && q.pos !== 'P' && q.state === 'play').sort((q1, q2) => dist(q1) - dist(q2));
       this.helpers[c.team] = near.slice(0, HELPERS);
+      this.helpWas = this.helpers[c.team];
+    }
+    // squadra umana in difesa: chi va sul portatore (i più vicini al pallone, senza linea disegnata)
+    const was = this.hPress || [[], []];
+    this.hPress = [[], []];
+    if (b.owner && this.human[1 - b.owner.team]) {
+      const c = b.owner, T = 1 - c.team, dir = T ? -1 : 1, deep = c.y * dir < -HL + HUM_PRESS_ZONE;
+      const dist = p => hyp(p.x - c.x, p.y - c.y) - (was[T].includes(p) ? HUM_PRESS_KEEP : 0);
+      this.hPress[T] = this.players.filter(p => p.team === T && !p.off && p.pos !== 'P' && p.state === 'play' && !this.runOf(p))
+        .sort((p1, p2) => dist(p1) - dist(p2)).slice(0, deep ? 2 : 1);
     }
     this.cover = [null, null];
     if (b.owner) {
@@ -252,13 +281,15 @@ export class AIMethods {
     if (this.phase === 'restart' && p.wall) { p.tx = p.wall.x; p.ty = p.wall.y; return; }
     const mv = hum && this.ctrl[T] === p ? this.move[T] : null;
     if (mv && mv.path) this.followPath(p, mv);
-    // linea disegnata in difesa: vale più di tutto il resto finché non è finita
-    if (hum && b.owner !== p && this.runs[T].length) { const r = this.runOf(p); if (r && this.followRun(p, r)) return; }
-    // senza palla (avversario in possesso o pallone libero non passato da noi) la squadra umana non fa nulla da sola:
-    // si muove solo chi ha una linea (sopra) o il controllato col dito; gli altri restano fermi (il portiere no)
-    if (hum && p.pos !== 'P' && this.phase === 'play' && this.manualDef(T)) {
-      if (mv && !mv.path) { p.tx = mv.x; p.ty = mv.y; p.sprint = !!mv.sprint; } else { p.tx = p.x; p.ty = p.y; }
-      return;
+    const def = hum && p.pos !== 'P' && this.phase === 'play' && this.manualDef(T);
+    // linea disegnata in difesa: vale più di tutto il resto (anche del pressing) finché non è finita
+    if (hum && b.owner !== p && this.runs[T].length) { const r = this.runOf(p); if (r && this.followRun(p, r)) { if (def) this.magnet(p); return; } }
+    // senza palla (avversario in possesso o pallone libero non passato da noi): il controllato segue il dito,
+    // gli altri li muove la CPU (pressing e posizione difensiva, vedi humanDefend)
+    if (def) {
+      if (mv && !mv.path) { p.tx = mv.x; p.ty = mv.y; p.sprint = !!mv.sprint; this.magnet(p); return; }
+      if (!this.autoDef[T]) { p.tx = p.x; p.ty = p.y; return; }
+      return this.humanDefend(p);
     }
     if (mv && mv.sprint) p.sprint = true;
     if (b.owner === p) {
@@ -285,6 +316,68 @@ export class AIMethods {
     if (this.phase === 'restart' && this.restart.type === 'kickoff' && p.ty * dir > -0.3) p.ty = -dir * 0.3;
   }
 
+  // giocatore mosso dalla persona vicino al pallone (avversario col pallone o pallone libero): l'ultimo tratto va dritto
+  // sul pallone, così il contrasto non si manca di poco. true se ha cambiato la destinazione
+  magnet(p) {
+    const b = this.ball, c = b.owner;
+    if (hyp(b.x - p.x, b.y - p.y) > HUM_MAGNET_R || b.h > 1.7) return false;
+    p.tx = b.x + (c ? c.vx : b.vx) * 0.2; p.ty = b.y + (c ? c.vy : b.vy) * 0.2;
+    return true;
+  }
+  // giocatore della squadra umana mosso dalla persona: il controllato, chi segue una linea, chi l'ha appena finita addosso al pallone
+  directed(p) { return !!this.human[p.team] && (this.ctrl[p.team] === p || p.stickT > 0 || !!this.runOf(p)); }
+  // chiamata quando finisce una linea di difesa: se è finita addosso al pallone, il giocatore ci resta attaccato un attimo
+  runEnded(p) {
+    const b = this.ball;
+    if (this.human[p.team] && this.manualDef(p.team) && hyp(b.x - p.x, b.y - p.y) < HUM_MAGNET_R + 1.5) p.stickT = HUM_STICK_T;
+  }
+  // squadra umana senza palla, giocatore senza linea e senza dito: pressing (i più vicini), pallone vagante
+  // (il più rapido ad arrivarci; i passaggi avversari in volo no: l'intercetto resta alla persona),
+  // altrimenti posizione di squadra dietro la palla con marcatura a zona
+  humanDefend(p) {
+    const b = this.ball, T = p.team, dir = T ? -1 : 1, own = -dir * HL, c = b.owner;
+    p.stickT = Math.max(0, (p.stickT || 0) - this.dtT);
+    if (p.stickT > 0 && this.magnet(p)) return;
+    if (!c) { const ch = this.chase[T]; if (ch && ch.p2 === p && !b.kick) { p.tx = ch.x2; p.ty = ch.y2; return; } }
+    else if (this.hPress && this.hPress[T].includes(p)) { p.tx = b.x + c.vx * 0.25; p.ty = b.y + c.vy * 0.25; return; }
+    const [ax, ay] = this.anchor(p);
+    let tx = ax, ty = ay, mo = null, md = HUM_MARK_R;
+    for (const o of this.players) if (o.team !== T && !o.off && o.pos !== 'P' && o !== c) { const d = hyp(o.x - ax, o.y - ay); if (d < md) { md = d; mo = o; } }
+    if (mo) {
+      const ux = -mo.x, uy = own - mo.y, n = hyp(ux, uy) || 1;
+      tx = ax * 0.35 + (mo.x + ux / n * 1.6) * 0.65; ty = ay * 0.35 + (mo.y + uy / n * 1.6) * 0.65;
+    }
+    // centrocampisti: si stringono sulla linea tra palla e centro della porta (chiudono i passaggi centrali)
+    if (p.pos === 'C') { const k = clamp((ty - own) / ((b.y - own) || 1), 0, 1); tx += (b.x * k - tx) * HUM_MID_LANE; }
+    // chi non pressa non va addosso al portatore: resta in copertura a qualche metro
+    if (c) {
+      let ux = tx - c.x, uy = ty - c.y; const d = hyp(ux, uy);
+      if (d < HUM_SCREEN) { if (d < 0.5) { ux = -c.x * 0.3; uy = own - c.y; } const n = hyp(ux, uy) || 1; tx = c.x + ux / n * HUM_SCREEN; ty = c.y + uy / n * HUM_SCREEN; }
+    }
+    // difensori e centrocampisti rientrano dietro la linea della palla
+    const lim = p.pos === 'D' ? b.y * dir - HUM_BEHIND_D : p.pos === 'C' ? b.y * dir - HUM_BEHIND_C : null;
+    if (lim !== null && ty * dir > lim) ty = Math.max(lim, -HL + 4) * dir;
+    p.tx = clamp(tx, -HW + 1, HW - 1); p.ty = clamp(ty, -HL + 1, HL - 1);
+    // lontano dal proprio posto, con la porta alle spalle: rientro di corsa
+    if (hyp(p.tx - p.x, p.ty - p.y) > HUM_RECOVER && (p.ty - p.y) * dir < 0) p.sprint = true;
+  }
+
+  // penalità per i compagni troppo vicini al punto (x, y) (squadra umana in attacco): niente grappoli
+  crowd(p, x, y) {
+    let pen = 0;
+    for (const q of this.players) if (q.team === p.team && q !== p && !q.off && q.pos !== 'P') { const d = hyp(q.x - x, q.y - y); if (d < SPACE_MIN) pen += SPACE_MIN - d; }
+    return pen;
+  }
+  // sposta (x, y) lontano dai compagni più vicini di SPACE_MIN (portatore compreso)
+  spread(p, x, y) {
+    for (const q of this.players) {
+      if (q.team !== p.team || q === p || q.off || q.pos === 'P') continue;
+      const dx = x - q.x, dy = y - q.y, d = hyp(dx, dy);
+      if (d < SPACE_MIN) { const k = (SPACE_MIN - d) * SPACE_PUSH / (d || 1); x += (d ? dx : (p.i % 2 ? 1 : -1)) * k; y += dy * k; }
+    }
+    return [clamp(x, -HW + 1.5, HW - 1.5), clamp(y, -HL + 2, HL - 2)];
+  }
+
   // compagno vicino al portatore: cerca uno spazio libero raggiungibile con un passaggio sicuro
   offerSupport(p, c) {
     const T = p.team, dir = T ? -1 : 1;
@@ -292,18 +385,25 @@ export class AIMethods {
     if (p.supT <= 0 || p.supC !== c) {
       p.supT = 0.35 + this.rnd() * 0.25; p.supC = c;
       let bs = -1e9; p.supX = p.x - c.x; p.supY = p.y - c.y;
-      for (const r of [8, 11]) for (let k = -5; k <= 5; k++) {
+      // squadra umana: il secondo d'appoggio si offre più lontano (linee di passaggio a distanze diverse), lontano dai compagni
+      const hum = this.human[T], far = hum && this.helpers[T][1] === p;
+      for (const r of far ? SUPPORT_FAR : [8, 11]) for (let k = -5; k <= 5; k++) {
         const a = Math.atan2(dir, 0) + k * 0.5, qx = c.x + Math.cos(a) * r, qy = c.y + Math.sin(a) * r;
         if (Math.abs(qx) > HW - 1.5 || Math.abs(qy) > HL - 2 || qy * dir > this.offLine[T] - 0.8) continue;
-        const sc = Math.min(this.nearOpp(qx, qy, T), 7) * 0.8 + clamp(this.lane(c.x, c.y, qx, qy, T, 16), -2, 2) * 1.2 + (qy - c.y) * dir * 0.07 - hyp(qx - p.x, qy - p.y) * 0.08 + this.rnd() * 0.3;
+        const sc = Math.min(this.nearOpp(qx, qy, T), 7) * 0.8 + clamp(this.lane(c.x, c.y, qx, qy, T, 16), -2, 2) * 1.2 + (qy - c.y) * dir * 0.07 - hyp(qx - p.x, qy - p.y) * 0.08 + this.rnd() * 0.3
+          - (hum ? this.crowd(p, qx, qy) * SPACE_PEN : 0);
         if (sc > bs) { bs = sc; p.supX = qx - c.x; p.supY = qy - c.y; }
       }
     }
     p.tx = clamp(c.x + p.supX, -HW + 1, HW - 1); p.ty = clamp(c.y + p.supY, -HL + 1, HL - 1);
+    if (this.human[T]) {
+      [p.tx, p.ty] = this.spread(p, p.tx, p.ty);
+      const mf = this.offLine[T] - 0.8; if (p.ty * dir > mf) p.ty = mf * dir;
+    }
   }
 
   support(p) {
-    const b = this.ball, T = p.team, dir = T ? -1 : 1;
+    const b = this.ball, T = p.team, dir = T ? -1 : 1, hum = this.human[T] && this.phase === 'play';
     if (this.phase === 'play' && b.owner && b.owner.team === T && this.helpers && this.helpers[T].includes(p)) return this.offerSupport(p, b.owner);
     const [ax, ay] = this.anchor(p);
     p.soT -= this.dtT;
@@ -312,13 +412,16 @@ export class AIMethods {
       for (const c of [[0, 0], [5, 0], [-5, 0], [0, 4], [3.5, 3], [-3.5, 3], [0, -4]]) {
         const qx = ax + c[0], qy = ay + c[1] * dir;
         if (Math.abs(qx) > HW - 1.5 || Math.abs(qy) > HL - 2) continue;
-        const s = Math.min(this.nearOpp(qx, qy, T), 7) + (this.lane(b.x, b.y, qx, qy, T, 18) > 0 ? 1.5 : 0) + (c[1] > 0 ? 0.6 : 0) + this.rnd() * 0.5;
+        const s = Math.min(this.nearOpp(qx, qy, T), 7) + (this.lane(b.x, b.y, qx, qy, T, 18) > 0 ? 1.5 : 0) + (c[1] > 0 ? 0.6 : 0) + this.rnd() * 0.5
+          - (hum ? this.crowd(p, qx, qy) * SPACE_PEN : 0);
         if (s > bs) { bs = s; p.sox = c[0]; p.soy = c[1] * dir; }
       }
     }
     let tx = ax + p.sox, ty = ay + p.soy;
     const line = this.offLine[T], flight = !b.owner && b.kick && b.kick.team === T;
-    if (p.pos === 'A' && b.y * dir > -15) ty = Math.max(ty * dir, Math.min(line - 0.8, HL - 6)) * dir;
+    // le punte attaccano lo spazio dietro la difesa, sulla linea del fuorigioco (la squadra umana già dalla propria metà)
+    if (p.pos === 'A' && b.y * dir > (hum ? DEEP_FROM : -15)) ty = Math.max(ty * dir, Math.min(line - 0.8, HL - 6)) * dir;
+    if (hum) [tx, ty] = this.spread(p, tx, ty);
     if (!flight) { const mf = Math.max(line - 0.8, b.y * dir); if (ty * dir > mf) ty = mf * dir; }
     p.tx = tx; p.ty = ty;
   }

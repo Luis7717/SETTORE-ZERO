@@ -21,7 +21,13 @@ export class MenuBg {
   show(who) {
     this.want = who;
     this.host.style.display = 'block';
-    if (!this.view) this.view = new Stage(this.host.querySelector('canvas'));
+    if (!this.view) {
+      // canvas sempre nuovo: quello vecchio ha il contesto WebGL perso apposta (forceContextLoss) e non si riusa
+      const old = this.host.querySelector('canvas'), cv = document.createElement('canvas');
+      cv.setAttribute('aria-hidden', 'true');
+      if (old) old.replaceWith(cv); else this.host.appendChild(cv);
+      this.view = new Stage(cv);
+    }
     const view = this.view;
     // il modello sta nella tappa 'match': si scarica in sottofondo, il menu intanto è già usabile
     const a = this.assets;
