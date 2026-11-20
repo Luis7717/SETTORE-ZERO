@@ -1,0 +1,58 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/partita/vista.gd" id="1_vista"]
+[ext_resource type="Script" path="res://scripts/partita/telecamera_partita.gd" id="2_cam"]
+[ext_resource type="Script" path="res://scripts/campo.gd" id="3_campo"]
+[ext_resource type="Script" path="res://scripts/stadio.gd" id="4_stadio"]
+[ext_resource type="Script" path="res://scripts/partita/nastri.gd" id="5_nastri"]
+
+[sub_resource type="ProceduralSkyMaterial" id="CieloMat"]
+sky_top_color = Color(0.25, 0.45, 0.8, 1)
+sky_horizon_color = Color(0.7, 0.79, 0.9, 1)
+ground_bottom_color = Color(0.18, 0.22, 0.18, 1)
+ground_horizon_color = Color(0.7, 0.79, 0.9, 1)
+sun_angle_max = 20.0
+
+[sub_resource type="Sky" id="Cielo"]
+sky_material = SubResource("CieloMat")
+
+[sub_resource type="Environment" id="Ambiente"]
+background_mode = 2
+sky = SubResource("Cielo")
+ambient_light_source = 3
+ambient_light_energy = 0.6
+reflected_light_source = 2
+tonemap_mode = 2
+fog_enabled = true
+fog_light_color = Color(0.62, 0.7, 0.82, 1)
+fog_density = 0.0012
+fog_sky_affect = 0.0
+
+[node name="VistaPartita" type="Node3D"]
+script = ExtResource("1_vista")
+
+[node name="Ambiente" type="WorldEnvironment" parent="."]
+environment = SubResource("Ambiente")
+
+[node name="Sole" type="DirectionalLight3D" parent="."]
+light_color = Color(1, 0.92, 0.8, 1)
+light_energy = 1.2
+shadow_enabled = true
+directional_shadow_mode = 1
+directional_shadow_max_distance = 70.0
+
+[node name="Telecamera" type="Camera3D" parent="."]
+current = true
+fov = 70.0
+script = ExtResource("2_cam")
+
+[node name="Campo" type="Node3D" parent="."]
+script = ExtResource("3_campo")
+
+[node name="Stadio" type="Node3D" parent="."]
+script = ExtResource("4_stadio")
+
+[node name="Giocatori" type="Node3D" parent="."]
+
+[node name="Nastri" type="Node3D" parent="."]
+script = ExtResource("5_nastri")

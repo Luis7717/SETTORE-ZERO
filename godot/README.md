@@ -13,6 +13,11 @@ HUD, suoni, squadre di prova, scena `scenes/partita.tscn`, ora scena principale)
 animazioni, telecamere: `scenes/vista_partita.tscn`, altro lavoro). Finché la vista vera non c'è, il gioco usa una
 vista finta (cilindri colorati). Dettagli sotto, in "Partita (fase 2)".
 
+**Fase 2, vista della partita** (`scripts/partita/`, `scenes/vista_partita.tscn`): tutto quello che si vede in partita,
+porting di `src/render.js`, `camfit.js`, `camuser.js`, `players3d.js`, `athlete3d.js`, `props.js`, `ik.js`,
+`move-pose.js`, `tricks.js` e `src/moves/*`. Legge lo stato del motore (`SimMatch`) e non lo cambia mai; il ciclo di
+gioco, i gesti e l'interfaccia sono un altro lavoro (`partita.tscn`). Contratto qui sotto.
+
 ## Aprire il progetto
 
 1. Scarica Godot 4.7.2-stable (https://godotengine.org/download/archive/4.7.2-stable/), versione normale (non .NET).
@@ -39,6 +44,7 @@ vista finta (cilindri colorati). Dettagli sotto, in "Partita (fase 2)".
 | `shaders/divisa.gdshader` | colori della divisa per zone del corpo, come `src/athlete3d.js` |
 | `assets/` | modelli, suoni, icona (licenze in `CREDITI.md`) |
 | `tools/` | strumenti di sviluppo (icona, ispezione dei modelli): non finiscono nell'app |
+<<<<<<< HEAD
 | `scenes/partita.tscn` | **partita** (scena principale): `scripts/partita/gioco.gd` |
 | `scenes/hud_partita.tscn` | interfaccia della partita: `scripts/partita/hud_partita.gd` |
 | `scripts/partita/gioco.gd` | ciclo della partita (`frame()` di `src/main.js`): gesti → motore col tempo scalato → eventi → vista; pausa, intervallo, fine |
@@ -52,6 +58,18 @@ vista finta (cilindri colorati). Dettagli sotto, in "Partita (fase 2)".
 | `scripts/partita/bot_dito.gd` | "dito finto" per le prove: gioca coi gesti veri |
 | `shaders/rallenty.gdshader` | bordo scuro del rallenty |
 | `sim/`, `tests/` | motore di gioco in GDScript e i suoi test (`tests/test_gesti.gd` = gesti) |
+=======
+| `sim/`, `tests/` | motore di gioco in GDScript e i suoi test (altro lavoro in parallelo) |
+| `scenes/vista_partita.tscn` | vista della partita: cielo, sole, telecamera, campo, stadio, giocatori, linee (`PartitaVista`) |
+| `scripts/partita/vista.gd` | `PartitaVista`: giocatori, pallone, anello, reti, giochetti, conversioni schermo ↔ campo |
+| `scripts/partita/telecamera_partita.gd` | telecamera come `View.update` del web: normale, vicino alla porta, difesa, duello, rallenty largo, angolo, parata, girata |
+| `scripts/partita/camfit.gd`, `camuser.gd` | inquadrature calcolate e visuale girata col dito (conti puri, provati senza schermo) |
+| `scripts/partita/figura.gd` | un giocatore in partita: clip fermo/corsa/scatto/salto, pose (calcio, testa, tuffo, scivolata, esultanza), giochetti con la IK |
+| `scripts/partita/mosse/` | movimenti calcolati dei giochetti (`mossa.gd`, `corpo.gd`, `giochetti.gd`) e IK a due ossa (`ik.gd`) |
+| `scripts/partita/nastri.gd`, `texture_vista.gd` | linee disegnate a nastro, linee di difesa, anteprima, fuorigioco; texture fatte a codice |
+| `shaders/rete.gdshader`, `bandierina.gdshader` | rete che si gonfia sul gol, bandierine che sventolano |
+| `scenes/prova_vista.tscn` | prova: computer contro computer disegnato dalla vista, scene per le schermate e misure |
+>>>>>>> wt-godot-vista
 
 ## Coordinate
 
@@ -161,6 +179,35 @@ Il preset si può provare anche da Windows: con i template installati
 (`%APPDATA%\Godot\export_templates\4.7.2.stable\ios.zip`) il comando
 `$G --headless --path godot --export-release "iOS" ../build/ios/TiroAGiroGodot.ipa` scrive il progetto Xcode in
 `build/ios/` (solo la compilazione richiede un Mac).
+
+### Vista della partita (fase 2)
+
+```sh
+$G --path godot res://scenes/prova_vista.tscn -- --schermata=shots/vista/partita.png --dopo=6
+#   --scena=rallenty | girata | parata | angolo | giochetto | linea | gol    (più --sequenza=N --ogni=SEC)
+#   --me=1 (campo capovolto) · --vicino=N (telecamera vicina a m.players[N]) · --senza-vsync --esci-dopo=15
+$G --headless --path godot res://scenes/prova_vista.tscn -- --controlla --me=1   # conversioni schermo/campo/porta
+$G --headless --path godot -s res://tests/run_tests.gd -- test_camfit    # anche test_camuser, test_mosse, test_figura
+node test/export-vista.mjs     # rigenera tests/fixtures/vista.json dal JS (camfit, camuser, giochetti, IK)
+```
+
+Contratto di `PartitaVista` (`scripts/partita/vista.gd`, radice di `scenes/vista_partita.tscn`):
+
+| Chiamata | Cosa fa |
+|---|---|
+| `setup(m: SimMatch, me: int)` | 22 giocatori con le divise (`team.kit` {shirt, shorts, socks, gk} se c'è, sennò rosso/blu e portieri arancio/verde), telecamera sul pallone |
+| `update_view(dt_game, dt_real)` | dopo il passo del motore: animazioni col tempo di gioco, telecamera col tempo vero; riporta piano `user_yaw` a 0 (relaxYaw) |
+| `world_to_screen(x, y, h) -> Vector3` | (x_px, y_px, 1 davanti alla telecamera / 0 dietro) — il terzo valore non dice "dentro lo schermo" |
+| `screen_to_field(p) -> Vector2` | punto del campo sotto il dito, con la telecamera vera anche girata; `Vector2(INF, INF)` sul cielo |
+| `screen_to_goal(p, gy) -> Vector3` | (x, h, 1 valido / 0 no) sul piano della porta a y = gy, per tiro e tuffo |
+| `set_zoom(z)` | zoom come `setZoom` del web (senza chiamarla lo calcola la vista con le stesse regole) |
+| `show_path(points, kind, end_h := 0.0, recv := null)` / `clear_path()` | linea a nastro: "run", "pass" (anello verde sul compagno entro 5 m), "shot" (gialla col mirino), "def" |
+| `show_preview(points, offside_y := NAN)` | puntini del volo e linea del fuorigioco (facoltativo: nel gioco li fa l'interfaccia) |
+| `trick(p, r := -1.0) -> Dictionary` | giochetto del dribbling per p (solo grafica): {id, name, dur} |
+| `dispose()` | via figure e riferimenti; va bene anche da `_exit_tree` del padre |
+| `user_yaw`, `cam_drag`, `drawing` | scritti da chi gestisce il dito |
+
+Le linee di difesa assegnate (`m.runs[me]`) si disegnano da sole a ogni `update_view`.
 
 ## Prestazioni sul telefono
 

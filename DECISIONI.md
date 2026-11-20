@@ -725,6 +725,7 @@ di costanti, metodi e campi; dettagli e corrispondenza dei file in `godot/sim/RE
   Un passo a fotogramma è ~3% dei 16,7 ms; su iPhone stimati 0,5-1 ms a passo. **Da misurare sul telefono.**
 - `m.dispose()` a fine partita: i riferimenti circolari tra giocatori (`supC`, `beatBy`) Godot non li libera da solo.
 
+<<<<<<< HEAD
 ## 2026-11-20 — Godot fase 2: gioco
 Partita giocabile in Godot, parte "gioco" (la vista con giocatori, animazioni e telecamere la fa un altro lavoro in
 parallelo). Scena principale ora `godot/scenes/partita.tscn`; dettagli e contratto della vista in `godot/README.md`
@@ -765,3 +766,40 @@ Verificato sul PC: 20 test dei gesti verdi più tutti quelli del motore; partite
 (`--bot`) che usa solo i gesti veri, senza errori; schermate 390×844 con la vista finta (partita, rallenty con frecce,
 disegno di un passaggio con anteprima, angolo, pausa, fine partita). **Non verificato**: iPhone (tocchi veri, aree
 sicure vere, suoni, prestazioni) e la vista vera.
+=======
+## 2026-11-20 — Godot fase 2: vista
+La vista della partita (`godot/scripts/partita/`, `scenes/vista_partita.tscn`, classe `PartitaVista`) porta in Godot
+quello che si vede in partita nel web: telecamere, giocatori animati, giochetti, pallone, reti, bandierine, linee.
+Legge `SimMatch` e non lo cambia; contratto nel README di `godot/`. Ciclo di gioco, gesti e interfaccia sono un altro lavoro.
+- **Conti della telecamera uguali al JS.** `camfit.gd` e `camuser.gd` sono porting riga per riga; `node test/export-vista.mjs`
+  scrive i risultati del JS (parata, rallenty largo, angolo, fitView, dragYaw/relaxYaw/keepGoal) in
+  `godot/tests/fixtures/vista.json` e i test li confrontano (posizione entro 2 cm: Vector3 di Godot è a 32 bit), più gli
+  stessi controlli "dentro lo schermo" di `test/unit/camfit.test.mjs` e `camuser.test.mjs`. Il resto della telecamera
+  (`View.update`: dietro l'azione, vicino alla porta, difesa, duello, girata) è copiato con le stesse costanti.
+- **Giochetti: stessi movimenti del JS, applicati allo scheletro vero.** `mosse/*` porta `src/moves/*` con le misure del
+  web (le pose combaciano col JS entro 2 mm a 17 istanti per giochetto, anche specchiate). Il modello Godot però non ha
+  le proporzioni ritoccate del web (`body/gambe.js`, `busto.js`): la posa si applica con le lunghezze e gli
+  orientamenti di riposo dello scheletro vero e con una IK a due ossa portata da `src/ik.js` (non `TwoBoneIK3D` di
+  Godot, per avere le stesse pose del web e poterle provare senza schermo). Le caviglie arrivano entro 1,4 cm dal
+  bersaglio; spalle e mani possono stare qualche cm più in là che nel web. **Limite noto.**
+- **Pose procedurali sopra il clip** (calcio, colpo di testa, tuffo, scivolata, a terra, esultanza, portiere pronto) come
+  `Players3D.pose`: rotazioni attorno agli assi del corpo, calcolate dalle pose locali (lo Skeleton3D aggiorna le pose
+  globali solo al disegno: leggerle subito dava le rotazioni del fotogramma prima) e rimesse a posto al fotogramma dopo.
+  Animazioni col tempo di gioco (AnimationTree in modo manuale), telecamera col tempo vero, come nel web.
+- **Rete semplificata**: invece di una molla per vertice (web) un solo spostamento per porta, molla e smorzamento del web,
+  distribuito dallo shader con una campana attorno al punto d'impatto; al massimo 45 cm, e il pallone a schermo si
+  ferma nel telo (il motore lo tiene fino a 1,9 m oltre la linea). La propria porta è più trasparente (0,22 contro 0,78).
+  Bandierine: onda nello shader (`waveFlags`). Niente scia, sbuffo d'erba e coriandoli (non richiesti in questa fase).
+- **Tribune di fondo spostate a 18 m dalla linea di porta** (`stadio.gd`, erano a 9): come nel web; a 9 m la telecamera
+  della parata (fino a 15 m dietro la porta) finiva dentro la tribuna.
+- **Richieste del lavoro del gioco** (`wt-godot-gioco`): `screen_to_goal` restituisce `Vector3(x, h, valido)`,
+  `world_to_screen` dice solo "davanti alla telecamera", `screen_to_field` dà `Vector2(INF, INF)` sul cielo, `set_zoom`
+  come `setZoom`, `dispose()` sicura da `_exit_tree`, ritorno di `user_yaw` a 0 fatto dalla vista, `trick()` restituisce
+  `{id, name, dur}`. `show_path` ha due parametri facoltativi in più (`end_h` per l'altezza del tiro, `recv`).
+- **Verifica** (PC, RTX 3070): test senza schermo `test_camfit` 7, `test_camuser` 7, `test_mosse` 4, `test_figura` 5 (con quelli del motore: 111 test verdi, 0 falliti),
+  `prova_vista.tscn -- --controlla` (campo → schermo → campo e porta, anche capovolto e
+  girato); schermate 390×844 di partita, rallenty largo, visuale girata, parata e tuffo, calcio d'angolo, arcobaleno da
+  vicino, linee (passaggio, anteprima, fuorigioco, difesa), gol. FPS senza vsync con 22 giocatori: ~315-340
+  (fotogramma 2,8-3 ms; vista 1,5 ms di CPU, di cui ~0,6 ms le 22 AnimationTree; motore 0,2 ms).
+  **Non verificato sull'iPhone.**
+>>>>>>> wt-godot-vista
