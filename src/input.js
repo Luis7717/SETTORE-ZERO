@@ -1,6 +1,6 @@
 // Comandi a un dito. Traduce i tocchi in ordini per la squadra `team`.
 import { HW, HL, GW, GH, SPRINT_DIST, RUN_MAX_LEN, clipLen } from './sim.js';
-import { userCamOn, dragYaw, isCamDrag } from './camuser.js';
+import { userCamOn, cornerCamOn, dragYaw, isCamDrag } from './camuser.js';
 
 const NO_OFFSIDE = ['throw', 'goalkick', 'corner']; // ripartenze senza fuorigioco
 const PASS_SNAP = 5; // la linea che finisce entro tanti metri da un compagno è un passaggio a lui (m)
@@ -34,14 +34,16 @@ export class Input {
     if (c && b.owner === c && (hint === 'attack' || hint === 'restart')) {
       const sp = this.view.worldToScreen(b.x, b.y, 0.3), sc = this.view.worldToScreen(c.x, c.y, 1);
       const R = Math.max(64, this.view.h * 0.085);
-      if (Math.hypot(x - sp.x, y - sp.y) < R || Math.hypot(x - sc.x, y - sc.y) < R || hint === 'restart') {
+      // sulle rimesse il dito disegna dalla palla ovunque si appoggi, tranne nel calcio d'angolo: lì solo vicino al
+      // battitore (lontano gira la visuale, come nel rallenty)
+      if (Math.hypot(x - sp.x, y - sp.y) < R || Math.hypot(x - sc.x, y - sc.y) < R || (hint === 'restart' && !cornerCamOn(m))) {
         this.mode = 'draw'; this.drawing = true; this.pts = [{ x: b.x, y: b.y, h: 0, sx: x, sy: y }];
         return;
       }
     }
     // rallenty in attacco (duello, area di tiro): dito lontano dal portatore = trascinando di lato gira la visuale;
     // il tocco breve (sul campo o su un compagno) non fa niente: il passaggio si disegna sempre
-    if (c && b.owner === c && hint === 'attack' && userCamOn(m, T)) {
+    if ((c && b.owner === c && hint === 'attack' && userCamOn(m, T)) || cornerCamOn(m)) {
       this.mode = 'cam'; this.camOn = false; this.yaw0 = this.view.userYaw || 0;
       return;
     }

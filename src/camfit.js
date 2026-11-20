@@ -173,27 +173,43 @@ export const CORNER_H = 9;         // altezza di partenza (m): dall'alto l'area 
 export const CORNER_PITCH = 0.62;  // inclinazione verso il basso (rad, ~30°): battitore in basso, area e porta in alto
 export const CORNER_AIM = 4;       // guarda verso il punto a tanti metri dalla linea di porta, al centro (battitore in mezzo allo schermo, porta davanti)
 export const CORNER_MAX_BACK = 9;  // non oltre tanti metri all'indietro (le tribune sono vicine)
+export const CORNER_GOAL_YAW = 0.35; // girata col dito: fino a tanto (rad, ~20°) si passa piano dalla visuale con la porta a quella col solo battitore
+export const CORNER_RUNUP = 1.5;  // il battitore prende la rincorsa tanti metri dietro il pallone
 export const CORNER_FOV_MAX = 90;  // campo visivo verticale massimo (gradi)
 export const CORNER_MARGIN = { l: 0.06, r: 0.06, t: 0.2, b: 0.3 }; // in basso il suggerimento: il battitore resta sopra
 
 /**
  * Visuale del calcio d'angolo (spazio orientato).
- * @param {{ ball: number[], aspect: number, fov: number }} o  ball [x, y]: la bandierina da cui si batte
+ * @param {{ ball: number[], yaw?: number, aspect: number, fov: number }} o  ball [x, y]: la bandierina da cui si batte;
+ *   yaw = visuale girata dalla persona col dito (rad, + = guarda verso destra): gira intorno al battitore
  */
 export function cornerView(o) {
   const [bx, by] = o.ball, sy = by >= 0 ? 1 : -1, gy = sy * HL;
   const ax = 0, ay = gy - sy * CORNER_AIM;
-  const yaw = Math.atan2(ax - bx, ay - by), hx = Math.sin(yaw), hy = Math.cos(yaw);
+  const turn = o.yaw || 0, yaw = Math.atan2(ax - bx, ay - by) + turn, hx = Math.sin(yaw), hy = Math.cos(yaw);
   const c0 = [bx - hx * CORNER_BACK, CORNER_H, by - hy * CORNER_BACK];
-  return fitView({
+  // battitore: il pallone e un metro e mezzo dietro (dove prende la rincorsa), dai piedi alla testa
+  const kx = bx - hx * CORNER_RUNUP, ky = by - hy * CORNER_RUNUP;
+  const kicker = [[bx, 0, by], [bx, 2, by], [kx, 0, ky], [kx, 2, ky]];
+  const base = {
     c0, yaw, pitch: CORNER_PITCH, aspect: o.aspect, fov: o.fov, fovMax: Math.max(o.fov, CORNER_FOV_MAX), m: CORNER_MARGIN,
-    tMin: 0, tMax: CORNER_MAX_BACK - CORNER_BACK, keep: 2, centerX: false, // di lato resta dietro al battitore
+    tMin: 0, tMax: CORNER_MAX_BACK - CORNER_BACK, centerX: false, // di lato resta dietro al battitore
+  };
+  const full = fitView({
+    ...base, keep: 2,
     groups: [
-      [[bx, 0, by], [bx, 2, by]],
+      kicker,
       goalCorners(gy, 0.5, 0.3),
       // l'area di rigore intera non si chiede: col telefono in verticale costringerebbe la telecamera a spostarsi di lato
       // e il battitore finirebbe sul bordo; basta l'area piccola davanti alla porta
       [[-SIX_W / 2, 0, gy - sy * SIX_D], [SIX_W / 2, 0, gy - sy * SIX_D]],
     ],
   });
+  // visuale girata col dito: guarda dove vuole la persona, col battitore in basso al centro (senza inseguire la
+  // porta, che spingerebbe la telecamera di lato); in mezzo si passa con dolcezza dall'una all'altra
+  const w = Math.min(1, Math.abs(turn) / CORNER_GOAL_YAW);
+  if (w <= 0) return full;
+  const free = fitView({ ...base, keep: 1, groups: [kicker] });
+  const mix = (p, q) => p.map((v, i) => v + (q[i] - v) * w);
+  return { ...full, pos: mix(full.pos, free.pos), look: mix(full.look, free.look), fov: full.fov + (free.fov - full.fov) * w };
 }

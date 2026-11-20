@@ -14,8 +14,14 @@ export const CAM_USER_GOAL_YAW = 40 * DEG;   // area di tiro: oltre questo angol
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
-/** rallenty in cui la visuale si può girare: fase di gioco, pallone a un giocatore di T, duello o area di tiro */
+/** il pallone è fermo sulla bandierina per un calcio d'angolo (di chiunque): anche lì la visuale si gira col dito */
+export function cornerCamOn(m) {
+  return !!(m && m.phase === 'restart' && m.restart && m.restart.type === 'corner');
+}
+
+/** visuale che si può girare: calcio d'angolo, oppure rallenty (fase di gioco, pallone a un giocatore di T, duello o area di tiro) */
 export function userCamOn(m, T) {
+  if (cornerCamOn(m)) return true;
   if (!m || m.phase !== 'play') return false;
   const c = m.ball && m.ball.owner;
   if (!c || c.team !== T) return false;

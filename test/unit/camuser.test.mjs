@@ -176,3 +176,13 @@ test('in difesa il tocco su un compagno lo fa ancora comandare', () => {
   drag([[s.x, s.y]]);
   assert.deepEqual(calls.map(c => c[0]), ['sw']);
 });
+
+// calcio d'angolo: anche lì la visuale si gira col dito (di chiunque sia l'angolo); sulle altre rimesse no
+test("calcio d'angolo: la visuale si può girare; rimessa laterale e punizione no", async () => {
+  const { cornerCamOn, userCamOn: on } = await import('../../src/camuser.js');
+  const m = t => ({ phase: 'restart', restart: { type: t, team: 1 }, ball: {} });
+  assert.equal(cornerCamOn(m('corner')), true);
+  assert.equal(on(m('corner'), 0), true);
+  for (const t of ['throw', 'free', 'goalkick', 'penalty']) { assert.equal(cornerCamOn(m(t)), false); assert.equal(on(m(t), 0), false); }
+  assert.equal(cornerCamOn({ phase: 'play', restart: null }), false);
+});

@@ -112,3 +112,16 @@ for (const [bx, by] of [[32, 50], [-32, 50], [32, -50], [-32, -50]]) {
     for (const p of goalCorners(gy, 0, 0)) assert.ok(inFrame(c, p, CORNER_MARGIN), `palo ${p}`);
   });
 }
+
+// calcio d'angolo con la visuale girata col dito: gira intorno al battitore, che resta sempre a schermo
+for (const turn of [-1.2, -0.4, 0.4, 1.2]) {
+  test(`calcio d'angolo girato di ${turn} rad: battitore sempre a schermo, telecamera girata`, () => {
+    const v0 = cornerView({ ball: [-32, 50], aspect: ASPECT, fov: FOV }), v = cornerView({ ball: [-32, 50], yaw: turn, aspect: ASPECT, fov: FOV });
+    const c = cam(v);
+    assert.ok(inFrame(c, [-32, 0, 50], CORNER_MARGIN, 0.02) && inFrame(c, [-32, 2, 50], CORNER_MARGIN, 0.02));
+    const ang = q => Math.atan2(q.look[0] - q.pos[0], q.look[2] - q.pos[2]);
+    let d = ang(v) - ang(v0); d = Math.atan2(Math.sin(d), Math.cos(d));
+    assert.ok(Math.abs(d - turn) < 0.05, `girata ${d}`);
+    if (turn === 0) for (const p of goalCorners(50, 0, 0)) assert.ok(inFrame(c, p, CORNER_MARGIN, 0.02));
+  });
+}
