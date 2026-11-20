@@ -12,7 +12,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { Players3D, loadPlayers3D, hex, rgb, shade, lumH, FACE, SOLE, cpuCanvas } from './players3d.js';
 import { SKINS, HAIR_COLORS, EYE_COLORS, BOOTS, normalizeKitStyle } from './looks.js';
 import { drawCrest } from './crest.js';
-import { makeRadialBase, scalpPaint, paintHairTex } from './hair3d.js';
+import { makeRadialBase, scalpAt, paintHairTex } from './hair3d.js';
 
 const MODEL_H = 1.84;                 // altezza prima di SCALE (come il vecchio modello: la scala del gioco resta quella)
 const HAIR_RECT = [16, 916, 200, 92]; // zona della tinta dei capelli (coordinate su 1024, fascia libera in basso)
@@ -223,12 +223,9 @@ export class Athlete3D extends Players3D {
             const o = sample(face, FACE.x + (x - midX) * fx, FACE.eyeY + (LM.eyeY - y) * fy);
             const a = face.d[o + 3] / 255 * smooth(-0.15, 0.25, nf); if (a > 0) mix([face.d[o], face.d[o + 1], face.d[o + 2]], a);
           }
-          if (scalpOn) {
-            const el = Math.atan2(ly, Math.hypot(lx, lz)) * 57.2958, az = Math.atan2(lx, lz) * 57.2958;
-            const a = scalpPaint(L.hair, el, az, (Math.imul(i, 2654435761) >>> 0) / 4294967296);
-            if (a > 0) mix(hairS, a);
-          }
         }
+        // cute sotto i capelli anche sul collo (nuca): niente scalino dove finisce l'osso della testa
+        if (scalpOn) { const a = scalpAt(this.head, L.hair, x, y, z, i); if (a > 0) mix(hairS, a); }
       } else if (c === C_HAND) {
         set(glove); cloth = !!kit.gloves;
         if (kit.gloves && Math.abs(ax - LM.wrX - 0.04) < 0.012) set(gloveBand);

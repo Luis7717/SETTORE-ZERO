@@ -77,3 +77,21 @@ test('base radiale: contiene la testa, aderisce, è liscia e regge tutti i tagli
   for (let az = -180; az < 180; az += 1) { const a = az * Math.PI / 180, b = Math.PI / 180; const d = Math.abs(rb([Math.sin(a), 0.3, Math.cos(a)]) - rb([Math.sin(a + b), 0.3, Math.cos(a + b)])); assert.ok(d < 0.03, `salto ${d} a ${az}°`); }
   for (let s = 1; s < HAIR.length; s++) { const g = hairPieces(s, rb); assert.ok((g.pos.length > 0 || !(HAIR[s].line || HAIR[s].strip)) && g.pos.every(Number.isFinite), `taglio ${s}`); }
 });
+
+// modello realistico: afro di volume credibile (non un fungo), basette e nuca pulita nella tinta della cute
+import { scalpPaint } from '../../src/hair3d.js';
+test('afro: spessore da testa vera (prima era un fungo: 0,6 R in cima)', () => {
+  const head = [];
+  for (let el = -80; el <= 85; el += 4) for (let az = -180; az < 180; az += 4) { const e = el * Math.PI / 180, a = az * Math.PI / 180; head.push([Math.cos(e) * Math.sin(a), Math.sin(e), Math.cos(e) * Math.cos(a)]); }
+  const rb = makeRadialBase({ c: [0, 0, 0], up: [0, 1, 0], fwd: [0, 0, 1], right: [1, 0, 0], R: 1, pts: head }).base;
+  const top = box(hairPieces(9, rb))[4] - rb([0, 1, 0]);
+  assert.ok(top > 0.2 && top < 0.5, `spessore in cima ${top}`);
+  const g = hairPieces(9, rb); let wide = 0; for (let i = 0; i < g.pos.length; i += 3) wide = Math.max(wide, Math.abs(g.pos[i]));
+  assert.ok(wide < 1.35, `afro troppo largo: ${wide}`);
+});
+test('basette solo col modello realistico, nuca senza tinta sul collo', () => {
+  assert.equal(scalpPaint(2, -5, 102, 0.5), 0);           // modello Kenney: niente basette
+  assert.ok(scalpPaint(2, -5, 102, 0.5, true) > 0.5);     // davanti all'orecchio
+  assert.equal(scalpPaint(2, -5, 60, 0.5, true), 0);      // guancia: pulita
+  assert.equal(scalpPaint(10, -40, 180, 0.5, true), 0);   // collo sotto un taglio lungo: pulito
+});
