@@ -73,6 +73,10 @@
   gira la telecamera intorno a lui (si afferra il campo: 150° per schermo, al massimo ±100°, `src/camuser.js`); niente
   più rotazione automatica. Il tocco breve sul campo o su un compagno lì non fa niente. Resta finché dura il rallenty
   con lo stesso portatore, poi torna dritta da sola.
+- **Fuga** (2026-11-20): avversario a meno di 4 m **di lato o alle spalle** del portatore (non davanti) = niente
+  dribbling né passaggio: il tempo rallenta (8%) e il tasto in basso diventa **Scatto**. Toccandolo il portatore si stacca
+  (più veloce per 1,2 s, l'avversario resta indietro e non contrasta per 0,6 s) e prosegue dritto. Il duello vale solo con
+  l'avversario davanti entro 60° (era 70°) e si chiude quando passa di lato; l'IA dribbla come prima.
 - La finta è stata tolta (2026-11-20).
 - Calcio d'angolo: telecamera alle spalle del battitore; dito vicino al battitore = cross, lontano = trascinando si gira la visuale.
 - Difesa: dito su un proprio giocatore e disegna = linea da seguire (tutti tranne il portiere); tieni premuto sul campo =

@@ -130,8 +130,8 @@ export class Tutorial {
     // in allenamento niente espulsioni né stanchezza: ogni prova riparte con tutti in campo
     // e niente attese rimaste dalla prova prima: duello, dribbling e contrasti ripartono da zero
     // (prima, dopo un dribbling fallito, il tasto Dribbling della prova nuova non faceva nulla per secondi)
-    for (const p of m.players) { p.off = false; p.yellow = 0; p.energy = 1; p.vx = p.vy = 0; p.stun = 0; p.dribCd = 0; p.tackleCd = 0; p.protect = 0; p.beat = 0; }
-    m.duel = null; m.duelCd = [0, 0]; m.duelCdP = [null, null];
+    for (const p of m.players) { p.off = false; p.yellow = 0; p.energy = 1; p.vx = p.vy = 0; p.stun = 0; p.dribCd = 0; p.tackleCd = 0; p.protect = 0; p.beat = 0; p.burst = 0; }
+    m.duel = null; m.duelCd = [0, 0]; m.duelCdP = [null, null]; m.flee = null; m.fleeCd = [0, 0]; m.fleeCdP = [null, null];
     m.ctrl[0] = null;
     m.place(m.gk(0), 0, -49); m.place(m.gk(1), 0, 49);
     for (const p of m.team(0)) if (p.pos !== 'P' && p.i !== 7 && p.i !== 9) { const [ax, ay] = m.anchor(p); this.put(m, p, ax, Math.min(ay, -5)); }

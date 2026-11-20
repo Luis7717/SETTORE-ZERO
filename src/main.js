@@ -113,6 +113,7 @@ const GK_SLOW = 0.1;
 const DEF_DRAW_SLOW = 0.13; // velocità del tempo mentre si disegna una linea di difesa      // velocità del tempo mentre si para
 const PASS_DRAW_SLOW = 0.04; // velocità del tempo mentre si disegna un passaggio o un tiro (Luis 2026-11-20: più lento)
 const DUEL_SLOW = 0.08; // velocità del tempo durante un duello col difensore (era 0,15)
+const FLEE_SLOW = 0.08; // velocità del tempo nella fuga: avversario di lato o alle spalle, tasto Scatto (Luis 2026-11-20)
 const ZONE_SLOW = 0.1; // (era 0,17) velocità del tempo negli ultimi 20 m prima della porta avversaria (area di tiro)
 const HINTS = {
   attack: 'Disegna la strada dal giocatore per correre · linea in porta = tiro',
@@ -120,6 +121,7 @@ const HINTS = {
   loose: 'Palla libera: disegna una linea da un tuo giocatore per andarci',
   dive: 'PARA! Tira una linea dal portiere al punto della porta',
   duel: 'Disegna fino a un compagno per passare · oppure tocca Dribbling',
+  flee: 'Avversario addosso: tocca Scatto per staccarlo',
   zone: 'Area di tiro: linea in porta = tiro · fino a un compagno = passaggio',
 };
 const RHINT = { kickoff: 'Calcio d\'inizio: disegna il passaggio', throw: 'Rimessa: disegna il passaggio', corner: 'Calcio d\'angolo: disegna il cross', goalkick: 'Rinvio: disegna il passaggio', freekick: 'Punizione: disegna il passaggio o il tiro', penalty: 'RIGORE: disegna il tiro in porta', gk: 'Rilancio del portiere: disegna il passaggio' };
@@ -135,6 +137,7 @@ function events(m) {
       case 'advantage': big('Vantaggio!', '', 1100); break;
       case 'advantage_back': sfx.whistle(); big('Si torna alla punizione', '', 1300); break;
       case 'tackle': case 'block': sfx.kick(9); break;
+      case 'burst': if (e.p.team === 0) { sfx.kick(6); big('Scatto!', 'g', 800); } break;
       case 'dribble': { const T = view.trick(e.p); if (e.p.team === 0) big(T.name + (e.ok ? '!' : ''), e.ok ? 'g' : '', 1000); break; }
       case 'goal':
         if (e.team === 0) { sfx.goal(); big('GOL!', 'g', 2600, (e.scorer ? e.scorer.name : 'Autogol') + ' · ' + e.minute + '\''); }
@@ -208,7 +211,11 @@ ov.addEventListener('click', e => {
   } else if (a === 'back') { if (m.phase === 'half') showHalf(); else showPause(); }
 });
 $('pause').addEventListener('click', () => { if (G.state === 'match' && !G.paused) showPause(); });
-$('drib').addEventListener('click', () => { if (G.state === 'match' && !G.paused && G.match.userDribble) G.match.userDribble(0); });
+$('drib').addEventListener('click', () => {
+  if (G.state !== 'match' || G.paused) return;
+  const m = G.match;
+  if (m.fleeFor && m.fleeFor(0)) m.userSprint(0); else if (m.userDribble) m.userDribble(0);
+});
 document.addEventListener('visibilitychange', () => { if (document.hidden && G.state === 'match' && !G.paused && G.match.phase !== 'half') showPause(); });
 
 // ---------------------------------------------------------------- radar
@@ -254,9 +261,11 @@ function frame(now) {
     if (!G.paused) {
       input.update();
       const dive = m.diveWin(0) && !m.autoGk[0];
-      const duel = !!(m.duelFor && m.duelFor(0)), zone = !duel && !!(m.inZone && m.inZone(0));
-      const target = input.mode === 'dpath' ? DEF_DRAW_SLOW : input.drawing ? (input.runPath() ? RUN_DRAW_SLOW : PASS_DRAW_SLOW) : dive ? GK_SLOW : duel ? DUEL_SLOW : zone ? ZONE_SLOW : 1;
-      $('drib').style.display = duel && !input.drawing ? 'block' : 'none';
+      const duel = !!(m.duelFor && m.duelFor(0)), flee = !duel && !!(m.fleeFor && m.fleeFor(0)), zone = !duel && !flee && !!(m.inZone && m.inZone(0));
+      const target = input.mode === 'dpath' ? DEF_DRAW_SLOW : input.drawing ? (input.runPath() ? RUN_DRAW_SLOW : PASS_DRAW_SLOW) : dive ? GK_SLOW : duel ? DUEL_SLOW : flee ? FLEE_SLOW : zone ? ZONE_SLOW : 1;
+      const drib = $('drib'), lbl = flee ? 'Scatto' : 'Dribbling';
+      drib.style.display = (duel || flee) && !input.drawing ? 'block' : 'none';
+      if (drib.textContent !== lbl) drib.textContent = lbl;
       G.ts += (target - G.ts) * Math.min(1, dt * 14);
       const sdt = dt * G.ts * (G.speed || 1), n = Math.max(1, Math.ceil(sdt / (1 / 60)));
       if (G.tut) G.tut.before();
@@ -276,7 +285,7 @@ function frame(now) {
       hudT = now + 100;
       $('sc').textContent = m.score[0] + ' – ' + m.score[1]; $('clock').textContent = m.minute() + '\'';
       drawRadar(m); camHint(m);
-      const h = m.duelFor && m.duelFor(0) ? 'duel' : m.inZone && m.inZone(0) ? 'zone' : m.hint(0); let txt = h === 'restart' ? RHINT[m.restart.type] : (HINTS[h] || '');
+      const h = m.duelFor && m.duelFor(0) ? 'duel' : m.fleeFor && m.fleeFor(0) ? 'flee' : m.inZone && m.inZone(0) ? 'zone' : m.hint(0); let txt = h === 'restart' ? RHINT[m.restart.type] : (HINTS[h] || '');
       if ((career.s.tut || 0) > 4 && (h === 'attack' || h === 'defend' || h === 'loose')) txt = '';
       if (G.tut) txt = '';
       if (txt !== lastHint) { lastHint = txt; const el = $('hint'); el.className = h === 'dive' || (h === 'restart' && m.restart.type === 'penalty') ? 'hot' : ''; el.innerHTML = txt ? `<span>${txt}</span>` : ''; }

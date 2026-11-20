@@ -64,6 +64,7 @@ export class Match {
     this.predT = 0; this.att = -1; this.dtT = 0; this.lastPass = null; this.restart = null;
     this.goalsLog = []; this.advantage = null;
     this.duel = null; this.duelCd = [0, 0]; this.duelCdP = [null, null];
+    this.flee = null; this.fleeCd = [0, 0]; this.fleeCdP = [null, null];
     this.kickoffTeam = o.kickoff ?? (this.rnd() < 0.5 ? 0 : 1);
     this.setupKickoff(this.kickoffTeam);
   }
@@ -73,7 +74,7 @@ export class Match {
     return {
       team, i, src, name: src.name, pos: slot[0], bx: slot[1], by: slot[2], st: effStats(src, slot[0]),
       x: 0, y: 0, vx: 0, vy: 0, fx: 0, fy: dir, tx: 0, ty: 0, spdF: 1, state: 'play', t: 0, stun: 0, protect: 0,
-      contact: 0, tackleCd: 0, kickAnim: 0, energy: 1, sprint: false, dribCd: 0, beat: 0, beatBy: null, wear: { dri: 1, tes: 1 }, wall: null, yellow: 0, off: false, sdx: 0, sdy: 0, hit: false,
+      contact: 0, tackleCd: 0, kickAnim: 0, energy: 1, sprint: false, dribCd: 0, beat: 0, beatBy: null, burst: 0, wear: { dri: 1, tes: 1 }, wall: null, yellow: 0, off: false, sdx: 0, sdy: 0, hit: false,
       dive: null, phase: this.rnd() * 6, aiT: 0, dx: 0, dy: 0, reactT: 0, decided: true, warn: false,
       sox: 0, soy: 0, soT: this.rnd(), cele: 0, look: this.lookFor(src),
     };
@@ -157,7 +158,7 @@ export class Match {
   setRestart(type, team, x, y, taker) {
     const b = this.ball, dir = team ? -1 : 1, own = -dir * HL, opp = 1 - team;
     b.owner = null; b.vx = b.vy = b.vh = 0; b.h = 0; b.kick = null; b.shot = null; b.ct = 0; b.noT = 0;
-    this.endDuel('gioco fermo');
+    this.endDuel('gioco fermo'); this.endFlee('gioco fermo');
     this.phase = 'restart'; this.move = [null, null]; this.runs = [[], []]; this.lastPass = null; this.advantage = null;
     this.resetStates();
     let cut = false, wallSide = 0;
@@ -418,7 +419,7 @@ export class Match {
     if (og && b.prev && b.prev.team === forT) { scorer = b.prev; }
     const minute = Math.min(90, Math.floor((this.half - 1) * 45 + this.t / this.halfLen * 45) + 1);
     this.goalsLog.push({ team: forT, name: scorer ? scorer.name : 'Autogol', minute, scorer: scorer ? scorer.src : null, assist: assist ? assist.src : null });
-    this.endDuel('gioco fermo');
+    this.endDuel('gioco fermo'); this.endFlee('gioco fermo');
     this.advantage = null; this.phase = 'goal'; this.goalT = 3.2; this.nextKick = 1 - forT; b.owner = null; b.shot = null; b.kick = null; b.ct = 0;
     for (const p of this.players) if (!p.off) { p.cele = p.team === forT ? 1 : -1; if (p.state !== 'play') { p.state = 'play'; p.dive = null; } }
     this.ev('goal', { team: forT, scorer, assist, og: og && !scorer, minute });
@@ -441,6 +442,7 @@ export class Match {
     this.movePlayers(dt);
     this.updateBall(dt);
     this.updateDuel(dt);
+    this.updateFlee(dt);
     if (this.phase === 'play') {
       this.contacts(dt);
       if (this.phase === 'play') this.checkAdvantage(dt);
@@ -478,7 +480,7 @@ export class Match {
   useAdvantage(T) { if (this.advantage && this.advantage.team === T) { this.advantage = null; this.ev('advantage_over', { team: T }); } }
 
   endHalf() {
-    this.endDuel('gioco fermo'); this.resetStates(); this.ball.shot = null;
+    this.endDuel('gioco fermo'); this.endFlee('gioco fermo'); this.resetStates(); this.ball.shot = null;
     if (this.half === 1) { this.phase = 'half'; this.ev('half', {}); }
     else { this.phase = 'full'; this.ev('full', {}); }
   }
@@ -616,6 +618,16 @@ export class Match {
     this.dribble(p, d.o);
     return true;
   }
+  // Scatto nella fuga aperta per la squadra T (tasto in basso). Ritorna true se è partito.
+  userSprint(T) {
+    const f = this.flee;
+    if (!f || f.team !== T || this.phase !== 'play') return false;
+    const p = f.p;
+    if (this.ball.owner !== p || p.stun > 0 || p.state !== 'play') return false;
+    this.burst(p, f.o);
+    this.endFlee('scatto');
+    return true;
+  }
   hint(T) {
     const b = this.ball;
     if (this.phase === 'restart') return this.restart.team === T ? 'restart' : 'wait';
@@ -630,6 +642,7 @@ export class Match {
     const p = this.team(T)[idx]; if (!p || p.off) return false;
     p.src = src; p.name = src.name; p.st = effStats(src, p.pos); p.energy = 1; p.wear = { dri: 1, tes: 1 }; p.dribCd = 0; p.yellow = 0; p.look = this.lookFor(src);
     if (this.duel && (this.duel.p === p || this.duel.o === p)) this.endDuel('gioco fermo');
+    if (this.flee && (this.flee.p === p || this.flee.o === p)) this.endFlee('gioco fermo');
     this.ev('sub', { p }); return true;
   }
 }

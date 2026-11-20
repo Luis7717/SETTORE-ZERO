@@ -1,6 +1,6 @@
 // Movimento dei giocatori, scivolate, tuffi, parate, falli, possesso e contatti col pallone.
 // I metodi vengono copiati su Match.prototype (vedi match.js): `this` è la partita.
-import { WEAR_TES, WEAR_TES_MIN, DRIB_BEAT_SPD } from './duel.js';
+import { WEAR_TES, WEAR_TES_MIN, DRIB_BEAT_SPD, BURST_SPD } from './duel.js';
 import { W, L, HW, HL, GW, GH, BOX_W, BOX_D, SIX_W, SIX_D, PEN_D, CIRCLE, G, ROLL, clamp, hyp, rng32, FORMATIONS, effStats, ballPhys, segInfo } from './core.js';
 
 // Regolazioni (misurate con test/balance.mjs, test/diag-flow.mjs e i test in test/unit)
@@ -55,10 +55,11 @@ export class MotionMethods {
       if (p.kickAnim > 0) p.kickAnim -= dt;
       if (p.dribCd > 0) p.dribCd -= dt;
       if (p.beat > 0) p.beat -= dt;
+      if (p.burst > 0) p.burst -= dt;
       if (p.state === 'play') {
         let dx = p.tx - p.x, dy = p.ty - p.y; const d = hyp(dx, dy);
         const vm = this.vmax(p) * (b.owner === p ? 0.86 + p.st.dri * 0.001 : 1) * p.spdF * (p.sprint ? 1 + SPRINT_BONUS * (0.3 + 0.7 * p.energy) : 1)
-          * (p.beat > 0 ? DRIB_BEAT_SPD : 1); // saltato col dribbling: ancora sbilanciato, corre piano
+          * (p.beat > 0 ? DRIB_BEAT_SPD : 1) * (p.burst > 0 ? BURST_SPD : 1); // saltato col dribbling: ancora sbilanciato, corre piano
         let sp = p.stun > 0 ? 0 : Math.min(vm, d * 3.2);
         if (d < 0.15) sp = 0;
         const wx = d > 0 ? dx / d * sp : 0, wy = d > 0 ? dy / d * sp : 0;
