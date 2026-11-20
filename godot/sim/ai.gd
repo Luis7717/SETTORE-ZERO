@@ -1,0 +1,868 @@
+# IA: tiro, passaggi, portatore, rimesse, posizioni in attacco e difesa, portiere (porting di src/sim/ai.js).
+extends "motion.gd"
+
+# Regolazioni dell'IA (misurate con test/balance.mjs e test/diag-flow.mjs)
+const CLEAR_ZONE := 30.0     # metri dalla propria linea di fondo in cui un difensore pressato può spazzare
+const CLEAR_TOUCH := 0.6     # spazzate mandate apposta in fallo laterale
+const LOFT_RISK := 0.35      # margine richiesto in più per un lancio alto (i lanci si perdevano 1 volta su 2)
+const CROSS_FREE := 2.2      # il cross si sceglie solo se il compagno in area ha questo spazio (m)
+const SHOT_RANGE := 32.0     # distanza massima dalla porta per pensare al tiro (m)
+const BOX_SHOT := 16.0       # sotto questa distanza la posizione di tiro è sempre buona (m)
+const SHOT_BAR := 0.18       # soglia della qualità del tiro (più bassa = tira più spesso)
+const LONG_SHOT := 1.1       # peso della posizione per i tiri da fuori area
+const SHOT_BLOCKED := 0.65   # porta coperta da un difensore: si tira lo stesso, ma meno volentieri
+const THROUGH_BOX := 1.0     # preferenza per il filtrante che porta un compagno dentro l'area
+const PRESS_NEAR := 2.6      # avversario più vicino di così = portatore pressato (m)
+const PRESS_REACT := 3.4     # distanza dell'avversario che fa decidere in fretta il portatore (m)
+const PRESS_REACT_T := 0.06  # tempo minimo di decisione sotto pressione (s), più lento per squadre scarse
+const SHOT_POST := 0.45      # distanza dal palo a cui mira l'IA (m): più vicino = più gol e più tiri fuori
+const HELPERS := 2           # compagni che vengono incontro al portatore
+const AIR_REACH := 2.4       # sui lanci vicino alle porte si va sul pallone fino a questa altezza (colpo di testa)
+const AIR_ZONE := 17.0       # distanza dalla porta avversaria entro cui l'attaccante va a colpire di testa (m)
+# Squadra umana senza palla: la CPU pressa il portatore con un giocatore (due vicino alla nostra porta) e gli altri
+# rientrano nella posizione di squadra. Le linee disegnate e il dito della persona hanno sempre la precedenza.
+const HUM_PRESS_ZONE := 33.0 # portatore entro questi metri dalla nostra linea di fondo (nostra trequarti): pressano in due
+const HUM_PRESS_KEEP := 4.0  # chi sta già pressando conta come più vicino di così: niente scambi continui tra due quasi alla pari (m)
+const HUM_BEHIND_D := 2.0    # i difensori restano almeno così dietro la palla (m)
+const HUM_BEHIND_C := -1.0   # i centrocampisti al massimo 1 m davanti alla palla (m)
+const HUM_MID_LANE := 0.3    # quanto i centrocampisti si stringono sulla linea palla-porta (chiudono il centro)
+const HUM_SCREEN := 4.0      # chi non pressa resta almeno a questa distanza dal portatore, in copertura (m)
+const HUM_MARK_R := 7.5      # si marca l'avversario più vicino al proprio posto entro questa distanza (m)
+const HUM_RECOVER := 8.0     # più lontano di così dal proprio posto, verso la propria porta: rientro con lo scatto (m)
+const HUM_MAGNET_R := 3.0    # giocatore mosso dalla persona (linea o dito) entro questa distanza dal pallone: va dritto sul pallone (m)
+const HUM_STICK_T := 1.5     # linea finita vicino al pallone: il giocatore resta attaccato al pallone per questo tempo (s)
+# Squadra umana in attacco: compagni senza palla larghi, in profondità e lontani tra loro
+const SPACE_MIN := 9.0       # distanza minima voluta tra due compagni (m)
+const SPACE_PUSH := 0.7      # parte della distanza mancante recuperata spostando il punto di arrivo (0..1)
+const SPACE_PEN := 0.35      # penalità per metro mancante nella scelta dello spazio libero
+const DEEP_FROM := -30.0     # con la palla da qui in avanti (m nel verso d'attacco) le punte attaccano la profondità
+const HELP_KEEP := 4.0       # chi è già d'appoggio conta come più vicino di così al portatore: niente cambi continui di compito (m)
+const SUPPORT_FAR := [15.0, 18.0] # il secondo compagno d'appoggio si offre più lontano (m), il primo resta a 8-11 m
+const SUPPORT_NEAR := [8.0, 11.0]
+const SPOTS := [[0.0, 0.0], [5.0, 0.0], [-5.0, 0.0], [0.0, 4.0], [3.5, 3.0], [-3.5, 3.0], [0.0, -4.0]]
+const RUN_TRY := [-1.2, -0.7, -0.35, 0.0, 0.35, 0.7, 1.2]
+const CHASE_N := 36
+
+
+# side: -1/1 = palo scelto; se manca (0), lato opposto al portiere (con un po' di casualità)
+func aiShoot(p: R.Player, pen: bool = false, side: float = 0.0) -> void:
+	var dir: float = -1.0 if p.team else 1.0
+	var g := gk(1 - p.team)
+	if side == 0.0:
+		if pen:
+			side = -1.0 if rnd() < 0.5 else 1.0
+		else:
+			side = (-1.0 if g.x > 0.0 else 1.0) * (1.0 if rnd() < 0.8 else -1.0)
+	var tx: float = side * (GW / 2.0 - (0.8 if pen else SHOT_POST))
+	var ty: float = dir * HL
+	var th: float = (0.3 + rnd() * 0.4) if rnd() < 0.55 else (1.2 + rnd() * 0.8)
+	var curve: float = (rnd() - 0.5) * 1.5
+	kick(p, {"type": "shot", "tx": tx, "ty": ty, "th": th, "curve": curve})
+
+
+# lato di tiro con la linea libera (0 = entrambi coperti); a pari merito, il palo lontano dal portiere
+func shotSide(p: R.Player) -> float:
+	var tm := p.team
+	var gy: float = (-1.0 if tm else 1.0) * HL
+	var g := gk(1 - tm)
+	var tx: float = GW / 2.0 - SHOT_POST
+	var open: Array[float] = []
+	for sd: float in [-1.0, 1.0]:
+		if lane(p.x, p.y, sd * tx, gy, tm, 28.0, true) > 0.0:
+			open.append(sd)
+	if open.is_empty():
+		return 0.0
+	if open.size() == 1:
+		return open[0]
+	return -1.0 if g.x > 0.0 else 1.0
+
+
+# spazzata: lunga e alta verso la fascia; a volte direttamente in fallo laterale
+func clear(p: R.Player) -> void:
+	var dir: float = -1.0 if p.team else 1.0
+	var side: float = C.sign_(p.x) if absf(p.x) > 4.0 else (-1.0 if rnd() < 0.5 else 1.0)
+	var touch: bool = rnd() < CLEAR_TOUCH
+	var tx: float = side * ((HW + 3.0 + rnd() * 6.0) if touch else (HW - 6.0 - rnd() * 10.0))
+	var ty: float = C.clamp_(p.y + dir * (22.0 + rnd() * 16.0), -HL + 6.0, HL - 6.0)
+	kick(p, {"type": "loft", "tx": tx, "ty": ty})
+
+
+# un'opzione di passaggio verso (tx, ty) per il compagno m (la funzione `consider` dentro passOptions in JS);
+# ritorna la migliore tra `best` e questa
+func _consider(best: Variant, p: R.Player, tm: int, dir: float, gy: float, sk: float, ox: float, oy: float, m: R.Player, tx: float, ty: float, through: bool) -> Variant:
+	var d: float = C.hyp(tx - ox, ty - oy)
+	if d < 4.0 or d > 44.0:
+		return best
+	var vp: float = minf(17.0 + p.st.pas * 0.13, sqrt(25.0 + 2.0 * ROLL * d)) * 0.8
+	var safe: float = lane(ox, oy, tx, ty, tm, vp)
+	var type := "ground"
+	var open: float = nearOpp(tx, ty, tm)
+	if through:
+		var dm: float = C.hyp(m.x - tx, m.y - ty)
+		if open < dm + 1.5:
+			return best
+		safe = minf(safe, (open - dm - 1.5) / 3.0)
+	elif safe < 0.3 and d > 16.0:
+		# pallonetto solo se nessun avversario può arrivare sul punto di caduta prima della palla
+		var Tl: float = C.clamp_(d / 14.0, 0.75, 2.6)
+		var mar: float = 9.0
+		for o: R.Player in players:
+			if o.team != tm and not o.off:
+				mar = minf(mar, C.hyp(o.x - tx, o.y - ty) - (0.9 + vmax(o) * maxf(0.0, Tl - 0.35)))
+		var s2: float = minf(mar / 3.0, 0.8) - LOFT_RISK
+		if s2 > safe:
+			safe = s2
+			type = "loft"
+	var gain: float = (ty - oy) * dir
+	var sc: float = C.clamp_(safe, -2.0, 1.2) + gain * 0.09 + minf(open, 8.0) * 0.06 - (0.25 if d > 30.0 else 0.0) + ((THROUGH_BOX if (absf(tx) < BOX_W / 2.0 and ty * dir > HL - BOX_D) else 0.6) if through else 0.0)
+	var dg: float = C.hyp(tx, ty - gy)
+	if dg < 22.0:
+		sc += (22.0 - dg) * 0.05
+	if m.pos == "P":
+		sc -= 1.0
+	sc += (rnd() - 0.5) * 0.6 * (1.0 - sk)
+	if best == null or sc > best.sc:
+		return {"m": m, "tx": tx, "ty": ty, "type": type, "sc": sc, "safe": safe, "d": d, "gain": gain, "through": through}
+	return best
+
+
+# migliore passaggio per p: {m, tx, ty, type, sc, safe, d, gain, through|cross} oppure null
+func passOptions(p: R.Player, exempt: bool = false) -> Variant:
+	var b := ball
+	var tm := p.team
+	var dir: float = -1.0 if tm else 1.0
+	var sk: float = teams[tm].skill
+	var line: float = offLine[tm]
+	var press: float = nearOpp(p.x, p.y, tm)
+	var gy: float = dir * HL
+	var ox: float = b.x if b.owner == p else p.x
+	var oy: float = b.y if b.owner == p else p.y
+	var best: Variant = null
+	for m: R.Player in players:
+		if m.team != tm or m == p or m.off:
+			continue
+		if m.pos == "P" and not (press < 3.0 and p.y * dir < -HL * 0.3):
+			continue
+		var mf: float = m.y * dir
+		if not exempt and mf > line + 0.2 and mf > b.y * dir and mf > 0.0:
+			continue
+		best = _consider(best, p, tm, dir, gy, sk, ox, oy, m, m.x + m.vx * 0.5, m.y + m.vy * 0.5, false)
+		if absf(ox) > 14.0 and oy * dir > HL - 24.0 and m.pos != "D" and absf(m.x) < 11.0 and m.y * dir > HL - 17.0 and nearOpp(m.x, m.y, tm) > CROSS_FREE:
+			var sc: float = 1.1 + (rnd() - 0.5) * 0.5 - C.hyp(m.x, m.y - gy) * 0.03
+			if best == null or sc > best.sc:
+				best = {"m": m, "tx": m.x + m.vx * 0.6, "ty": m.y + m.vy * 0.6, "type": "loft", "sc": sc, "safe": 0.5, "d": C.hyp(m.x - ox, m.y - oy), "gain": 8.0, "cross": true}
+		if m.pos != "D" and m.pos != "P" and mf > oy * dir - 3.0 and mf > -10.0:
+			var lead: float = 7.0 + rnd() * 5.0
+			var gx: float = m.x * 0.6
+			var n: float = C.orf(C.hyp(gx - m.x, gy - m.y), 1.0)
+			var tx: float = m.x + (gx - m.x) / n * lead
+			var ty: float = m.y + (gy - m.y) / n * lead
+			if absf(ty) < HL - 5.0:
+				best = _consider(best, p, tm, dir, gy, sk, ox, oy, m, tx, ty, true)
+	return best
+
+
+func carrierAI(p: R.Player) -> void:
+	var b := ball
+	var tm := p.team
+	var dir: float = -1.0 if tm else 1.0
+	var sk: float = teams[tm].skill
+	var gy: float = dir * HL
+	var dg: float = C.hyp(p.x, p.y - gy)
+	var press: float = nearOpp(b.x, b.y, tm)
+	p.aiT -= dtT
+	# avversario in arrivo: si decide subito (prima che arrivi il contrasto)
+	var react: float = PRESS_REACT_T + 0.1 * (1.0 - sk)
+	if press < PRESS_REACT and p.aiT > react:
+		p.aiT = react
+	if p.aiT <= 0.0 and p.stun <= 0.0:
+		p.aiT = 0.42 - 0.2 * sk + rnd() * 0.15
+		if dg < SHOT_RANGE:
+			var ang: float = absf(F.atan2_(p.x, maxf(0.1, HL - p.y * dir)))
+			# dentro l'area si tira quasi sempre; da fuori solo da buona posizione (i tiri da lontano li para quasi tutti)
+			var q: float = (1.0 if dg < BOX_SHOT else C.clamp_((SHOT_RANGE - dg) / (SHOT_RANGE - BOX_SHOT), 0.0, 1.0) * LONG_SHOT) * C.clamp_(1.25 - ang * 0.9, 0.1, 1.0)
+			# si guarda la linea verso ciascun palo (dove si mira davvero), meglio se lontano dal portiere
+			var side: float = shotSide(p)
+			if side == 0.0:
+				q *= SHOT_BLOCKED
+			if dg < 10.0:
+				q += 0.5
+			if q > SHOT_BAR + rnd() * 0.3 - (0.12 if press < 2.5 else 0.0):
+				aiShoot(p, false, side)
+				return
+		# pressato vicino alla propria porta e senza passaggi sicuri: spazzata lunga verso la fascia
+		if p.y * dir < -HL + CLEAR_ZONE and press < 2.6:
+			var safe: Variant = passOptions(p)
+			if safe == null or safe.safe < (0.5 if inOwnBox(p) else 0.15):
+				clear(p)
+				return
+		# avversario che chiude la strada verso la porta
+		var gdx: float = -p.x * 0.5
+		var gdy: float = gy - p.y
+		var gn: float = C.orf(C.hyp(gdx, gdy), 1.0)
+		var front: float = 99.0
+		for o: R.Player in players:
+			if o.team == tm or o.off:
+				continue
+			var dx: float = o.x - p.x
+			var dy: float = o.y - p.y
+			var d: float = C.hyp(dx, dy)
+			if d < 5.0 and (dx * gdx + dy * gdy) / C.orf(d * gn, 1.0) > 0.6:
+				front = minf(front, d)
+		var pass_: Variant = passOptions(p)
+		p.holdN = p.holdN + 1
+		if pass_ != null:
+			var want: float = 0.0
+			if press < PRESS_NEAR:
+				want = 0.95 if pass_.safe > 0.0 else (0.5 if p.y * dir < -HL * 0.5 else 0.0)
+			elif pass_.safe > 0.15:
+				if pass_.gain > 6.0:
+					want = 0.8 if front < 5.0 else 0.45
+				elif front < 4.0:
+					want = 0.6
+				elif p.holdN > 5:
+					want = 0.3
+			if rnd() < want:
+				kick(p, {"type": pass_.type if pass_.safe > 0.0 else "loft", "tx": pass_.tx, "ty": pass_.ty})
+				return
+		# avversario davanti e nessun passaggio scelto: a volte si prova il dribbling (stessa regola dell'umano)
+		if front < 5.0 and aiDribble(p):
+			return
+		var base: float = F.atan2_(gy - p.y, (p.x * 0.7 if dg > 30.0 else 0.0) - p.x)
+		var bs: float = -1e9
+		var ba: float = base
+		for o: float in RUN_TRY:
+			var a: float = base + o
+			var qx: float = p.x + F.cos_(a) * 5.0
+			var qy: float = p.y + F.sin_(a) * 5.0
+			var s2: float = (dg - C.hyp(qx, qy - gy)) * 1.5 + minf(nearOpp(qx, qy, tm), 4.0) * (2.6 if press < PRESS_NEAR else 1.1) - absf(o) * 0.3
+			if absf(qx) > HW - 2.0 or absf(qy) > HL - 1.5:
+				s2 -= 6.0
+			if s2 > bs:
+				bs = s2
+				ba = a
+		p.dx = p.x + F.cos_(ba) * 10.0
+		p.dy = p.y + F.sin_(ba) * 10.0
+	p.tx = C.clamp_(p.dx, -HW + 1.0, HW - 1.0)
+	p.ty = C.clamp_(p.dy, -HL + 1.0, HL - 1.0)
+
+
+func aiRestart() -> void:
+	var r := restart
+	var p := r.taker
+	var tm := p.team
+	var dir: float = -1.0 if tm else 1.0
+	if r.type == "penalty":
+		aiShoot(p, true)
+		return
+	if r.type == "corner":
+		var tx: float = (rnd() - 0.5) * 10.0
+		var ty: float = dir * (HL - 5.0 - rnd() * 6.0)
+		var curve: float = (rnd() - 0.5) * 3.0
+		kick(p, {"type": "loft", "tx": tx, "ty": ty, "curve": curve})
+		return
+	if r.type == "kickoff":
+		var m: R.Player = null
+		var bd: float = 99.0
+		for q: R.Player in players:
+			if q.team == tm and q != p and not q.off and q.pos != "P":
+				var d: float = C.hyp(q.x - p.x, q.y - p.y)
+				if d < bd and q.y * dir < p.y * dir - 2.0:
+					bd = d
+					m = q
+		if m != null:
+			kick(p, {"type": "ground", "tx": m.x, "ty": m.y})
+			return
+	if r.type == "freekick":
+		var dg: float = C.hyp(p.x, p.y - dir * HL)
+		if dg < 27.0 and absf(p.x) < 16.0:
+			aiShoot(p, false, -r.wallSide if r.wallSide != 0.0 else 0.0)
+			return
+		if dg < 42.0:
+			var tx2: float = (rnd() - 0.5) * 12.0
+			var ty2: float = dir * (HL - 7.0 - rnd() * 5.0)
+			kick(p, {"type": "loft", "tx": tx2, "ty": ty2})
+			return
+	var o: Variant = passOptions(p, r.type == "throw" or r.type == "goalkick")
+	if o != null and o.safe > -0.2:
+		kick(p, {"type": o.type, "tx": o.tx, "ty": o.ty})
+		return
+	var tx3: float = C.clamp_(p.x * 0.5 + (rnd() - 0.5) * 24.0, -HW + 4.0, HW - 4.0)
+	var ty3: float = C.clamp_(p.y + dir * 36.0, -HL + 8.0, HL - 8.0)
+	kick(p, {"type": "loft", "tx": tx3, "ty": ty3})
+
+
+# ------------------------------------------------------------ IA
+func computeLines() -> void:
+	for tm in 2:
+		offLine[tm] = maxf(0.0, lineOf(tm))
+
+
+func computeChasers() -> void:
+	var b := ball
+	presser = [null, null]
+	for tm in 2:
+		var bp: R.Player = null
+		var bd: float = 1e9
+		for p: R.Player in players:
+			if p.team == tm and not p.off and p.pos != "P" and p.state == "play":
+				var d: float = C.hyp(p.x - b.x, p.y - b.y)
+				if d < bd:
+					bd = d
+					bp = p
+		presser[tm] = bp
+	helpers = [[], []]
+	if b.owner != null:
+		var c := b.owner
+		var was: Array = helpWas if human[c.team] else []
+		var near: Array = []
+		for q: R.Player in players:
+			if q.team == c.team and q != c and not q.off and q.pos != "P" and q.state == "play":
+				near.append(q)
+		near = stableSort(near, func(q: R.Player) -> float: return C.hyp(q.x - c.x, q.y - c.y) - (HELP_KEEP if was.has(q) else 0.0))
+		helpers[c.team] = near.slice(0, HELPERS)
+		helpWas = helpers[c.team]
+	# squadra umana in difesa: chi va sul portatore (i più vicini al pallone, senza linea disegnata)
+	var wasP: Array = hPress if hPress != null else [[], []]
+	hPress = [[], []]
+	if b.owner != null and human[1 - b.owner.team]:
+		var c := b.owner
+		var tm: int = 1 - c.team
+		var dir: float = -1.0 if tm else 1.0
+		var deep: bool = c.y * dir < -HL + HUM_PRESS_ZONE
+		var wasT: Array = wasP[tm]
+		var cand: Array = []
+		for p: R.Player in players:
+			if p.team == tm and not p.off and p.pos != "P" and p.state == "play" and runOf(p) == null:
+				cand.append(p)
+		cand = stableSort(cand, func(q: R.Player) -> float: return C.hyp(q.x - c.x, q.y - c.y) - (HUM_PRESS_KEEP if wasT.has(q) else 0.0))
+		hPress[tm] = cand.slice(0, 2 if deep else 1)
+	cover = [null, null]
+	if b.owner != null:
+		var c := b.owner
+		var tm: int = 1 - c.team
+		var dir: float = -1.0 if tm else 1.0
+		var own: float = -dir * HL
+		var ux: float = -c.x * 0.6
+		var uy: float = own - c.y
+		var n: float = C.orf(C.hyp(ux, uy), 1.0)
+		var qx: float = c.x + ux / n * 4.0
+		var qy: float = c.y + uy / n * 4.0
+		var first: R.Player = ctrl[tm] if human[tm] else presser[tm]
+		var bp: R.Player = null
+		var bd: float = 14.0
+		for p: R.Player in players:
+			if p.team == tm and not p.off and p.pos != "P" and p.state == "play" and p != first:
+				var d: float = C.hyp(p.x - qx, p.y - qy)
+				if d < bd:
+					bd = d
+					bp = p
+		cover[tm] = null if (human[tm] or float(teams[tm].skill) < 0.42) else bp
+		chase = [null, null]
+		return
+	_computeChase(b)
+
+
+# pallone libero: previsione del volo e, per ogni squadra, chi ci arriva prima (seconda parte di computeChasers)
+func _computeChase(b: R.Ball) -> void:
+	var N := CHASE_N
+	var px := PackedFloat64Array()
+	var py := PackedFloat64Array()
+	var ph := PackedFloat64Array()
+	px.resize(N)
+	py.resize(N)
+	ph.resize(N)
+	var s := b.physCopy()
+	for k in N:
+		px[k] = C.clamp_(s.x, -HW, HW)
+		py[k] = C.clamp_(s.y, -HL, HL)
+		ph[k] = s.h
+		for j in 4:
+			C.ballPhys(s, 0.025)
+	for tm in 2:
+		var dir: float = -1.0 if tm else 1.0
+		var best: R.Chase = null
+		var bestO: R.Chase = null
+		for p: R.Player in players:
+			if p.team != tm or p.off or p.state != "play":
+				continue
+			if b.kick != null and b.kick.kicker == p and b.kick.age < 1.2:
+				continue
+			var isGk: bool = p.pos == "P"
+			var vm: float = vmax(p)
+			var hm: float = 2.3 if isGk else 1.5
+			# sui lanci alti vicino alle porte si va incontro al pallone per colpirlo di testa
+			var loft: bool = not isGk and b.kick != null and b.kick.type == "loft" and b.kick.kicker != p
+			var mate: bool = loft and b.kick.team == tm
+			var r: R.Chase = null
+			for k in N:
+				var lim: float = hm
+				if loft and ph[k] <= AIR_REACH and (C.hyp(px[k], py[k] - dir * HL) < AIR_ZONE if mate else C.hyp(px[k], py[k] + dir * HL) < AIR_ZONE + 15.0):
+					lim = AIR_REACH
+				if ph[k] > lim:
+					continue
+				var tk: float = k * 0.1
+				var d: float = C.hyp(p.x - px[k], p.y - py[k])
+				if d - 0.8 <= vm * maxf(0.0, tk - 0.12):
+					r = R.Chase.new()
+					r.p = p
+					r.t = tk
+					r.x = px[k]
+					r.y = py[k]
+					break
+			if r == null:
+				r = R.Chase.new()
+				r.p = p
+				r.t = 50.0 + C.hyp(p.x - px[N - 1], p.y - py[N - 1])
+				r.x = px[N - 1]
+				r.y = py[N - 1]
+			if isGk:
+				if not (absf(r.x) < BOX_W / 2.0 and r.y * dir < -HL + BOX_D):
+					continue
+			elif bestO == null or r.t < bestO.t:
+				bestO = r
+			if best == null or r.t < best.t:
+				best = r
+		if best != null:
+			var ch := R.Chase.new()
+			ch.p = best.p
+			ch.x = best.x
+			ch.y = best.y
+			ch.t = best.t
+			ch.p2 = bestO.p if bestO != null else null
+			ch.x2 = bestO.x if bestO != null else 0.0
+			ch.y2 = bestO.y if bestO != null else 0.0
+			chase[tm] = ch
+		else:
+			chase[tm] = null
+
+
+func think(dt: float) -> void:
+	var b := ball
+	dtT = dt
+	att = b.owner.team if b.owner != null else (b.kick.team if b.kick != null else (restart.team if phase == "restart" else -1))
+	predT -= dt
+	if predT <= 0.0:
+		predT = 0.1
+		computeChasers()
+		computeLines()
+	for p: R.Player in players:
+		if p.off or p.state != "play":
+			continue
+		p.spdF = 1.0
+		p.sprint = false
+		assign(p)
+
+
+# la squadra T è senza palla: possesso avversario, oppure pallone libero che non viene da un nostro passaggio o tiro
+func manualDef(tm: int) -> bool:
+	var b := ball
+	return b.owner.team != tm if b.owner != null else not (b.kick != null and b.kick.team == tm)
+
+
+func assign(p: R.Player) -> void:
+	var b := ball
+	var tm := p.team
+	var dir: float = -1.0 if tm else 1.0
+	var hum: bool = human[tm]
+	if phase == "restart" and restart.taker == p:
+		p.tx = p.x
+		p.ty = p.y
+		return
+	if phase == "restart" and p.wall != null:
+		p.tx = p.wall.x
+		p.ty = p.wall.y
+		return
+	var mv: R.Move = move[tm] if (hum and ctrl[tm] == p) else null
+	if mv != null and mv.path != null:
+		followPath(p, mv)
+	var def: bool = hum and p.pos != "P" and phase == "play" and manualDef(tm)
+	# linea disegnata in difesa: vale più di tutto il resto (anche del pressing) finché non è finita
+	if hum and b.owner != p and not runs[tm].is_empty():
+		var r := runOf(p)
+		if r != null and followRun(p, r):
+			if def:
+				magnet(p)
+			return
+	# senza palla (avversario in possesso o pallone libero non passato da noi): il controllato segue il dito,
+	# gli altri li muove la CPU (pressing e posizione difensiva, vedi humanDefend)
+	if def:
+		if mv != null and mv.path == null:
+			p.tx = mv.x
+			p.ty = mv.y
+			p.sprint = mv.sprint
+			magnet(p)
+			return
+		if not autoDef[tm]:
+			p.tx = p.x
+			p.ty = p.y
+			return
+		humanDefend(p)
+		return
+	if mv != null and mv.sprint:
+		p.sprint = true
+	if b.owner == p:
+		if hum:
+			if mv != null:
+				p.tx = mv.x
+				p.ty = mv.y
+			else:
+				p.tx = p.x * 0.9
+				p.ty = C.clamp_(p.y + dir * 8.0, -HL + 3.0, HL - 3.0)
+				p.spdF = 0.7
+		else:
+			carrierAI(p)
+		return
+	if mv != null:
+		p.tx = mv.x
+		p.ty = mv.y
+		return
+	if p.pos == "P":
+		gkAI(p)
+		return
+	if b.owner == null and phase == "play":
+		var ch: R.Chase = chase[tm]
+		if ch != null and ch.p == p:
+			p.tx = ch.x
+			p.ty = ch.y
+			return
+		if ch != null and ch.p2 == p:
+			p.tx = ch.x2
+			p.ty = ch.y2
+			return
+	if att == tm:
+		support(p)
+	else:
+		defend(p)
+	if phase == "restart" and restart.team != tm:
+		var r := restart
+		var Rr: float = 5.0 if r.type == "throw" else (CIRCLE if r.type == "kickoff" else 8.5)
+		var dx: float = p.tx - r.x
+		var dy: float = p.ty - r.y
+		var d: float = C.hyp(dx, dy)
+		if d < Rr:
+			p.tx = r.x + (dx / C.orf(d, 1.0)) * Rr
+			p.ty = r.y + (dy / C.orf(d, 1.0)) * Rr
+			if d < 0.1:
+				p.ty = r.y - dir * Rr
+		if r.type == "kickoff" and p.ty * dir > -0.5:
+			p.ty = -dir * 0.5
+	if phase == "restart" and restart.type == "kickoff" and p.ty * dir > -0.3:
+		p.ty = -dir * 0.3
+
+
+# giocatore mosso dalla persona vicino al pallone (avversario col pallone o pallone libero): l'ultimo tratto va dritto
+# sul pallone, così il contrasto non si manca di poco. true se ha cambiato la destinazione
+func magnet(p: R.Player) -> bool:
+	var b := ball
+	var c := b.owner
+	if C.hyp(b.x - p.x, b.y - p.y) > HUM_MAGNET_R or b.h > 1.7:
+		return false
+	p.tx = b.x + (c.vx if c != null else b.vx) * 0.2
+	p.ty = b.y + (c.vy if c != null else b.vy) * 0.2
+	return true
+
+
+# giocatore della squadra umana mosso dalla persona: il controllato, chi segue una linea, chi l'ha appena finita addosso al pallone
+func directed(p: R.Player) -> bool:
+	return bool(human[p.team]) and (ctrl[p.team] == p or p.stickT > 0.0 or runOf(p) != null)
+
+
+# chiamata quando finisce una linea di difesa: se è finita addosso al pallone, il giocatore ci resta attaccato un attimo
+func runEnded(p: R.Player) -> void:
+	var b := ball
+	if human[p.team] and manualDef(p.team) and C.hyp(b.x - p.x, b.y - p.y) < HUM_MAGNET_R + 1.5:
+		p.stickT = HUM_STICK_T
+
+
+# squadra umana senza palla, giocatore senza linea e senza dito: pressing (i più vicini), pallone vagante
+# (il più rapido ad arrivarci; i passaggi avversari in volo no: l'intercetto resta alla persona),
+# altrimenti posizione di squadra dietro la palla con marcatura a zona
+func humanDefend(p: R.Player) -> void:
+	var b := ball
+	var tm := p.team
+	var dir: float = -1.0 if tm else 1.0
+	var own: float = -dir * HL
+	var c := b.owner
+	p.stickT = maxf(0.0, p.stickT - dtT)
+	if p.stickT > 0.0 and magnet(p):
+		return
+	if c == null:
+		var ch: R.Chase = chase[tm]
+		if ch != null and ch.p2 == p and b.kick == null:
+			p.tx = ch.x2
+			p.ty = ch.y2
+			return
+	elif hPress != null and hPress[tm].has(p):
+		p.tx = b.x + c.vx * 0.25
+		p.ty = b.y + c.vy * 0.25
+		return
+	var an := anchor(p)
+	var ax: float = an[0]
+	var ay: float = an[1]
+	var tx: float = ax
+	var ty: float = ay
+	var mo: R.Player = null
+	var md: float = HUM_MARK_R
+	for o: R.Player in players:
+		if o.team != tm and not o.off and o.pos != "P" and o != c:
+			var d: float = C.hyp(o.x - ax, o.y - ay)
+			if d < md:
+				md = d
+				mo = o
+	if mo != null:
+		var ux: float = -mo.x
+		var uy: float = own - mo.y
+		var n: float = C.orf(C.hyp(ux, uy), 1.0)
+		tx = ax * 0.35 + (mo.x + ux / n * 1.6) * 0.65
+		ty = ay * 0.35 + (mo.y + uy / n * 1.6) * 0.65
+	# centrocampisti: si stringono sulla linea tra palla e centro della porta (chiudono i passaggi centrali)
+	if p.pos == "C":
+		var k: float = C.clamp_((ty - own) / C.orf(b.y - own, 1.0), 0.0, 1.0)
+		tx += (b.x * k - tx) * HUM_MID_LANE
+	# chi non pressa non va addosso al portatore: resta in copertura a qualche metro
+	if c != null:
+		var ux2: float = tx - c.x
+		var uy2: float = ty - c.y
+		var d2: float = C.hyp(ux2, uy2)
+		if d2 < HUM_SCREEN:
+			if d2 < 0.5:
+				ux2 = -c.x * 0.3
+				uy2 = own - c.y
+			var n2: float = C.orf(C.hyp(ux2, uy2), 1.0)
+			tx = c.x + ux2 / n2 * HUM_SCREEN
+			ty = c.y + uy2 / n2 * HUM_SCREEN
+	# difensori e centrocampisti rientrano dietro la linea della palla
+	var hasLim: bool = p.pos == "D" or p.pos == "C"
+	var lim: float = (b.y * dir - HUM_BEHIND_D) if p.pos == "D" else (b.y * dir - HUM_BEHIND_C)
+	if hasLim and ty * dir > lim:
+		ty = maxf(lim, -HL + 4.0) * dir
+	p.tx = C.clamp_(tx, -HW + 1.0, HW - 1.0)
+	p.ty = C.clamp_(ty, -HL + 1.0, HL - 1.0)
+	# lontano dal proprio posto, con la porta alle spalle: rientro di corsa
+	if C.hyp(p.tx - p.x, p.ty - p.y) > HUM_RECOVER and (p.ty - p.y) * dir < 0.0:
+		p.sprint = true
+
+
+# penalità per i compagni troppo vicini al punto (x, y) (squadra umana in attacco): niente grappoli
+func crowd(p: R.Player, x: float, y: float) -> float:
+	var pen: float = 0.0
+	for q: R.Player in players:
+		if q.team == p.team and q != p and not q.off and q.pos != "P":
+			var d: float = C.hyp(q.x - x, q.y - y)
+			if d < SPACE_MIN:
+				pen += SPACE_MIN - d
+	return pen
+
+
+# sposta (x, y) lontano dai compagni più vicini di SPACE_MIN (portatore compreso)
+func spread(p: R.Player, x: float, y: float) -> PackedFloat64Array:
+	for q: R.Player in players:
+		if q.team != p.team or q == p or q.off or q.pos == "P":
+			continue
+		var dx: float = x - q.x
+		var dy: float = y - q.y
+		var d: float = C.hyp(dx, dy)
+		if d < SPACE_MIN:
+			var k: float = (SPACE_MIN - d) * SPACE_PUSH / C.orf(d, 1.0)
+			x += (dx if d != 0.0 else (1.0 if p.i % 2 else -1.0)) * k
+			y += dy * k
+	return PackedFloat64Array([C.clamp_(x, -HW + 1.5, HW - 1.5), C.clamp_(y, -HL + 2.0, HL - 2.0)])
+
+
+# compagno vicino al portatore: cerca uno spazio libero raggiungibile con un passaggio sicuro
+func offerSupport(p: R.Player, c: R.Player) -> void:
+	var tm := p.team
+	var dir: float = -1.0 if tm else 1.0
+	p.supT = p.supT - dtT
+	if p.supT <= 0.0 or p.supC != c:
+		p.supT = 0.35 + rnd() * 0.25
+		p.supC = c
+		var bs: float = -1e9
+		p.supX = p.x - c.x
+		p.supY = p.y - c.y
+		# squadra umana: il secondo d'appoggio si offre più lontano (linee di passaggio a distanze diverse), lontano dai compagni
+		var hum: bool = human[tm]
+		var far: bool = hum and helpers[tm].size() > 1 and helpers[tm][1] == p
+		for r: float in (SUPPORT_FAR if far else SUPPORT_NEAR):
+			for k in range(-5, 6):
+				var a: float = F.atan2_(dir, 0.0) + k * 0.5
+				var qx: float = c.x + F.cos_(a) * r
+				var qy: float = c.y + F.sin_(a) * r
+				if absf(qx) > HW - 1.5 or absf(qy) > HL - 2.0 or qy * dir > offLine[tm] - 0.8:
+					continue
+				var sc: float = minf(nearOpp(qx, qy, tm), 7.0) * 0.8 + C.clamp_(lane(c.x, c.y, qx, qy, tm, 16.0), -2.0, 2.0) * 1.2 + (qy - c.y) * dir * 0.07 - C.hyp(qx - p.x, qy - p.y) * 0.08 + rnd() * 0.3 - (crowd(p, qx, qy) * SPACE_PEN if hum else 0.0)
+				if sc > bs:
+					bs = sc
+					p.supX = qx - c.x
+					p.supY = qy - c.y
+	p.tx = C.clamp_(c.x + p.supX, -HW + 1.0, HW - 1.0)
+	p.ty = C.clamp_(c.y + p.supY, -HL + 1.0, HL - 1.0)
+	if human[tm]:
+		var sp := spread(p, p.tx, p.ty)
+		p.tx = sp[0]
+		p.ty = sp[1]
+		var mf: float = offLine[tm] - 0.8
+		if p.ty * dir > mf:
+			p.ty = mf * dir
+
+
+func support(p: R.Player) -> void:
+	var b := ball
+	var tm := p.team
+	var dir: float = -1.0 if tm else 1.0
+	var hum: bool = human[tm] and phase == "play"
+	if phase == "play" and b.owner != null and b.owner.team == tm and helpers[tm].has(p):
+		offerSupport(p, b.owner)
+		return
+	var an := anchor(p)
+	var ax: float = an[0]
+	var ay: float = an[1]
+	p.soT -= dtT
+	if p.soT <= 0.0:
+		p.soT = 0.5 + rnd() * 0.4
+		var bs: float = -1e9
+		for c: Array in SPOTS:
+			var qx: float = ax + c[0]
+			var qy: float = ay + c[1] * dir
+			if absf(qx) > HW - 1.5 or absf(qy) > HL - 2.0:
+				continue
+			var s: float = minf(nearOpp(qx, qy, tm), 7.0) + (1.5 if lane(b.x, b.y, qx, qy, tm, 18.0) > 0.0 else 0.0) + (0.6 if c[1] > 0.0 else 0.0) + rnd() * 0.5 - (crowd(p, qx, qy) * SPACE_PEN if hum else 0.0)
+			if s > bs:
+				bs = s
+				p.sox = c[0]
+				p.soy = c[1] * dir
+	var tx: float = ax + p.sox
+	var ty: float = ay + p.soy
+	var line: float = offLine[tm]
+	var flight: bool = b.owner == null and b.kick != null and b.kick.team == tm
+	# le punte attaccano lo spazio dietro la difesa, sulla linea del fuorigioco (la squadra umana già dalla propria metà)
+	if p.pos == "A" and b.y * dir > (DEEP_FROM if hum else -15.0):
+		ty = maxf(ty * dir, minf(line - 0.8, HL - 6.0)) * dir
+	if hum:
+		var sp := spread(p, tx, ty)
+		tx = sp[0]
+		ty = sp[1]
+	if not flight:
+		var mf: float = maxf(line - 0.8, b.y * dir)
+		if ty * dir > mf:
+			ty = mf * dir
+	p.tx = tx
+	p.ty = ty
+
+
+func defend(p: R.Player) -> void:
+	var b := ball
+	var tm := p.team
+	var dir: float = -1.0 if tm else 1.0
+	var own: float = -dir * HL
+	var hum: bool = human[tm]
+	var an := anchor(p)
+	var ax: float = an[0]
+	var ay: float = an[1]
+	var tx: float = ax
+	var ty: float = ay
+	if phase == "play" and b.owner != null and b.owner.team != tm:
+		var c := b.owner
+		if (ctrl[tm] == p) if hum else (presser[tm] == p):
+			if hum: # contenimento automatico se non si tocca lo schermo
+				var ux: float = -c.x
+				var uy: float = own - c.y
+				var n: float = C.orf(C.hyp(ux, uy), 1.0)
+				p.tx = c.x + ux / n * 2.6
+				p.ty = c.y + uy / n * 2.6
+			else:
+				# niente scivolate (tolte anche all'IA il 2026-11-20): il pressatore ruba palla solo col contatto
+				p.tx = b.x + c.vx * 0.25
+				p.ty = b.y + c.vy * 0.25
+			return
+		if cover[tm] == p:
+			var ux2: float = -c.x * 0.6
+			var uy2: float = own - c.y
+			var n2: float = C.orf(C.hyp(ux2, uy2), 1.0)
+			p.tx = c.x + ux2 / n2 * 3.2
+			p.ty = c.y + uy2 / n2 * 3.2
+			return
+	var mo: R.Player = null
+	var md: float = 7.5
+	for o: R.Player in players:
+		if o.team != tm and not o.off and o.pos != "P" and o != b.owner:
+			var d: float = C.hyp(o.x - ax, o.y - ay)
+			if d < md:
+				md = d
+				mo = o
+	if mo != null:
+		var ux3: float = -mo.x
+		var uy3: float = own - mo.y
+		var n3: float = C.orf(C.hyp(ux3, uy3), 1.0)
+		tx = ax * 0.35 + (mo.x + ux3 / n3 * 1.6) * 0.65
+		ty = ay * 0.35 + (mo.y + uy3 / n3 * 1.6) * 0.65
+	p.tx = tx
+	p.ty = ty
+
+
+func gkAI(p: R.Player) -> void:
+	var b := ball
+	var tm := p.team
+	var dir: float = -1.0 if tm else 1.0
+	var own: float = -dir * HL
+	if phase == "restart":
+		p.tx = 0.0
+		p.ty = own + dir * (9.0 if restart.team == tm else 1.2)
+		return
+	var s := b.shot
+	if s != null and s.team != tm:
+		p.ty = own + dir * 0.6
+		if human[tm] and not autoGk[tm]:
+			p.tx = s.gx0 + C.clamp_(s.cx - s.gx0, -0.9, 0.9)
+			return
+		if not p.decided:
+			p.reactT -= dtT
+			p.tx = p.x
+			if p.reactT <= 0.0:
+				p.decided = true
+				if absf(s.cx - p.x) > 1.0 or s.ch > 2.0:
+					startDive(p, s.cx, s.ch)
+		else:
+			p.tx = C.clamp_(s.cx, -GW / 2.0, GW / 2.0)
+		return
+	var ch: R.Chase = chase[tm]
+	if b.owner == null and ch != null and ch.p == p:
+		p.tx = ch.x
+		p.ty = ch.y
+		return
+	if att == tm:
+		p.tx = b.x * 0.1
+		p.ty = own + dir * C.clamp_((b.y * dir + HL) * 0.22, 3.0, 16.0)
+		return
+	var vx: float = b.x
+	var vy: float = b.y - own
+	var d: float = C.orf(C.hyp(vx, vy), 1.0)
+	var out_: float = C.clamp_(d * 0.09, 0.8, 4.5)
+	if b.owner != null and d < 16.0:
+		var nd: float = 99.0
+		var c := b.owner
+		for q: R.Player in players:
+			if q.team == tm and q != p and not q.off:
+				nd = minf(nd, C.hyp(q.x - c.x, q.y - c.y))
+		if nd > 3.0:
+			out_ = C.clamp_(d - 3.0, 1.0, 8.0)
+	p.tx = C.clamp_(vx / d * out_, -GW / 2.0 - 1.0, GW / 2.0 + 1.0)
+	p.ty = own + vy / d * out_
+
+
+func startDive(p: R.Player, tx: float, th: float) -> void:
+	p.state = "dive"
+	p.t = 0.0
+	p.vx = 0.0
+	p.vy = 0.0
+	var tt: float = C.clamp_(tx, -GW / 2.0 - 0.9, GW / 2.0 + 0.9)
+	var dv := R.Dive.new()
+	dv.tx = tt
+	dv.th = C.clamp_(th, 0.15, 2.7)
+	dv.hx = p.x
+	dv.hh = 1.1
+	dv.x0 = p.x
+	dv.dirx = 1.0 if tt >= p.x else -1.0
+	p.dive = dv
+	ev("dive", {"p": p})

@@ -68,4 +68,4 @@ Limite di 2 subagenti insieme tolto più tardi lo stesso giorno (richiesta di Lu
 | 30 | Dribbling del tutorial: difensore che si attacca al portatore | `TAG-wt-dribble` / `wt-dribble` | fatto (`03f0be3`), unito |
 | 31 | Stadio che manca su iPhone, memoria dei canvas, riga Diagnostica | `TAG-wt-ios` / `wt-ios` | fatto (`2b95e95`), unito |
 | 32 | Godot fase 1: progetto, build IPA (`tiro-a-giro-godot-ipa`), scena di prova | `TAG-wt-godot-base` / `wt-godot-base` | fatto (`b2b1883`), unito |
-| 33 | Godot: motore portato in GDScript con prova di equivalenza | `TAG-wt-godot-sim` / `wt-godot-sim` | in corso |
+| 33 | Godot: motore portato in GDScript con prova di equivalenza | `TAG-wt-godot-sim` / `wt-godot-sim` | fatto (`0daad91`), unito |
