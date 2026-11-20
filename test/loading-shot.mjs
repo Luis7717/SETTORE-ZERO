@@ -1,6 +1,7 @@
 // Prova a schermo del caricamento a pezzi (Puppeteer, iPhone 390×844), servendo www/ come fa l'app:
 // 1) menu subito, 2) ingresso in partita con un file presente e uno mancante: la partita parte lo stesso,
-// 3) la tappa musica arriva in sottofondo, 4) la versione a file unico funziona aprendola da disco.
+// 3) la tappa musica arriva in sottofondo, 4) la versione a file unico funziona aprendola da disco,
+// 5) senza assets/three.min.js (indispensabile) compare il messaggio d'errore invece di una pagina vuota.
 // Alla fine ricostruisce www/ col manifesto vero. Uso: node test/loading-shot.mjs shots
 import puppeteer from 'puppeteer-core';
 import { execFileSync } from 'node:child_process';
@@ -45,6 +46,17 @@ try {
   await q.waitForFunction(() => window.__G.state === 'match', { timeout: 10000 });
   res.fileUnico = await q.evaluate(() => ['crowd', 'kick'].filter(id => window.__assets.has(id)));
   res.erroriFileUnico = errs2;
+  // three.min.js che non arriva: messaggio chiaro, nessun errore di pagina
+  const z = await b.newPage(); const errs3 = [];
+  z.on('pageerror', e => errs3.push('PAGEERR ' + e.message));
+  await z.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+  await z.setRequestInterception(true);
+  z.on('request', rq => (rq.url().endsWith('/assets/three.min.js') ? rq.respond({ status: 404, body: '' }) : rq.continue()));
+  await z.goto(srv.url + 'index.html', { waitUntil: 'load' });
+  await wait(500);
+  res.senzaThree = await z.evaluate(() => ({ messaggio: getComputedStyle(document.getElementById('nothree')).display === 'flex', menu: !!window.__ui }));
+  res.erroriSenzaThree = errs3;
+  await z.screenshot({ path: `${out}/load-2-senza-three.png` });
 } finally {
   await b.close(); srv.close();
   run(); run('--single');
