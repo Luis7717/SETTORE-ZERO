@@ -13,6 +13,7 @@ import { Players3D, loadPlayers3D, hex, rgb, shade, lumH, FACE, SOLE, cpuCanvas 
 import { SKINS, HAIR_COLORS, EYE_COLORS, BOOTS, normalizeKitStyle } from './looks.js';
 import { drawCrest } from './crest.js';
 import { makeRadialBase, scalpPaint, paintHairTex } from './hair3d.js';
+import { shapeLegs } from './body/gambe.js';
 
 const MODEL_H = 1.84;                 // altezza prima di SCALE (come il vecchio modello: la scala del gioco resta quella)
 const HAIR_RECT = [16, 916, 200, 92]; // zona della tinta dei capelli (coordinate su 1024, fascia libera in basso)
@@ -109,6 +110,7 @@ export class Athlete3D extends Players3D {
       ankleY: (bp.foot_l.y + bp.foot_r.y) / 2, neckZ: bp.neck_01.z, shX: Math.abs(bp.upperarm_l.x), elX: Math.abs(bp.lowerarm_l.x), wrX: Math.abs(bp.hand_l.x),
       eyeY: eyes.y, eyeDX: Math.abs(eyeL.x - eyeR.x) / 2, chinY, faceZ: eyes.z, spine3Y: bp.spine_03.y,
     };
+    shapeLegs(this); // bacino, gambe e piedi: src/body/gambe.js
   }
 
   // pantaloncini un po' larghi: fianchi e cosce gonfiati lungo la normale fin sotto l'orlo (una volta per geometria)
