@@ -18,6 +18,8 @@ const REST := {
 	"thigh_r": Vector3(-0.1153, 0.9896, -0.0363), "calf_r": Vector3(-0.1153, 0.4715, -0.0364),
 	"foot_r": Vector3(-0.1153, 0.0805, -0.0883), "ball_r": Vector3(-0.1153, 0.0207, 0.0497),
 }
+const THIGH_L := 0.5181                    # lunghezza della coscia (anca → ginocchio)
+const CALF_L := 0.3944                     # lunghezza della gamba (ginocchio → caviglia)
 const ANKLE_H := 0.0805                    # altezza della caviglia col piede piatto a terra
 const SIDE := {"l": 1.0, "r": -1.0}        # da che parte sta ogni lato (x)
 
@@ -30,6 +32,11 @@ const FOOT_PTS := {
 	"outside": [Vector3(0.062, -0.045, 0.11), Vector3(1, 0, 0)],
 	"heel": [Vector3(0.015, -0.05, -0.056), Vector3(0, 0, -1)],
 }
+
+# coscia: punto davanti a 2/3 della coscia (lungo l'asse, verso il davanti) con la normale; testa: fronte alta
+# rispetto all'osso della testa a riposo (capelli compresi) con la normale (palleggi del menu)
+const THIGH_PT := {"along": 0.33, "front": 0.092}
+const HEAD_PT := [Vector3(0, 0.205, 0.1), Vector3(0, 0.866, 0.5)]
 
 const X := Vector3(1, 0, 0)
 const Y := Vector3(0, 1, 0)
@@ -145,3 +152,15 @@ static func hip(tr: Dictionary, s: String) -> Vector3:
 static func shoulder(tr: Dictionary, s: String) -> Vector3:
 	var q3: Quaternion = tr.q.spine_03
 	return (tr.p.spine_03 as Vector3) + q3 * _off("spine_03", "clavicle_" + s) + q3 * _off("clavicle_" + s, "upperarm_" + s)
+
+
+## punto della fronte che tocca il pallone nel colpo di testa (tr = trunk()): [punto, normale]
+static func head_pt(tr: Dictionary) -> Array:
+	var qh: Quaternion = tr.q.Head
+	return [(tr.p.Head as Vector3) + qh * (HEAD_PT[0] as Vector3), qh * (HEAD_PT[1] as Vector3)]
+
+
+## coscia in direzione d con cerniera del ginocchio h (x a riposo): punto davanti alla coscia e sua normale
+static func thigh_point(hip_p: Vector3, d: Vector3, h: Vector3) -> Array:
+	var front := d.cross(h).normalized()   # a riposo: d = −y, h = +x → davanti = +z
+	return [hip_p + d * float(THIGH_PT.along) + front * float(THIGH_PT.front), front]
