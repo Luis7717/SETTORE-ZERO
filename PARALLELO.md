@@ -25,3 +25,8 @@ nuovi finché quel blocco non è finito e la build su GitHub non è riuscita. La
 | 9 | Duello lato schermo, allenamento a schede con 3 prove, statistiche RES/TES nelle schede | Opus (coordinatore) | fatto | `src/render.js`, `src/main.js`, `src/tutorial.js`, `src/ui.js`, `src/ui-style.js`, `src/index.tpl.html`, test a schermo |
 | 10 | Corsa a strada, parata con linea, difesa a linee per tutti, raggio di intercetto | Opus (coordinatore) | fatto | `src/sim/*`, `src/input.js`, `src/render.js`, `src/main.js`, `src/tutorial.js`, `src/ui.js`, test |
 | 11 | Giocatori molto più dettagliati + editor "Crea il tuo campione" (occhi, capelli, divisa, calzettoni) | Opus | finita e unita (commit a70e15a: 17 tagli, stemmi 10×10×20, nome e numero sulla schiena, 92 test) | `src/players3d.js`, `src/career.js`, `src/ui.js`, `src/ui-style.js`, file nuovi, `assets/**` |
+
+## 12 — Capelli e grafica (2026-11-20) · Opus · FATTO, unito
+- Worktree `TAG-wt-gfx`, ramo `wt-gfx`, commit `0aa1784`. File: `src/hair3d.js` (nuovo), `src/players3d.js`, `src/render.js`
+  (campo, luci, tonemapping, ombre), `src/stadium.js`, `test/unit/hair.test.mjs`, `test/hair-shot.mjs`.
+- 17 tagli rifatti come calotte lisce dipinte (stessi indici: salvataggi validi). Triangoli scena circa 41k → 50k, draw call invariati (57).

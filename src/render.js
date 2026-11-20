@@ -7,6 +7,8 @@ import { loadPlayers3D } from './players3d.js';
 const SKIN = [0xf1c9a5, 0xd9a47a, 0xa9744f, 0x6b4630];
 const HAIR = [0x1c1410, 0x4a2f1b, 0x8a5a2b, 0xd9b66a, 0x222222, 0x2b2b2b];
 const SCALE = 1.25;
+const TONE_EXPOSURE = 1.0;      // esposizione del tonemapping neutro
+const PL_SHADOW = 3.2;         // lato (m) del quadrato dell'ombra di un giocatore 3D (macchia ai piedi + ombre dei fari)
 const PREVIEW_COLOR = 0x7dd3ff; // puntini dell'anteprima della traiettoria
 const OFFSIDE_COLOR = 0xff5a5a; // linea del fuorigioco
 const GK_CAM_BACK = 6.5;       // parata: telecamera dietro la propria linea di porta (m)
@@ -21,11 +23,73 @@ function canvasTex(w, h, draw) {
   return t;
 }
 
+// ---------------------------------------------------------------- campo (texture disegnata una volta)
+// Erba: strisce di taglio con riflesso morbido (lato chiaro e scuro dell'erba piegata), leggero taglio incrociato,
+// chiazze naturali, usura in area piccola e sul dischetto, pozze di luce dei quattro fari, grana fine.
+// Linee: un alone tenue sotto la linea netta (restano pulite anche da lontano con le mipmap).
+const PITCH = { base: '#2a7631', light: '#33893a', dark: '#256b2c', stripes: 12, line: 'rgba(246,250,242,0.95)' };
+function drawPitch(g, w, h, PX, MX, MY) {
+  let seed = 1234567; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const X = x => (x + HW + MX) * PX, Y = y => (HL - y + MY) * PX;
+  g.fillStyle = PITCH.base; g.fillRect(0, 0, w, h);
+  // strisce di taglio: ogni striscia sfuma da un bordo all'altro (l'erba piegata riflette in modo diverso)
+  const sh = (L * PX) / PITCH.stripes;
+  for (let i = -2; i < PITCH.stripes + 2; i++) {
+    const y0 = MY * PX + i * sh, gr = g.createLinearGradient(0, y0, 0, y0 + sh), c = i % 2 ? PITCH.light : PITCH.dark;
+    gr.addColorStop(0, c); gr.addColorStop(0.5, c); gr.addColorStop(1, i % 2 ? '#30823a' : '#27702e');
+    g.fillStyle = gr; g.fillRect(0, y0, w, sh);
+  }
+  // taglio incrociato appena accennato (righe lungo il campo)
+  const sw = (W * PX) / 10;
+  for (let i = 0; i < 10; i += 2) { g.fillStyle = 'rgba(255,255,255,0.022)'; g.fillRect(MX * PX + i * sw, 0, sw, h); }
+  // chiazze naturali (più chiare e più scure), grandi e morbide
+  for (let i = 0; i < 70; i++) {
+    const x = rnd() * w, y = rnd() * h, r = (3 + rnd() * 9) * PX, gr = g.createRadialGradient(x, y, 0, x, y, r);
+    gr.addColorStop(0, rnd() < 0.5 ? 'rgba(10,40,10,0.07)' : 'rgba(190,230,120,0.045)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  // usura: davanti alle porte, sul dischetto del rigore e al centro (erba più chiara e secca)
+  const wear = (x, y, rx, ry, a) => { g.save(); g.translate(X(x), Y(y)); g.scale(1, ry / rx); const r = rx * PX, gr = g.createRadialGradient(0, 0, 0, 0, 0, r); gr.addColorStop(0, `rgba(150,160,90,${a})`); gr.addColorStop(1, 'rgba(150,160,90,0)'); g.fillStyle = gr; g.fillRect(-r, -r, r * 2, r * 2); g.restore(); };
+  for (const d of [1, -1]) { wear(0, d * (HL - 2.5), 7, 3, 0.2); wear(0, d * (HL - PEN_D), 1.6, 1.6, 0.18); }
+  wear(0, 0, 3, 3, 0.1);
+  // pozze di luce dei fari agli angoli e bordo un po' più scuro fuori dalle linee
+  for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    const x = X(sx * HW * 0.55), y = Y(sy * HL * 0.6), r = 40 * PX, gr = g.createRadialGradient(x, y, 0, x, y, r);
+    gr.addColorStop(0, 'rgba(255,255,230,0.05)'); gr.addColorStop(1, 'rgba(255,255,230,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  const vg = g.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.45, w / 2, h / 2, Math.max(w, h) * 0.62);
+  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,10,0,0.22)'); g.fillStyle = vg; g.fillRect(0, 0, w, h);
+  // grana dell'erba: fili corti chiari e scuri
+  for (let i = 0; i < 30000; i++) { g.fillStyle = rnd() < 0.5 ? 'rgba(220,255,200,0.04)' : 'rgba(0,20,0,0.06)'; g.fillRect(rnd() * w, rnd() * h, 1.5, 3 + rnd() * 4); }
+  // linee: alone e tratto netto
+  const lines = () => {
+    g.strokeRect(X(-HW), Y(HL), W * PX, L * PX);
+    g.beginPath(); g.moveTo(X(-HW), Y(0)); g.lineTo(X(HW), Y(0)); g.stroke();
+    g.beginPath(); g.arc(X(0), Y(0), CIRCLE * PX, 0, 7); g.stroke();
+    for (const d of [1, -1]) {
+      const gy = d * HL;
+      g.strokeRect(X(-BOX_W / 2), Math.min(Y(gy), Y(gy - d * BOX_D)), BOX_W * PX, BOX_D * PX);
+      g.strokeRect(X(-SIX_W / 2), Math.min(Y(gy), Y(gy - d * SIX_D)), SIX_W * PX, SIX_D * PX);
+      g.beginPath(); const a = Math.acos((BOX_D - PEN_D) / CIRCLE);
+      if (d > 0) g.arc(X(0), Y(gy - d * PEN_D), CIRCLE * PX, Math.PI / 2 - a, Math.PI / 2 + a); else g.arc(X(0), Y(gy - d * PEN_D), CIRCLE * PX, -Math.PI / 2 - a, -Math.PI / 2 + a);
+      g.stroke();
+      for (const sx of [1, -1]) { g.beginPath(); g.arc(X(sx * HW), Y(gy), 1 * PX, sx > 0 ? (d > 0 ? Math.PI / 2 : Math.PI) : (d > 0 ? 0 : -Math.PI / 2), sx > 0 ? (d > 0 ? Math.PI : Math.PI * 1.5) : (d > 0 ? Math.PI / 2 : 0)); g.stroke(); }
+    }
+  };
+  g.lineJoin = 'miter';
+  g.strokeStyle = 'rgba(255,255,255,0.12)'; g.lineWidth = 0.2 * PX * 2.4; lines();
+  g.strokeStyle = PITCH.line; g.lineWidth = 0.2 * PX; lines();
+  g.fillStyle = PITCH.line;
+  for (const [x, y, r] of [[0, 0, 0.3], [0, HL - PEN_D, 0.25], [0, -(HL - PEN_D), 0.25]]) { g.beginPath(); g.arc(X(x), Y(y), r * PX, 0, 7); g.fill(); }
+}
+
 export class View {
   constructor(canvas) {
     this.canvas = canvas;
     this.r = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     this.r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    // tonemapping neutro: i colori restano quelli scelti, le luci forti (fari, maglie chiare) non si "bruciano"
+    this.r.toneMapping = THREE.NeutralToneMapping; this.r.toneMappingExposure = TONE_EXPOSURE;
     this.scene = new THREE.Scene();
     this.cam = new THREE.PerspectiveCamera(62, 0.5, 0.5, 600);
     this.flip = 1; this.zoom = 0; this.zoomT = 0; this.w = 1; this.h = 1;
@@ -46,34 +110,14 @@ export class View {
 
   buildWorld() {
     const s = this.scene;
-    s.add(new THREE.HemisphereLight(0xdfeaff, 0x30502a, 1.15));
-    const sun = new THREE.DirectionalLight(0xffffff, 1.5); sun.position.set(30, 60, 20); s.add(sun);
+    // luci serali: cielo freddo, faro principale caldo-neutro, controluce freddo dai fari opposti (contorni)
+    s.add(new THREE.HemisphereLight(0xd6e4ff, 0x2c4a26, 1.05));
+    const sun = new THREE.DirectionalLight(0xfff6e8, 1.55); sun.position.set(30, 60, 20); s.add(sun);
+    const fill = new THREE.DirectionalLight(0xa9c2ff, 0.45); fill.position.set(-35, 40, -45); s.add(fill);
 
     // campo
     const PX = 16, MX = 10, MY = 12;
-    const tex = canvasTex((W + MX * 2) * PX, (L + MY * 2) * PX, (g, w, h) => {
-      const stripes = 12, sh = (L * PX) / stripes;
-      g.fillStyle = '#2c7a33'; g.fillRect(0, 0, w, h);
-      for (let i = -2; i < stripes + 2; i++) { g.fillStyle = i % 2 ? '#2f8337' : '#297430'; g.fillRect(0, MY * PX + i * sh, w, sh); }
-      // grana dell'erba
-      for (let i = 0; i < 26000; i++) { g.fillStyle = Math.random() < 0.5 ? 'rgba(255,255,255,0.035)' : 'rgba(0,0,0,0.05)'; g.fillRect(Math.random() * w, Math.random() * h, 2, 5); }
-      g.strokeStyle = 'rgba(255,255,255,0.92)'; g.lineWidth = 0.14 * PX * 1.4; g.lineJoin = 'miter';
-      const X = x => (x + HW + MX) * PX, Y = y => (HL - y + MY) * PX;
-      g.strokeRect(X(-HW), Y(HL), W * PX, L * PX);
-      g.beginPath(); g.moveTo(X(-HW), Y(0)); g.lineTo(X(HW), Y(0)); g.stroke();
-      g.beginPath(); g.arc(X(0), Y(0), CIRCLE * PX, 0, 7); g.stroke();
-      g.fillStyle = '#fff'; g.beginPath(); g.arc(X(0), Y(0), 0.25 * PX, 0, 7); g.fill();
-      for (const d of [1, -1]) {
-        const gy = d * HL;
-        g.strokeRect(X(-BOX_W / 2), Math.min(Y(gy), Y(gy - d * BOX_D)), BOX_W * PX, BOX_D * PX);
-        g.strokeRect(X(-SIX_W / 2), Math.min(Y(gy), Y(gy - d * SIX_D)), SIX_W * PX, SIX_D * PX);
-        g.beginPath(); g.arc(X(0), Y(gy - d * PEN_D), 0.25 * PX, 0, 7); g.fill();
-        g.beginPath(); const a = Math.acos((BOX_D - PEN_D) / CIRCLE);
-        if (d > 0) g.arc(X(0), Y(gy - d * PEN_D), CIRCLE * PX, Math.PI / 2 - a, Math.PI / 2 + a); else g.arc(X(0), Y(gy - d * PEN_D), CIRCLE * PX, -Math.PI / 2 - a, -Math.PI / 2 + a);
-        g.stroke();
-        for (const sx of [1, -1]) { g.beginPath(); g.arc(X(sx * HW), Y(gy), 1 * PX, 0, 7); g.stroke(); }
-      }
-    });
+    const tex = canvasTex((W + MX * 2) * PX, (L + MY * 2) * PX, (g, w, h) => drawPitch(g, w, h, PX, MX, MY));
     const pitch = new THREE.Mesh(new THREE.PlaneGeometry(W + MX * 2, L + MY * 2), new THREE.MeshLambertMaterial({ map: tex }));
     pitch.rotation.x = -Math.PI / 2; s.add(pitch);
     // stadio intorno al campo (tribune, pubblico, tetto, cartelloni, cielo): src/stadium.js
@@ -108,6 +152,17 @@ export class View {
     const shT = canvasTex(64, 64, (g) => { const gr = g.createRadialGradient(32, 32, 2, 32, 32, 30); gr.addColorStop(0, 'rgba(0,0,0,0.55)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); });
     this.shMat = new THREE.MeshBasicMaterial({ map: shT, transparent: true, depthWrite: false });
     this.shGeo = new THREE.PlaneGeometry(1, 1); this.shGeo.rotateX(-Math.PI / 2);
+    // ombra dei giocatori: macchia scura ai piedi e quattro ombre lunghe e tenui verso gli angoli (i quattro fari)
+    const plT = canvasTex(128, 128, (g) => {
+      for (let k = 0; k < 4; k++) {
+        g.save(); g.translate(64, 64); g.rotate(Math.PI / 4 + k * Math.PI / 2); g.translate(25, 0); g.scale(1, 0.26);
+        const gr = g.createRadialGradient(0, 0, 0, 0, 0, 30); gr.addColorStop(0, 'rgba(0,0,0,0.2)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = gr; g.fillRect(-30, -30, 60, 60); g.restore();
+      }
+      const gr = g.createRadialGradient(64, 64, 1, 64, 64, 15); gr.addColorStop(0, 'rgba(0,0,0,0.6)'); gr.addColorStop(0.6, 'rgba(0,0,0,0.35)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+    });
+    this.plShMat = new THREE.MeshBasicMaterial({ map: plT, transparent: true, depthWrite: false });
     this.ballSh = new THREE.Mesh(this.shGeo, this.shMat); this.ballSh.position.y = 0.02; s.add(this.ballSh);
 
     // anello del giocatore controllato e bersagli
@@ -166,7 +221,7 @@ export class View {
   makeFig(kit, look, num, name) {
     if (this.p3d) {
       const f = this.p3d.make(kit, look, { num, name }); f.g.scale.setScalar(SCALE);
-      f.sh = new THREE.Mesh(this.shGeo, this.shMat); f.sh.position.y = 0.025; f.sh.scale.set(1.3, 1, 1.3);
+      f.sh = new THREE.Mesh(this.shGeo, this.plShMat); f.sh.position.y = 0.025; f.sh.scale.set(PL_SHADOW, 1, PL_SHADOW);
       f.warn = new THREE.Sprite(this.warnMat); f.warn.scale.set(0.7, 0.7, 1); f.warn.position.y = 2.25; f.warn.visible = false; f.warn.renderOrder = 22; f.g.add(f.warn);
       this.scene.add(f.g); this.scene.add(f.sh);
       return f;
