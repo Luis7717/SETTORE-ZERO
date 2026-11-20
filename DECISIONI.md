@@ -483,3 +483,34 @@ Richieste di Luis dopo la prova sull'iPhone: "in difesa restano tutti fermi e in
   e 390×763 = spazio vero tra le aree sicure; controlla che non scorra e che le carte non si sovrappongano).
 - **Da provare sull'iPhone**: carte abbastanza grandi da toccare e leggere? Il confronto prima dello scambio va bene o
   Luis preferisce lo scambio subito al 2° tocco? La panchina scorre bene col dito senza muovere la pagina? I visi.
+
+## 2026-11-20 — three.js in un file a parte (`www/assets/three.min.js`)
+Problema: `www/index.html` pesava 986 KB (limite 1 MB) e le animazioni in arrivo aggiungono codice. Dentro c'erano
+three.js (592 KB), gli addons (49 KB) e il nostro codice (~330 KB).
+- **Tecnica**: due build esbuild in `build.mjs`. 1) Il gioco (`src/main.js`) con un plugin che risolve `three` e
+  `three/addons/...` (anche `three/examples/jsm/...`) in moduli ponte CommonJS (`module.exports = globalThis.__THREE`,
+  `globalThis.__THREE_ADDONS['examples/jsm/loaders/GLTFLoader.js']`); il plugin annota gli addons usati. 2) Il file di
+  three: `import * as T from 'three'` + gli addons annotati, in formato iife, che crea i due globali. Gli addons sono
+  nello stesso file di three e importano lo stesso three: una sola istanza (le classi e i controlli `instanceof` coincidono).
+- **Perché così**: il codice del gioco e i test in Node non cambiano (`import * as THREE from 'three'` resta, in Node
+  è il pacchetto vero); nessun elenco di nomi da tenere aggiornato (il ponte CommonJS passa l'oggetto intero; con un
+  ponte ESM servirebbe l'elenco di tutti gli export di three, ~30 KB di nomi). Scartati: `<script type="module">` con
+  import map (dipende dal supporto e dall'ordine dei moduli in WKWebView, e da `file://` per il file unico i moduli non
+  vanno); dividere in più pezzi con `splitting` (solo formato esm, stesso problema).
+- **three intero, non sfoltito**: il file contiene tutto three (793 KB contro 592 KB della parte usata prima), così
+  qualunque classe nuova (es. per le animazioni) funziona senza toccare la build. Il menu non è più lento: tempo di
+  apertura (`node test/menu-time.mjs http 15`) mediana 903 ms prima, 852–856 ms dopo (Chrome su PC, swiftshader).
+- **Dimensioni**: `www/index.html` 986 KB → 350 KB; `www/assets/three.min.js` 793 KB (con la licenza MIT di three in fondo).
+  File unico (`npm run build:single`) 4255 KB, three incorporato in un secondo `<script>` prima del gioco.
+- **Caricamento**: `<script src="assets/three.min.js">` sincrono prima del codice del gioco (è locale, nell'app su
+  `app://`, tipo `text/javascript` già in `App/main.swift`; il workflow copia tutta `www/`). Se il file manca o si
+  rompe, il codice del gioco non parte e compare il messaggio `#nothree` ("Il gioco non riesce a partire… chiudi e
+  riapri l'app; se non basta, reinstallala") invece di una pagina vuota.
+- **Controlli**: `build.mjs` si ferma se nel metafile del gioco compare un file di `node_modules/three/`, avvisa sopra
+  800 KB e controlla i 20 MB anche per `three.min.js`; `test/unit/split-three.test.mjs` controlla che `www/index.html`
+  non contenga three (frase `THREE.WebGLRenderer:`), stia sotto 700 KB e carichi `three.min.js` prima del codice, e
+  carica `three.min.js` in un contesto `vm` di Node: three intero (443 nomi) e ogni addon chiesto dal gioco presente;
+  nomi `three/build/...` diversi da three stesso (es. `three/webgpu`) fermano la build;
+  `node test/loading-shot.mjs shots` prova anche three mancante (schermata `load-2-senza-three.png`).
+- **Da provare sull'iPhone**: apertura del menu (tempo e nessuna pagina vuota), ingresso in partita, giocatori e stadio
+  come prima.

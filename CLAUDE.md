@@ -14,7 +14,14 @@
 - Gioco **offline a più file** (regola cambiata il 2026-11-19: non più file unico, niente limite di 15 MB):
   `www/index.html` = codice e menu, **sotto 1 MB**; modelli, texture e audio in `www/assets/` (sorgenti in `assets/`,
   elenco in `assets/manifest.json`). **Nessun singolo file sopra i 20 MB.** `build.mjs` controlla entrambi i limiti.
-- Ordine di caricamento (`src/assets.js`): 1) menu subito; 2) all'ingresso in partita la tappa `match`
+- **three.js sta in `www/assets/three.min.js`** (dal 2026-11-20), non dentro `index.html`: tutto three + gli addons
+  importati dal gioco (GLTFLoader, SkeletonUtils, BufferGeometryUtils), esposti come `window.__THREE` e
+  `window.__THREE_ADDONS`. `index.html` lo carica con un `<script src>` normale **prima** del codice del gioco; nel
+  codice si continua a scrivere `import * as THREE from 'three'` (e `three/addons/...`): in build un plugin li gira sui
+  globali, in Node (test) restano il pacchetto vero. Se il file manca il gioco mostra un messaggio (`#nothree`), non
+  una pagina vuota. `build.mjs` si ferma se three rientra in `index.html`; `test/unit/split-three.test.mjs` lo ricontrolla.
+  Nuovi addons: basta importarli, finiscono da soli in `three.min.js`. Non è nel manifesto (è codice, non un file da scaricare).
+- Ordine di caricamento (`src/assets.js`): 0) `assets/three.min.js` (sincrono, indispensabile); 1) menu subito; 2) all'ingresso in partita la tappa `match`
   (stadio, giocatori, suoni) con barra di avanzamento; 3) la tappa `music` in sottofondo. Un file che manca o fallisce
   si salta: il gioco parte lo stesso senza quel pezzo.
 - Nell'app iOS i file sono serviti su schema proprio `app://localhost/` (`WKURLSchemeHandler` in `App/main.swift`).
@@ -34,7 +41,8 @@
 - `src/render.js` grafica three.js · `src/input.js` gesti · `src/career.js` campionato, mercato, salvataggio ·
   `src/ui.js` menu · `src/main.js` collegamento e ciclo · `src/audio.js` suoni sintetizzati.
 - `src/assets.js` caricamento a pezzi · `src/legacy-save.js` recupero del vecchio salvataggio.
-- `build.mjs` → `www/index.html` + `www/assets/` (esbuild). `App/` involucro iOS (WKWebView + schema `app://`),
+- `build.mjs` → `www/index.html` (~350 KB) + `www/assets/three.min.js` (~800 KB) + `www/assets/` (esbuild);
+  `--single` incorpora anche three. `App/` involucro iOS (WKWebView + schema `app://`),
   `.github/workflows/` build IPA (copia tutta `www/` nell'app).
 - Coordinate: x = larghezza (−32..32), y = lunghezza (−50..50); la squadra 0 attacca verso +y.
 
