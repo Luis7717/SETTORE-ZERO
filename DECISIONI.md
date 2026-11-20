@@ -816,7 +816,9 @@ Legge `SimMatch` e non lo cambia; contratto nel README di `godot/`. Ciclo di gio
   impronte golden invariate: il bot non tocca il tasto).
 - La lezione dell'allenamento "Dribbling" diventa "Scatto". Prove: `test/unit/sprint.test.mjs`, `test/unit/dribble-beat.test.mjs`,
   `node test/sprint-shot.mjs shots` (Puppeteer 390×844).
-- Da fare: allineare la versione Godot (motore GDScript identico bit per bit + tasto Scatto).
+- Godot allineato: `sprintChance`, `dribble(p, o, sprint)`, `userSprint`, `p.burst` in `godot/sim/`, identici al JS bit per bit anche
+  sullo Scatto (nuova `tests/fixtures/sprint.json`, 14 scene da `node test/export-trace.mjs`); tasto "Scatto" nell'HUD, scritta
+  "Scatto!"/"Fermato!" senza giochetto, lezione "Scatto" nell'allenamento, dito finto che tocca Scatto. **Non verificato sull'iPhone.**
 
 ## 2026-11-20 — Godot fase 3: sfondo menu e allenamento
 - **Sfondo del menu = stessa routine del web, non un'animazione nuova.** `mosse/palleggi.gd`, `mosse/tiro.gd` e

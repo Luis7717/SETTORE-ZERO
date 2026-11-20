@@ -1,5 +1,5 @@
 # Allenamento guidato (scripts/partita/allenamento.gd, porting di src/tutorial.js): gli stessi casi di
-# test/unit/tutorial.test.mjs e le due prove della lezione Dribbling di test/unit/dribble-beat.test.mjs
+# test/unit/tutorial.test.mjs e le due prove della lezione Scatto (era Dribbling) di test/unit/dribble-beat.test.mjs
 # (il difensore saltato non si attacca al portatore, il tasto della prova nuova funziona subito).
 extends "test_base.gd"
 
@@ -67,9 +67,9 @@ func comanda(m: SimMatchScript, t: Allenamento) -> void:
 		"Recupera palla": # linea dal proprio giocatore fino al portatore avversario
 			if c != null and b.owner != null and b.owner.team == 1 and m.runOf(c) == null:
 				m.userRun(0, c, [{"x": (c.x + b.x) / 2.0, "y": (c.y + b.y) / 2.0}, {"x": b.x, "y": b.y}])
-		"Dribbling":
+		"Scatto":
 			if m.duelFor(0):
-				m.userDribble(0)
+				m.userSprint(0)
 			elif c != null:
 				m.userMove(0, c.x, c.y + 4.0, true)
 		"Portiere":
@@ -186,11 +186,11 @@ func test_ogni_prova_riparte_senza_linee_rimaste() -> bool:
 	return done()
 
 
-# ---------------------------------------------------------------- lezione Dribbling, come sul telefono
-func _nuovo_dribbling(seed_value: int) -> Allenamento:
+# ---------------------------------------------------------------- lezione Scatto (era Dribbling), come sul telefono
+func _nuovo_scatto(seed_value: int) -> Allenamento:
 	var m := H.newMatch(seed_value, Allenamento.HALF_LEN, [true, false], H.mkTeam("A", 55, seed_value), H.mkTeam("B", 40, seed_value + 1))
 	var t := Allenamento.new(m, Registro.new())
-	a_lezione(t, "Dribbling")
+	a_lezione(t, "Scatto")
 	t.go()
 	return t
 
@@ -203,9 +203,9 @@ func _fotogramma_rallenty(t: Allenamento, g: Dictionary) -> void:
 	fotogramma(m, t, DT * g.ts)
 
 
-func test_dribbling_dopo_un_tentativo_fallito_il_tasto_funziona_subito() -> bool:
+func test_scatto_dopo_un_tentativo_fallito_il_tasto_funziona_subito() -> bool:
 	# Arrange: come dopo un dribbling fallito, attese ancora in corso quando la prova riparte
-	var t := _nuovo_dribbling(3)
+	var t := _nuovo_scatto(3)
 	var m: SimMatchScript = t.m
 	var c0: R.Player = t.st.c
 	c0.dribCd = 1.2
@@ -216,19 +216,19 @@ func test_dribbling_dopo_un_tentativo_fallito_il_tasto_funziona_subito() -> bool
 	_fotogramma_rallenty(t, {"ts": 1.0})
 	# Assert
 	eq(m.duelFor(0), true, "duello aperto subito")
-	eq(m.userDribble(0), true, "il tasto Dribbling funziona")
+	eq(m.userSprint(0), true, "il tasto Scatto funziona")
 	H.disposeAll()
 	return done()
 
 
-func test_dribbling_si_supera_e_il_difensore_saltato_non_si_attacca() -> bool:
+func test_scatto_si_supera_e_il_difensore_saltato_non_si_attacca() -> bool:
 	const SEEDS := 8
 	var attempts := 0
 	var sticky := 0
 	var passed := 0
 	for seed_i in range(1, SEEDS + 1):
 		# Arrange
-		var t := _nuovo_dribbling(seed_i * 31)
+		var t := _nuovo_scatto(seed_i * 31)
 		var m: SimMatchScript = t.m
 		var g := {"ts": 1.0}
 		var L := t.lesson()
@@ -241,7 +241,7 @@ func test_dribbling_si_supera_e_il_difensore_saltato_non_si_attacca() -> bool:
 			f += 1
 			if m.duelFor(0):
 				since += DT
-				if since >= 1.0 and tap_c == null and m.userDribble(0):
+				if since >= 1.0 and tap_c == null and m.userSprint(0):
 					attempts += 1
 					tap_c = t.st.c
 					tap_o = t.st.o
@@ -260,6 +260,6 @@ func test_dribbling_si_supera_e_il_difensore_saltato_non_si_attacca() -> bool:
 	eq(passed, SEEDS, "lezione superata in tutte le partite")
 	check(attempts <= SEEDS * REPS * 1.5, "tentativi %d per %d prove superate" % [attempts, SEEDS * REPS])
 	eq(sticky, 0, "fotogrammi col difensore saltato attaccato al portatore")
-	note("dribbling: %d tentativi per %d prove superate" % [attempts, SEEDS * REPS])
+	note("scatto: %d tentativi per %d prove superate" % [attempts, SEEDS * REPS])
 	H.disposeAll()
 	return done()

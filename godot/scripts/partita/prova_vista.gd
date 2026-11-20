@@ -108,7 +108,7 @@ func _process(delta: float) -> void:
 
 func _eventi() -> void:
 	for e: Dictionary in m.events:
-		if e.type == "dribble":
+		if e.type == "dribble" and not e.get("sprint", false): # lo Scatto non ha giochetto
 			vista.trick(e.p)
 	m.events.clear()
 
