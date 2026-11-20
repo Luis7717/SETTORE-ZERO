@@ -47,9 +47,9 @@ const combos = [
   { look: { skin: 4, hair: 12, hairColor: 2, eyes: 4, eyeColor: 6, brows: 4, beard: 6, boots: 5 }, style: { fit: 0, sleeves: 1, collar: 2, pattern: 4, shorts: 1, socks: 2 } },
 ];
 for (const [i, c] of combos.entries()) {
-  await p.evaluate((c) => { const e = window.__ui.ed; e.d.look = c.look; e.d.style = c.style; e.tab = 'face'; e.refresh(true); e.view.yaw = 0; e.view.frame({ y: 1.82, z: 1.75, look: 1.78 }, true); }, c);
+  await p.evaluate((c) => { const e = window.__ui.ed; e.d.look = c.look; e.d.style = c.style; e.tab = 'face'; e.refresh(true); e.view.yaw = 0; const hy = e.view.p3d && e.view.p3d.headY; e.view.frame(hy ? { y: hy * 1.25 + 0.03, z: 1.25, look: hy * 1.25 - 0.03 } : { y: 1.82, z: 1.75, look: 1.78 }, true); }, c); // inquadratura sulla testa del modello in uso
   await wait(500); await p.evaluate(() => { window.__ui.ed.view.yaw = 0.25; }); await snap(`8-combo${i + 1}-viso`);
-  await p.evaluate(() => { const e = window.__ui.ed; e.tab = 'kit'; e.refresh(true); e.view.frame({ y: 1.05, z: 4.6, look: 1.0 }, true); e.view.yaw = 0.3; });
+  await p.evaluate(() => { const e = window.__ui.ed; e.tab = 'kit'; e.refresh(true); e.view.frame(e.view.p3d && e.view.p3d.headY ? { y: 1.1, z: 5.3, look: 1.08 } : { y: 1.05, z: 4.6, look: 1.0 }, true); e.view.yaw = 0.3; });
   await wait(300); await p.evaluate(() => { window.__ui.ed.view.yaw = 0.3; }); await snap(`8-combo${i + 1}-corpo`);
   await p.evaluate(() => { window.__ui.ed.view.yaw = Math.PI; }); await snap(`8-combo${i + 1}-dietro`);
 }

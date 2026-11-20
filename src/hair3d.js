@@ -65,7 +65,7 @@ const SKIRT_IN = -0.06;   // il risvolto del bordo entra sotto la base (in R): c
 const TUCK = 0.07;        // il bordo rientra verso la testa: niente visiera
 
 // ---------------------------------------------------------------- testa: superficie di base
-// frame = { c, up, fwd, right (array o oggetti {x,y,z}), R, pts: punti della testa (per adattare la base) }
+// frame = { c, up, fwd, right (array o oggetti {x,y,z}), R, pts: punti della testa (per adattare la base), N?: esponente del superellissoide }
 export function makeBase(frame) {
   const v3 = o => Array.isArray(o) ? o : [o.x, o.y, o.z];
   const c = v3(frame.c), up = v3(frame.up), fwd = v3(frame.fwd), right = v3(frame.right), R = frame.R;
@@ -75,13 +75,57 @@ export function makeBase(frame) {
   for (const p of P) { ext[0] = Math.max(ext[0], p[0]); ext[1] = Math.max(ext[1], -p[0]); ext[2] = Math.max(ext[2], p[1]); ext[3] = Math.max(ext[3], -p[1]); ext[4] = Math.max(ext[4], p[2]); ext[5] = Math.max(ext[5], -p[2]); }
   const sx = Math.max(ext[0], ext[1]); ext[0] = ext[1] = sx; // simmetrica
   for (let i = 0; i < 6; i++) ext[i] = Math.max(0.3, ext[i]);
-  const N = 4;
+  const N = frame.N || 4;   // 4 = testa squadrata (Kenney), più basso = testa tonda (modello realistico)
   const raw = L => { const a = L[0] >= 0 ? ext[0] : ext[1], b = L[1] >= 0 ? ext[2] : ext[3], d = L[2] >= 0 ? ext[4] : ext[5]; return Math.pow(Math.abs(L[0] / a) ** N + Math.abs(L[1] / b) ** N + Math.abs(L[2] / d) ** N, -1 / N); };
   // la base deve contenere la testa dove ci sono capelli (non il mento): si allarga del rapporto massimo
   let k = 1; for (const p of P) { if (p[1] < -0.4 && p[2] > 0) continue; const r = Math.hypot(p[0], p[1], p[2]); if (r > 1e-6) k = Math.max(k, r / raw([p[0] / r, p[1] / r, p[2] / r])); }
   const base = L => raw(L) * k * 1.01;
   const world = p => [c[0] + R * (right[0] * p[0] + up[0] * p[1] + fwd[0] * p[2]), c[1] + R * (right[1] * p[0] + up[1] * p[1] + fwd[1] * p[2]), c[2] + R * (right[2] * p[0] + up[2] * p[1] + fwd[2] * p[2])];
   return { base, world, ext, k };
+}
+
+// Base "radiale" per una testa vera (modello realistico): per ogni direzione il raggio massimo della testa,
+// letto da una griglia elevazione × giro riempita coi punti, allargata di una cella e ammorbidita. Aderisce alla testa
+// (niente spazio tra capelli e cranio) dove un superellissoide lascerebbe vuoti o la buche.
+// frame come makeBase; i punti senza capelli (viso, orecchie) si tolgono prima: le celle vuote si riempiono dai vicini.
+export const RB_STEP = 5;   // gradi per cella
+export function makeRadialBase(frame) {
+  const v3 = o => Array.isArray(o) ? o : [o.x, o.y, o.z];
+  const c = v3(frame.c), up = v3(frame.up), fwd = v3(frame.fwd), right = v3(frame.right), R = frame.R;
+  const NE = 180 / RB_STEP + 1, NA = 360 / RB_STEP, grid = new Float32Array(NE * NA).fill(-1);
+  const cell = (e, a) => e * NA + ((a % NA) + NA) % NA;
+  for (const q of frame.pts) {
+    const p = v3(q), d = [p[0] - c[0], p[1] - c[1], p[2] - c[2]];
+    const x = (d[0] * right[0] + d[1] * right[1] + d[2] * right[2]) / R, y = (d[0] * up[0] + d[1] * up[1] + d[2] * up[2]) / R, z = (d[0] * fwd[0] + d[1] * fwd[1] + d[2] * fwd[2]) / R;
+    const r = Math.hypot(x, y, z); if (r < 1e-6) continue;
+    const el = Math.asin(Math.max(-1, Math.min(1, y / r))) / DEG, az = Math.atan2(x, z) / DEG;
+    const i = cell(Math.round((el + 90) / RB_STEP), Math.round((az + 180) / RB_STEP));
+    if (r > grid[i]) grid[i] = r;
+  }
+  // celle vuote: media dei vicini pieni, finché tutto è pieno
+  for (let it = 0; it < 200; it++) {
+    const add = []; let empty = 0;
+    for (let e = 0; e < NE; e++) for (let a = 0; a < NA; a++) {
+      const i = cell(e, a); if (grid[i] >= 0) continue; empty++;
+      let s = 0, n = 0; for (const [de, da] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const ee = e + de; if (ee < 0 || ee >= NE) continue; const g = grid[cell(ee, a + da)]; if (g >= 0) { s += g; n++; } }
+      if (n) add.push(i, s / n);
+    }
+    for (let k = 0; k < add.length; k += 2) grid[add[k]] = add[k + 1];
+    if (!empty) break;
+  }
+  for (let i = 0; i < grid.length; i++) if (grid[i] < 0) grid[i] = 1;
+  // allargata di una cella (i capelli non entrano tra due punti) e ammorbidita due volte
+  const pass = (f) => { const out = new Float32Array(grid.length); for (let e = 0; e < NE; e++) for (let a = 0; a < NA; a++) { const vals = []; for (let de = -1; de <= 1; de++) for (let da = -1; da <= 1; da++) { const ee = Math.max(0, Math.min(NE - 1, e + de)); vals.push(grid[cell(ee, a + da)]); } out[cell(e, a)] = f(vals); } grid.set(out); };
+  pass(v => Math.max(...v));
+  pass(v => v.reduce((x, y) => x + y, 0) / v.length); pass(v => v.reduce((x, y) => x + y, 0) / v.length);
+  const base = L => {
+    const r = Math.hypot(L[0], L[1], L[2]) || 1, el = Math.asin(Math.max(-1, Math.min(1, L[1] / r))) / DEG, az = Math.atan2(L[0], L[2]) / DEG;
+    const fe = Math.max(0, Math.min(NE - 1.001, (el + 90) / RB_STEP)), fa = (az + 180) / RB_STEP, e0 = Math.floor(fe), a0 = Math.floor(fa), te = fe - e0, ta = fa - a0;
+    const g = (e, a) => grid[cell(Math.min(NE - 1, e), a)];
+    return 1.015 * lerp(lerp(g(e0, a0), g(e0, a0 + 1), ta), lerp(g(e0 + 1, a0), g(e0 + 1, a0 + 1), ta), te);
+  };
+  const world = p => [c[0] + R * (right[0] * p[0] + up[0] * p[1] + fwd[0] * p[2]), c[1] + R * (right[1] * p[0] + up[1] * p[1] + fwd[1] * p[2]), c[2] + R * (right[2] * p[0] + up[2] * p[1] + fwd[2] * p[2])];
+  return { base, world };
 }
 
 // ---------------------------------------------------------------- griglie con normali morbide

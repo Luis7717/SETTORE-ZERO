@@ -61,3 +61,19 @@ test('ogni taglio ha una forma diversa dagli altri', () => {
     assert.ok(d > 0.02, `tagli ${sig[i][0]} e ${sig[j][0]} troppo simili`);
   }
 });
+
+// base radiale (modello realistico): testa tonda con un buco (viso tolto) → la base contiene tutti i punti,
+// è vicina alla testa e non ha salti; i tagli si costruiscono anche su questa base
+import { makeRadialBase } from '../../src/hair3d.js';
+test('base radiale: contiene la testa, aderisce, è liscia e regge tutti i tagli', () => {
+  const head = [];
+  for (let el = -80; el <= 85; el += 4) for (let az = -180; az < 180; az += 4) {
+    const e = el * Math.PI / 180, a = az * Math.PI / 180, r = 1 + 0.12 * Math.sin(e) - 0.05 * Math.cos(a);
+    if (el < 0 && Math.abs(az) < 40) continue; // viso tolto
+    head.push([r * Math.cos(e) * Math.sin(a), r * Math.sin(e), r * Math.cos(e) * Math.cos(a)]);
+  }
+  const rb = makeRadialBase({ c: [0, 0, 0], up: [0, 1, 0], fwd: [0, 0, 1], right: [1, 0, 0], R: 1, pts: head }).base;
+  for (const p of head) { const r = Math.hypot(...p); const b = rb(p.map(x => x / r)); assert.ok(b >= r * 0.985, `punto fuori dalla base: ${b} < ${r}`); assert.ok(b < r * 1.12, `base troppo larga: ${b} vs ${r}`); }
+  for (let az = -180; az < 180; az += 1) { const a = az * Math.PI / 180, b = Math.PI / 180; const d = Math.abs(rb([Math.sin(a), 0.3, Math.cos(a)]) - rb([Math.sin(a + b), 0.3, Math.cos(a + b)])); assert.ok(d < 0.03, `salto ${d} a ${az}°`); }
+  for (let s = 1; s < HAIR.length; s++) { const g = hairPieces(s, rb); assert.ok((g.pos.length > 0 || !(HAIR[s].line || HAIR[s].strip)) && g.pos.every(Number.isFinite), `taglio ${s}`); }
+});

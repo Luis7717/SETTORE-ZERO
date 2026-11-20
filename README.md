@@ -30,8 +30,10 @@ Sideloadly o AltStore.
 ## Note
 
 Squadre, giocatori e sponsor sono inventati. Grafica 3D con three.js (licenza MIT).
-Modello dei giocatori: Kenney, "Animated Characters: Protagonists" (CC0, https://kenney.nl). Capelli, viso, maglie,
-numeri e stemmi sono disegnati dal codice del gioco (`src/players3d.js`, `src/crest.js`): niente file in più.
+Modello dei giocatori: Quaternius, "Universal Base Characters" (corpo e occhi) e "Universal Animation Library"
+(animazioni), entrambi CC0 (https://quaternius.com), adattati con `tools/make-athlete.mjs`. Modello di riserva se il primo
+non si carica: Kenney, "Animated Characters: Protagonists" (CC0, https://kenney.nl). Capelli, viso, maglie, numeri e
+stemmi sono disegnati dal codice del gioco (`src/athlete3d.js`, `src/players3d.js`, `src/hair3d.js`, `src/crest.js`).
 All'inizio di una carriera si sceglie lo stemma della squadra e si crea il proprio campione (viso, occhi, capelli, divisa);
 l'aspetto di ogni giocatore si cambia dalla Rosa ("Aspetto"), stile della divisa e stemma dalle Impostazioni.
 Suoni: Freesound, tutti CC0 (autori e link in `assets/CREDITI.md`).

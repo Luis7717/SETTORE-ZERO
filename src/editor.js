@@ -7,13 +7,14 @@ import * as THREE from 'three';
 import { KITS, POS_NAME, randomName } from './career.js';
 import { SKINS, HAIR_COLORS, HAIR_STYLES, EYE_SHAPES, EYE_COLORS, BROWS, BEARDS, BOOTS, KIT_OPTS, lookFromSeed, lookOf, normalizeLook, normalizeKitStyle, kitStyleFromSeed, hash32, seeded } from './looks.js';
 import { CREST_SHAPES, CREST_PATTERNS, CREST_ICONS, crestSvg, crestFromSeed } from './crest.js';
-import { loadPlayers3D } from './players3d.js';
+import { loadBestPlayers } from './athlete3d.js';
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const PREVIEW_TEX = 1024;     // texture dell'anteprima: più fine che in partita (si vede da vicino)
 const SPIN = 0.45;            // rad/s: rotazione lenta dell'anteprima
 const CAM_BODY = { y: 1.35, z: 5.0, look: 1.2 }, CAM_HEAD = { y: 2.1, z: 2.0, look: 2.02 }; // inquadrature (m, giocatore scalato 1,25)
 const KIT_LABELS = { fit: 'Maglia', sleeves: 'Maniche', collar: 'Colletto', pattern: 'Motivo', shorts: 'Pantaloncini', socks: 'Calzettoni' };
+const STILL = { vx: 0, vy: 0, state: 'play', cele: 0, kickAnim: 0, pos: 'A', i: 0, x: 0, y: 0 }; // giocatore fermo per la posa dell'anteprima
 const GK_KIT = { shirt: 0x27e0c0, shorts: 0x0c5c52, socks: 0x27e0c0 };
 
 export class Editor {
@@ -178,12 +179,14 @@ export class Editor {
     this.view.frame(this.tab === 'face' || this.tab === 'hair' ? CAM_HEAD : CAM_BODY, true); this.view.swing = this.tab === 'face';
     const assets = this.ui.api.assets || (typeof window !== 'undefined' && window.__assets);
     const view = this.view;
-    const ready = assets ? assets.loadStage('match').then(() => loadPlayers3D(assets.get('player'))) : Promise.resolve(null);
+    const ready = assets ? assets.loadStage('match').then(() => loadBestPlayers(assets)) : Promise.resolve(null);
     ready.then(m => {
       if (this.view !== view) return;
       const w = this.ui.root.querySelector('#edwait');
       if (!m) { if (w) w.textContent = 'Anteprima 3D non disponibile'; return; }
       if (w) w.style.display = 'none';
+      // inquadratura del viso all'altezza della testa del modello in uso (il modello realistico ha la testa più alta)
+      if (m.headY) { CAM_HEAD.look = m.headY * 1.25 - 0.03; CAM_HEAD.y = CAM_HEAD.look + 0.06; CAM_HEAD.z = 1.35; CAM_BODY.z = 5.6; CAM_BODY.look = 1.2; CAM_BODY.y = 1.3; view.frame(this.tab === 'face' || this.tab === 'hair' ? CAM_HEAD : CAM_BODY, true); }
       view.p3d = m; view.setPlayer(this.kitFor(), this.d.look, this.d.num, this.d.name);
     }).catch(() => { const w = this.ui.root.querySelector('#edwait'); if (w) w.textContent = 'Anteprima 3D non disponibile'; });
   }
@@ -228,7 +231,8 @@ class Preview {
     this.t += dt;
     if (!this.drag) this.yaw = this.swing ? this.yaw + (0.55 * Math.sin(this.t * 0.7) - this.yaw) * Math.min(1, dt * 2) : this.yaw + dt * SPIN;
     const k = Math.min(1, dt * 6); for (const n of ['y', 'z', 'look']) this.cur[n] += (this.goal[n] - this.cur[n]) * k;
-    if (this.fig) { this.fig.g.rotation.y = this.yaw; this.fig.mixer.update(dt); }
+    // la stessa posa del campo, da fermo (il modello realistico chiude un po' gambe e braccia del clip "fermo")
+    if (this.fig) { this.fig.g.rotation.y = this.yaw; this.p3d.pose(STILL, this.fig, dt, { t: this.t, phase: 'menu', flip: 1, yaw: 0, ball: null, scale: 1.25, trick: null }); }
     this.cam.position.set(0, this.cur.y, this.cur.z); this.cam.lookAt(0, this.cur.look, 0);
     this.r.render(this.scene, this.cam);
   }

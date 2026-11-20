@@ -5,7 +5,8 @@ import { b, p, wait, snap, errs } from './shot.mjs';
 import { TRICKS } from '../src/tricks.js';
 
 await wait(1200);
-await p.evaluate(() => { window.__newCareer(); window.__start('friendly', 50); });
+// __enter carica la tappa 'match' (modello dei giocatori): con __start si vedrebbero le figure a box
+await p.evaluate(() => { window.__newCareer(); return window.__enter('friendly', 50); });
 await wait(2500);
 const info = [];
 for (const T of TRICKS) {
