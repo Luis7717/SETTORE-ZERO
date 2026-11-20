@@ -1,0 +1,193 @@
+# IPA della versione Godot di Tiro a Giro ("Tiro a Giro 3D", bundle it.tiroagiro.godot): convive sul telefono con
+# l'app web (it.tiroagiro.game, workflow tiro-a-giro-ipa.yml).
+#
+# Passi: Godot 4.7.2 per macOS + template iOS (in cache) → importa il progetto godot/ → prova la scena senza
+# schermo → esporta il progetto Xcode (preset "iOS" di godot/export_presets.cfg, solo progetto) → xcodebuild
+# SENZA firma → firma ad-hoc (codesign --sign -, come l'app web) → TiroAGiroGodot.ipa → release
+# "tiro-a-giro-godot-ipa". L'IPA si installa a mano (TrollStore, Sideloadly, AltStore) come quella web.
+name: Tiro a Giro Godot IPA
+
+on:
+  push:
+    branches: [tiro-a-giro]
+    paths:
+      - 'godot/**'
+      - '.github/workflows/tiro-a-giro-godot-ipa.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tiro-a-giro-godot-ipa-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_TAG: 4.7.2-stable            # versione nei link di GitHub
+  GODOT_TPL: 4.7.2.stable            # nome della cartella dei template (= templates/version.txt)
+  APP_NAME: TiroAGiroGodot           # nome del binario e del progetto Xcode (dal percorso di export)
+  IPA_NAME: TiroAGiroGodot.ipa
+  BUNDLE_ID: it.tiroagiro.godot
+  RELEASE_TAG: tiro-a-giro-godot-ipa
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        # due macchine con Xcode diversi: se una non riesce a collegare i template di Godot, resta l'altra (job pubblica)
+        runner: [macos-15, macos-26]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Godot e template iOS dalla cache
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: ~/godot-ci
+          key: godot-${{ env.GODOT_TAG }}-macos-ios-v1
+
+      - name: Scarica Godot e i template iOS (solo se non sono in cache)
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p ~/godot-ci
+          cd ~/godot-ci
+          BASE="https://github.com/godotengine/godot/releases/download/${GODOT_TAG}"
+          curl -fsSL --retry 5 --retry-delay 10 -o SHA512-SUMS.txt "$BASE/SHA512-SUMS.txt"
+          for f in "Godot_v${GODOT_TAG}_macos.universal.zip" "Godot_v${GODOT_TAG}_export_templates.tpz"; do
+            echo "::group::scarico $f"
+            curl -fSL --retry 5 --retry-delay 10 -o "$f" "$BASE/$f"
+            grep "  $f\$" SHA512-SUMS.txt | shasum -a 512 -c -
+            echo "::endgroup::"
+          done
+          unzip -q "Godot_v${GODOT_TAG}_macos.universal.zip"
+          mkdir -p templates
+          # dei 1,2 GB di template serve solo ios.zip (~200 MB): solo quello finisce in cache
+          unzip -q -j "Godot_v${GODOT_TAG}_export_templates.tpz" templates/ios.zip templates/version.txt -d templates
+          rm -f ./*.zip ./*.tpz
+          ls -la ~/godot-ci ~/godot-ci/templates
+
+      - name: Installa Godot e i template
+        run: |
+          set -euo pipefail
+          GODOT="$HOME/godot-ci/Godot.app/Contents/MacOS/Godot"
+          test -x "$GODOT" || { echo "::error::Godot non trovato in ~/godot-ci"; ls -la ~/godot-ci; exit 1; }
+          "$GODOT" --version
+          TPL="$HOME/Library/Application Support/Godot/export_templates/${GODOT_TPL}"
+          mkdir -p "$TPL"
+          cp ~/godot-ci/templates/ios.zip ~/godot-ci/templates/version.txt "$TPL/"
+          test "$(tr -d '[:space:]' < "$TPL/version.txt")" = "${GODOT_TPL}" || { echo "::error::template di un'altra versione"; exit 1; }
+          echo "GODOT=$GODOT" >> "$GITHUB_ENV"
+          xcodebuild -version
+
+      - name: Importa il progetto
+        run: |
+          set -euo pipefail
+          # la prima apertura importa modelli, texture e suoni (cartella godot/.godot, fuori dal repo)
+          "$GODOT" --headless --path godot --import 2>&1 | tee build-import.log | grep -E "ERROR|WARNING" || true
+          test -d godot/.godot/imported || { echo "::error::importazione non riuscita"; exit 1; }
+
+      - name: Prova la scena senza schermo
+        run: |
+          set -euo pipefail
+          # 3 secondi di scena di prova: un errore di script qui vuol dire un'app rotta sul telefono
+          "$GODOT" --headless --path godot -- --esci-dopo=3 2>&1 | tee build-run.log
+          if grep -E "SCRIPT ERROR|^ERROR:|Parse Error" build-run.log; then
+            echo "::error::la scena di prova stampa errori (vedi sopra)"; exit 1
+          fi
+          grep -q "FPS medi" build-run.log || { echo "::error::la scena di prova non è arrivata in fondo"; exit 1; }
+
+      - name: Esporta il progetto Xcode
+        run: |
+          set -euo pipefail
+          mkdir -p build/ios
+          # preset "iOS" con export_project_only=true: Godot scrive il progetto Xcode e il .pck, non compila
+          "$GODOT" --headless --path godot --export-release "iOS" "../build/ios/${APP_NAME}.ipa" > build-export.log 2>&1 || true
+          grep -vE "^(READ|ADDING|Creating) " build-export.log | grep -iE "error|warning|export" || true
+          if [ ! -d "build/ios/${APP_NAME}.xcodeproj" ] || [ ! -f "build/ios/${APP_NAME}.pck" ]; then
+            echo "::error::Godot non ha creato il progetto Xcode"; tail -n 80 build-export.log; exit 1
+          fi
+          ls -la build/ios
+
+      - name: Compila con Xcode (senza firma)
+        run: |
+          set -euo pipefail
+          xcodebuild -quiet \
+            -project "build/ios/${APP_NAME}.xcodeproj" -scheme "${APP_NAME}" \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath build/dd \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" DEVELOPMENT_TEAM="" PROVISIONING_PROFILE_SPECIFIER="" \
+            build 2>&1 | tee build-xcode.log
+
+      - name: Crea l'IPA (firma ad-hoc)
+        run: |
+          set -euo pipefail
+          APP_SRC="build/dd/Build/Products/Release-iphoneos/${APP_NAME}.app"
+          if [ ! -d "$APP_SRC" ]; then echo "::error::app non trovata"; find build/dd/Build/Products -maxdepth 2 || true; exit 1; fi
+          rm -rf build/Payload
+          mkdir -p build/Payload
+          cp -R "$APP_SRC" build/Payload/
+          APP="build/Payload/${APP_NAME}.app"
+          test -x "$APP/${APP_NAME}" || { echo "::error::manca il binario"; exit 1; }
+          test -f "$APP/${APP_NAME}.pck" || { echo "::error::manca il .pck (i dati del gioco)"; exit 1; }
+          ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP/Info.plist")
+          [ "$ID" = "${BUNDLE_ID}" ] || { echo "::error::bundle id $ID invece di ${BUNDLE_ID}"; exit 1; }
+          echo "nome: $(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$APP/Info.plist")"
+          echo "iOS minimo: $(/usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$APP/Info.plist")"
+          # firma ad-hoc come l'app web: prima framework e librerie dentro l'app, poi l'app
+          while IFS= read -r -d '' f; do
+            codesign --force --sign - --timestamp=none "$f"
+          done < <(find "$APP" -depth \( -name "*.framework" -o -name "*.dylib" \) -print0)
+          codesign --force --sign - --timestamp=none "$APP"
+          codesign --verify --verbose=2 "$APP"
+          du -sh "$APP"
+          (cd build && zip -qry "../${IPA_NAME}" Payload)
+          ls -la "${IPA_NAME}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TiroAGiroGodot-ipa-${{ matrix.runner }}
+          path: ${{ env.IPA_NAME }}
+
+      - name: Log in caso di errore
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: TiroAGiroGodot-log-${{ matrix.runner }}
+          path: |
+            build-*.log
+          if-no-files-found: ignore
+
+  # pubblica una sola volta, dopo le due macchine: l'IPA di macos-26 (Xcode più nuovo), altrimenti quella di macos-15
+  pubblica:
+    needs: build
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: TiroAGiroGodot-ipa-*
+          path: ipa
+
+      - name: Pubblica come release scaricabile
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          SCELTA=""
+          for r in macos-26 macos-15; do
+            if [ -f "ipa/TiroAGiroGodot-ipa-$r/${IPA_NAME}" ]; then SCELTA="$r"; break; fi
+          done
+          if [ -z "$SCELTA" ]; then echo "::error::nessuna macchina ha prodotto l'IPA"; ls -R ipa || true; exit 1; fi
+          cp "ipa/TiroAGiroGodot-ipa-$SCELTA/${IPA_NAME}" "${IPA_NAME}"
+          ls -la "${IPA_NAME}"
+          gh release delete "$RELEASE_TAG" --yes --cleanup-tag || true
+          gh release create "$RELEASE_TAG" "$IPA_NAME" \
+            --title "Tiro a Giro 3D (Godot, IPA)" \
+            --notes "Versione Godot in costruzione, build automatica dal commit ${GITHUB_SHA} (compilata su ${SCELTA}). IPA non firmata: installala con TrollStore, Sideloadly o AltStore. Convive con l'app web (bundle diverso: ${BUNDLE_ID})." \
+            --target "${GITHUB_SHA}" --prerelease

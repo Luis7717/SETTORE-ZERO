@@ -1,0 +1,9 @@
+# cartella di lavoro dell'editor e dell'importazione: Godot la rigenera da sola alla prima apertura
+.godot/
+# credenziali di export (Godot 4.3+ le tiene fuori da export_presets.cfg): mai nel repo
+export_credentials.cfg
+# export fatti in locale dentro il progetto (di norma vanno in ../build/, già escluso)
+/build/
+/export/
+# progetto Android, se un giorno si installa il modello di build
+/android/

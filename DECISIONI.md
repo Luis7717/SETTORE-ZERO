@@ -585,3 +585,44 @@ corsa andava bene. Non ci sono clip CC0/CC-BY di palleggio o skill per questo sc
   in qualche fotogramma (punta e polpaccio nell'arcobaleno).
 - **Da provare sull'iPhone**: palleggio e giochetti nel menu (fluidità, se il contatto si vede), giochetti in partita
   nel duello (tasto Dribbling, anche col sinistro), durata dei voli di sombrero e arcobaleno in partita.
+
+## 2026-11-20 — Passaggio a Godot: fase 1
+
+Luis ha scelto di passare a un'app vera fatta con **Godot 4.7.2-stable**. La versione web resta intatta; la nuova vive
+in `godot/` (dettagli in `godot/README.md`). Scelte fatte in autonomia:
+
+1. **Renderer Mobile** (non Forward+ né Compatibility): è quello pensato per i telefoni, su iPhone usa Metal, ha ombre,
+   nebbia, MSAA e le "instance uniform" (un solo materiale per i 22 giocatori, colori diversi per ognuno).
+   Conseguenza decisa da Godot: l'IPA chiede un **chip A12** (iPhone XS / XR o più nuovi).
+2. **Schermo**: 390×844 punti logici, stretch `canvas_items` + `expand`, solo verticale, niente 120 Hz (60 fps come
+   obiettivo, meno calore). Il 3D si disegna largo al massimo 780 px e si ingrandisce con FSR (su iPhone a 3×: scala
+   0,67). Contatore FPS/memoria dentro l'area sicura.
+3. **Coordinate**: Godot X = x, Y = altezza, Z = −y, come three.js nel web: i numeri di `src/render.js` (telecamera
+   16 m dietro, 10,5 m in alto, 9 m avanti, campo visivo verticale 70°) e la direzione del sole si copiano uguali.
+4. **Righe del campo nello shader** (`godot/shaders/erba.gdshader`): la prima versione disegnava strisce e righe in
+   una texture da 1344×1984 come il web, ma i cerchi venivano a scalini; calcolate per pixel sono nitide a ogni
+   distanza, senza sfarfallio lontano, e sul telefono risparmiano ~10 MB.
+5. **Divisa nello shader** (`godot/shaders/divisa.gdshader`): invece di dipingere una texture per giocatore come
+   `src/athlete3d.js`, ogni vertice si porta dietro la sua posizione nella posa a T (CUSTOM0) e lo shader sceglie maglia,
+   maniche, pantaloncini, calzettoni, scarpe, pelle, capelli con le stesse misure del web (frazioni tra anca e
+   caviglia). Mancano ancora numero, nome, stemma, motivi della maglia, viso e capelli veri: fasi successive.
+6. **Animazioni**: AnimationTree con BlendSpace1D (fermo 0, corsa 4,2 m/s, scatto 8 m/s, passi sincronizzati) e
+   velocità del clip che segue la velocità vera, come i riferimenti di `src/athlete3d.js`.
+7. **Build IPA**: Godot esporta solo il progetto Xcode, `xcodebuild` compila senza firma, poi firma ad-hoc come l'app
+   web. Godot vuole per forza un Team ID anche solo per il progetto: ne mettiamo uno finto (`AAAAAAAAAA`) che
+   `xcodebuild` ignora (`DEVELOPMENT_TEAM=""`). iOS minimo **15.0** (il minimo di Godot 4.7). Bundle
+   `it.tiroagiro.godot`, nome "Tiro a Giro 3D", release `tiro-a-giro-godot-ipa`. Due Mac (`macos-15`, `macos-26`)
+   perché non si sa con quale Xcode i template di Godot 4.7.2 si collegano senza problemi: un job finale pubblica
+   l'IPA di macos-26 o, se manca, quella di macos-15. In cache solo l'editor e `ios.zip`.
+8. **Template di export sul PC**: scaricati (1,28 GB, SHA-512 controllato) ma estratti solo `ios.zip` e i template
+   Windows in `%APPDATA%\Godot\export_templates\4.7.2.stable`. Ne valeva la pena: l'export iOS da Windows produce lo
+   stesso progetto Xcode che userà GitHub, così bundle id, nome, iOS minimo, icone, orientamento e nome dello schema
+   (`TiroAGiroGodot`) sono stati controllati davvero; l'export Windows ha dimostrato che il gioco esportato (non
+   l'editor) parte e gira.
+9. **Memoria nel contatore**: nelle build "release" (quella dell'IPA) `OS.get_static_memory_usage()` vale 0; il
+   contatore mostra memoria video e RAM libera secondo il sistema (`OS.get_memory_info()`), più la memoria del motore
+   quando c'è (editor e debug).
+
+Verificato sul PC (Windows, RTX 3070): importazione senza errori, scena senza schermo senza errori, schermate
+390×844 (campo, giocatore da vicino, porta, campo intero), prova dei tocchi automatica, export iOS (progetto Xcode) ed
+export Windows. **Non verificato**: la build su GitHub (niente push in questa fase) e tutto ciò che riguarda l'iPhone.
