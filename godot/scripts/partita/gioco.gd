@@ -59,7 +59,7 @@ const HINTS := {
 	"defend": "Difende la CPU: disegna una linea da un tuo giocatore per guidarlo tu",
 	"loose": "Palla libera: disegna una linea da un tuo giocatore per andarci",
 	"dive": "PARA! Tira una linea dal portiere al punto della porta",
-	"duel": "Disegna fino a un compagno per passare · oppure tocca Dribbling",
+	"duel": "Disegna fino a un compagno per passare · oppure tocca Scatto",
 	"zone": "Area di tiro: linea in porta = tiro · fino a un compagno = passaggio",
 }
 const RHINT := {
@@ -277,6 +277,11 @@ func _evento(e: Dictionary, adv: bool) -> void:
 		"tackle", "block":
 			audio.kick(9.0)
 		"dribble":
+			if e.get("sprint", false): # tasto Scatto: niente giochetto, solo la scritta
+				audio.kick(6.0)
+				if (e.p as R.Player).team == me:
+					hud.big("Scatto!" if e.ok else "Fermato!", "g" if e.ok else "", 900)
+				return
 			var nome := _nome_giochetto(vista.trick(e.p))
 			if (e.p as R.Player).team == me:
 				hud.big(nome + ("!" if e.ok else ""), "g" if e.ok else "", 1000)
@@ -377,9 +382,10 @@ func _notification(what: int) -> void:
 			_mostra_pausa()
 
 
+# tasto in basso nel duello: Scatto (era Dribbling; i nomi interni restano _dribbling / mostra_dribbling)
 func _dribbling() -> void:
 	if stato == "partita" and not paused:
-		m.userDribble(me)
+		m.userSprint(me)
 
 
 # ---------------------------------------------------------------- pausa, intervallo, fine

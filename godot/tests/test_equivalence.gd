@@ -201,3 +201,56 @@ func test_traccia_5() -> bool:
 
 func test_traccia_6() -> bool:
 	return _trace(6)
+
+
+# Scatto nel duello (userSprint): le partite col bot non lo usano mai, quindi ha scene sue (fixtures/sprint.json):
+# stesso esito e stessa impronta dello stato a ogni passo dopo il tocco
+func test_scatto_come_js() -> bool:
+	var ref: Variant = readJson("sprint.json")
+	if not check(ref != null, "manca fixtures/sprint.json"):
+		return done()
+	var nSteps: int = int(C.round_(float(ref.sec) * 60.0))
+	var riusciti := 0
+	for r: Dictionary in ref.scenes:
+		var sc: Dictionary = r.scene
+		var tag := "scena %d" % int(sc.seed)
+		var m := H.scene(int(sc.seed))
+		var p: R.Player = m.players[9]
+		var o: R.Player = m.players[11 + 3]
+		H.wake(p, float(sc.px), float(sc.py))
+		p.fx = 0
+		p.fy = 1
+		p.st.vel = float(sc.vel)
+		H.give(m, p)
+		m.updateCtrl(0)
+		H.wake(o, float(sc.px) + float(sc.ox), float(sc.py) + float(sc.dist))
+		o.st.dif = float(sc.dif)
+		o.fx = 0
+		o.fy = -1
+		m.userMove(0, p.x, p.y, true)
+		m.step(DT)
+		m.events.clear()
+		eq(m.duelFor(0), r.duel, tag + ": duello")
+		eq(m.userSprint(0), r.tapped, tag + ": tasto")
+		var e: Variant = findEvent(m.events, "dribble")
+		eq(e.ok if e != null else null, r.ok, tag + ": esito")
+		eq(p.burst, float(r.burst), tag + ": burst")
+		m.events.clear()
+		var hashes: String = r.hashes
+		var firstDiff := -1
+		var evs: Array = []
+		for n in nSteps:
+			m.step(DT)
+			if firstDiff < 0 and "%08x" % stepHash(m) != hashes.substr(n * 8, 8):
+				firstDiff = n
+			for x: Dictionary in m.events:
+				var xp: Variant = x.get("p")
+				evs.append([n, x.type, (xp.team * 11 + xp.i) if xp != null else -1])
+			m.events.clear()
+		eq(firstDiff, -1, tag + ": stato diverso dal JS dal passo")
+		eq(str(evs), str((r.events as Array).map(func(a: Array) -> Array: return [int(a[0]), a[1], int(a[2])])), tag + ": eventi")
+		if r.ok == true:
+			riusciti += 1
+		m.dispose()
+	note("%d scene di Scatto (%d riuscite) identiche al JS per %d passi" % [ref.scenes.size(), riusciti, nSteps])
+	return done()
