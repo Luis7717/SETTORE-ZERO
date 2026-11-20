@@ -1,10 +1,15 @@
-// Stadio serale intorno al campo: tribune a gradoni con pubblico animato, tetto con anello di luci,
-// cartelloni LED con marchi inventati, panchine, maxischermo, cielo e terreno.
+// Stadio serale intorno al campo: tribune a due anelli con scalette, vomitori, corrimano e parapetti, pubblico
+// animato (salti, braccia alzate, ola), bandiere che sventolano, tetto a sbalzo con travi, reticolare e anello di
+// luci, cartelloni LED e fascia LED con sponsor inventati, maxischermo col risultato, steward, fotografi, panchine.
 // Tutto in poche draw call: ogni gruppo è una sola geometria unita, le texture sono disegnate su canvas.
 // Coordinate three: x = larghezza, y = altezza, z = -y del motore. La telecamera sta verso +z.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { HW, HL } from './sim.js';
+import { canvasTex, rnd, pick, C, placeMatrix, fitText, fanColors, QuadBuilder, WHITE_UV } from './stadium-kit.js';
+import { CELLS, TILE, CROWD_H, CROWD_VARIANTS, crowdTexture, crowdMaterial, flagTexture, flagMaterial, FlagBuilder } from './stadium-crowd.js';
+import { adsTexture, adsMaterial, adsTicker, ledStrip } from './stadium-ads.js';
+import { makeScreen, SCREEN_ASPECT } from './stadium-screen.js';
 
 // ---------------------------------------------------------------- misure (metri)
 const SIDE_GAP = 12;          // dalla linea laterale al muretto della tribuna laterale
@@ -12,96 +17,29 @@ const END_GAP = 13;           // dalla linea di porta al muretto della tribuna d
 const BACK_EXTRA = 5;         // la tribuna alle spalle della telecamera è un po' più lontana
 const FRONT_H = 1.6;          // muretto davanti al primo anello
 const T1 = { rows: 14, rise: 0.42, run: 0.8 };   // primo anello
-const VIP_H = 3.0;            // fascia delle tribune vip tra i due anelli
+const VIP_H = 3.0;            // fascia delle tribune vip tra i due anelli (in alto la fascia LED)
+const RIBBON = { y0: 1.0, y1: 0.1 };             // fascia LED: da VIP_H - 1.0 a VIP_H - 0.1 sopra il primo anello
 const PARAPET_D = 1.0;        // passaggio davanti al secondo anello
 const T2 = { rows: 16, rise: 0.5, run: 0.8 };    // secondo anello (più ripido)
 const AISLE_EVERY = 12, AISLE_W = 1.2;           // settori e scalette
-const ROOF = { front: 5, back: 27, yFront: 25, yBack: 23, thick: 0.9 };
-const BOARD = { h: 0.95, panel: 4, side: HW + 4, end: HL + 6, zMax: HL + 4 };
+const VOM = { from: 5, to: 9, w: 2.4 };          // vomitori del primo anello: file 5..8, larghi 2.4 m
+const RAIL_H = 0.95;                             // corrimano e parapetti
+const ROOF = { front: 5, back: 27, yFront: 25, yBack: 23, thick: 0.9, beamEvery: 8, truss: 1.9 };
+const BOARD = { h: 0.95, side: HW + 4, end: HL + 6, zMax: HL + 4 };
 const BENCH_X = -(HW + 2.6);
-const SEAT_W = 0.55, CELLS = 32, TILE = SEAT_W * CELLS, CROWD_H = 2.2;
 const LIGHT_EVERY = 6, LIGHT_SIZE = 3.4;
-const CROWD_SHADE = [0.62, 1.06];   // luminosità del pubblico in basso e in alto di ogni fila
-const AD_ROWS = 8, AD_HOLD = 6, AD_SCROLL = 0.45;
+const CROWD_SHADE = [0.6, 1.04];   // luminosità del pubblico in basso e in alto di ogni fila
+const AWAY_GAP = 5;            // metri di posti vuoti accanto al settore ospiti
+const OLA_EVERY = 38, OLA_LAPS = 1.6, OLA_SPEED = 0.55; // secondi di calma prima di un'ola, giri, radianti al secondo
 
-const BRANDS = [
-  ['TIRO A GIRO', '#0b3d91'], ['CAFFÈ BORGO', '#6b3a1f'], ['GELATERIA STELLA', '#d6336c'], ['FORNO DEL CORSO', '#c77700'],
-  ['RADIO CURVA', '#5b2a86'], ['PIZZERIA DA NINO', '#b3122b'], ['OFFICINA ROSSI', '#14606e'], ['PASTA MONTI', '#e0a100'],
-  ['BICI LAMPO', '#0f7a55'], ['ACQUA FONTEVIVA', '#1d7fc4'], ['MOBILI GIRARDI', '#7a4e2d'], ['FERRAMENTA BRUNO', '#c44e00'],
-  ['LATTERIA ALPINA', '#2b7bb9'], ['TAXI 777', '#d9b300'], ['CARTOLERIA LUNA', '#3a3f9e'], ['AUTO CORTI', '#a11d1d'],
-];
 const BANNERS = [['FORZA RAGAZZI', '#b3122b', '#fff'], ['CURVA DEL BORGO', '#0b3d91', '#ffd43b'], ['SEMPRE CON VOI', '#111', '#fff'],
   ['TIRO A GIRO', '#0f7a55', '#fff'], ['NOI CI CREDIAMO', '#ffd43b', '#111'], ['GLI AMICI DELLA STELLA', '#5b2a86', '#fff']];
 
-function canvasTex(w, h, draw) {
-  const c = document.createElement('canvas'); c.width = w; c.height = h;
-  draw(c.getContext('2d'), w, h);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
-  return t;
-}
-const rnd = (a, b) => a + Math.random() * (b - a);
-const pick = arr => arr[(Math.random() * arr.length) | 0];
-
-// ---------------------------------------------------------------- costruttore di geometrie a quadrilateri
-// Ogni quadrilatero: angoli a,b,c,d (in basso a sinistra, in basso a destra, in alto a destra, in alto a sinistra
-// visti da chi guarda), un colore (o 4) e un rettangolo uv [u0, v0, u1, v1]. `face` indica da che parte si guarda:
-// se l'ordine dei vertici è al contrario lo si gira, così le facce posteriori si possono scartare.
-const WHITE_UV = [0.01, 0.99, 0.02, 0.995];
-const V = new THREE.Vector3(), V2 = new THREE.Vector3(), V3 = new THREE.Vector3();
-class QuadBuilder {
-  constructor() { this.pos = []; this.col = []; this.uv = []; }
-  quad(a, b, c, d, color, uv = WHITE_UV, face = null) {
-    const cols = Array.isArray(color) ? color : [color, color, color, color];
-    const uvs = [[uv[0], uv[1]], [uv[2], uv[1]], [uv[2], uv[3]], [uv[0], uv[3]]];
-    let p = [a, b, c, d], q = [0, 1, 2, 3];
-    if (face) {
-      V.set(b[0] - a[0], b[1] - a[1], b[2] - a[2]); V2.set(c[0] - a[0], c[1] - a[1], c[2] - a[2]);
-      if (V3.crossVectors(V, V2).dot(V.set(face[0], face[1], face[2])) < 0) { p = [a, d, c, b]; q = [0, 3, 2, 1]; }
-    }
-    for (const k of [0, 1, 2, 0, 2, 3]) {
-      this.pos.push(p[k][0], p[k][1], p[k][2]);
-      const cc = cols[q[k]]; this.col.push(cc.r, cc.g, cc.b);
-      this.uv.push(uvs[q[k]][0], uvs[q[k]][1]);
-    }
-  }
-  tri(a, b, c, color, face) {
-    V.set(b[0] - a[0], b[1] - a[1], b[2] - a[2]); V2.set(c[0] - a[0], c[1] - a[1], c[2] - a[2]);
-    const pts = V3.crossVectors(V, V2).dot(V.set(face[0], face[1], face[2])) < 0 ? [a, c, b] : [a, b, c];
-    for (const p of pts) { this.pos.push(p[0], p[1], p[2]); this.col.push(color.r, color.g, color.b); this.uv.push(WHITE_UV[0], WHITE_UV[1]); }
-  }
-  // parete verticale rivolta verso -z (il campo, nel sistema locale della tribuna): xl è il bordo sinistro visto dal campo
-  wall(xl, xr, z, y0, y1, color, uv) { this.quad([xl, y0, z], [xr, y0, z], [xr, y1, z], [xl, y1, z], color, uv, [0, 0, -1]); }
-  floor(x0, x1, z0, z1, y, color, uv) { this.quad([x0, y, z0], [x1, y, z0], [x1, y, z1], [x0, y, z1], color, uv, [0, 1, 0]); }
-  box(cx, cy, cz, sx, sy, sz, color, top = color) {
-    const x0 = cx - sx / 2, x1 = cx + sx / 2, y0 = cy - sy / 2, y1 = cy + sy / 2, z0 = cz - sz / 2, z1 = cz + sz / 2;
-    this.quad([x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1], top, WHITE_UV, [0, 1, 0]);
-    this.quad([x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0], color, WHITE_UV, [0, 0, -1]);
-    this.quad([x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], color, WHITE_UV, [0, 0, 1]);
-    this.quad([x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0], color, WHITE_UV, [-1, 0, 0]);
-    this.quad([x1, y0, z0], [x1, y0, z1], [x1, y1, z1], [x1, y1, z0], color, WHITE_UV, [1, 0, 0]);
-  }
-  geometry(matrix) {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
-    g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
-    if (matrix) g.applyMatrix4(matrix);
-    return g;
-  }
-}
-const C = (hex, k = 1) => new THREE.Color(hex).multiplyScalar(k);
-const placeMatrix = (rotY, x, z) => new THREE.Matrix4().makeRotationY(rotY).setPosition(x, 0, z);
-
-// ---------------------------------------------------------------- texture
+// ---------------------------------------------------------------- atlante della struttura
 const ATLAS = 1024;
 const region = (x, y, w, h, pad = 2) => [(x + pad) / ATLAS, 1 - (y + h - pad) / ATLAS, (x + w - pad) / ATLAS, 1 - (y + pad) / ATLAS];
-const R = { vip: region(0, 64, 512, 128), fascia: region(512, 64, 512, 64), screen: region(0, 576, 1024, 384) };
+const R = { vip: region(0, 64, 512, 128), fascia: region(512, 64, 512, 64), truss: region(512, 128, 512, 96), sky: region(0, 576, 1024, 384) };
 R.banners = BANNERS.map((_, i) => region((i % 2) * 512, 256 + ((i / 2) | 0) * 96, 512, 96));
-
-function fitText(g, text, x, y, maxW, size, weight = 900) {
-  g.font = `${weight} ${size}px system-ui, Arial, sans-serif`;
-  g.fillText(text, x, y, maxW);
-}
 
 function drawVip(g) {
   g.fillStyle = '#121722'; g.fillRect(0, 64, 512, 128);
@@ -111,12 +49,24 @@ function drawVip(g) {
     g.fillStyle = 'rgba(20,16,24,0.85)';
     for (let k = 0; k < 4; k++) { const hx = x + 6 + k * 13 + rnd(-2, 2); g.beginPath(); g.arc(hx, 150, 5, 0, 7); g.fill(); g.fillRect(hx - 6, 154, 12, 24); }
   }
-  g.fillStyle = '#d7dde8'; g.fillRect(0, 64, 512, 6);
+  g.fillStyle = '#d7dde8'; g.fillRect(0, 64, 512, 5); g.fillRect(0, 186, 512, 6);
 }
 function drawFascia(g) {
-  g.fillStyle = '#2b3242'; g.fillRect(512, 64, 512, 64);
-  g.fillStyle = '#f4f8ff'; g.fillRect(512, 70, 512, 8); g.fillRect(512, 112, 512, 6);
-  g.fillStyle = '#3d4658'; for (let x = 512; x < 1024; x += 32) g.fillRect(x, 80, 3, 30);
+  const gr = g.createLinearGradient(0, 64, 0, 128); gr.addColorStop(0, '#e9eef6'); gr.addColorStop(0.6, '#aab3c2'); gr.addColorStop(1, '#5d6676');
+  g.fillStyle = gr; g.fillRect(512, 64, 512, 64);
+  g.fillStyle = 'rgba(30,36,48,0.5)'; for (let x = 512; x < 1024; x += 64) g.fillRect(x, 64, 2, 64);
+  g.fillStyle = '#2b3242'; g.fillRect(512, 120, 512, 8);
+}
+// reticolare d'acciaio sotto il bordo del tetto: correnti, montanti e diagonali su fondo scuro
+function drawTruss(g) {
+  const x0 = 512, y0 = 128, w = 512, h = 96;
+  g.fillStyle = '#0d1119'; g.fillRect(x0, y0, w, h);
+  g.strokeStyle = '#59627a'; g.lineWidth = 6; g.strokeRect(x0 + 3, y0 + 6, w - 6, h - 12);
+  g.lineWidth = 4; g.strokeStyle = '#4a5368';
+  for (let x = 0; x < w; x += 64) {
+    g.beginPath(); g.moveTo(x0 + x, y0 + 6); g.lineTo(x0 + x, y0 + h - 6); g.stroke();
+    g.beginPath(); g.moveTo(x0 + x, y0 + h - 6); g.lineTo(x0 + x + 32, y0 + 6); g.lineTo(x0 + x + 64, y0 + h - 6); g.stroke();
+  }
 }
 function drawBanner(g, i) {
   const [text, bg, fg] = BANNERS[i], x = (i % 2) * 512, y = 256 + ((i / 2) | 0) * 96;
@@ -124,83 +74,12 @@ function drawBanner(g, i) {
   g.fillStyle = fg; g.fillRect(x, y + 6, 512, 5); g.fillRect(x, y + 85, 512, 5);
   g.textAlign = 'center'; g.textBaseline = 'middle'; fitText(g, text, x + 256, y + 50, 470, 54);
 }
-function drawScreen(g) {
-  const x = 0, y = 576, w = 1024, h = 384;
-  g.fillStyle = '#0c0f16'; g.fillRect(x, y, w, h);
-  const gr = g.createLinearGradient(0, y + 20, 0, y + h - 20); gr.addColorStop(0, '#0f2b5c'); gr.addColorStop(1, '#06142e');
-  g.fillStyle = gr; g.fillRect(x + 18, y + 18, w - 36, h - 36);
-  // pallone con la scia a giro
-  g.strokeStyle = '#ffd43b'; g.lineWidth = 14; g.beginPath(); g.arc(x + 210, y + 250, 120, Math.PI * 1.05, Math.PI * 1.75); g.stroke();
-  g.fillStyle = '#fff'; g.beginPath(); g.arc(x + 300, y + 150, 46, 0, 7); g.fill();
-  g.fillStyle = '#111'; g.beginPath(); for (let k = 0; k < 5; k++) { const a = k * 1.2566 - 1.57; g.lineTo(x + 300 + Math.cos(a) * 18, y + 150 + Math.sin(a) * 18); } g.fill();
-  g.fillStyle = '#fff'; g.textAlign = 'left'; g.textBaseline = 'middle'; fitText(g, 'TIRO A GIRO', x + 380, y + 160, 600, 110);
-  g.fillStyle = '#ffd43b'; fitText(g, 'STADIO DEI TIGLI', x + 384, y + 268, 580, 56, 800);
-  g.fillStyle = 'rgba(255,255,255,0.06)'; for (let k = y + 18; k < y + h - 18; k += 4) g.fillRect(x + 18, k, w - 36, 1);
-}
 function structureTexture() {
   return canvasTex(ATLAS, ATLAS, (g) => {
     g.fillStyle = '#fff'; g.fillRect(0, 0, 64, 64);
-    drawVip(g); drawFascia(g); BANNERS.forEach((_, i) => drawBanner(g, i)); drawScreen(g);
+    drawVip(g); drawFascia(g); drawTruss(g); BANNERS.forEach((_, i) => drawBanner(g, i));
   });
 }
-
-// Pubblico: 32 persone per riga, 2 righe di varianti calme (in alto) e le stesse persone a braccia alzate (in basso).
-function personLook(home, away) {
-  const r = Math.random(), misc = ['#2a2d36', '#3b4252', '#6b7280', '#e5e7eb', '#1f3a5f', '#5b3b2a', '#7a1f2b', '#355e3b', '#c2b280'];
-  const shirt = r < 0.4 ? home[0] : r < 0.55 ? home[1] : r < 0.68 ? away[0] : pick(misc);
-  return {
-    empty: Math.random() < 0.07, shirt, w: (rnd(17, 24)) | 0, h: (rnd(40, 50)) | 0,
-    skin: pick(['#f1c9a5', '#e0b48c', '#c68f63', '#8d5a3b', '#5e3b26']),
-    hair: pick(['#1c1410', '#3a2414', '#6b4423', '#c9a45c', '#9a9a9a', '#111']),
-    cap: Math.random() < 0.15 ? pick([home[0], away[0], '#111', '#fff']) : null,
-    scarf: Math.random() < 0.35 ? (Math.random() < 0.75 ? home : away) : null,
-    flag: Math.random() < 0.03 ? (Math.random() < 0.8 ? home : away) : null,
-  };
-}
-function drawPerson(g, x, y, p, up) {
-  const cx = x + 16, base = y + 127, top = base - p.h, l = cx - p.w / 2, hy = top - 6;
-  if (p.flag) { g.fillStyle = '#ddd'; g.fillRect(cx + 7, y + 4, 2, top - y); g.fillStyle = p.flag[0]; g.fillRect(cx - 14, y + 4, 21, 9); g.fillStyle = p.flag[1]; g.fillRect(cx - 14, y + 13, 21, 8); }
-  g.fillStyle = p.shirt;
-  if (up) { g.fillRect(l - 2, top - 30, 5, 36); g.fillRect(l + p.w - 3, top - 30, 5, 36); }
-  g.beginPath(); g.roundRect(l, top, p.w, base - top + 1, [7, 7, 0, 0]); g.fill();
-  const sg = g.createLinearGradient(0, top, 0, base); sg.addColorStop(0, 'rgba(255,255,255,0.14)'); sg.addColorStop(0.35, 'rgba(0,0,0,0)'); sg.addColorStop(1, 'rgba(0,0,0,0.3)');
-  g.fillStyle = sg; g.beginPath(); g.roundRect(l, top, p.w, base - top + 1, [7, 7, 0, 0]); g.fill();
-  g.fillStyle = 'rgba(0,0,0,0.22)'; if (!up) { g.fillRect(l + 1, top + 8, 3, 28); g.fillRect(l + p.w - 4, top + 8, 3, 28); }
-  if (p.scarf && !up) { g.fillStyle = p.scarf[0]; g.fillRect(l + 2, top + 1, p.w - 4, 5); g.fillStyle = p.scarf[1]; g.fillRect(cx - 2, top + 6, 4, 14); }
-  g.fillStyle = p.skin; g.beginPath(); g.arc(cx, hy, 7, 0, 7); g.fill();
-  if (up) { g.beginPath(); g.arc(l + 0.5, top - 32, 3, 0, 7); g.arc(l + p.w - 0.5, top - 32, 3, 0, 7); g.fill(); }
-  g.fillStyle = p.cap || p.hair; g.beginPath(); g.arc(cx, hy - 1, 7.5, Math.PI, 0); g.fill();
-  if (p.cap) g.fillRect(cx - 9, hy - 2, 18, 2);
-  if (up && p.scarf) { g.fillStyle = p.scarf[0]; g.fillRect(x, top - 34, 32, 7); g.fillStyle = p.scarf[1]; for (let k = 2; k < 32; k += 8) g.fillRect(x + k, top - 34, 4, 7); }
-}
-function crowdTexture(home, away) {
-  const t = canvasTex(1024, 512, (g) => {
-    g.clearRect(0, 0, 1024, 512);
-    for (let v = 0; v < 2; v++) for (let j = 0; j < CELLS; j++) {
-      const p = personLook(home, away); if (p.empty) continue;
-      drawPerson(g, j * 32, v * 128, p, false); drawPerson(g, j * 32, 256 + v * 128, p, true);
-    }
-  });
-  t.wrapS = THREE.RepeatWrapping;
-  return t;
-}
-
-function adsTexture() {
-  const t = canvasTex(1024, 512, (g) => {
-    g.textAlign = 'center'; g.textBaseline = 'middle';
-    for (let r = 0; r < AD_ROWS; r++) for (let c = 0; c < 4; c++) {
-      const [text, col] = BRANDS[(r * 4 + c + r) % BRANDS.length], x = c * 256, y = r * 64, dark = (r + c) % 2 === 1;
-      g.fillStyle = dark ? '#0d1117' : col; g.fillRect(x, y, 256, 64);
-      g.fillStyle = dark ? col : 'rgba(255,255,255,0.18)'; g.fillRect(x, y + 4, 10, 56); g.fillRect(x + 246, y + 4, 10, 56);
-      g.fillStyle = dark ? '#ffffff' : '#ffffff'; if (dark) g.fillStyle = lighten(col);
-      fitText(g, text, x + 128, y + 34, 220, 34);
-      g.fillStyle = '#05070a'; g.fillRect(x, y, 256, 3); g.fillRect(x, y + 61, 256, 3);
-    }
-  });
-  t.wrapT = THREE.RepeatWrapping;
-  return t;
-}
-function lighten(hex) { const c = new THREE.Color(hex); c.lerp(new THREE.Color('#ffffff'), 0.35); return '#' + c.getHexString(); }
 
 function glowTexture() {
   return canvasTex(64, 64, (g) => {
@@ -237,9 +116,9 @@ function skyTexture() {
 // ---------------------------------------------------------------- tribuna (sistema locale: x lungo, z verso l'esterno, fronte a z=0)
 function standProfile() {
   const t1 = [], t2 = [];
-  for (let i = 0; i < T1.rows; i++) t1.push({ z: i * T1.run, y: FRONT_H + i * T1.rise, rise: T1.rise, run: T1.run, light: 1 - 0.15 * i / T1.rows });
+  for (let i = 0; i < T1.rows; i++) t1.push({ z: i * T1.run, y: FRONT_H + i * T1.rise, rise: T1.rise, run: T1.run, light: 1 - 0.15 * i / T1.rows, tier: 0, i });
   const z1 = T1.rows * T1.run, y1 = FRONT_H + T1.rows * T1.rise, y2 = y1 + VIP_H, z2 = z1 + PARAPET_D;
-  for (let i = 0; i < T2.rows; i++) t2.push({ z: z2 + i * T2.run, y: y2 + i * T2.rise, rise: T2.rise, run: T2.run, light: 0.8 - 0.28 * i / T2.rows });
+  for (let i = 0; i < T2.rows; i++) t2.push({ z: z2 + i * T2.run, y: y2 + i * T2.rise, rise: T2.rise, run: T2.run, light: 0.8 - 0.28 * i / T2.rows, tier: 1, i });
   return { rows: [...t1, ...t2], t1, t2, z1, y1, y2, z2, zb: z2 + T2.rows * T2.run, yb: y2 + T2.rows * T2.rise };
 }
 const PROFILE = standProfile();
@@ -249,66 +128,125 @@ function sections(len) {
   for (let k = 0; k < n; k++) { const xs = -len / 2 + k * sw; out.push([xs + AISLE_W / 2, xs + sw - AISLE_W / 2]); }
   return out;
 }
-
-function addSteps(sb, len, seats) {
-  const secs = sections(len), concrete = 0x8a8f99;
-  for (const [ti, tier] of [PROFILE.t1, PROFILE.t2].entries()) {
-    const seat = seats[ti];
-    for (const r of tier) {
-      const top = r.y + r.rise, k = r.light;
-      for (const [s0, s1] of secs) {
-        sb.wall(s1, s0, r.z, r.y, top, C(seat, 0.62 * k));
-        sb.floor(s0, s1, r.z, r.z + r.run, top, C(seat, 0.95 * k));
-      }
-      for (let i = 0; i <= secs.length; i++) { // scalette tra i settori
-        const a = i === 0 ? -len / 2 : secs[i - 1][1], b = i === secs.length ? len / 2 : secs[i][0];
-        sb.wall(b, a, r.z, r.y, top, C(concrete, 0.55 * k)); sb.floor(a, b, r.z, r.z + r.run, top, C(concrete, 0.85 * k));
-      }
-    }
-  }
+const inVom = (r, opts) => opts.vom && r.tier === 0 && r.i >= VOM.from && r.i < VOM.to;
+// tratti di una fila in un settore, saltando il vomitorio al centro
+function rowSpans(r, s0, s1, opts) {
+  if (!inVom(r, opts)) return [[s0, s1]];
+  const c = (s0 + s1) / 2;
+  return [[s0, c - VOM.w / 2], [c + VOM.w / 2, s1]];
 }
 
-function addCrowd(cb, len) {
+function addSteps(sb, len, opts) {
+  const secs = sections(len), concrete = 0x8a8f99;
+  for (const r of PROFILE.rows) {
+    const top = r.y + r.rise, k = r.light, seat = opts.seats[r.tier];
+    for (const [a0, a1] of secs) for (const [s0, s1] of rowSpans(r, a0, a1, opts)) {
+      sb.wall(s1, s0, r.z, r.y, top, C(seat, 0.62 * k));
+      sb.floor(s0, s1, r.z, r.z + r.run, top, C(seat, 0.95 * k));
+    }
+    for (let i = 0; i <= secs.length; i++) { // scalette tra i settori
+      const a = i === 0 ? -len / 2 : secs[i - 1][1], b = i === secs.length ? len / 2 : secs[i][0];
+      sb.wall(b, a, r.z, r.y, top, C(concrete, 0.55 * k)); sb.floor(a, b, r.z, r.z + r.run, top, C(concrete, 0.85 * k));
+    }
+  }
+  // corrimano al centro di ogni scaletta, dal basso all'alto di ogni anello
+  const rail = C(0xc9ced6, 0.9);
+  for (let i = 1; i < secs.length; i++) {
+    const x = (secs[i - 1][1] + secs[i][0]) / 2;
+    for (const tier of [PROFILE.t1, PROFILE.t2]) {
+      const f = tier[0], l = tier[tier.length - 1];
+      sb.bar([x, f.y + f.rise + RAIL_H, f.z + 0.2], [x, l.y + l.rise + RAIL_H, l.z + l.run * 0.5], 0.035, rail);
+    }
+  }
+  if (opts.vom) for (const [s0, s1] of secs) addVomitory(sb, (s0 + s1) / 2);
+}
+
+// vomitorio: apertura nel primo anello con pavimento, pareti di cemento, fondo buio e corrimano attorno
+function addVomitory(sb, c) {
+  const rows = PROFILE.t1.slice(VOM.from, VOM.to), f = rows[0], l = rows[rows.length - 1];
+  const x0 = c - VOM.w / 2, x1 = c + VOM.w / 2, fy = f.y, zf = f.z, zb = l.z + l.run, wallC = C(0x6d727c);
+  sb.floor(x0, x1, zf, zb, fy, C(0x3a3f48));
+  sb.wall(x1, x0, zb, fy, l.y + l.rise, [C(0x0a0b0e), C(0x0a0b0e), C(0x2a2219), C(0x2a2219)]);
+  for (const r of rows) {
+    sb.side(x0, r.z, r.z + r.run, fy, r.y + r.rise, C(wallC, r.light), 1);
+    sb.side(x1, r.z, r.z + r.run, fy, r.y + r.rise, C(wallC, r.light * 0.8), -1);
+  }
+  const rail = C(0xd5dae2);
+  sb.hbar(x0, x1, fy + RAIL_H, zf - 0.02, 0.06, rail);
+  for (const x of [x0, x1]) sb.bar([x, f.y + f.rise + RAIL_H * 0.8, zf], [x, l.y + l.rise + RAIL_H * 0.8, zb], 0.03, rail);
+}
+
+function crowdVariant(r, sec, opts) {
+  if (opts.away && r.tier === 1 && sec === opts.away.sec) return CROWD_VARIANTS.away;
+  if (opts.curva && r.tier === 0) return CROWD_VARIANTS.curva;
+  return CROWD_VARIANTS.home[(Math.random() * 2) | 0];
+}
+function addCrowd(cb, len, opts) {
+  const secs = sections(len);
   for (const r of PROFILE.rows) {
     const z = r.z + r.run * 0.35, y0 = r.y + r.rise - 0.12, y1 = y0 + CROWD_H;
-    for (const [s0, s1] of sections(len)) {
-      const variant = Math.random() < 0.5 ? 0 : 1, v0 = 0.5 + (1 - variant) * 0.25, u0 = ((Math.random() * CELLS) | 0) / CELLS + ((Math.random() * 8) | 0);
-      const b = r.light * rnd(0.88, 1.05);
+    secs.forEach(([s0, s1], sec) => {
+      // settore ospiti: nel settore accanto restano liberi 5 m di posti (separazione)
+      const gap = opts.away && r.tier === 1 && sec === opts.away.gap;
+      const a0 = gap ? s0 + AWAY_GAP : s0, a1 = s1;
+      const variant = crowdVariant(r, sec, opts), v0 = 1 - (variant + 1) / 8 + 0.002, v1 = 1 - variant / 8 - 0.002;
+      const b = r.light * rnd(0.9, 1.04);
       // in basso più scuro (la fila davanti fa ombra), in alto più chiaro (i fari): il pubblico prende volume
       const lo = C(0xffffff, b * CROWD_SHADE[0]), hi = C(0xffffff, b * CROWD_SHADE[1]);
-      cb.wall(s1, s0, z, y0, y1, [lo, lo, hi, hi], [u0, v0 + 0.002, u0 + (s1 - s0) / TILE, v0 + 0.248]);
-    }
+      for (const [s0, s1] of rowSpans(r, a0, a1, opts)) {
+        const u0 = ((Math.random() * CELLS) | 0) / CELLS + ((Math.random() * 8) | 0);
+        cb.wall(s1, s0, z, y0, y1, [lo, lo, hi, hi], [u0, v0, u0 + (s1 - s0) / TILE, v1]);
+      }
+    });
   }
 }
 
 function addShell(sb, len, opts) {
   const { z1, y1, y2, z2, zb, yb } = PROFILE, L2 = len / 2;
-  // muretto con striscioni dei tifosi
+  // muretto con striscioni dei tifosi e corrimano sopra
   for (let x = L2; x > -L2; x -= 8) {
     const x1 = Math.max(-L2, x - 8), bi = opts.banners && Math.random() < 0.45 ? (Math.random() * BANNERS.length) | 0 : -1;
     sb.wall(x, x1, 0, 0, FRONT_H, C(0x1b2638));
     if (bi >= 0 && x - x1 > 7) sb.wall(x - 0.3, x1 + 0.3, -0.05, 0.15, FRONT_H - 0.1, C(0xffffff, 0.92), R.banners[bi]);
   }
   sb.floor(-L2, L2, -0.25, 0, FRONT_H, C(0xb8bec8));
-  // fascia vip e parapetto del secondo anello
-  for (let x = L2; x > -L2; x -= 9) sb.wall(x, Math.max(-L2, x - 9), z1, y1, y2, C(0xffffff, 0.95), R.vip);
+  // fascia vip (la parte alta è la fascia LED, nella mesh dei cartelloni) e parapetto del secondo anello
+  const vipTop = opts.ribbon ? y2 - RIBBON.y0 : y2;
+  for (let x = L2; x > -L2; x -= 9) sb.wall(x, Math.max(-L2, x - 9), z1, y1, vipTop, C(0xffffff, 0.95), R.vip);
+  if (opts.ribbon) sb.wall(L2, -L2, z1 + 0.01, vipTop, y2, C(0x0b0e14));
   sb.floor(-L2, L2, z1, z2, y2, C(0x9aa0aa, 0.8));
-  sb.wall(L2, -L2, z1 - 0.02, y2 - 0.35, y2, C(0xdfe4ec));
+  sb.wall(L2, -L2, z1 - 0.02, y2 - RIBBON.y1, y2, C(0xdfe4ec));
+  const rail = C(0xd5dae2);
+  sb.hbar(-L2, L2, y2 + RAIL_H, z1 + 0.08, 0.07, rail);
+  for (let x = -L2 + 1; x < L2; x += 2.5) sb.wall(x + 0.03, x - 0.03, z1 + 0.08, y2, y2 + RAIL_H, rail);
   // muro di fondo fino al tetto
   sb.wall(L2, -L2, zb, yb, ROOF.yBack, [C(0x161c28), C(0x161c28), C(0x0d1119), C(0x0d1119)]);
   // ali: nelle tribune di fondo muro e tetto continuano dietro gli angoli, così l'angolo dello stadio resta chiuso
   const RL = L2 + (opts.wing || 0);
   if (opts.wing) for (const sx of [-1, 1]) sb.wall(sx > 0 ? RL : -L2, sx > 0 ? L2 : -RL, zb, 0, ROOF.yBack, [C(0x2a3346), C(0x2a3346), C(0x1a2030), C(0x1a2030)]);
-  // tetto: sotto scuro (più chiaro verso il bordo illuminato), sopra grigio, bordo frontale con la fascia luminosa
+  addRoof(sb, L2, RL, opts);
+  addEndFaces(sb, L2);
+}
+
+// tetto a sbalzo: sotto scuro (più chiaro verso il bordo illuminato), sopra grigio, bordo frontale chiaro,
+// reticolare d'acciaio sotto il bordo (le luci ci stanno davanti), travi a sbalzo ogni ROOF.beamEvery metri
+function addRoof(sb, L2, RL, opts) {
   const yb0 = ROOF.yBack - ROOF.thick, yf0 = ROOF.yFront - ROOF.thick;
   sb.quad([RL, yf0, ROOF.front], [-RL, yf0, ROOF.front], [-RL, yb0, ROOF.back], [RL, yb0, ROOF.back],
     [C(0x3a4254), C(0x3a4254), C(0x10141d), C(0x10141d)], WHITE_UV, [0, -1, 0]);
   sb.quad([-RL, ROOF.yFront, ROOF.front], [RL, ROOF.yFront, ROOF.front], [RL, ROOF.yBack, ROOF.back], [-RL, ROOF.yBack, ROOF.back], C(0x4d5566), WHITE_UV, [0, 1, 0]);
   const FL = opts.wing ? L2 + ROOF.front + 1 : L2;
-  for (let x = FL; x > -FL; x -= 8) sb.wall(x, Math.max(-FL, x - 8), ROOF.front, yf0 - 0.5, ROOF.yFront + 0.1, C(0xffffff), R.fascia);
-  // travi sotto il tetto
-  for (let x = -L2 + 4; x < L2; x += 16) sb.box(x, (yb0 + yf0) / 2 - 0.6, (ROOF.front + ROOF.back) / 2, 0.5, 1.2, ROOF.back - ROOF.front, C(0x232a38));
-  addEndFaces(sb, L2);
+  for (let x = FL; x > -FL; x -= 8) {
+    const x1 = Math.max(-FL, x - 8);
+    sb.wall(x, x1, ROOF.front, yf0 - 0.3, ROOF.yFront + 0.1, C(0xffffff), R.fascia);
+    sb.wall(x, x1, ROOF.front + 0.25, yf0 - 0.3 - ROOF.truss, yf0 - 0.3, C(0xffffff), R.truss);
+  }
+  const beam = C(0x2a3242), zm = (ROOF.front + ROOF.back) / 2;
+  for (let x = -L2 + 2; x < L2; x += ROOF.beamEvery) {
+    sb.box(x, (yb0 + yf0) / 2 - 0.55, zm, 0.35, 1.1, ROOF.back - ROOF.front, beam);
+    // tirante dal fondo della tribuna alla trave
+    sb.bar([x, PROFILE.yb, PROFILE.zb - 0.2], [x, (yb0 + yf0) / 2 - 1.0, zm], 0.12, C(0x1d2330));
+  }
 }
 
 function addEndFaces(sb, L2) {
@@ -322,35 +260,76 @@ function addEndFaces(sb, L2) {
   }
 }
 
-function addScreen(sb, len) {
-  const y0 = ROOF.yBack + 0.6, h = 7, w = h * (1024 / 384), z = ROOF.back - 3;
+// maxischermo: cornice e sostegni nella struttura, schermo (texture viva) in una geometria a parte
+function screenGeo(sb) {
+  const y0 = ROOF.yBack + 0.6, h = 7, w = h * SCREEN_ASPECT, z = ROOF.back - 3;
   sb.box(0, y0 + h / 2, z + 0.4, w + 1, h + 1, 0.6, C(0x111520));
-  sb.wall(w / 2, -w / 2, z, y0, y0 + h, C(0xffffff), R.screen);
   for (const sx of [-1, 1]) sb.box(sx * w * 0.35, (ROOF.yBack + y0) / 2, z + 0.4, 0.4, y0 - ROOF.yBack + 0.2, 0.4, C(0x2a3140));
+  const q = new QuadBuilder(); q.quad([w / 2, y0, z], [-w / 2, y0, z], [-w / 2, y0 + h, z], [w / 2, y0 + h, z], C(0xffffff), [0, 0, 1, 1], [0, 0, -1]);
+  return q;
 }
 
 function addLights(lb, len) {
-  const L2 = len / 2, y = ROOF.yFront - ROOF.thick - 0.7, z = ROOF.front - 0.4, s = LIGHT_SIZE / 2, warm = C(0xfff1d6);
+  const L2 = len / 2, y = ROOF.yFront - ROOF.thick - 0.9, z = ROOF.front - 0.4, s = LIGHT_SIZE / 2, warm = C(0xfff1d6);
   for (let x = -L2 + LIGHT_EVERY / 2; x < L2; x += LIGHT_EVERY) lb.wall(x + s, x - s, z, y - s, y + s, warm, [0, 0, 1, 1]);
 }
 
-// una tribuna completa: struttura, pubblico, luci (tre geometrie già nel sistema del mondo)
-function buildStand(len, matrix, opts) {
-  const sb = new QuadBuilder(), cb = new QuadBuilder(), lb = new QuadBuilder();
-  addSteps(sb, len, opts.seats); addShell(sb, len, opts); addCrowd(cb, len); addLights(lb, len);
-  if (opts.screen) addScreen(sb, len);
-  return { struct: sb.geometry(matrix), crowd: cb.geometry(matrix), lights: lb.geometry(matrix) };
+// steward seduti davanti al muretto, rivolti verso il pubblico (giubbotto ad alta visibilità)
+function addStewards(sb, len) {
+  for (let x = -len / 2 + 7; x < len / 2 - 4; x += 14 + rnd(-2, 2)) {
+    const z = -2.2, vest = C(pick([0xf2c230, 0xff8a1f]));
+    sb.box(x, 0.45, z, 0.45, 0.06, 0.45, C(0x22262e));
+    sb.box(x, 0.85, z, 0.42, 0.62, 0.28, vest);
+    sb.box(x, 1.28, z, 0.2, 0.22, 0.2, C(pick([0xf1c9a5, 0xc68f63, 0x8d5a3b])));
+    sb.box(x, 0.25, z - 0.12, 0.36, 0.5, 0.22, C(0x1b1e26));
+  }
 }
 
-// ---------------------------------------------------------------- cartelloni e panchine
-function addBoardLine(ab, sb, len, matrix, start) {
-  const n = Math.floor(len / BOARD.panel), x0 = (n * BOARD.panel) / 2, rowH = 1 / AD_ROWS, a = new QuadBuilder(), s = new QuadBuilder();
-  for (let i = 0; i < n; i++) {
-    const xl = x0 - i * BOARD.panel, xr = xl - BOARD.panel, k = start + i, c = k % 4, r = ((k / 4) | 0) % AD_ROWS;
-    a.wall(xl, xr, 0, 0.05, BOARD.h, C(0xffffff), [c / 4 + 0.002, 1 - (r + 1) * rowH + 0.004, (c + 1) / 4 - 0.002, 1 - r * rowH - 0.004]);
+// una tribuna completa: struttura, pubblico, luci, fascia LED (geometrie già nel sistema del mondo) e bandiere
+function buildStand(len, matrix, opts, fb) {
+  const sb = new QuadBuilder(), cb = new QuadBuilder(), lb = new QuadBuilder(), ab = new QuadBuilder();
+  addSteps(sb, len, opts); addShell(sb, len, opts); addCrowd(cb, len, opts); addLights(lb, len); addStewards(sb, len);
+  if (opts.ribbon) ledStrip(ab, len / 2, -len / 2, PROFILE.z1 - 0.03, PROFILE.y2 - RIBBON.y0, PROFILE.y2 - RIBBON.y1, opts.ribbonStart || 0);
+  const screen = opts.screen ? screenGeo(sb) : null;
+  const out = { struct: sb.geometry(matrix), crowd: cb.geometry(matrix), lights: lb.geometry(matrix),
+    ads: ab.pos.length ? ab.geometry(matrix) : null, screen: screen && screen.geometry(matrix) };
+  if (fb) addFlags(fb, len, matrix, opts);
+  return out;
+}
+
+// bandiere: a mano tra il pubblico (più fitte in curva) e grandi sul bordo del tetto, mosse dal vento
+function addFlags(fb, len, matrix, opts) {
+  const P = new THREE.Vector3(), rot = new THREE.Matrix3().setFromMatrix4(matrix);
+  const w = (x, y, z) => P.set(x, y, z).applyMatrix4(matrix).toArray();
+  const d = (x, y, z) => P.set(x, y, z).applyMatrix3(rot).normalize().toArray();
+  const toField = d(0, 0, -1), secs = sections(len);
+  const nHand = opts.curva ? 32 : 11;
+  for (let i = 0; i < nHand; i++) {
+    const tierRows = opts.curva && i < 22 ? PROFILE.t1 : PROFILE.rows, r = pick(tierRows.slice(1));
+    const [s0, s1] = pick(secs), x = rnd(s0 + 1.5, s1 - 1.5);
+    if (inVom(r, opts) && Math.abs(x - (s0 + s1) / 2) < VOM.w) continue;
+    const away = opts.away && r.tier === 1 && secs[opts.away.sec][0] <= x && x <= secs[opts.away.sec][1];
+    const design = away ? 12 + ((Math.random() * 4) | 0) : (Math.random() * 12) | 0;
+    const big = Math.random() < (opts.curva ? 0.4 : 0.25);
+    fb.flag(w(x, r.y + r.rise + 1.1, r.z + r.run * 0.35), toField, d(Math.random() < 0.5 ? 1 : -1, 0, 0),
+      big ? 2.2 : 1.5, big ? 2.2 : 1.4, big ? 1.4 : 0.9, design, rnd(0.35, 0.6), rnd(0, 100));
   }
+  // bandiere sul tetto (tutte sventolano dalla stessa parte: c'è vento)
+  const wind = d(1, 0, 0), n = Math.max(2, Math.round(len / 26));
+  for (let k = 0; k < n; k++) {
+    let x = -len / 2 + (k + 0.5) * len / n;
+    if (opts.screen && Math.abs(x) < 16) x = (x < 0 ? -1 : 1) * 16 || 16; // non davanti al maxischermo
+    fb.flag(w(x, ROOF.yFront, ROOF.front + 1.2), toField, wind, 4.2, 3.0, 1.9, k % 2 ? 0 : 2, 0, k * 1.7);
+  }
+}
+
+// ---------------------------------------------------------------- cartelloni, panchine, fotografi
+function addBoardLine(ab, sb, len, matrix, startM) {
+  const x0 = len / 2, a = new QuadBuilder(), s = new QuadBuilder();
+  ledStrip(a, x0, -x0, 0, 0.05, BOARD.h, startM);
   s.floor(-x0, x0, 0, 0.35, BOARD.h, C(0x1a1f29)); s.wall(x0, -x0, 0.35, 0, BOARD.h, C(0x11151d));
   s.quad([x0, 0, 0.35], [-x0, 0, 0.35], [-x0, BOARD.h, 0.35], [x0, BOARD.h, 0.35], C(0x11151d), WHITE_UV, [0, 0, 1]);
+  s.wall(x0, -x0, -0.01, 0, 0.05, C(0x05070a));
   ab.push(a.geometry(matrix)); sb.push(s.geometry(matrix));
 }
 
@@ -368,92 +347,88 @@ function benchGeometry() {
       b.box(back + 0.5, 1.28, pz, 0.2, 0.22, 0.2, C(pick([0xf1c9a5, 0xc68f63, 0x8d5a3b])));
     }
   }
+  // fotografi accovacciati dietro la linea di fondo lontana, ai lati della porta
+  for (const sx of [-1, 1]) for (let k = 0; k < 4; k++) {
+    const x = sx * (8 + k * 3.2 + rnd(-0.5, 0.5)), z = -(HL + 3.2 + rnd(-0.3, 0.3));
+    b.box(x, 0.45, z, 0.5, 0.7, 0.45, C(pick([0x2a2f3a, 0x3b4252, 0x1e2a44])));
+    b.box(x, 0.95, z + 0.05, 0.22, 0.24, 0.22, C(pick([0xf1c9a5, 0xc68f63, 0x8d5a3b])));
+    b.box(x, 0.85, z + 0.3, 0.18, 0.16, 0.36, C(0x111111));
+  }
   return b.geometry();
 }
 
-// ---------------------------------------------------------------- cielo, terreno, materiali
+// ---------------------------------------------------------------- cielo, terreno
 function skyMesh() {
   const g = new THREE.SphereGeometry(330, 32, 12, 0, Math.PI * 2, 0, Math.PI * 0.555);
   const m = new THREE.MeshBasicMaterial({ map: skyTexture(), side: THREE.BackSide, depthWrite: false, fog: false });
   const mesh = new THREE.Mesh(g, m); mesh.renderOrder = -10; mesh.frustumCulled = false;
   return mesh;
 }
+// terreno attorno al campo: quattro rettangoli attorno a un buco sotto il prato (il prato lo copre già:
+// niente pixel disegnati due volte)
+const GROUND = { holeX: HW + 8, holeZ: HL + 10, size: 350 };
 function groundMesh() {
-  const g = new THREE.PlaneGeometry(700, 700); g.rotateX(-Math.PI / 2);
-  const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: 0x24502b }));
-  mesh.position.y = -0.05;
-  return mesh;
+  const q = new QuadBuilder(), { holeX: x, holeZ: z, size: S } = GROUND, col = C(0xffffff);
+  for (const [x0, x1, z0, z1] of [[-S, S, -S, -z], [-S, S, z, S], [-S, -x, -z, z], [x, S, -z, z]]) q.floor(x0, x1, z0, z1, -0.05, col);
+  const g = q.geometry(); g.deleteAttribute('color'); g.computeVertexNormals();
+  return new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: 0x24502b }));
 }
 
-// materiale del pubblico: salti e braccia alzate decisi nel fragment shader (per persona, con una funzione hash)
-function crowdMaterial(map, uniforms) {
-  const m = new THREE.MeshBasicMaterial({ map, vertexColors: true, alphaTest: 0.4 });
-  m.onBeforeCompile = (sh) => {
-    sh.uniforms.uTime = uniforms.uTime; sh.uniforms.uExcite = uniforms.uExcite;
-    sh.fragmentShader = 'uniform float uTime;\nuniform float uExcite;\n' + sh.fragmentShader.replace('#include <map_fragment>', CROWD_FRAG);
-  };
-  m.customProgramCacheKey = () => 'tag-crowd';
-  return m;
+// settore ospiti: nell'anello alto della tribuna laterale sinistra, il settore più vicino alla porta lontana
+function awaySector(len) {
+  const secs = sections(len), target = -(HL + 2);
+  let best = 0; secs.forEach(([a, b], i) => { if (Math.abs((a + b) / 2 - target) < Math.abs((secs[best][0] + secs[best][1]) / 2 - target)) best = i; });
+  return { sec: best, gap: best + 1 };
 }
-const CROWD_FRAG = /* glsl */`
-#ifdef USE_MAP
-  vec2 uv0 = vMapUv;
-  float cell = floor(uv0.x * ${CELLS}.0);
-  float rowId = floor(uv0.y * 4.0);
-  float h = fract(sin(cell * 12.9898 + rowId * 78.233) * 43758.5453);
-  float local = fract(uv0.y * 4.0);
-  float up = step(h, uExcite * 0.95 - 0.08);
-  float idle = (0.5 + 0.5 * sin(uTime * (1.2 + h) + h * 40.0)) * 0.012;
-  float hop = uExcite * max(0.0, sin(uTime * (7.0 + 5.0 * h) + h * 60.0)) * 0.12 * step(0.2, h);
-  local = clamp(local - idle - hop, 0.004, 0.996);
-  vec2 suv = vec2(uv0.x, (rowId + local) * 0.25 - up * 0.5);
-  vec4 sampledDiffuseColor = textureGrad(map, suv, dFdx(uv0), dFdy(uv0));
-  diffuseColor *= sampledDiffuseColor;
-#endif
-`;
 
 // ---------------------------------------------------------------- stadio
 /**
  * Aggiunge lo stadio alla scena.
  * @param {THREE.Scene} scene
- * @param {{ home?: [string,string], away?: [string,string], sky?: boolean }} opts colori dei tifosi; sky:false lascia lo sfondo com'è
- * @returns {{ crowdMats: THREE.Material[], backStand: THREE.Object3D, root: THREE.Group, buildMs: number, update(dt:number, excitement?:number):void }}
+ * @param {{ home?: {shirt:number, shorts?:number}, away?: {shirt:number, shorts?:number}, sky?: boolean }} opts
+ *   divise delle due squadre (colori dei tifosi); sky:false lascia lo sfondo com'è
+ * @returns {{ crowdMats: THREE.Material[], backStand: THREE.Object3D, root: THREE.Group, buildMs: number,
+ *   update(dt:number, excitement?:number, match?:object):void, setTeams(home:object, away:object):void }}
  */
 export function buildStadium(scene, opts = {}) {
   const t0 = performance.now();
-  const home = opts.home || ['#d23b3b', '#f4f4f4'], away = opts.away || ['#2f6fd6', '#f2c230'];
+  let home = opts.home ? fanColors(opts.home) : ['#d23b3b', '#f4f4f4'], away = opts.away ? fanColors(opts.away) : ['#2f6fd6', '#f2c230'];
   const root = new THREE.Group(); root.name = 'stadium';
-  const uniforms = { uTime: { value: 0 }, uExcite: { value: 0 } };
-  const atlas = structureTexture(), crowdTex = crowdTexture(home, away), adTex = adsTexture(), glowTex = glowTexture();
+  const uniforms = { uTime: { value: 0 }, uExcite: { value: 0 }, uOla: { value: 0 }, uOlaAmp: { value: 0 },
+    uAdA: { value: 0 }, uAdB: { value: 0 }, uAdFlip: { value: 0 }, uAdMosA: { value: 0 }, uAdMosB: { value: 0 } };
+  const atlas = structureTexture(), crowdTex = crowdTexture(home, away), adTex = adsTexture(), glowTex = glowTexture(), flagTex = flagTexture(home, away);
   const structMat = () => new THREE.MeshBasicMaterial({ map: atlas, vertexColors: true });
   const lightMat = () => new THREE.MeshBasicMaterial({ map: glowTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
 
   const sx = HW + SIDE_GAP, ez = HL + END_GAP, bz = HL + END_GAP + BACK_EXTRA;
   const sideLen = 2 * (bz + PROFILE.zb), endLen = 2 * sx;
-  const lower = 0x2c64a8, upper = 0x9aa3b0;
+  const lower = 0x2c64a8, upper = 0x9aa3b0, fb = new FlagBuilder();
   const stands = [
-    buildStand(sideLen, placeMatrix(Math.PI / 2, sx, 0), { seats: [lower, upper], banners: true }),
-    buildStand(sideLen, placeMatrix(-Math.PI / 2, -sx, 0), { seats: [lower, upper], banners: true }),
-    buildStand(endLen, placeMatrix(Math.PI, 0, -ez), { seats: [0xb3263a, upper], banners: true, screen: true, wing: PROFILE.zb + 2 }),
+    buildStand(sideLen, placeMatrix(Math.PI / 2, sx, 0), { seats: [lower, upper], banners: true, vom: true, ribbon: true }, fb),
+    buildStand(sideLen, placeMatrix(-Math.PI / 2, -sx, 0), { seats: [lower, upper], banners: true, vom: true, ribbon: true, ribbonStart: 40, away: awaySector(sideLen) }, fb),
+    buildStand(endLen, placeMatrix(Math.PI, 0, -ez), { seats: [0xb3263a, upper], banners: true, screen: true, curva: true, vom: true, ribbon: true, ribbonStart: 20, wing: PROFILE.zb + 2 }, fb),
   ];
-  const back = buildStand(endLen, placeMatrix(0, 0, bz), { seats: [0xb3263a, upper], banners: false, wing: PROFILE.zb + 2 });
+  const back = buildStand(endLen, placeMatrix(0, 0, bz), { seats: [0xb3263a, upper], banners: false, vom: true, wing: PROFILE.zb + 2 }, null);
 
-  // gruppo principale: 1 draw call per struttura, pubblico, luci, cartelloni
-  const adGeos = [], boardGeos = [];
+  // gruppo principale: 1 draw call ciascuno per struttura, pubblico, luci, cartelloni+fascia LED, bandiere, maxischermo
+  const adGeos = stands.map(s => s.ads).filter(Boolean), boardGeos = [];
   addBoardLine(adGeos, boardGeos, 2 * BOARD.zMax, placeMatrix(Math.PI / 2, BOARD.side, 0), 0);
-  addBoardLine(adGeos, boardGeos, 2 * BOARD.zMax, placeMatrix(-Math.PI / 2, -BOARD.side, 0), 7);
-  addBoardLine(adGeos, boardGeos, 2 * BOARD.side, placeMatrix(Math.PI, 0, -BOARD.end), 13);
+  addBoardLine(adGeos, boardGeos, 2 * BOARD.zMax, placeMatrix(-Math.PI / 2, -BOARD.side, 0), 31);
+  addBoardLine(adGeos, boardGeos, 2 * BOARD.side, placeMatrix(Math.PI, 0, -BOARD.end), 57);
   const structGeo = mergeGeometries([...stands.map(s => s.struct), ...boardGeos, benchGeometry()]);
   const crowdMain = crowdMaterial(crowdTex, uniforms), crowdBack = crowdMaterial(crowdTex, uniforms);
   root.add(new THREE.Mesh(structGeo, structMat()));
-  root.add(new THREE.Mesh(mergeGeometries(stands.map(s => s.crowd)), crowdMain));
+  // il pubblico si disegna prima della struttura: i gradini nascosti dalle persone non vengono colorati
+  const crowdMesh = new THREE.Mesh(mergeGeometries(stands.map(s => s.crowd)), crowdMain); crowdMesh.renderOrder = -1; root.add(crowdMesh);
   const lights = new THREE.Mesh(mergeGeometries(stands.map(s => s.lights)), lightMat()); lights.renderOrder = 5; root.add(lights);
-  root.add(new THREE.Mesh(mergeGeometries(adGeos), new THREE.MeshBasicMaterial({ map: adTex, vertexColors: true })));
+  root.add(new THREE.Mesh(mergeGeometries(adGeos), adsMaterial(adTex, uniforms)));
+  const flags = new THREE.Mesh(fb.geometry(), flagMaterial(flagTex, uniforms)); flags.frustumCulled = false; root.add(flags);
+  const screen = makeScreen(); root.add(new THREE.Mesh(stands[2].screen, screen.material));
 
   // tribuna alle spalle della telecamera: oggetto unico con materiali propri (si può nascondere o dissolvere)
   const backStand = new THREE.Group(); backStand.name = 'backStand';
   backStand.add(new THREE.Mesh(back.struct, structMat()));
-  backStand.add(new THREE.Mesh(back.crowd, crowdBack));
+  const backCrowd = new THREE.Mesh(back.crowd, crowdBack); backCrowd.renderOrder = -1; backStand.add(backCrowd);
   const backLights = new THREE.Mesh(back.lights, lightMat()); backLights.renderOrder = 5; backStand.add(backLights);
   root.add(backStand);
 
@@ -461,13 +436,33 @@ export function buildStadium(scene, opts = {}) {
   if (opts.sky !== false) { root.add(skyMesh()); scene.background = new THREE.Color(0x0b1028); }
   scene.add(root);
 
-  let adT = 0;
-  const update = (dt, excitement = 0) => {
+  const tickAds = adsTicker(uniforms);
+  let calm = 0, ola = -1, goalT = 0;
+  const update = (dt, excitement = 0, match = null) => {
     uniforms.uTime.value += dt;
     const e = Math.max(0, Math.min(1, excitement || 0));
     uniforms.uExcite.value += (e - uniforms.uExcite.value) * Math.min(1, dt * 3);
-    adT += dt; const cyc = AD_HOLD + AD_SCROLL, step = Math.floor(adT / cyc), f = Math.min(1, (adT % cyc) / AD_SCROLL);
-    adTex.offset.y = -((step + f * f * (3 - 2 * f)) % AD_ROWS) / AD_ROWS;
+    tickAds(dt);
+    // ola: dopo un po' di calma parte un'onda che fa il giro dello stadio
+    calm = e < 0.15 ? calm + dt : 0;
+    if (ola < 0 && calm > OLA_EVERY) { ola = 0; calm = 0; }
+    if (ola >= 0) {
+      ola += dt * OLA_SPEED; uniforms.uOla.value = ola - Math.PI;
+      uniforms.uOlaAmp.value = Math.min(1, ola * 2, (OLA_LAPS * 2 * Math.PI - ola) * 2);
+      if (ola > OLA_LAPS * 2 * Math.PI || e > 0.5) { ola = -1; uniforms.uOlaAmp.value = 0; }
+    }
+    if (match) {
+      goalT = match.phase === 'goal' ? goalT + dt : 0;
+      screen.set({ score: [match.score[0], match.score[1]], goal: goalT > 0 && goalT < 4 });
+    }
   };
-  return { crowdMats: [crowdMain, crowdBack], backStand, root, update, buildMs: performance.now() - t0 };
+  const setTeams = (homeKit, awayKit, names) => {
+    if (!homeKit || !awayKit) return;
+    const h = fanColors(homeKit), a = fanColors(awayKit);
+    if (names) screen.set({ names: names.map(n => String(n || '').slice(0, 4).toUpperCase()) });
+    screen.set({ colors: [h, a] });
+    if (h.join() === home.join() && a.join() === away.join()) return;
+    home = h; away = a; crowdTex.redraw(h, a); flagTex.redraw(h, a);
+  };
+  return { crowdMats: [crowdMain, crowdBack], backStand, root, update, setTeams, buildMs: performance.now() - t0 };
 }

@@ -126,7 +126,7 @@ export class View {
     // stadio intorno al campo (tribune, pubblico, tetto, cartelloni, cielo): src/stadium.js
     // costruito subito dopo il primo disegno del menu, così il menu compare prima
     this.stadium = null; this.crowdMats = []; this.backStand = null;
-    setTimeout(() => { const st = buildStadium(s); this.stadium = st; this.crowdMats = st.crowdMats; this.backStand = st.backStand; }, 0);
+    setTimeout(() => { const st = buildStadium(s); this.stadium = st; this.crowdMats = st.crowdMats; this.backStand = st.backStand; this.stadiumTeams(); }, 0);
 
     // porte
     const postM = new THREE.MeshLambertMaterial({ color: 0xffffff });
@@ -259,7 +259,11 @@ export class View {
     }
     const b = match.ball; this.cx = b.x; this.cy = b.y;
     if (this.backStand) this.backStand.visible = true;
+    this.stadiumTeams();
   }
+
+  // tifosi, bandiere e maxischermo coi colori e i nomi delle squadre in campo (la squadra 0 gioca in casa)
+  stadiumTeams() { const m = this.match; if (this.stadium && m) this.stadium.setTeams(m.teams[0].kit, m.teams[1].kit, [m.teams[0].short, m.teams[1].short]); }
 
   // figura di un giocatore della partita: divisa (portiere a parte), aspetto, numero e cognome
   figFor(p) { const kit = this.match.teams[p.team].kit, f = this.makeFig(p.pos === 'P' ? kit.gk : kit, p.look, p.src && p.src.num || p.i + 1, p.src && p.src.name); f.src = p.src; return f; }
@@ -279,7 +283,7 @@ export class View {
     const m = this.match; if (!m) return;
     const s = this.flip, b = m.ball; this.t += dt;
     // pubblico: si anima quando il pallone si avvicina a una porta e soprattutto dopo un gol
-    if (this.stadium) this.stadium.update(dt, m.phase === 'goal' ? 1 : Math.max(0, (Math.abs(b.y) - 25) / 25) * 0.4);
+    if (this.stadium) this.stadium.update(dt, m.phase === 'goal' ? 1 : Math.max(0, (Math.abs(b.y) - 25) / 25) * 0.4, m);
     this.zoom += (this.zoomT - this.zoom) * Math.min(1, dt * 7);
     for (let i = 0; i < 22; i++) {
       const p = m.players[i]; let f = this.figs[i];
