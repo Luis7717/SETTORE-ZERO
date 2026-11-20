@@ -190,3 +190,28 @@ func test_stagione_intera_salvata_e_ricaricata_uguale() -> bool:
 	note("stagione: esito %s, posto %d, soldi %s" % [res.season.outcome, res.season.pos, CarrieraScript.fmtMoney(c.s.money)])
 	c.reset()
 	return done()
+
+
+func test_calendario_rotto_e_stagione_non_chiusa_si_aggiustano() -> bool:
+	var c := _nuova("calendario.json")
+	var dati: Dictionary = JSON.parse_string(Salv.leggi_file(c.percorso))
+	dati.carriera.fix[2][0][0] = ["me", "squadra_che_non_esiste"]
+	dati.carriera.tab.t0.erase("pts")
+	dati.carriera.teams.t1.erase("rating")
+	dati.carriera.squad[2].pos = "Z"
+	_scrivi_testo(c.percorso, JSON.stringify(dati))
+	var c2 := _ricarica(c.percorso)
+	check(c2.s != null and c2.nextMatch() != null, "calendario rifatto, c'è la prossima partita")
+	eq(c2.s.teams.t1.rating, 55, "rating mancante riempito")
+	eq(c2.s.squad[2].pos, "C", "ruolo sbagliato corretto")
+	c2.s.day = 18 # stagione finita ma non chiusa
+	c2.save()
+	var c3 := _ricarica(c.percorso)
+	eq(c3.s.season, 2, "la stagione si chiude al caricamento")
+	eq(c3.s.day, 0, "calendario nuovo")
+	check(c3.nextMatch() != null, "si può giocare")
+	eq(c3.finishMatch(1, 0, []).is_empty(), false, "finishMatch registra")
+	c3.s.day = 18
+	eq(c3.finishMatch(1, 0, []), {}, "a stagione finita finishMatch non fa niente")
+	c.reset()
+	return done()

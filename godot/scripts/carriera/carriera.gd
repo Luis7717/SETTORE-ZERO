@@ -218,6 +218,18 @@ func completa(st: Dictionary) -> Dictionary:
 	st["settings"] = sett
 	var me: Dictionary = st.teams.me
 	me.merge({"id": "me", "name": st.club, "short": "MIA", "kit": st.kit, "rating": 0})
+	for id: Variant in st.teams.keys():
+		if not st.teams[id] is Dictionary:
+			st.teams.erase(id)
+			continue
+		var t: Dictionary = st.teams[id]
+		t.merge({"id": id, "name": "Squadra " + str(id), "short": str(id).left(3).to_upper(), "kit": 0, "rating": 55})
+		if id != "me" and not JS.is_integer(t.get("seed")):
+			t["seed"] = Asp.hash32(id, t.name)
+		if not JS.is_integer(t.kit) or t.kit < 0 or t.kit >= KITS.size():
+			t.kit = 0
+		if not JS.is_integer(t.rating):
+			t.rating = 55
 	st.market = st.market.filter(func(p: Variant) -> bool: return p is Dictionary and JS.is_integer(p.get("id")) and JS.is_integer(p.get("price")))
 	var max_id := 0
 	for p: Dictionary in st.squad + st.market:
@@ -230,6 +242,8 @@ func completa(st: Dictionary) -> Dictionary:
 			if not st.teams.has(id):
 				st.teams[id] = {"id": id, "name": "Squadra " + id, "short": id.left(3).to_upper(), "kit": 0, "rating": 55, "seed": Asp.hash32(id)}
 	st.day = clampi(st.day, 0, ROUNDS)
+	sett.half = clampi(int(sett.half), 30, 99999)
+	sett.diff = clampi(int(sett.diff), 0, 2)
 	if not _calendario_valido(st):
 		newSeason(true)
 	if st.lineup.size() != FORMATIONS[st.formation].size():
@@ -237,11 +251,20 @@ func completa(st: Dictionary) -> Dictionary:
 		autoLineup()
 	else:
 		fixLineup()
+	if st.day >= ROUNDS: # stagione finita ma non chiusa (salvataggio a metà): la si chiude adesso
+		endSeason()
 	return st
 
 
 func _completa_giocatore(p: Dictionary) -> void:
 	p.merge({"name": "Giocatore", "pos": "C", "age": 25, "goals": 0, "assists": 0, "apps": 0})
+	if not p.pos is String or not "PDCA".contains(p.pos) or p.pos.length() != 1:
+		p.pos = "C"
+	for k: String in ["age", "goals", "assists", "apps"]:
+		if not JS.is_integer(p[k]):
+			p[k] = 25 if k == "age" else 0
+	if not p.name is String:
+		p.name = JS.js_str(p.name)
 	for k: String in STAT_KEYS:
 		if not JS.is_integer(p.get(k)):
 			p[k] = 12 if k == "por" and p.pos != "P" else 40
@@ -255,9 +278,18 @@ func _calendario_valido(st: Dictionary) -> bool:
 	for d in 3:
 		if not st.fix[d] is Array or st.fix[d].size() != ROUNDS:
 			return false
-		for id: String in st.divs[d]:
-			if not st.tab.has(id):
+		for giornata: Variant in st.fix[d]: # ogni giornata: 5 partite [casa, ospiti] tra squadre della divisione
+			if not giornata is Array or giornata.size() != 5:
 				return false
+			for hw: Variant in giornata:
+				if not hw is Array or hw.size() != 2 or not st.divs[d].has(hw[0]) or not st.divs[d].has(hw[1]):
+					return false
+		for id: String in st.divs[d]:
+			if not st.tab.get(id) is Dictionary:
+				return false
+			for k: String in ["p", "w", "d", "l", "gf", "ga", "pts"]:
+				if not JS.is_integer(st.tab[id].get(k)):
+					return false
 	if not st.get("res") is Array:
 		st["res"] = []
 	return true
@@ -480,6 +512,8 @@ func nextMatch() -> Variant:
 		if x[0] == "me" or x[1] == "me":
 			m = x
 			break
+	if m.is_empty():
+		return null
 	var home: bool = m[0] == "me"
 	return {"home": home, "opp": team(m[1] if home else m[0]), "day": s.day + 1, "div": d}
 
@@ -737,9 +771,12 @@ func _poisson(l: float) -> int:
 
 ## applica il risultato della partita giocata e simula il resto della giornata.
 ## log = marcatori della partita ([{team, scorer: {id}, assist: {id}}], come m.goalsLog del motore).
-## Ritorna {income, wages, others: [[sigla, gol, gol, sigla]], grown: [nomi], season: (fine stagione, se c'è)}
+## Ritorna {income, wages, others: [[sigla, gol, gol, sigla]], grown: [nomi], season: (fine stagione, se c'è)};
+## {} se non c'è una partita da registrare (nel JS sarebbe un errore)
 func finishMatch(my: int, opp: int, log: Array = []) -> Dictionary:
 	var d := div()
+	if nextMatch() == null:
+		return {} # stagione già finita: niente da registrare
 	var nm: Dictionary = nextMatch()
 	var res := {"income": 0, "wages": 0, "others": [], "grown": []}
 	s.teams.me.rating = myRating()
