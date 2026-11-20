@@ -21,6 +21,7 @@ const BOARD = { h: 0.95, panel: 4, side: HW + 4, end: HL + 6, zMax: HL + 4 };
 const BENCH_X = -(HW + 2.6);
 const SEAT_W = 0.55, CELLS = 32, TILE = SEAT_W * CELLS, CROWD_H = 2.2;
 const LIGHT_EVERY = 6, LIGHT_SIZE = 3.4;
+const CROWD_SHADE = [0.62, 1.06];   // luminosità del pubblico in basso e in alto di ogni fila
 const AD_ROWS = 8, AD_HOLD = 6, AD_SCROLL = 0.45;
 
 const BRANDS = [
@@ -162,6 +163,8 @@ function drawPerson(g, x, y, p, up) {
   g.fillStyle = p.shirt;
   if (up) { g.fillRect(l - 2, top - 30, 5, 36); g.fillRect(l + p.w - 3, top - 30, 5, 36); }
   g.beginPath(); g.roundRect(l, top, p.w, base - top + 1, [7, 7, 0, 0]); g.fill();
+  const sg = g.createLinearGradient(0, top, 0, base); sg.addColorStop(0, 'rgba(255,255,255,0.14)'); sg.addColorStop(0.35, 'rgba(0,0,0,0)'); sg.addColorStop(1, 'rgba(0,0,0,0.3)');
+  g.fillStyle = sg; g.beginPath(); g.roundRect(l, top, p.w, base - top + 1, [7, 7, 0, 0]); g.fill();
   g.fillStyle = 'rgba(0,0,0,0.22)'; if (!up) { g.fillRect(l + 1, top + 8, 3, 28); g.fillRect(l + p.w - 4, top + 8, 3, 28); }
   if (p.scarf && !up) { g.fillStyle = p.scarf[0]; g.fillRect(l + 2, top + 1, p.w - 4, 5); g.fillStyle = p.scarf[1]; g.fillRect(cx - 2, top + 6, 4, 14); }
   g.fillStyle = p.skin; g.beginPath(); g.arc(cx, hy, 7, 0, 7); g.fill();
@@ -271,7 +274,9 @@ function addCrowd(cb, len) {
     for (const [s0, s1] of sections(len)) {
       const variant = Math.random() < 0.5 ? 0 : 1, v0 = 0.5 + (1 - variant) * 0.25, u0 = ((Math.random() * CELLS) | 0) / CELLS + ((Math.random() * 8) | 0);
       const b = r.light * rnd(0.88, 1.05);
-      cb.wall(s1, s0, z, y0, y1, C(0xffffff, b), [u0, v0 + 0.002, u0 + (s1 - s0) / TILE, v0 + 0.248]);
+      // in basso più scuro (la fila davanti fa ombra), in alto più chiaro (i fari): il pubblico prende volume
+      const lo = C(0xffffff, b * CROWD_SHADE[0]), hi = C(0xffffff, b * CROWD_SHADE[1]);
+      cb.wall(s1, s0, z, y0, y1, [lo, lo, hi, hi], [u0, v0 + 0.002, u0 + (s1 - s0) / TILE, v0 + 0.248]);
     }
   }
 }
