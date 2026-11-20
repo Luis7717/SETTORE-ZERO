@@ -973,3 +973,36 @@ scambio in Rosa coi tre tocchi, acquisto in due tocchi, impostazioni salvate, nu
 all'allenamento, Continua → fine stagione); 24 schermate 390×844 confrontate con quelle del web (Puppeteer, stessa
 carriera); giro dell'app menu → partita → dopo partita → menu senza errori; scorrimento col dito finto ~120 FPS sul
 PC. **Non verificato**: iPhone (tocchi veri, tastiera del nome, aree sicure, fluidità, vibrazione).
+
+## 2026-11-20 — Godot: animazioni mocap
+Clip vere del "Free mocap pack 05: Soccer" di Anderson Rohr nella versione Godot (`godot/assets/mocap/mocap.res`,
+`godot/scripts/partita/figura_mocap.gd`, strumento `godot/tools/converti_mocap.gd`; dettagli nel README di `godot/`).
+- **Reindirizzamento fatto da noi, non col retarget di Godot.** Il pack (versione UE5) e il nostro modello hanno gli
+  stessi nomi di ossa e sono tutti e due in posa a T: per ogni osso si prende la rotazione nel mondo rispetto alla posa
+  a T, la si porta nel riferimento del corpo (sinistra, su, avanti) e la si rimette sul nostro osso. Spine diverse:
+  spine_01←spine_02, spine_02←spine_04, spine_03←spine_05. Le versioni dell'altro piede/lato sono specchiate.
+- **Solo le clip usate** (25, ~436 KB compresse con `Animation.compress`). I dribbling 1-3 non sono nell'app: sono
+  giochetti da fermo (doppi passi, suola, finte) che non vanno con la corsa del motore né coi giochetti calcolati che
+  ci sono già; si possono rifare con `--tutte`.
+- **Root motion**: bacino fermo in orizzontale (lo spostamento è del motore, così il giocatore resta dove dice il
+  motore), altezza tenuta e scalata sulle nostre gambe. Il verso delle clip è normalizzato (il pack non ne ha uno
+  fisso): calci = piede al contatto in avanti, rimessa = mano al rilascio, il resto = sguardo medio del bacino.
+- **Calci allineati al motore**: il calcio del motore è istantaneo (il pallone parte quando `kickAnim` riparte), quindi
+  la clip parte proprio dal fotogramma del contatto (misurato: il piede più veloce vicino a terra) ed entra in 0,05 s.
+  La rincorsa non si vede, si vedono contatto e accompagnamento: per la rincorsa servirebbe un preavviso dal motore.
+- **Parate**: la clip sostituisce il tuffo calcolato solo se combacia (lato, distanza, altezza entro una soglia),
+  altrimenti resta il tuffo calcolato. Nel pack la parata "alta" è un salto di lato, la "media" è quasi centrale e la
+  "bassa" è un'uscita bassa di lato: i tuffi lunghi e orizzontali restano calcolati. La clip parte poco prima dello
+  slancio, a velocità vera: partendo dallo stacco delle mani il portiere restava in piedi mentre il motore lo spostava.
+  Il petto va verso il campo anche se in quel momento il portiere guardava altrove.
+- **Esultanze col seme**: il seme della partita non è nel motore, quindi la scelta usa un hash di numero del gol,
+  minuto, squadra e giocatore: stessa partita = stesse esultanze, niente `randi()`.
+- **Difesa solo da (quasi) fermi**: la clip sta sul posto e sopra 3 m/s i piedi scivolerebbero. In partita i difensori
+  vicini al portatore corrono spesso, quindi la si vede soprattutto quando aspettano il portatore.
+- **Cartellini e palleggi pronti ma non usati**: il motore ha i cartellini ma non un arbitro; i palleggi sono per lo
+  sfondo del menu (come usarli nel README).
+- **Prestazioni** (PC, `prova_vista.tscn -- --senza-vsync --esci-dopo=15`): con mocap 506-546 FPS, fotogramma
+  1,71-1,85 ms, vista 1,12-1,18 ms; con `--senza-mocap` 580-585 FPS, vista 1,00-1,01 ms (prima del lavoro 538-635 FPS,
+  vista 0,93-1,05 ms). Costo circa 0,15 ms a fotogramma per 22 giocatori. Sull'iPhone A12 non è misurato: resta da provare.
+- **Limiti**: niente rincorsa prima del calcio; colpo di testa calcolato; difesa poco visibile in partita vera; la
+  parata alta è un salto più che un tuffo; nelle clip di palleggi e cartellini non c'è il pallone.

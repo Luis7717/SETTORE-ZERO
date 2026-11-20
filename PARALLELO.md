@@ -75,5 +75,5 @@ Limite di 2 subagenti insieme tolto più tardi lo stesso giorno (richiesta di Lu
 | 37 | Godot fase 3: interfaccia dei menu, Rosa FUT, editor, stemma, facce | `TAG-wt-godot-menu` / `wt-godot-menu` | fatto (`638486d`), unito |
 | 38 | Godot fase 3: sfondo 3D del menu (palleggio) e allenamento guidato | `TAG-wt-godot-intro` / `wt-godot-intro` | fatto (`6b18cce`), unito |
 | 39 | Godot fase 4: pubblico 3D, stadio, effetti, stoffa, texture HD, aspetto giocatori | `TAG-wt-godot-grafica` / `wt-godot-grafica` | fatto (`b3e9795`), unito |
-| 40 | Godot: animazioni mocap del pack Soccer di Anderson Rohr (esultanze, parate, tiri, rimessa, difesa) | `TAG-wt-godot-mocap` / `wt-godot-mocap` | in corso |
+| 40 | Godot: animazioni mocap del pack Soccer di Anderson Rohr (esultanze, parate, tiri, rimessa, difesa) | `TAG-wt-godot-mocap` / `wt-godot-mocap` | fatto (`ce5570a`), unito |
 | 41 | Godot: tasto Scatto nel duello (porting di `595493c`), anche nella lezione dell'allenamento | `TAG-wt-godot-fuga` / `wt-godot-fuga` | fatto (`045d212`), unito |

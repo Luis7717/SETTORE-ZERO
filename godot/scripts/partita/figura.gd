@@ -15,6 +15,7 @@ const Mossa := preload("mosse/mossa.gd")
 const Giochetti := preload("mosse/giochetti.gd")
 const Corpo := preload("mosse/corpo.gd")
 const IK := preload("mosse/ik.gd")
+const FiguraMocap := preload("figura_mocap.gd")   # animazioni mocap (esultanze, parate, calci, rimessa, difesa)
 
 const MODEL_H := 1.84          # altezza del modello prima della scala del gioco (come src/athlete3d.js)
 const RUN_FULL := 1.6          # m/s: sopra questa velocità il clip di corsa è a peso pieno
@@ -64,6 +65,8 @@ var _gcache := {}              # osso → posa globale calcolata in questo fotog
 var _avviso: Sprite3D
 var _mesh: MeshInstance3D
 var _corsa := 0.0              # ultimo valore di "corsa" dato allo shader (la maglia ondeggia)
+## clip mocap di questa figura (figura_mocap.gd); null solo prima di prepara()
+var mocap: FiguraMocap
 
 
 ## kit: maglia, calzoncini, calzettoni, bordino (Color) e se c'è stile, numero (Vector4); aspetto: pelle, capelli
@@ -101,6 +104,7 @@ func prepara(kit: Dictionary, aspetto: Dictionary, sfasa: float, tex_avviso: Tex
 	_anim.anim_player = _anim.get_path_to(player)
 	_anim.tree_root = _albero
 	_anim.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
+	mocap = FiguraMocap.new(self, player, _anim)   # [mocap] libreria "mocap" nel suo AnimationPlayer
 	_anim.active = true
 	_anim.set(P_MOTO, 0.0)
 	_anim.set(P_SALTO, 0.0)
@@ -127,6 +131,7 @@ static func sprint_mix(v: float, sprinting: bool) -> float:
 func posa(p: Object, dt: float, ctx: Dictionary) -> void:
 	_rimetti()
 	_avviso.visible = p.warn
+	var mc := mocap.aggiorna(p, dt, ctx)   # [mocap] peso della clip mocap (0 = nessuna)
 	var v := sqrt(p.vx * p.vx + p.vy * p.vy)
 	var run := clampf((v - 0.25) / RUN_FULL, 0.0, 1.0)
 	var corsa := clampf(v / SPRINT_REF, 0.0, 1.0)
@@ -156,10 +161,13 @@ func posa(p: Object, dt: float, ctx: Dictionary) -> void:
 		w_run = 0.0
 		w_jump = 1.0
 	_mescola(w_idle, w_run, w_jump, v, cele, p.sprint)
+	_w_idle *= 1.0 - mc   # [mocap] le correzioni del clip "fermo" non vanno sopra la clip mocap
 	_anim.advance(dt)
 	_gcache.clear()
 	var s := Coord.SCALE
-	if st == "slide":
+	if mocap.al_posto_delle_pose():   # [mocap] la clip fa tutto il corpo: niente pose calcolate, solo il giro
+		by = mocap.yaw
+	elif st == "slide":
 		bx = -1.2
 		py = 0.36 / s
 		pz = -0.3
@@ -215,7 +223,7 @@ func posa(p: Object, dt: float, ctx: Dictionary) -> void:
 	corpo.basis = Basis(Vector3.RIGHT, bx) * Basis(Vector3.UP, by) * Basis(Vector3.BACK, bz)
 	corpo.position = Vector3(px, py, pz)
 	_applica_rot()
-	if trick != null and st == "play" and not cele:
+	if trick != null and st == "play" and not cele and mc <= 0.0:
 		_giochetto(trick)
 
 
@@ -422,4 +430,5 @@ static func _costruisci_albero() -> AnimationNodeBlendTree:
 	t.connect_node("salto", 0, "moto")
 	t.connect_node("salto", 1, "ts_jump")
 	t.connect_node("output", 0, "salto")
+	FiguraMocap.estendi_albero(t, "salto")   # [mocap] output ← Blend2 "mocap" (salto, clip mocap)
 	return t
