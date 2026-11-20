@@ -452,3 +452,34 @@ Richieste di Luis dopo la prova sull'iPhone: "in difesa restano tutti fermi e in
 - **Da provare sull'iPhone**: rientro e pressing quando si perde palla; linea di difesa lunga che si ferma a 14 m;
   contrasto vicino al portatore; intercetto in corsa; scatto lungo una strada (velocità e animazione); smarcamento a
   centrocampo.
+
+## 2026-11-20 — Rosa a campo con le carte
+- Richiesta di Luis (con l'immagine della rosa di un gioco famoso): campo visto dall'alto con gli 11 titolari come carte
+  nei posti della formazione, panchina scorrevole sotto, tocco per scegliere e scambiare, confronto verde/rosso.
+  Preso solo lo schema: **grafica nostra** (pannelli scuri, oro per gli accenti, colori della squadra), niente carte dorate,
+  niente loghi né scritte copiate, niente "chemistry".
+- **Schermata ferma** (classe `fix` su `.scr`): barra alta, in alto un riquadro fisso di 150 px (formazioni + Forza squadra
+  + "Migliori 11", oppure il pannello del giocatore, oppure il confronto), il campo prende lo spazio che resta, sotto la
+  panchina che scorre in orizzontale. Niente scorrimento verticale.
+- **Carte** (`src/ui-squad.js`, 64×70 px): valutazione nel ruolo del posto (colore per fascia come `ovrCls`, anche il
+  bordo), ruolo del posto (colori `pP/pD/pC/pA`), ritratto, cognome. **Fuori ruolo**: etichetta arancio col ruolo vero.
+- **Posizioni** (`src/squad-layout.js`, puro, testato): i posti di `FORMATIONS` si raggruppano in file (y entro 0,1),
+  file a passo uguale dal portiere in basso agli attaccanti in alto; in ogni fila le x della formazione, allargate dove le
+  carte si toccherebbero; piccolo spostamento dentro la fila (terzini e ali più avanti) solo se c'è spazio; se il campo è
+  piccolo la carta si rimpicciolisce (minimo 72%). Test: nessuna sovrapposizione e niente fuori dal campo per ogni
+  formazione e altezze da 330 a 560 px; a 390×844 meno le aree sicure il campo è alto 418 px e le carte restano a 64 px.
+- **Tocchi** (scelta mia): 1° tocco sceglie (pannello con statistiche, "Aspetto" e "Vendi"); 2° tocco su un altro con cui
+  si può scambiare apre il **confronto** (valori verdi per chi è meglio, rossi per chi è peggio, Forza prima → dopo);
+  si scambia toccandolo ancora o con "Scambia". Prima lo scambio era al 2° tocco: così si vede prima di decidere.
+  Panchina→panchina sceglie l'altro. Con un giocatore scelto le altre carte mostrano un **badge** verde/rosso (quanto
+  cambia la somma delle valutazioni dei titolari): solo per chi è nello stesso ruolo o se lo scambio migliora, per non
+  riempire il campo di numeri assurdi (attaccante in porta).
+- **Ritratto**: viso SVG disegnato (`src/face2d.js`): pelle, colore e taglio dei capelli (17 tagli approssimati),
+  barba, maglia e colletto coi colori della squadra. Niente WebGL: 18–24 piccoli SVG, costo trascurabile.
+- Scambio: `swapLineup` (nuovo array, non tocca il vecchio) usato da `Career.swap`; `lineup` resta un array di id,
+  salvataggio `tag_save_v1` invariato.
+- Prove: `node --test test/unit/squad.test.mjs`; a schermo `node test/squad-shot.mjs shots` (4 formazioni, fuori ruolo,
+  scelto, confronto, scambio campo↔panchina con controllo del salvataggio, panchina scorsa, portiere + Vendi, Aspetto,
+  e 390×763 = spazio vero tra le aree sicure; controlla che non scorra e che le carte non si sovrappongano).
+- **Da provare sull'iPhone**: carte abbastanza grandi da toccare e leggere? Il confronto prima dello scambio va bene o
+  Luis preferisce lo scambio subito al 2° tocco? La panchina scorre bene col dito senza muovere la pagina? I visi.

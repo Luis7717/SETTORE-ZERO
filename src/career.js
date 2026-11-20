@@ -2,6 +2,7 @@
 import { rng32, FORMATIONS, headingOf } from './sim.js';
 import { lookFromSeed, normalizeLook, normalizeKitStyle, kitStyleFromSeed, squadNumbers, hash32 } from './looks.js';
 import { crestFromSeed, normalizeCrest } from './crest.js';
+import { canSwap, swapLineup } from './squad-layout.js';
 
 const KEY = 'tag_save_v1';
 export const DIV_NAMES = ['Prima Divisione', 'Seconda Divisione', 'Terza Divisione'];
@@ -167,8 +168,8 @@ export class Career {
   }
   bench() { const s = this.s; return s.squad.filter(p => !s.lineup.includes(p.id)); }
   swap(a, b) { // scambia due giocatori (titolare/titolare o titolare/panchina)
-    const l = this.s.lineup, ia = l.indexOf(a), ib = l.indexOf(b);
-    if (ia >= 0 && ib >= 0) { l[ia] = b; l[ib] = a; } else if (ia >= 0) l[ia] = b; else if (ib >= 0) l[ib] = a;
+    if (!canSwap(this.s.lineup, a, b)) return;
+    this.s.lineup = swapLineup(this.s.lineup, a, b);
     this.save();
   }
 
