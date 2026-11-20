@@ -947,3 +947,29 @@ Grafica della partita nella versione Godot (`godot/`), solo vista: il motore non
   del rumore (< 0,03 ms di GPU). Stima per l'iPhone A12 (GPU ~20 volte più lenta, CPU ~3-4 volte, margine dimezzato):
   +2 ms di GPU in partita, +4 ms nel rallenty con la profondità di campo, +1 ms di CPU: dentro i 16,6 ms, ma la
   profondità di campo è la prima a saltare. **Non verificato sull'iPhone.**
+
+## 2026-11-20 — Godot fase 3: menu
+Interfaccia dei menu in Godot (`godot/scenes/menu/`, `godot/scripts/menu/`, dettagli in `godot/README.md`, "Menu
+(fase 3)"). Scelte fatte in autonomia:
+1. **Schermate costruite nel codice**, una scena minima per schermata (nome = nome per `App.vai`); base comune
+   `MenuSchermata` (barra in alto, scorrimento, entrata, scritta gialla, aree sicure). Così le schermate seguono
+   `ui.js` riga per riga e un cambio di stile si fa in un posto solo (`tema_menu.gd`).
+2. **Stemmi e visi = stesso SVG del web** disegnato da ThorVG (test: 57 visi e 30 stemmi con testo identico). ThorVG
+   non conosce `paint-order`: il bordo dello stemma si disegna prima del riempimento, come `drawCrest` del canvas.
+3. **Carattere di sistema** come il web (niente file di caratteri da licenziare); pesi 500-900 con `SystemFont`.
+4. **Impostazioni**: oltre a durata, difficoltà, portiere e audio ci sono **Musica** e **Vibrazione** (campi
+   `music`, `vibra` già previsti dalla carriera, accesi se mancano). La vibrazione si sente a ogni tocco
+   (`Input.vibrate_handheld`, 12 ms).
+5. **Anteprima dell'editor**: il modello 3D della partita mostra solo i colori di pelle e capelli (niente taglio,
+   occhi, barba, stile della maglia): per questo accanto c'è il viso disegnato (che invece li mostra tutti).
+6. **Sfondo 3D anche dietro la casa della carriera** (come il web), con un velo scuro al 55% perché le schede si
+   leggano; nel menu principale velo al 20%.
+7. **Come si gioca** con lo stesso testo del web aggiornato (tasto **Scatto**, non più Dribbling).
+8. **Mercato ordinato come il web** anche a pari valutazione (ordinamento stabile di V8, `MenuDati.ordina`).
+
+Verificato sul PC (Windows, Godot 4.7.2): test senza schermo verdi (13 dei menu: visi, stemmi, semi, soldi, Rosa
+uguale a `squad-layout.js`); 6 controlli dei gesti con le schermate vere (`--controlli`: ogni schermata si costruisce,
+scambio in Rosa coi tre tocchi, acquisto in due tocchi, impostazioni salvate, nuova squadra dall'editor fino
+all'allenamento, Continua → fine stagione); 24 schermate 390×844 confrontate con quelle del web (Puppeteer, stessa
+carriera); giro dell'app menu → partita → dopo partita → menu senza errori; scorrimento col dito finto ~120 FPS sul
+PC. **Non verificato**: iPhone (tocchi veri, tastiera del nome, aree sicure, fluidità, vibrazione).
