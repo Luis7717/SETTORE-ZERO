@@ -514,3 +514,39 @@ three.js (592 KB), gli addons (49 KB) e il nostro codice (~330 KB).
   `node test/loading-shot.mjs shots` prova anche three mancante (schermata `load-2-senza-three.png`).
 - **Da provare sull'iPhone**: apertura del menu (tempo e nessuna pagina vuota), ingresso in partita, giocatori e stadio
   come prima.
+
+## 2026-11-20 — Visuale girata col dito nel rallenty, passaggio solo disegnato
+Richieste di Luis: "quando si rallenta per tiro e passaggio devo poter muovere io la telecamera a destra e sinistra,
+togli l'automatismo" e "toccare un compagno non deve fargli fare il passaggio, bisogna sempre disegnarlo".
+- **Tolta la rotazione automatica** del duello (`duelSide`, `sideK`, `DUEL_SIDE_MAX/K`, `DUEL_AHEAD_R` in `render.js`;
+  tolta anche la prova `test/duel-side-shot.mjs`). Resta l'**inquadratura larga** del rallenty (`wideView`, "allargare
+  la visuale per avere più scelte"), ma girata dell'angolo scelto dalla persona.
+- **Gesto** (`src/input.js`, modo `'cam'`): nel duello o nell'area di tiro, col pallone del controllato, un dito che si
+  appoggia lontano da pallone/portatore (fuori dal raggio del disegno) e si sposta di lato di almeno 12 px (più di lato
+  che in verticale) gira la visuale intorno al portatore. Il disegno dal portatore resta linea (il modo si decide quando
+  il dito si appoggia, quindi una linea non diventa mai rotazione e viceversa). In difesa e fuori dal rallenty non cambia nulla.
+  Nel rallenty "tieni premuto sul campo = corri lì" non c'è più (si corre disegnando la strada).
+- **Sensibilità e limiti** (`src/camuser.js`): 150° per una larghezza di schermo (mezzo schermo ≈ 75°), limite ±100°
+  dalla direzione d'attacco: oltre si guarderebbe all'indietro e il campo davanti sparirebbe. Verso: **si afferra il
+  campo** (dito verso destra = il campo scorre a destra = si guarda più a sinistra), come girare una mappa; se sull'iPhone
+  sembra al contrario basta `CAM_USER_GRAB = 1`. Mentre il dito gira, l'inquadratura insegue più in fretta (`POSE_K_DRAG` 14/s).
+- **Ritorno**: l'angolo resta finché dura il rallenty con lo stesso portatore (anche passando da duello ad area di
+  tiro) e mentre si disegna una linea; finito il rallenty (passaggio, tiro, palla persa, uscita dall'area) torna dritto
+  da solo in circa 1–1,5 s (`CAM_USER_RETURN`). Chi riceve il passaggio riparte con la visuale dritta.
+- **Area di tiro**: con la visuale girata oltre 40° (`CAM_USER_GOAL_YAW`) la porta avversaria non si tiene più a
+  schermo per forza (altrimenti la telecamera andrebbe lontanissima).
+- **Linee e tocchi** con la visuale girata: `worldToScreen`/`screenToGround`/`screenToGoal` usano la telecamera vera
+  (`this.cam`), i punti della linea sono salvati in coordinate di campo. Prova a schermo: con la visuale girata di 54°
+  la linea disegnata finisce a 0,02–0,03 m dal compagno e il passaggio parte.
+- **Suggerimento**: nel rallenty due frecce discrete ‹ › ai lati; finché non si è mai girata la visuale anche la
+  scritta "⟷ Trascina il campo per girare la visuale" in alto (stesso stile del suggerimento in basso). Campo nuovo nel
+  salvataggio `camTip` (assente = mostra la scritta). Riga anche in "Come si gioca".
+- **Passaggio solo disegnato**: il tocco breve su un compagno col pallone (duello, area di tiro, rimesse) non fa più
+  niente; sulle rimesse il dito ovunque disegna dalla palla. In difesa il tocco su un compagno lo fa ancora comandare.
+  Testi aggiornati: suggerimento del duello, tutorial "Passaggio", "Come si gioca".
+- Prove: `test/unit/camuser.test.mjs` (angolo, limiti, ritorno, inquadratura girata fino a ±100° col portatore a
+  schermo, gesti con una visuale finta: rotazione, tocco senza passaggio, linea = passaggio, rimessa, difesa);
+  `node test/cam-user-shot.mjs shots` (duello e area: dritta, sinistra, destra, linea con visuale girata, ritorno;
+  tocco su un compagno; lezione "Passaggio" del tutorial fatta disegnando: 3 prove su 3 riuscite).
+- **Da provare sull'iPhone**: se il verso del trascinamento sembra naturale, se 150°/schermo è troppo o poco, se il
+  gesto parte mai per sbaglio, leggibilità delle frecce e della scritta.

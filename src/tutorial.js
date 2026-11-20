@@ -16,7 +16,7 @@ export const LESSONS = [
   {
     title: 'Passaggio',
     short: 'Corri verso il difensore; quando il tempo rallenta disegna dalla palla fino a un compagno.',
-    text: 'Si passa quando ti avvicini a un difensore (la visuale si abbassa e il tempo rallenta) e negli ultimi 20 metri prima della porta. Allora <b>disegna dalla palla fino a un compagno</b>, chiunque sia (o toccalo). I puntini azzurri mostrano dove andrà davvero la palla.',
+    text: 'Si passa quando ti avvicini a un difensore (la visuale si abbassa e il tempo rallenta) e negli ultimi 20 metri prima della porta. Allora <b>disegna dalla palla fino a un compagno</b>, chiunque sia: il passaggio si disegna sempre, toccare il compagno non basta. I puntini azzurri mostrano dove andrà davvero la palla.',
     setup(m, T, k) {
       const c = T.carrier(m, 7, [0, -6, 4][k], [0, -4, 6][k]); T.clearOpp(m);
       // difensore a una decina di metri: prima ci si avvicina, poi parte il duello (DUEL_R = 7 m)

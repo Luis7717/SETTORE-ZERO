@@ -10,6 +10,7 @@ import { Tutorial } from './tutorial.js';
 import { MenuBg } from './menu-bg.js';
 import { normalizeKitStyle, lookFromSeed } from './looks.js';
 import { crestFromSeed } from './crest.js';
+import { userCamOn } from './camuser.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('c'), hud = $('hud'), ov = $('ov'), uiRoot = $('ui');
@@ -114,7 +115,7 @@ const HINTS = {
   defend: 'Disegna linee dai tuoi giocatori: solo chi ha una linea si muove',
   loose: 'Palla libera: disegna una linea da un tuo giocatore per andarci',
   dive: 'PARA! Tira una linea dal portiere al punto della porta',
-  duel: 'Disegna fino a un compagno o toccalo per passare · oppure tocca Dribbling',
+  duel: 'Disegna fino a un compagno per passare · oppure tocca Dribbling',
   zone: 'Area di tiro: linea in porta = tiro · fino a un compagno = passaggio',
 };
 const RHINT = { kickoff: 'Calcio d\'inizio: disegna il passaggio', throw: 'Rimessa: disegna il passaggio', corner: 'Calcio d\'angolo: disegna il cross', goalkick: 'Rinvio: disegna il passaggio', freekick: 'Punizione: disegna il passaggio o il tiro', penalty: 'RIGORE: disegna il tiro in porta', gk: 'Rilancio del portiere: disegna il passaggio' };
@@ -217,6 +218,22 @@ function drawRadar(m) {
   rc.fillStyle = '#fff'; rc.strokeStyle = '#000'; rc.lineWidth = 1.5; rc.beginPath(); rc.arc(X(m.ball.x), Y(m.ball.y), 4, 0, 7); rc.fill(); rc.stroke();
 }
 
+// ---------------------------------------------------------------- visuale girata col dito (src/camuser.js)
+// Nel rallenty in attacco due frecce discrete ai lati; la prima volta anche la scritta, finché non la si gira una volta.
+const camTip = document.createElement('div'); camTip.id = 'camtip'; camTip.innerHTML = '<span>⟷ Trascina il campo per girare la visuale</span>';
+const camArr = ['l', 'r'].map(k => { const e = document.createElement('div'); e.className = 'camarr ' + k; e.textContent = k === 'l' ? '‹' : '›'; return e; });
+hud.append(camTip, ...camArr);
+let camShown = null;
+function camHint(m) {
+  if (input.camUsed && career.s && !career.s.camTip) { career.s.camTip = true; career.save(); } // campo nuovo del salvataggio (predefinito: assente)
+  const on = !G.tut && !G.paused && !input.drawing && userCamOn(m, 0);
+  const key = on ? (career.s && career.s.camTip ? 'arr' : 'tip') : '';
+  if (key === camShown) return;
+  camShown = key;
+  camTip.style.display = key === 'tip' ? 'block' : 'none';
+  for (const e of camArr) e.style.display = key ? 'block' : 'none';
+}
+
 // ---------------------------------------------------------------- ciclo principale
 let last = performance.now(), hudT = 0, lastHint = '';
 function frame(now) {
@@ -248,7 +265,7 @@ function frame(now) {
     if (now > hudT) {
       hudT = now + 100;
       $('sc').textContent = m.score[0] + ' – ' + m.score[1]; $('clock').textContent = m.minute() + '\'';
-      drawRadar(m);
+      drawRadar(m); camHint(m);
       const h = m.duelFor && m.duelFor(0) ? 'duel' : m.inZone && m.inZone(0) ? 'zone' : m.hint(0); let txt = h === 'restart' ? RHINT[m.restart.type] : (HINTS[h] || '');
       if ((career.s.tut || 0) > 4 && (h === 'attack' || h === 'defend' || h === 'loose')) txt = '';
       if (G.tut) txt = '';

@@ -65,10 +65,14 @@
 
 ## Gesti (tutto a un dito)
 - Col pallone, fuori dal duello: disegna dal giocatore = **strada da correre** (con tanta strada davanti scatta); linea che finisce in porta = tiro.
-- **Duello** (portatore a 7 m da un difensore davanti): visuale bassa, tempo al 20%. Si passa a qualunque compagno:
-  disegna fino al compagno o toccalo; oppure tasto **Dribbling** in basso.
+- **Duello** (portatore a 7 m da un difensore davanti): visuale bassa, tempo al 20%. Si passa a qualunque compagno
+  **solo disegnando** fino al compagno (il tocco sul compagno non passa più, 2026-11-20); oppure tasto **Dribbling** in basso.
 - **Area di tiro** (ultimi 20 m prima della porta avversaria, col pallone): tempo al 22%; linea in porta = tiro,
-  linea fino a un compagno (entro 5 m) o tocco = passaggio, altrove = strada da correre.
+  linea fino a un compagno (entro 5 m) = passaggio, altrove = strada da correre. Anche sulle rimesse il passaggio si disegna.
+- **Visuale girata col dito** (duello e area di tiro, pallone nostro): trascinare di lato partendo lontano dal portatore
+  gira la telecamera intorno a lui (si afferra il campo: 150° per schermo, al massimo ±100°, `src/camuser.js`); niente
+  più rotazione automatica. Il tocco breve sul campo o su un compagno lì non fa niente. Resta finché dura il rallenty
+  con lo stesso portatore, poi torna dritta da sola.
 - La finta è stata tolta (2026-11-20).
 - Difesa: dito su un proprio giocatore e disegna = linea da seguire (tutti tranne il portiere); tieni premuto sul campo =
   muovi il controllato. Le linee di difesa sono lunghe al massimo 14 m; finita la linea il giocatore torna alla CPU.

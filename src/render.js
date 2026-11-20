@@ -7,6 +7,7 @@ import { loadBestPlayers } from './athlete3d.js';
 import { buildPitch, buildLights, setupRenderer, fitSun, playerShadowTexture, shadowYaw, SHADOWS } from './pitch.js';
 import { Props, makeRibbon, fillRibbon } from './props.js';
 import { saveView, wideView } from './camfit.js';
+import { userCamOn, relaxYaw, keepGoal } from './camuser.js';
 
 const _rp = [0, 0, 0]; // punto riusato per i nastri delle linee
 
@@ -26,9 +27,7 @@ const CAM_SNAP = 12;           // oltre questo salto del pallone (m) la telecame
 const CAM_H = 10.5;            // ... e altezza (m); più bassa e vicina = giocatori più grandi
 const DUEL_LOW = 0.3;           // quanto si abbassa la telecamera nel duello (0 = niente, 1 = a terra)
 const DUEL_BACK = 0.12;         // nel duello la telecamera si allontana di questa frazione della distanza normale
-const DUEL_AHEAD_R = 35;        // duello: compagni "davanti" entro questa distanza (m) e in un cono di ~45°
-const DUEL_SIDE_MAX = 1.2;      // duello senza compagni davanti: la visuale gira intorno al portatore verso i compagni, al massimo di tanto (rad, ~70°)
-const DUEL_SIDE_K = 0.85;       // ... di questa frazione dell'angolo tra "avanti" e la media dei compagni di quel lato
+const POSE_K_DRAG = 14;          // mentre il dito gira la visuale (src/camuser.js) l'inquadratura larga insegue più in fretta (1/s)
 
 // insegue l'inquadratura calcolata v ({ pos, look, fov }); la prima volta ci va subito
 function smoothPose(s, v, k) {
@@ -229,14 +228,18 @@ export class View {
     // duello col difensore: telecamera più bassa e più avanti (si passa a qualunque compagno)
     const duel = !!(m.duelFor && m.duelFor(this.me));
     this.duelK = (this.duelK || 0) + ((duel ? 1 : 0) - (this.duelK || 0)) * Math.min(1, dt * 5);
-    const side = duel ? this.duelSide(m) : 0;
-    this.sideK = (this.sideK || 0) + (side - (this.sideK || 0)) * Math.min(1, dt * 8);
     this.showRuns(m);
     // telecamera dietro l'azione
     const dir = this.me === 1 ? -1 : 1;
     let fx = b.x, fy = b.y;
     if (m.phase === 'restart' && m.restart) { fx = m.restart.x; fy = m.restart.y; }
     const rdt = this.rdt != null ? this.rdt : dt; // tempo vero: la telecamera non rallenta col rallenty
+    // visuale girata dalla persona (trascinando il dito, src/input.js): resta finché dura il rallenty in attacco con lo
+    // stesso portatore e mentre si disegna una linea; poi torna dolcemente dritta (src/camuser.js). Con un portatore
+    // nuovo (passaggio ricevuto) si riparte dritti anche se si è di nuovo nel rallenty.
+    if (this.camDrag) this.yawOwner = m.ball.owner;
+    const holdYaw = (userCamOn(m, this.me) && m.ball.owner === this.yawOwner) || this.drawing;
+    this.userYaw = relaxYaw(this.userYaw || 0, holdYaw, rdt);
     const k = Math.min(1, rdt * 4.5);
     // salto lungo del pallone (nuova prova del tutorial, ripartenza spostata): la telecamera ci va subito
     if (Math.hypot(fx - this.cx, fy - this.cy) > CAM_SNAP) { this.cx = fx; this.cy = fy; this.near = 0; }
@@ -263,7 +266,7 @@ export class View {
     const du = this.duelK; hh *= 1 - DUEL_LOW * du; camY += back * (0.3 - DUEL_BACK) * du; lookY += 8 * du;
     const camX = this.cx * dir * (0.82 - 0.3 * a) * (1 - 0.55 * dk);
     let px = camX, py = camY, lx = this.cx * dir * (0.9 - 0.45 * a) * (1 - 0.45 * dk), ly = lookY;
-    const phi = this.sideK * du; // duello senza compagni davanti: la visuale gira intorno al portatore verso i compagni
+    const phi = this.userYaw; // la visuale gira intorno al portatore dell'angolo scelto dalla persona
     if (Math.abs(phi) > 1e-3) {
       const ox = this.cx * dir, oy = this.cy * dir, cs = Math.cos(phi), sn = Math.sin(phi);
       const rot = (x, y) => [ox + (x - ox) * cs + (y - oy) * sn, oy - (x - ox) * sn + (y - oy) * cs];
@@ -272,7 +275,7 @@ export class View {
     // visuali calcolate (src/camfit.js), nello spazio "orientato" (si attacca verso +y): rallenty largo, poi parata
     let P = [px, hh, py], L = [lx, 0, ly], fov = this.baseFov || this.cam.fov;
     const pk = Math.min(1, rdt * POSE_K);
-    const wk = this.wideStep(m, mine, duel, du, rdt, pk);
+    const wk = this.wideStep(m, mine, duel, rdt, this.camDrag ? Math.min(1, rdt * POSE_K_DRAG) : pk);
     if (wk > 1e-3) ({ P, L, fov } = mixPose(P, L, fov, this.wideP, wk));
     const gk = this.saveStep(m, dir, rdt, pk);
     if (gk > 1e-3) ({ P, L, fov } = mixPose(P, L, fov, this.saveP, gk));
@@ -285,7 +288,7 @@ export class View {
 
   // rallenty in attacco (duello, area di tiro, disegno col pallone): visuale larga che tiene a schermo i compagni
   // davanti e di fianco al portatore; restituisce quanto pesa (0..1, entra ed esce col tempo vero)
-  wideStep(m, mine, duel, du, rdt, pk) {
+  wideStep(m, mine, duel, rdt, pk) {
     const c = m.ball.owner, zone = !duel && !!(m.inZone && m.inZone(this.me));
     const on = !!(mine && c && m.phase === 'play' && (duel || zone || this.drawing));
     this.wideK = (this.wideK || 0) + ((on ? 1 : 0) - (this.wideK || 0)) * Math.min(1, rdt * WIDE_IN);
@@ -293,8 +296,9 @@ export class View {
     if (on) {
       const dir = this.me === 1 ? -1 : 1, mates = [];
       for (const p of m.players) if (p.team === this.me && !p.off && p !== c && p.pos !== 'P') mates.push([p.x * dir, p.y * dir]);
-      // nel duello resta la rotazione verso i compagni di fianco (duelSide); nell'area di tiro anche la porta a schermo
-      const v = wideView({ carrier: [c.x * dir, c.y * dir], yaw: duel ? (this.sideK || 0) * du : 0, mates, goal: zone, aspect: this.cam.aspect, fov: this.baseFov || 70 });
+      // girata dell'angolo scelto dalla persona; nell'area di tiro anche la porta a schermo (se la visuale guarda verso di lei)
+      const yaw = this.userYaw || 0;
+      const v = wideView({ carrier: [c.x * dir, c.y * dir], yaw, mates, goal: keepGoal(zone, yaw), aspect: this.cam.aspect, fov: this.baseFov || 70 });
       this.wideP = smoothPose(this.wideP, v, pk);
     }
     return this.wideP ? this.wideK : 0;
@@ -357,31 +361,6 @@ export class View {
       fillRibbon(l, n, get, (i, n) => 0.2 * Math.min(1, 0.45 + i * 0.25), s, 0.75);
     });
   }
-  // duello: 0 se c'è almeno un compagno davanti al portatore (la visuale resta dritta), altrimenti l'angolo (rad)
-  // di cui girare la visuale verso il lato dello schermo con più compagni a cui passare (+ destra, − sinistra)
-  duelSide(m) {
-    const c = m.ctrl[this.me]; if (!c) return 0;
-    const dir = this.me === 1 ? -1 : 1; let ahead = 0, right = 0, left = 0;
-    for (const p of m.players) {
-      if (p.team !== this.me || p.off || p === c || p.pos === 'P') continue;
-      const dx = (p.x - c.x) * dir, dy = (p.y - c.y) * dir, d = Math.hypot(dx, dy);
-      if (d > DUEL_AHEAD_R) continue;
-      if (dy > 2 && Math.abs(dx) < dy) ahead++;
-      else if (dy > -10) { if (dx > 0) right++; else left++; }
-    }
-    if (ahead || right === left) return 0;
-    // angolo verso la media dei compagni del lato scelto (+ = verso destra dello schermo)
-    let sx = 0, sy = 0, n = 0;
-    for (const p of m.players) {
-      if (p.team !== this.me || p.off || p === c || p.pos === 'P') continue;
-      const dx = (p.x - c.x) * dir, dy = (p.y - c.y) * dir;
-      if (Math.hypot(dx, dy) > DUEL_AHEAD_R || dy <= -10 || (right > left ? dx <= 0 : dx >= 0)) continue;
-      sx += dx; sy += dy; n++;
-    }
-    const a = Math.atan2(Math.abs(sx / n), sy / n) * DUEL_SIDE_K;
-    return (right > left ? 1 : -1) * Math.min(DUEL_SIDE_MAX, a);
-  }
-
   render() { fitSun(this.lights, this.cam, this.flip); this.r.render(this.scene, this.cam); }
 
   // ---------------------------------------------------- conversioni schermo/campo

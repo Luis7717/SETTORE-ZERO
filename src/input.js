@@ -1,5 +1,6 @@
 // Comandi a un dito. Traduce i tocchi in ordini per la squadra `team`.
 import { HW, HL, GW, GH, SPRINT_DIST, RUN_MAX_LEN, clipLen } from './sim.js';
+import { userCamOn, dragYaw, isCamDrag } from './camuser.js';
 
 const NO_OFFSIDE = ['throw', 'goalkick', 'corner']; // ripartenze senza fuorigioco
 const PASS_SNAP = 5; // la linea che finisce entro tanti metri da un compagno è un passaggio a lui (m)
@@ -11,13 +12,15 @@ export class Input {
     this.el = el; this.view = view; this.out = out; this.match = null; this.team = 0; this.enabled = false;
     this.mode = null; this.pts = []; this.sx = 0; this.sy = 0; this.x = 0; this.y = 0; this.t0 = 0; this.id = null;
     this.drawing = false; this.onTap = null;
+    this.camOn = false; this.yaw0 = 0; this.camUsed = false; // visuale girata col dito nel rallenty (modo 'cam')
     el.addEventListener('pointerdown', e => this.down(e));
     el.addEventListener('pointermove', e => this.moveEv(e));
     el.addEventListener('pointerup', e => this.up(e));
     el.addEventListener('pointercancel', e => this.cancel(e));
   }
   set(match, team) { this.match = match; this.team = team; this.cancel(); }
-  cancel() { this.mode = null; this.id = null; this.drawing = false; this.pts = []; this.view.clearPath(); }
+  cancel() { this.mode = null; this.id = null; this.drawing = false; this.pts = []; this.endCam(); this.view.clearPath(); }
+  endCam() { this.camOn = false; this.view.camDrag = false; }
 
   pos(e) { const r = this.el.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
 
@@ -31,10 +34,16 @@ export class Input {
     if (c && b.owner === c && (hint === 'attack' || hint === 'restart')) {
       const sp = this.view.worldToScreen(b.x, b.y, 0.3), sc = this.view.worldToScreen(c.x, c.y, 1);
       const R = Math.max(64, this.view.h * 0.085);
-      if (Math.hypot(x - sp.x, y - sp.y) < R || Math.hypot(x - sc.x, y - sc.y) < R || hint === 'restart' && !this.nearMate(x, y)) {
+      if (Math.hypot(x - sp.x, y - sp.y) < R || Math.hypot(x - sc.x, y - sc.y) < R || hint === 'restart') {
         this.mode = 'draw'; this.drawing = true; this.pts = [{ x: b.x, y: b.y, h: 0, sx: x, sy: y }];
         return;
       }
+    }
+    // rallenty in attacco (duello, area di tiro): dito lontano dal portatore = trascinando di lato gira la visuale;
+    // il tocco breve (sul campo o su un compagno) non fa niente: il passaggio si disegna sempre
+    if (c && b.owner === c && hint === 'attack' && userCamOn(m, T)) {
+      this.mode = 'cam'; this.camOn = false; this.yaw0 = this.view.userYaw || 0;
+      return;
     }
     // difesa: dito su un proprio giocatore = linea da fargli seguire (tutti tranne il portiere)
     if (hint === 'defend' || hint === 'loose') {
@@ -66,8 +75,6 @@ export class Input {
   }
 
   goalY() { return this.team === 0 ? HL : -HL; }
-  // passaggio permesso in un duello col difensore, nell'area di tiro (ultimi 20 m) o su una rimessa
-  canPass() { const m = this.match; return m.phase === 'restart' || !!(m.passFor && m.passFor(this.team)); }
   // compagno (chiunque, tranne il portatore) vicino a un punto del campo
   mateAt(x, y, R = PASS_SNAP) {
     const m = this.match; let best = null, bd = R;
@@ -112,6 +119,12 @@ export class Input {
         // la linea di difesa si vede già tagliata alla lunghezza massima (il motore la taglia allo stesso modo)
         if (this.pts.length >= 2) this.view.setPath([this.pts[0], ...clipLen(this.pts[0].x, this.pts[0].y, this.pts.slice(1), RUN_MAX_LEN)], false, null);
       }
+    } else if (this.mode === 'cam') {
+      // la visuale parte quando il dito si sposta abbastanza di lato, poi lo segue (angolo e limiti: src/camuser.js)
+      const dx = x - this.sx;
+      if (!this.camOn && isCamDrag(dx, y - this.sy)) { this.camOn = true; this.camUsed = true; }
+      if (this.camOn && userCamOn(this.match, this.team)) { this.view.userYaw = dragYaw(this.yaw0, dx, this.view.w); this.view.camDrag = true; }
+      else this.view.camDrag = false;
     } else if (this.mode === 'dive') {
       // linea dal portiere verso il punto della porta dove tuffarsi: il tuffo parte quando si alza il dito
       const t = this.diveTarget(), g = this.match.gk(this.team);
@@ -164,7 +177,8 @@ export class Input {
   up(e) {
     if (e.pointerId !== this.id) return;
     const m = this.match, T = this.team; this.id = null;
-    const dt = performance.now() - this.t0, dist = Math.hypot(this.x - this.sx, this.y - this.sy), mode = this.mode;
+    const dt = performance.now() - this.t0, dist = Math.hypot(this.x - this.sx, this.y - this.sy);
+    const mode = this.mode;
     this.mode = null;
     if (!m) return;
     if (mode === 'draw') {
@@ -178,6 +192,10 @@ export class Input {
       return;
     }
     if (mode === 'dive') { if (dist > 22) this.doDive(); else this.view.clearPath(); return; }
+    if (mode === 'cam') {
+      this.endCam(); // nessun ordine al giocatore: né col tocco breve né tenendo premuto
+      return;
+    }
     if (mode === 'dpath') {
       const r = this.runner, pts = this.pts; this.runner = null; this.pts = []; this.view.clearPath();
       let len = 0; for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i].sx - pts[i - 1].sx, pts[i].sy - pts[i - 1].sy);
@@ -190,9 +208,8 @@ export class Input {
     if (dist < 16 && dt < 320) {
       const mate = this.nearMate(this.x, this.y);
       if (mate) {
-        if ((hint === 'attack' || hint === 'restart') && this.canPass()) this.out.kick({ type: 'auto', tx: mate.x + mate.vx * 0.45, ty: mate.y + mate.vy * 0.45, curve: 0 });
-        else if (hint === 'attack' || hint === 'restart') { /* fuori da duello e area di tiro niente passaggio diretto */ }
-        else this.out.sw(mate.i);
+        // col pallone il tocco su un compagno non fa niente (il passaggio si disegna sempre); senza = lo si comanda
+        if (hint !== 'attack' && hint !== 'restart') this.out.sw(mate.i);
       } else { const g = this.view.screenToGround(this.x, this.y); if (g) this.out.move(g.x, g.y, false); }
       return;
     }
