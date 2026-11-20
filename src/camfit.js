@@ -4,7 +4,7 @@
 //
 // Spazio "orientato": punti [x, h, y] con x = larghezza, h = altezza, y = lunghezza, già girati in modo che la
 // squadra umana attacchi verso +y (la propria porta è a y = −HL). Nel mondo three: X = x, Y = h, Z = −y.
-import { HL, GW, GH } from './sim/core.js';
+import { HL, GW, GH, SIX_W, SIX_D } from './sim/core.js';
 
 // Parata: telecamera dietro la propria porta, girata in parte verso chi tira; si allontana (e poi allarga il campo
 // visivo) quanto serve perché porta intera, portiere e pallone stiano a schermo.
@@ -163,5 +163,37 @@ export function wideView(o) {
   return fitView({
     c0, yaw, pitch: WIDE_PITCH, aspect: o.aspect, fov: o.fov, fovMax: Math.max(o.fov, WIDE_FOV_MAX), m: WIDE_MARGIN,
     tMin: 0, tMax: WIDE_MAX_DIST - WIDE_MIN_DIST, keep: o.goal ? 2 : 1, centerX: true, groups,
+  });
+}
+
+// Calcio d'angolo: telecamera alle spalle del battitore, girata verso il centro dell'area; si allontana (e poi
+// allarga il campo visivo) quanto serve perché battitore, area di rigore e porta stiano a schermo.
+export const CORNER_BACK = 4;      // distanza dietro la bandierina, sulla retta porta-bandierina (m)
+export const CORNER_H = 9;         // altezza di partenza (m): dall'alto l'area si legge meglio
+export const CORNER_PITCH = 0.62;  // inclinazione verso il basso (rad, ~30°): battitore in basso, area e porta in alto
+export const CORNER_AIM = 4;       // guarda verso il punto a tanti metri dalla linea di porta, al centro (battitore in mezzo allo schermo, porta davanti)
+export const CORNER_MAX_BACK = 9;  // non oltre tanti metri all'indietro (le tribune sono vicine)
+export const CORNER_FOV_MAX = 90;  // campo visivo verticale massimo (gradi)
+export const CORNER_MARGIN = { l: 0.06, r: 0.06, t: 0.2, b: 0.3 }; // in basso il suggerimento: il battitore resta sopra
+
+/**
+ * Visuale del calcio d'angolo (spazio orientato).
+ * @param {{ ball: number[], aspect: number, fov: number }} o  ball [x, y]: la bandierina da cui si batte
+ */
+export function cornerView(o) {
+  const [bx, by] = o.ball, sy = by >= 0 ? 1 : -1, gy = sy * HL;
+  const ax = 0, ay = gy - sy * CORNER_AIM;
+  const yaw = Math.atan2(ax - bx, ay - by), hx = Math.sin(yaw), hy = Math.cos(yaw);
+  const c0 = [bx - hx * CORNER_BACK, CORNER_H, by - hy * CORNER_BACK];
+  return fitView({
+    c0, yaw, pitch: CORNER_PITCH, aspect: o.aspect, fov: o.fov, fovMax: Math.max(o.fov, CORNER_FOV_MAX), m: CORNER_MARGIN,
+    tMin: 0, tMax: CORNER_MAX_BACK - CORNER_BACK, keep: 2, centerX: false, // di lato resta dietro al battitore
+    groups: [
+      [[bx, 0, by], [bx, 2, by]],
+      goalCorners(gy, 0.5, 0.3),
+      // l'area di rigore intera non si chiede: col telefono in verticale costringerebbe la telecamera a spostarsi di lato
+      // e il battitore finirebbe sul bordo; basta l'area piccola davanti alla porta
+      [[-SIX_W / 2, 0, gy - sy * SIX_D], [SIX_W / 2, 0, gy - sy * SIX_D]],
+    ],
   });
 }

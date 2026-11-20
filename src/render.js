@@ -8,7 +8,7 @@ import { releaseCanvas, watchRestore } from './canvas-mem.js';
 import { loadBestPlayers } from './athlete3d.js';
 import { buildPitch, buildLights, setupRenderer, fitSun, playerShadowTexture, shadowYaw, SHADOWS } from './pitch.js';
 import { Props, makeRibbon, fillRibbon } from './props.js';
-import { saveView, wideView } from './camfit.js';
+import { saveView, wideView, cornerView } from './camfit.js';
 import { userCamOn, relaxYaw, keepGoal } from './camuser.js';
 
 const _rp = [0, 0, 0]; // punto riusato per i nastri delle linee
@@ -313,6 +313,8 @@ export class View {
     const pk = Math.min(1, rdt * POSE_K);
     const wk = this.wideStep(m, mine, duel, rdt, this.camDrag ? Math.min(1, rdt * POSE_K_DRAG) : pk);
     if (wk > 1e-3) ({ P, L, fov } = mixPose(P, L, fov, this.wideP, wk));
+    const ck = this.cornerStep(m, dir, rdt, pk);
+    if (ck > 1e-3) ({ P, L, fov } = mixPose(P, L, fov, this.cornerP, ck));
     const gk = this.saveStep(m, dir, rdt, pk);
     if (gk > 1e-3) ({ P, L, fov } = mixPose(P, L, fov, this.saveP, gk));
     this.cam.position.set(P[0], P[1], -P[2]);
@@ -340,6 +342,16 @@ export class View {
     return this.wideP ? this.wideK : 0;
   }
   // parata: dietro la propria porta, porta intera + portiere + pallone sempre a schermo; restituisce quanto pesa
+  // calcio d'angolo (di chiunque): telecamera alle spalle del battitore, verso l'area (src/camfit.js cornerView);
+  // dopo il calcio torna dolcemente alla visuale normale
+  cornerStep(m, dir, rdt, pk) {
+    const r = m.restart, on = !!(m.phase === 'restart' && r && r.type === 'corner');
+    this.cornK = (this.cornK || 0) + ((on ? 1 : 0) - (this.cornK || 0)) * Math.min(1, rdt * (on ? 4 : 1.5));
+    if (this.cornK < 1e-3 && !on) { this.cornK = 0; this.cornerP = null; return 0; }
+    if (on) this.cornerP = smoothPose(this.cornerP, cornerView({ ball: [r.x * dir, r.y * dir], aspect: this.cam.aspect, fov: this.baseFov || 70 }), pk);
+    return this.cornK;
+  }
+
   saveStep(m, dir, rdt, pk) {
     const on = !!(m.diveWin && m.diveWin(this.me) && !(m.autoGk && m.autoGk[this.me]));
     this.gkK = (this.gkK || 0) + ((on ? 1 : 0) - (this.gkK || 0)) * Math.min(1, rdt * 6);

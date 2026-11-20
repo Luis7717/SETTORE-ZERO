@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { saveView, wideView, fitView, goalCorners, SAVE_MARGIN, WIDE_MARGIN, SAVE_MAX_BACK, WIDE_R } from '../../src/camfit.js';
+import { saveView, wideView, fitView, goalCorners, cornerView, SAVE_MARGIN, WIDE_MARGIN, CORNER_MARGIN, SAVE_MAX_BACK, WIDE_R } from '../../src/camfit.js';
 import { HL, GW, GH } from '../../src/sim/core.js';
 
 const ASPECT = 390 / 844, FOV = 70;
@@ -95,3 +95,20 @@ test('fitView: un gruppo impossibile si salta, quelli dopo si tengono', () => {
   assert.ok(inFrame(c, [0, 0, 0], WIDE_MARGIN) && inFrame(c, [3, 0, 10], WIDE_MARGIN));
   assert.ok(!inFrame(c, [200, 0, 0], WIDE_MARGIN));
 });
+
+// calcio d'angolo: telecamera alle spalle del battitore (fuori dal campo, oltre la bandierina), guarda verso l'area;
+// battitore e porta intera a schermo, da tutte e quattro le bandierine
+for (const [bx, by] of [[32, 50], [-32, 50], [32, -50], [-32, -50]]) {
+  test(`calcio d'angolo da (${bx}, ${by}): dietro il battitore, battitore e porta a schermo`, () => {
+    const v = cornerView({ ball: [bx, by], aspect: ASPECT, fov: FOV });
+    const c = cam(v), gy = Math.sign(by) * HL;
+    // dietro la bandierina: più lontano dal centro dell'area del battitore, e fuori dal campo
+    const aim = [0, gy - Math.sign(by) * 9];
+    assert.ok(Math.hypot(v.pos[0] - aim[0], v.pos[2] - aim[1]) > Math.hypot(bx - aim[0], by - aim[1]) + 3);
+    assert.ok(Math.abs(v.pos[0]) > 32 || Math.abs(v.pos[2]) > 50, 'fuori dal campo');
+    // guarda verso l'area: il punto guardato è più vicino al centro dell'area del battitore
+    assert.ok(Math.hypot(v.look[0] - aim[0], v.look[2] - aim[1]) < Math.hypot(bx - aim[0], by - aim[1]));
+    assert.ok(inFrame(c, [bx, 0, by], CORNER_MARGIN) && inFrame(c, [bx, 2, by], CORNER_MARGIN));
+    for (const p of goalCorners(gy, 0, 0)) assert.ok(inFrame(c, p, CORNER_MARGIN), `palo ${p}`);
+  });
+}

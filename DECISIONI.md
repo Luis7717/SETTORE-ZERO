@@ -659,3 +659,6 @@ Segnalazione di Luis (foto, IPA di `2931068`): campo, giocatori, tabellone e min
   pubblico negato → riga Diagnostica con l'errore; tutti i canvas ≥1024 negati → cielo blu, tribune a colori, campo verde.
 - **Da provare sull'iPhone**: lo stadio si vede? Se manca ancora (anche solo un pezzo), mettere in pausa e fotografare la
   riga "Diagnostica" in fondo.
+
+## 2026-11-20 — Calcio d'angolo: telecamera alle spalle del battitore
+Luis: "Il calcio d'angolo non ha la telecamera dietro al battitore". `cornerView` in `src/camfit.js` (+ `cornerStep` in `src/render.js`): per ogni angolo (nostro o avversario) la telecamera sta 4 m dietro la bandierina, alta 9 m, girata verso il centro della porta; battitore in basso al centro, porta e area piccola in alto. L'area di rigore intera non si chiede: col telefono in verticale la telecamera dovrebbe spostarsi di lato e il battitore finirebbe sul bordo. Dopo il calcio torna dolcemente alla visuale normale. Prova: `node test/corner-cam-shot.mjs <cartella>`.
