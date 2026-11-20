@@ -1,0 +1,60 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/menu/sfondo_menu.gd" id="1_sfondo"]
+[ext_resource type="Script" path="res://scripts/campo.gd" id="2_campo"]
+[ext_resource type="Script" path="res://scripts/stadio.gd" id="3_stadio"]
+
+[sub_resource type="ProceduralSkyMaterial" id="CieloMat"]
+sky_top_color = Color(0.2, 0.36, 0.68, 1)
+sky_horizon_color = Color(0.95, 0.78, 0.6, 1)
+sky_curve = 0.12
+ground_bottom_color = Color(0.16, 0.2, 0.16, 1)
+ground_horizon_color = Color(0.95, 0.78, 0.6, 1)
+sun_angle_max = 25.0
+
+[sub_resource type="Sky" id="Cielo"]
+sky_material = SubResource("CieloMat")
+
+[sub_resource type="Environment" id="Ambiente"]
+background_mode = 2
+sky = SubResource("Cielo")
+ambient_light_source = 3
+ambient_light_energy = 0.7
+reflected_light_source = 2
+tonemap_mode = 2
+fog_enabled = true
+fog_light_color = Color(0.86, 0.74, 0.62, 1)
+fog_density = 0.0016
+fog_sky_affect = 0.0
+
+[node name="SfondoMenu" type="Node3D"]
+script = ExtResource("1_sfondo")
+
+[node name="Ambiente" type="WorldEnvironment" parent="."]
+environment = SubResource("Ambiente")
+
+[node name="Sole" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.7071, 0.4082, -0.5774, 0, 0.8165, 0.5774, 0.7071, -0.4082, 0.5774, 0, 0, 0)
+light_color = Color(1, 0.86, 0.7, 1)
+light_energy = 1.35
+shadow_enabled = true
+directional_shadow_mode = 0
+directional_shadow_max_distance = 24.0
+
+[node name="Telecamera" type="Camera3D" parent="."]
+current = true
+fov = 30.0
+near = 0.1
+far = 400.0
+
+[node name="Campo" type="Node3D" parent="."]
+script = ExtResource("2_campo")
+
+[node name="Stadio" type="Node3D" parent="."]
+script = ExtResource("3_stadio")
+
+[node name="Campione" type="Node3D" parent="."]
+
+[node name="Pallone" type="MeshInstance3D" parent="Campione"]
+
+[node name="OmbraPallone" type="MeshInstance3D" parent="Campione"]
