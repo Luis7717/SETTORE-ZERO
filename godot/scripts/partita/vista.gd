@@ -27,6 +27,11 @@ extends Node3D
 
 const Coord := preload("res://scripts/coord.gd")
 const Figura := preload("figura.gd")
+const PALLA_HD := "res://assets/textures/pallone.png"
+const PALLA_N := "res://assets/textures/pallone_n.png"
+const Aspetto := preload("aspetto.gd")
+const Schiene := preload("schiene.gd")
+const Giocatore := preload("res://scripts/giocatore.gd")
 const TV := preload("texture_vista.gd")
 const CU := preload("camuser.gd")
 const Giochetti := preload("mosse/giochetti.gd")
@@ -55,8 +60,6 @@ const DOF_FORZA := 0.07        # sfocatura massima (dof_blur_amount)
 # divise come nel gioco web (src/career.js kitOf: Rosso e Blu; portieri arancio e verde)
 const KIT_CASA := {"shirt": 0xc8102e, "shorts": 0xffffff, "socks": 0xc8102e, "gk": {"shirt": 0xffa41c, "shorts": 0x222222, "socks": 0xffa41c}}
 const KIT_OSPITI := {"shirt": 0x1746a2, "shorts": 0xffffff, "socks": 0x1746a2, "gk": {"shirt": 0x2ad17a, "shorts": 0x15803d, "socks": 0x15803d}}
-const PELLI := [Color("#f1c9a5"), Color("#d9a47a"), Color("#a9744f"), Color("#6b4630")]
-const CAPELLI := [Color("#1c1410"), Color("#4a2f1b"), Color("#8a5a2b"), Color("#d9b66a"), Color("#222222")]
 
 ## angolo (rad) della visuale girata col dito: lo scrive chi gestisce il dito, qui torna dolcemente a 0 (relaxYaw)
 var user_yaw := 0.0
@@ -90,6 +93,7 @@ var qualita_auto := true
 var livello_qualita := Qualita.ALTO
 var t_vero := 0.0              # tempo vero dall'inizio (s)
 var _qualita := Qualita.new()
+var _schiene: Node
 var _effetti: Node3D
 var _attr: CameraAttributesPractical
 var _env: Environment
@@ -118,6 +122,9 @@ func _ready() -> void:
 	_tex_warn = TV.avviso()
 	_crea_pallone()
 	_crea_segni()
+	_schiene = Schiene.new()
+	_schiene.name = "Schiene"
+	add_child(_schiene)
 	_effetti = Effetti.new()
 	add_child(_effetti)
 	_attr = CameraAttributesPractical.new()
@@ -145,6 +152,7 @@ func setup(match_: SimMatch, me_: int) -> void:
 	for i in m.players.size():
 		_figs.append(_figura(m.players[i]))
 		_srcs.append(m.players[i].src)
+	_prepara_schiene()
 	var mm := _shadows.multimesh
 	mm.instance_count = m.players.size()
 	cam.reset(m.ball.x, m.ball.y)
@@ -173,6 +181,8 @@ func update_view(dt_game: float, dt_real: float) -> void:
 		if p.src != _srcs[i]:   # cambio: entra un altro giocatore
 			_figs[i].queue_free()
 			_figs[i] = _figura(p)
+			_srcs[i] = p.src
+			_prepara_schiene()
 			_srcs[i] = p.src
 		_posa(i, p, dt_game)
 		var on: bool = not p.off
@@ -406,29 +416,66 @@ func _trick_of(p: Object) -> Dictionary:
 	return {"id": k.id, "q": minf(1.0, k.t / k.dur), "side": k.side}
 
 
+# divisa del giocatore (figFor di src/render.js): kit della squadra o del portiere, stile (team.kit.style, sennò dal
+# nome della squadra come kitStyleFromSeed; il portiere ha maniche lunghe, tinta unita e girocollo), numero e cognome
 func _kit_di(p: Object) -> Dictionary:
 	var team: Dictionary = m.teams[p.team]
-	var k: Dictionary = team.get("kit", KIT_CASA if p.team == 0 else KIT_OSPITI)
 	var def: Dictionary = KIT_CASA if p.team == 0 else KIT_OSPITI
+	var squadra: Dictionary = team.get("kit", def)
+	var k: Dictionary = squadra
+	var st := _stile_squadra(p.team)
 	if p.pos == "P":
-		k = k.get("gk", def.gk)
+		k = squadra.get("gk", def.gk)
+		st = st.duplicate()
+		st.sleeves = 1
+		st.pattern = 0
+		st.collar = 0
 	var shirt := _colore(k.get("shirt", 0xffffff))
 	var shorts := _colore(k.get("shorts", 0xffffff))
-	return {"maglia": shirt, "calzoncini": shorts, "calzettoni": _colore(k.get("socks", k.get("shirt", 0xffffff))), "bordino": shorts}
+	var i: int = m.players.find(p)
+	var cel := Schiene.cella(maxi(i, 0))
+	return {"maglia": shirt, "calzoncini": shorts, "calzettoni": _colore(k.get("socks", k.get("shirt", 0xffffff))),
+		"bordino": _secondo_colore(shirt, shorts),
+		"stile": Vector4(st.sleeves, st.collar, st.pattern, st.socks),
+		"numero": Vector4(cel.x, cel.y, 1.0 if i >= 0 else 0.0, st.fit)}
 
 
-# pelle e capelli: dal giocatore (src.look {skin, hair} se c'è), altrimenti fissi per nome
+func _stile_squadra(k: int) -> Dictionary:
+	var team: Dictionary = m.teams[k]
+	var kit: Variant = team.get("kit")
+	if kit is Dictionary and kit.has("style"):
+		return Aspetto.normalize_kit_style(kit["style"])
+	return Aspetto.kit_style_from_seed(Aspetto.hash32([str(team.get("name", "squadra %d" % k))]))
+
+
+# secondo colore della divisa (altH di src/athlete3d.js): i calzoncini, o bianco / quasi nero se sono come la maglia
+static func _secondo_colore(maglia: Color, calzoncini: Color) -> Color:
+	if maglia.is_equal_approx(calzoncini):
+		return Color("#1b1b1b") if maglia.get_luminance() > 0.5 else Color.WHITE
+	return calzoncini
+
+
+# aspetto (src/looks.js): il `look` del giocatore se c'è (completato), sennò dal suo id e nome come lookOf del web
 func _aspetto_di(p: Object) -> Dictionary:
-	var look: Variant = p.src.get("look")
-	var h := hash(str(p.team) + ":" + str(p.name) + ":" + str(p.i))
-	var skin: Color = PELLI[absi(h) % PELLI.size()]
-	var hair: Color = CAPELLI[absi(h / 7) % CAPELLI.size()]
-	if look is Dictionary:
-		if look.has("skin"):
-			skin = _colore(look.skin)
-		if look.has("hair"):
-			hair = _colore(look.hair)
-	return {"pelle": skin, "capelli": hair}
+	var src: Dictionary = p.src if p.src is Dictionary else {}
+	var l := Aspetto.look_of(src if not src.is_empty() else {"id": "%d_%d" % [p.team, p.i], "name": str(p.name)})
+	return {"pelle": Aspetto.colore(Aspetto.SKINS, l.skin), "capelli": Aspetto.colore(Aspetto.HAIR_COLORS, l.hairColor),
+		"iride": Aspetto.colore(Aspetto.EYE_COLORS, l.eyeColor), "scarpe": Aspetto.colore(Aspetto.BOOTS, l.boots),
+		"stile2": Vector4(l.hair, l.beard, l.brows, _stile_squadra(p.team).shorts)}
+
+
+# cognomi e numeri di chi è in campo (numero: src.num, sennò il posto in squadra + 1, come figFor del web)
+func _prepara_schiene() -> void:
+	var voci: Array = []
+	for i in m.players.size():
+		var p: Object = m.players[i]
+		var k := _kit_di(p)
+		var st: Vector4 = k.stile
+		var ink := Schiene.inchiostro(k.maglia, k.bordino, int(st.z))
+		var src: Dictionary = p.src if p.src is Dictionary else {}
+		voci.append({"num": int(src.get("num", p.i + 1)), "nome": Aspetto.back_name(str(src.get("name", p.name))),
+			"fill": ink[0], "line": ink[1]})
+	_schiene.prepara(voci, Giocatore._materiale)
 
 
 static func _colore(v: Variant) -> Color:
@@ -457,11 +504,19 @@ func _crea_pallone() -> void:
 	var sfera := SphereMesh.new()
 	sfera.radius = BALL_R
 	sfera.height = BALL_R * 2.0
-	sfera.radial_segments = 20
-	sfera.rings = 10
+	sfera.radial_segments = 32
+	sfera.rings = 16
 	var mat := StandardMaterial3D.new()
-	mat.albedo_texture = TV.palla()
+	# pallone HD (tools/genera_texture.gd: 32 spicchi con le cuciture in rilievo), sennò quello disegnato al volo
+	if ResourceLoader.exists(PALLA_HD) and ResourceLoader.exists(PALLA_N):
+		mat.albedo_texture = load(PALLA_HD)
+		mat.normal_enabled = true
+		mat.normal_texture = load(PALLA_N)
+		mat.normal_scale = 0.8
+	else:
+		mat.albedo_texture = TV.palla()
 	mat.roughness = 0.45
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	_ball = MeshInstance3D.new()
 	_ball.name = "Pallone"
 	_ball.mesh = sfera

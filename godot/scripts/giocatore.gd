@@ -97,6 +97,10 @@ static func _prepara_condivisi(mi: MeshInstance3D, scheletro: Skeleton3D, player
 	_materiale.set_shader_parameter("gomito_x", absf(osso.call("lowerarm_l").x))
 	_materiale.set_shader_parameter("testa", osso.call("Head"))
 	_materiale.set_shader_parameter("testa_alto", _mesh_divisa.get_aabb().end.y)
+	_materiale.set_shader_parameter("collo_z", osso.call("neck_01").z)
+	_materiale.set_shader_parameter("petto_y", osso.call("spine_03").y + 0.07)
+	_materiale.set_shader_parameter("polso_x", absf(osso.call("hand_l").x))
+	_materiale.set_shader_parameter("occhi", _centro_occhio(_mesh_divisa))
 	# verso del modello: dalla caviglia alla punta del piede; lo si gira perché guardi verso −Z (il "davanti" di Godot)
 	var punta: Vector3 = osso.call("ball_r") - osso.call("foot_r")
 	_yaw_modello = -atan2(-punta.x, -punta.z)
@@ -105,6 +109,20 @@ static func _prepara_condivisi(mi: MeshInstance3D, scheletro: Skeleton3D, player
 		if player.has_animation(nome):
 			player.get_animation(nome).loop_mode = Animation.LOOP_LINEAR
 	_albero = _costruisci_albero()
+
+
+# centro dell'occhio sinistro (x > 0) in posa di riposo: i vertici col tassello degli occhi nelle UV (come il web)
+static func _centro_occhio(mesh: ArrayMesh) -> Vector3:
+	var a := mesh.surface_get_arrays(0)
+	var v: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
+	var uv: PackedVector2Array = a[Mesh.ARRAY_TEX_UV]
+	var somma := Vector3.ZERO
+	var n := 0
+	for i in v.size():
+		if uv[i].x >= 0.875 and uv[i].y >= 0.875 and v[i].x > 0.0:
+			somma += v[i]
+			n += 1
+	return somma / n if n > 0 else Vector3(0.034, 1.698, 0.07)
 
 
 # copia della mesh con la posizione di riposo di ogni vertice in CUSTOM0 (per lo shader della divisa)

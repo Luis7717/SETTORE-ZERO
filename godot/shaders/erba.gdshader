@@ -12,6 +12,10 @@ uniform vec3 scura_bordo : source_color = vec3(0.216, 0.541, 0.192);  // #378a31
 uniform vec3 riga : source_color = vec3(0.98, 0.988, 0.965);
 uniform sampler2D grana : filter_linear_mipmap_anisotropic, repeat_enable;
 uniform float forza_grana = 0.3;
+uniform sampler2D dettaglio_n : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;   // fili d'erba (normal map)
+uniform float forza_dettaglio = 0.55;
+const float DETTAGLIO_M = 0.9;     // m coperti da una ripetizione dei fili
+const float DETTAGLIO_FINE = 26.0; // m dalla telecamera: oltre, niente fili (non si vedono e sfarfallerebbero)
 
 const float HW = 32.0;
 const float HL = 50.0;
@@ -63,6 +67,13 @@ void fragment() {
 	vec3 c = chiara_qui ? mix(chiara_bordo, chiara, smoothstep(0.0, 0.45, t)) : mix(scura_bordo, scura, smoothstep(0.0, 0.45, t));
 	float g = texture(grana, pos_mondo / 1.6).r * 0.55 + texture(grana, pos_mondo / 4.3 + vec2(0.37, 0.11)).r * 0.45;
 	c *= 1.0 + forza_grana * (g - 0.5);
+	// chiazze larghe (erba un po' più gialla o più verde), appena accennate
+	float chiazza = texture(grana, pos_mondo / 23.0 + vec2(0.71, 0.29)).r;
+	c *= mix(vec3(1.0), vec3(1.05, 1.03, 0.9), smoothstep(0.55, 0.8, chiazza) * 0.6);
+	// da vicino: fili d'erba in rilievo, che spariscono piano con la distanza
+	float vicino = 1.0 - smoothstep(DETTAGLIO_FINE * 0.4, DETTAGLIO_FINE, length(VERTEX));
+	NORMAL_MAP = mix(vec3(0.5, 0.5, 1.0), texture(dettaglio_n, pos_mondo / DETTAGLIO_M).rgb, vicino);
+	NORMAL_MAP_DEPTH = forza_dettaglio;
 	// righe con bordo morbido largo un pixel; lontano, quando la riga è più sottile di un pixel, si schiarisce
 	// invece di sfarfallare
 	float d = distanza_righe(p);

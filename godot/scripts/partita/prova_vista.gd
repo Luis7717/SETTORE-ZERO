@@ -7,6 +7,13 @@
 #                         visuale girata) · parata (tiro avversario, visuale dietro la porta) · angolo (calcio d'angolo)
 #                         · giochetto (arcobaleno da vicino) · gol (la rete si gonfia) · rete (la stessa vista di fianco,
 #                         da dietro la linea) · linea (passaggio disegnato, anteprima e linee di difesa)
+#                         · festa (gol visto dal centro: tifosi in piedi, maxischermo, coriandoli)
+#                         · primo (primo piano di un giocatore da dietro: aspetto, cognome e numero)
+#                         · volti (primo piano di tre giocatori di fronte: pelle, capelli, barba, occhi)
+#   --qualita=0..3        livello grafico fisso (3 alto, 2 medio, 1 basso, 0 minimo; niente cambi automatici)
+#   --senza=a,b,...       spegne singole voci per misurarne il costo: pubblico, cartelloni, schermi, tetti, fari,
+#                         bagliore, dof, ombre, effetti, rete, aspetto
+#   --scala3d=K           pixel 3D × K (2 = tanti quanti sull'iPhone, 780 px di larghezza)
 #   --schermata=PERCORSO.png [--dopo=SEC]   salva una schermata dopo SEC secondi ed esce (percorso relativo = dal repo)
 #   --sequenza=N [--ogni=SEC]               con --schermata: N schermate a distanza di SEC secondi (_1, _2, ...)
 #   --esci-dopo=SEC       esce dopo SEC secondi e stampa FPS medi e tempo del fotogramma
@@ -40,6 +47,7 @@ var _n := 0
 var _gpu_ms := 0.0             # tempo della scheda video e del disegno sul processore (misurati da Godot)
 var _cpu_ms := 0.0
 var _n_misure := 0
+var _ultimo_tiro := 0          # squadra dell'ultimo tiro (il palo non dice di chi era)
 
 
 func _ready() -> void:
@@ -63,6 +71,13 @@ func _ready() -> void:
 	m = SimMatch.new({"seed": seme, "halfLen": 600.0, "human": [false, false], "kickoff": 0,
 		"teams": [squadra("Rossi", 74.0, seme * 3 + 1), squadra("Blu", 72.0, seme * 3 + 2)]})
 	vista.setup(m, int(_opz.get("me", "0")))
+	if _opz.has("qualita"):
+		vista.qualita_auto = false
+		vista.set_qualita(int(_opz["qualita"]))
+	if _opz.has("senza"):
+		vista.qualita_auto = false
+		for voce: String in str(_opz["senza"]).split(",", false):
+			_spegni(voce)
 	await _prepara_scena()
 	_avvia_prove()
 
@@ -117,15 +132,76 @@ func _process(delta: float) -> void:
 	elif _scena == "rete":
 		vista.cam.fov = 50.0
 		vista.cam.look_at_from_position(Vector3(11.0, 2.4, -53.5), Vector3(0.5, 1.0, -51.2), Vector3.UP)
+	elif _scena == "festa":
+		vista.cam.fov = 62.0
+		vista.cam.look_at_from_position(Vector3(-14.0, 9.0, -24.0), Vector3(0.0, 4.0, -56.0), Vector3.UP)
+	elif _scena == "primo":
+		_primo_piano(m.players[9], true)
+	elif _scena == "volti":
+		_volti()
 	elif _opz.has("vicino"):
 		_telecamera_vicina(m.players[int(_opz["vicino"])])
 
 
+# fatti del motore → giochetti e tifo (il gol la vista lo vede da sola dal punteggio)
 func _eventi() -> void:
 	for e: Dictionary in m.events:
-		if e.type == "dribble":
-			vista.trick(e.p)
+		match e.type:
+			"dribble":
+				vista.trick(e.p)
+			"kick":
+				if e.get("kind") == "shot" and e.p != null:
+					_ultimo_tiro = e.p.team
+					vista.tifo("occasione", e.p.team)
+			"post":
+				vista.tifo("palo", _ultimo_tiro)
+			"save":
+				if e.p != null:
+					vista.tifo("parata", e.p.team)
+			"foul":
+				if e.get("by") != null:
+					vista.tifo("fischio", e.by.team)
 	m.events.clear()
+
+
+# spegne una voce della grafica (per misurarne il costo con --senza)
+func _spegni(voce: String) -> void:
+	var st: Node = vista.get_node("Stadio")
+	match voce:
+		"pubblico":
+			st.set_pubblico(0.0)
+		"cartelloni", "schermi", "tetti", "fari":
+			var nomi := {"cartelloni": "Cartelloni", "schermi": "Maxischermo", "tetti": "Tettoia", "fari": "Faro"}
+			var tolti := 0
+			for n: Node in st.get_children():
+				if str(n.name).contains(nomi[voce]) and n is Node3D:
+					(n as Node3D).visible = false   # nascosti, non tolti: lo stadio continua ad aggiornarli
+					tolti += 1
+			if tolti == 0:
+				push_warning("--senza=%s: niente da togliere" % voce)
+		"bagliore":
+			vista._env.glow_enabled = false
+		"dof":
+			vista._dof_on = false
+			vista._attr.dof_blur_far_enabled = false
+			vista._attr.dof_blur_near_enabled = false
+		"ombre":
+			RenderingServer.directional_soft_shadow_filter_set_quality(RenderingServer.SHADOW_QUALITY_HARD)
+			vista._sole.shadow_blur = 1.0
+		"effetti":
+			vista._effetti.set_quantita(0.0)
+			vista._effetti.scia_on = false
+			vista._effetti.sbuffi_on = false
+		"rete":
+			vista._campo.set("_molle", {})
+		"aspetto":
+			for f: Node3D in vista._figs:
+				var mi: MeshInstance3D = f.get("_mesh")
+				mi.set_instance_shader_parameter(&"stile2", Vector4(2, 0, 0, 0))
+				mi.set_instance_shader_parameter(&"numero", Vector4.ZERO)
+				mi.set_instance_shader_parameter(&"stile", Vector4.ZERO)
+		_:
+			push_warning("--senza: voce sconosciuta " + voce)
 
 
 # ---------------------------------------------------------------- scene
@@ -151,9 +227,15 @@ func _prepara_scena() -> void:
 			_tiro_avversario()
 			_ts = SLOW
 			_tuffo_dopo(0.36)   # senza await: le schermate partono subito, il tuffo arriva dopo
-		"gol", "rete":
+		"gol", "rete", "festa":
 			await _corri(1.0)
 			_tiro_in_porta()
+		"primo", "volti":
+			await _corri(0.5)
+			_fermo = true
+			for q: Object in m.players:
+				q.vx = 0.0
+				q.vy = 0.0
 		"angolo":
 			await _corri(1.0)
 			m.setRestart("corner", 0, Coord_HW(), 50.0)
@@ -249,6 +331,29 @@ func _linee(c: Object) -> void:
 	for i in [2, 3]:
 		var d: Object = m.players[i]
 		m.userRun(0, d, [{"x": d.x + 4.0, "y": d.y + 5.0}, {"x": d.x + 2.0, "y": d.y + 11.0}])
+
+
+# primo piano da dietro (da_dietro) o di fronte, all'altezza delle spalle
+func _primo_piano(c: Object, da_dietro: bool) -> void:
+	var s := vista.flip
+	var p := Vector3(s * c.x, 0.0, -s * c.y)
+	var avanti := Vector3(s * c.fx, 0.0, -s * c.fy).normalized()
+	var dove := p + avanti * (-2.2 if da_dietro else 1.6) + Vector3(0.5, 2.0, 0.0)
+	vista.cam.fov = 40.0
+	vista.cam.look_at_from_position(dove, p + Vector3(0.0, 1.75 if da_dietro else 2.0, 0.0), Vector3.UP)
+
+
+# tre giocatori in fila guardati di fronte, da vicino (aspetti diversi)
+func _volti() -> void:
+	for k in 3:
+		var q: Object = m.players[[3, 6, 9][k]]
+		q.x = -0.62 + k * 0.62
+		q.y = 0.0
+		q.fx = 0.0
+		q.fy = -1.0
+	var s := vista.flip
+	vista.cam.fov = 26.0
+	vista.cam.look_at_from_position(Vector3(0.0, 2.3, s * 6.5), Vector3(0.0, 2.0, 0.0), Vector3.UP)
 
 
 # telecamera fissa vicina a un giocatore (per guardare il giochetto o il tuffo)

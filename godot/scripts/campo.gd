@@ -11,6 +11,7 @@ const ReteMolle := preload("res://scripts/rete_molle.gd")
 const MX := 10.0               # margine d'erba oltre le linee laterali (m)
 const MY := 12.0               # margine d'erba oltre le linee di porta (m)
 const ERBA_FUORI := Color("#2c6428")   # terreno oltre i margini
+const ERBA_N := "res://assets/textures/erba_n.png"
 const GRANA_LATO := 256         # lato della texture di grana dell'erba (px)
 const PALO_R := 0.06            # raggio di pali e traversa (m)
 const RETE_FONDO := 2.0         # profondità della rete a terra (m)
@@ -37,6 +38,8 @@ func _costruisci_erba() -> void:
 	var mat := ShaderMaterial.new()
 	mat.shader = SHADER_ERBA
 	mat.set_shader_parameter("grana", _texture_grana())
+	if ResourceLoader.exists(ERBA_N):   # fili d'erba da vicino (tools/genera_texture.gd)
+		mat.set_shader_parameter("dettaglio_n", load(ERBA_N))
 	var piano := PlaneMesh.new()
 	piano.size = Vector2(Coord.W + MX * 2.0, Coord.L + MY * 2.0)
 	var erba := MeshInstance3D.new()

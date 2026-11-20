@@ -286,6 +286,7 @@ func _faro(sx: float, sy: float) -> void:
 	var x: float = sx * (Coord.HW + TRIBUNA_DX + TRIBUNA_FONDA * 0.55)
 	var y: float = sy * (Coord.HL + TRIBUNA_DY + TRIBUNA_FONDA * 0.55)
 	var torre := MeshInstance3D.new()
+	torre.name = "Faro"
 	var c := CylinderMesh.new()
 	c.top_radius = 0.5
 	c.bottom_radius = 0.9
@@ -297,6 +298,7 @@ func _faro(sx: float, sy: float) -> void:
 	torre.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(torre)
 	var lampade := MeshInstance3D.new()
+	lampade.name = "FaroLampade"
 	var b := BoxMesh.new()
 	b.size = Vector3(7.0, 3.5, 0.6)
 	lampade.mesh = b

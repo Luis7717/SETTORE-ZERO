@@ -42,7 +42,7 @@ func _ready() -> void:
 func _scalda() -> void:
 	for e: GPUParticles3D in [_cori, _sbuffi[0]]:
 		e.amount_ratio = 0.002
-		e.global_position = Vector3(0.0, 0.05, 0.0)
+		e.global_position = Vector3(0.0, -40.0, 0.0)   # sotto il campo: non si vede
 		e.restart()
 	await get_tree().create_timer(0.3).timeout
 	_cori.amount_ratio = _quantita
