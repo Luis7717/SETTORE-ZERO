@@ -35,7 +35,7 @@ nuovi finché quel blocco non è finito e la build su GitHub non è riuscita. La
 | # | Pezzo | Worktree / ramo | File |
 |---|---|---|---|
 | 13 | Giocatori: modello con proporzioni realistiche, divise, capelli, pose, editor | `TAG-wt-gfx2` / `wt-gfx2` | `players3d.js`, `hair3d.js`, `editor.js`, `assets/models` |
-| 14 | Campo: erba, luci, tonemapping, ombre | `TAG-wt-campo` / `wt-campo` | `render.js` (solo campo/luci/ombre), nuovi file |
+| 14 | Campo: erba, luci, tonemapping, ombre vere — FATTO, unito (`ad4cffa`) | `TAG-wt-campo` / `wt-campo` | nuovo `pitch.js`, `render.js` |
 | 15 | Stadio, pubblico, bandiere, cartelloni | `TAG-wt-stadio` / `wt-stadio` | `stadium.js` |
 | 16 | Pallone, porte e rete, bandierine, effetti, linee disegnate | `TAG-wt-effetti` / `wt-effetti` | nuovo `props.js`, chiamate in `render.js` |
 Telecamera: la tengo io. L'unione in `gioco2` la faccio io, un pezzo alla volta, con test e schermate dopo ognuno.
