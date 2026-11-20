@@ -801,3 +801,31 @@ Legge `SimMatch` e non lo cambia; contratto nel README di `godot/`. Ciclo di gio
   vicino, linee (passaggio, anteprima, fuorigioco, difesa), gol. FPS senza vsync con 22 giocatori: ~315-340
   (fotogramma 2,8-3 ms; vista 1,5 ms di CPU, di cui ~0,6 ms le 22 AnimationTree; motore 0,2 ms).
   **Non verificato sull'iPhone.**
+
+## 2026-11-20 — Godot fase 3: sfondo menu e allenamento
+- **Sfondo del menu = stessa routine del web, non un'animazione nuova.** `mosse/palleggi.gd`, `mosse/tiro.gd` e
+  `scripts/menu/routine_menu.gd` portano `src/moves/juggle.js`, `shot.js` e `src/menu-routine.js` riga per riga; un
+  test confronta 510 istanti del ciclo (114 s) con quelli esportati dal JS (`test/export-menu.mjs` →
+  `godot/tests/fixtures/menu.json`) entro 2 mm. `giochetti.gd` ora costruisce sia la versione del menu (pallone
+  piccolo, tempi ×1,6, sombrero 1,9 m con atterraggio vero) sia quella della partita (invariata: `test_mosse` passa).
+  `corpo.gd` ha in più i punti di coscia e testa (`thigh_point`, `head_pt`) usati dai palleggi.
+- **Un solo giocatore, scena leggera.** Campo e stadio della partita, una `figura.gd`, ombra a disco per il pallone;
+  la telecamera gira piano (±0,32 rad in 38 s) e "respira" (±0,5 m in 23 s). Con `attivo = false` o nascosta la scena
+  si ferma del tutto (niente `_process`, telecamera, cielo e sole staccati) per non pesare durante la partita.
+  Inquadratura come il web (fov 30, 7,2 m): il campione riempie metà schermo, i tasti del menu staranno sopra.
+- **Allenamento: logica pura uguale al web, interfaccia separata.** `allenamento.gd` non conosce la grafica: riceve un
+  oggetto `ui` con `text()` e `card()` come il web, così i 7 test (i 5 di `tutorial.test.mjs` e i 2 della lezione
+  Dribbling di `dribble-beat.test.mjs`) girano senza schermo. Il motore non si tocca: la lezione sposta solo giocatori e
+  pallone. Correzione del dribbling compresa (attese azzerate a ogni prova, difensore con difesa 15): nei test 26
+  tentativi per 24 prove superate, 0 fotogrammi col difensore saltato attaccato al portatore.
+- **Aggancio minimo a `gioco.gd`** (lo modifica anche il lavoro della carriera): `var tipo`, la squadra avversaria e il
+  tempo infinito in `_crea_partita`, `before()/after()` attorno ai passi del motore, suggerimenti e aiuto visuale spenti,
+  testo "Esci dall'allenamento", e tutto il resto in un blocco in fondo al file. Finché non c'è `avvia(opz)` si parte con
+  `--allenamento`; a fine allenamento si manda `finita(esito)` se il segnale esiste, sennò si ricomincia.
+- **Squadra "Allenamento" fatta qui** (`Allenamento.squadra_ospite()`, livello ~40, seme fisso): nel web è
+  `aiMatchTeam` della carriera, che in Godot non c'è ancora. Quando arriva la carriera si può sostituire.
+- **Prova del dito finto**: `bot_allenamento.gd` supera tutte e 6 le lezioni (18 prove) solo con gesti a schermo, con 3
+  semi diversi (~30 s a velocità 4). Schermate 390×844 di scheda e lezioni confrontate col web (`test/tut-lessons-shot.mjs`).
+- **Verifica** (PC, RTX 3070): 144 test verdi, 0 falliti (anche `test_allenamento` 7 e `test_sfondo_menu` 6). Sfondo
+  del menu: ~1500 FPS senza vsync, 120 con vsync; scena principale e menu senza errori senza schermo.
+  **Non verificato sull'iPhone.**
