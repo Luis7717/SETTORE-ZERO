@@ -13,7 +13,11 @@ const DUEL_CD = 1.0;           // dopo la fine, lo stesso portatore non apre un 
 const DRIB_BASE = 0.5;         // probabilità di riuscita a pari dribbling e difesa
 const DRIB_SKILL = 1.2;        // quanto pesa la differenza dribbling - difesa (per punto / 100)
 const DRIB_MIN = 0.15, DRIB_MAX = 0.85; // limiti della probabilità di riuscita
-const DRIB_STUN = 0.8;         // dribbling riuscito: il difensore resta sbilanciato per questo tempo (s)
+const DRIB_STUN = 0.8;         // dribbling riuscito: il difensore resta sbilanciato (fermo) per questo tempo da quando il portatore lo raggiunge (s)
+const DRIB_REACH = 1;          // ... "raggiunto" = portatore arrivato a questa distanza dal difensore (m)
+const DRIB_BEAT = 1.2;         // finito lo sbilanciamento, il difensore saltato resta ancora "saltato" per questo tempo (s;
+                               // sbilanciato + saltato = 2 s, quanto il giochetto più lungo della grafica, l'arcobaleno):
+export const DRIB_BEAT_SPD = 0.5; // ... corre a questa frazione della velocità, non contrasta chi l'ha saltato e non gli riapre il duello
 const DRIB_PROTECT = 0.35;     // ... e il portatore non può essere contrastato da nessuno per questo tempo (s)
 const DRIB_PAST = 3;           // il portatore punta a questa distanza oltre il difensore (m)
 const DRIB_SIDE = 2.5;         // ... spostato di lato di tanto (m)
@@ -38,6 +42,8 @@ export class DuelMethods {
   passFor(T) { return this.duelFor(T) || this.inZone(T); }
   // il difensore del duello non può ancora rubare palla
   duelGuard(o) { const d = this.duel; return !!(d && d.o === o && d.t < DUEL_GUARD); }
+  // o è stato saltato col dribbling da c e non si è ancora ripreso: non può contrastarlo né riaprirgli il duello
+  beaten(o, c) { return o.beat > 0 && o.beatBy === c; }
 
   // verso di corsa del portatore (fermo: verso cui guarda)
   runDir(c) { const v = hyp(c.vx, c.vy); return v > 1.5 ? [c.vx / v, c.vy / v] : [c.fx, c.fy]; }
@@ -47,7 +53,7 @@ export class DuelMethods {
   frontOpp(c, R) {
     let best = null, bd = R;
     for (const o of this.players) {
-      if (o.team === c.team || o.off || o.stun > 0 || (o.state !== 'play' && o.state !== 'prep')) continue;
+      if (o.team === c.team || o.off || o.stun > 0 || this.beaten(o, c) || (o.state !== 'play' && o.state !== 'prep')) continue;
       const d = hyp(o.x - c.x, o.y - c.y);
       if (d < bd && this.frontDot(c, o) > DUEL_FRONT) { bd = d; best = o; }
     }
@@ -100,10 +106,14 @@ export class DuelMethods {
       p.vx = wx / wn * sp; p.vy = wy / wn * sp; p.fx = wx / wn; p.fy = wy / wn;
       p.dx = p.tx = tx; p.dy = p.ty = ty; p.aiT = Math.max(p.aiT, 0.35);
       p.protect = Math.max(p.protect, DRIB_PROTECT);
-      o.stun = DRIB_STUN; o.contact = 0; o.vx *= 0.3; o.vy *= 0.3;
+      // il tasto si può toccare appena si apre il duello (difensore a 7 m): lo sbilanciamento conta da quando il portatore
+      // arriva addosso al difensore, altrimenti finiva prima e il difensore, ancora davanti, gli si attaccava addosso
+      o.stun = DRIB_STUN + Math.max(0, d - DRIB_REACH) / sp; o.contact = 0; o.vx *= 0.3; o.vy *= 0.3;
+      o.beat = o.stun + DRIB_BEAT; o.beatBy = p;
       if (o.state === 'prep') { o.state = 'play'; o.warn = false; }
       this.wearDown(p, 'dri', WEAR_DRI, WEAR_DRI_MIN);
-      if (this.human[T] && this.ctrl[T] === p) this.move[T] = { x: tx, y: ty, ttl: 0.6, held: false, sprint: false };
+      // la corsa dura finché il portatore non arriva oltre il difensore (prima tornava dritto e gli passava accanto)
+      if (this.human[T] && this.ctrl[T] === p) this.move[T] = { x: tx, y: ty, ttl: Math.max(0.6, wn / sp + 0.15), held: false, sprint: false };
     } else {
       p.stun = Math.max(p.stun, 0.35); p.tackleCd = 0.6;
       if (this.human[T] && this.ctrl[T] === p) this.move[T] = null;

@@ -1,6 +1,6 @@
 // Movimento dei giocatori, scivolate, tuffi, parate, falli, possesso e contatti col pallone.
 // I metodi vengono copiati su Match.prototype (vedi match.js): `this` è la partita.
-import { WEAR_TES, WEAR_TES_MIN } from './duel.js';
+import { WEAR_TES, WEAR_TES_MIN, DRIB_BEAT_SPD } from './duel.js';
 import { W, L, HW, HL, GW, GH, BOX_W, BOX_D, SIX_W, SIX_D, PEN_D, CIRCLE, G, ROLL, clamp, hyp, rng32, FORMATIONS, effStats, ballPhys, segInfo } from './core.js';
 
 // Regolazioni (misurate con test/balance.mjs, test/diag-flow.mjs e i test in test/unit)
@@ -54,9 +54,11 @@ export class MotionMethods {
       if (p.tackleCd > 0) p.tackleCd -= dt;
       if (p.kickAnim > 0) p.kickAnim -= dt;
       if (p.dribCd > 0) p.dribCd -= dt;
+      if (p.beat > 0) p.beat -= dt;
       if (p.state === 'play') {
         let dx = p.tx - p.x, dy = p.ty - p.y; const d = hyp(dx, dy);
-        const vm = this.vmax(p) * (b.owner === p ? 0.86 + p.st.dri * 0.001 : 1) * p.spdF * (p.sprint ? 1 + SPRINT_BONUS * (0.3 + 0.7 * p.energy) : 1);
+        const vm = this.vmax(p) * (b.owner === p ? 0.86 + p.st.dri * 0.001 : 1) * p.spdF * (p.sprint ? 1 + SPRINT_BONUS * (0.3 + 0.7 * p.energy) : 1)
+          * (p.beat > 0 ? DRIB_BEAT_SPD : 1); // saltato col dribbling: ancora sbilanciato, corre piano
         let sp = p.stun > 0 ? 0 : Math.min(vm, d * 3.2);
         if (d < 0.15) sp = 0;
         const wx = d > 0 ? dx / d * sp : 0, wy = d > 0 ? dy / d * sp : 0;
@@ -176,7 +178,7 @@ export class MotionMethods {
     p.vx = p.sdx * sp; p.vy = p.sdy * sp; p.x += p.vx * dt; p.y += p.vy * dt; p.t += dt;
     if (this.phase === 'play' && !p.hit) {
       const db = hyp(b.x - p.x, b.y - p.y);
-      if (b.owner && b.owner.team !== p.team && !this.duelGuard(p)) {
+      if (b.owner && b.owner.team !== p.team && !this.duelGuard(p) && !this.beaten(p, b.owner)) {
         const c = b.owner, dc = hyp(c.x - p.x, c.y - p.y);
         if (db < 0.95) {
           p.hit = true; c.stun = 0.55; c.tackleCd = 0.8;
@@ -275,7 +277,7 @@ export class MotionMethods {
       const c = b.owner;
       if (c.protect > 0) return;
       for (const o of this.players) {
-        if (o.team === c.team || o.off || o.state !== 'play' || o.stun > 0 || o.tackleCd > 0 || this.duelGuard(o)) continue;
+        if (o.team === c.team || o.off || o.state !== 'play' || o.stun > 0 || o.tackleCd > 0 || this.duelGuard(o) || this.beaten(o, c)) continue;
         const d = hyp(o.x - b.x, o.y - b.y), hc = this.human[c.team], ho = this.human[o.team], dir = ho && this.directed(o);
         if (d < 0.85 + o.st.dif * 0.0025 + (dir ? HUM_TACKLE_R : 0)) {
           o.contact += dt;

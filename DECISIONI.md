@@ -585,3 +585,36 @@ corsa andava bene. Non ci sono clip CC0/CC-BY di palleggio o skill per questo sc
   in qualche fotogramma (punta e polpaccio nell'arcobaleno).
 - **Da provare sull'iPhone**: palleggio e giochetti nel menu (fluidità, se il contatto si vede), giochetti in partita
   nel duello (tasto Dribbling, anche col sinistro), durata dei voli di sombrero e arcobaleno in partita.
+
+## 2026-11-20 — Dribbling: il difensore saltato non si attacca più al portatore
+Segnalazione di Luis (iPhone): "nel tutorial Dribbling il giocatore si appiccica al portatore e non permette di dribblare".
+- **Causa (misurata in Node, non i commit sospettati)**: il contrasto "magnetico" vale solo per i difensori umani mossi
+  dalla persona (`directed()`), le durate dei giochetti in `TRICKS` le usa solo la grafica (il motore non le legge) e il
+  codice di prima del pressing (9e1649f) dà gli stessi numeri. Il difetto era nel dribbling stesso: il duello si apre a
+  7 m (nella lezione il difensore parte proprio a 7 m) e il dribbling si decide subito, ma lo sbilanciamento del
+  difensore (0,8 s) partiva dal tocco. Toccato a 6-7 m, finiva prima che il portatore arrivasse: il difensore, ancora
+  davanti, riapriva il duello e gli si attaccava (0,70 m, la distanza minima tra due giocatori). Scena del test
+  (dribbling riuscito toccato all'apertura del duello, 166 riusciti su 200 semi): prima difensore che riapre il duello e
+  riprende palla entro 3 s nel **100%** dei casi, distanza a +2 s 0,70 m; ora 0%, distanza a +2 s 4,0 m.
+- **Tasto che non rispondeva**: dopo un tentativo la prova nuova della lezione ereditava le attese (`dribCd` 1,2 s e
+  `duelCd` 1 s di partita); col rallenty a 0,08 sono fino a 15 s veri col tasto in vista che non fa nulla. Lezione con
+  tocco 1 s vero dopo l'apertura del duello: prima circa 1 tocco su 5 rifiutato, ora nessuno.
+- **Correzione nel motore** (`src/sim/duel.js`, `motion.js`): lo sbilanciamento (fermo) dura `DRIB_STUN` 0,8 s **da quando
+  il portatore arriva** a 1 m dal difensore (più il tempo per arrivarci); poi per `DRIB_BEAT` 1,2 s il difensore resta
+  "saltato" (`p.beat`, `p.beatBy`): corre a metà velocità (`DRIB_BEAT_SPD`), non può contrastare chi l'ha saltato (né col
+  contatto né in scivolata) e non gli riapre il duello. Gli altri difensori no. Stessa regola per umano e IA. La corsa
+  del portatore dopo il dribbling dura finché arriva oltre il difensore (prima 0,6 s fissi, poi tornava dritto e gli
+  passava accanto). `userDribble` non guarda più `dribCd` (resta per l'IA): fra due duelli passa già `DUEL_CD`.
+- **Lezione** (`src/tutorial.js`): ogni prova riparte senza attese rimaste (duello, dribbling, contrasti) e il difensore
+  della lezione ha difesa 15, così il dribbling riesce con la probabilità massima (85%): riuscita per tentativo 57% → 83%
+  (tocco 1 s dopo il duello, 120 prove con squadre di carriera nuova); 26 tentativi per 24 prove superate su 8 partite nel
+  test (prima 38). Sbilanciato + saltato = 2 s dopo l'arrivo, quanto il giochetto più lungo (arcobaleno 2,0 s): durante
+  il giochetto il difensore saltato non tocca il portatore.
+- **Equilibrio** (`node test/balance.mjs 60 60 60`): prima V14 N22 P24, gol 0,5-0,8, tiri 7,3-4,9; ora V15 N21 P24, gol
+  0,6-0,8, tiri 7,1-4,7. `diag-flow 60 20 bot`: gol umano 0,8 → 1,1, IA 0,3 → 0,2; dribbling umano 2,7 (riusciti 1,4) →
+  2,6 (1,5), IA 2,6 (1,4) → 2,5 (0,9: la probabilità non è cambiata, 20 partite sono poche). In partita col tasto toccato
+  nel 40% dei duelli: palla ancora nostra 2 s dopo un dribbling riuscito 82% → 85% (ripresa dal difensore saltato già 0% prima: in partita il portatore non va dritto addosso al difensore come nella lezione).
+- Test: `test/unit/dribble-beat.test.mjs` (4 su 5 falliscono sul codice di prima). Golden rigenerato (cambio voluto).
+  A schermo: `node test/tut-dribble-shot.mjs shots [prova]` (tocca il tasto vero e salva i fotogrammi del giochetto).
+- **Da provare sull'iPhone**: lezione Dribbling (tasto subito dopo il rallenty e anche più tardi, da vicino), che il
+  difensore resti fermo e poi insegua piano; in partita che dopo un dribbling il vantaggio si senta ma non sia troppo.
