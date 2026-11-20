@@ -13,6 +13,7 @@ import { Players3D, loadPlayers3D, hex, rgb, shade, lumH, FACE, SOLE, cpuCanvas 
 import { SKINS, HAIR_COLORS, EYE_COLORS, BOOTS, normalizeKitStyle } from './looks.js';
 import { drawCrest } from './crest.js';
 import { makeRadialBase, scalpPaint, paintHairTex } from './hair3d.js';
+import { installHead } from './body/testa.js';
 
 const MODEL_H = 1.84;                 // altezza prima di SCALE (come il vecchio modello: la scala del gioco resta quella)
 const HAIR_RECT = [16, 916, 200, 92]; // zona della tinta dei capelli (coordinate su 1024, fascia libera in basso)
@@ -54,6 +55,7 @@ export class Athlete3D extends Players3D {
 
   // scala e verso (come nel modello Kenney, con i nomi delle ossa nuovi)
   measure() {
+    installHead(this); // testa, viso e collo (forma e pittura): src/body/testa.js
     const s = this.scene; s.updateMatrixWorld(true);
     const bones = {}; s.traverse(o => { if (o.isBone) bones[o.name] = o; });
     const v = new THREE.Vector3(), w = new THREE.Vector3();
