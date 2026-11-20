@@ -1,58 +1,58 @@
 // Allenamento del campione sullo sfondo del menu principale: sequenza che si ripete (palleggi, giochetto, corsa
-// palla al piede, tiro). Funzione pura del tempo, senza grafica: la usa src/menu-bg.js e la provano i test in Node.
-// Il pallone è dato rispetto al giocatore: f = avanti, s = di lato, h = altezza (metri veri, prima della scala).
-import { TRICKS, ballOffset } from './tricks.js';
+// palla al piede, tiro, pallone nuovo che arriva rotolando). Funzione pura del tempo, senza grafica: la usa
+// src/menu-bg.js e la provano i test in Node. Palleggi, giochetti e tiro sono movimenti calcolati (src/moves/*):
+// la posa del corpo (frame) e il pallone con la fisica vera; la corsa resta quella del clip, col pallone che rimbalza.
+// Riferimento: x = sinistra del giocatore, y = su, z = avanti (metri veri, prima della scala).
+import { TRICKS } from './tricks.js';
+import { juggleMove, BALL_R, BASE } from './moves/juggle.js';
+import { trickMove, MENU_OPT } from './moves/tricks.js';
+import { shotMove, rollInMove, SHOT_BALL } from './moves/shot.js';
+import { qAxis } from './moves/vec.js';
 
-export const JUGGLE_T = 7;          // secondi di palleggi
-export const TOUCH_T = 0.55;        // tempo tra due tocchi
-export const TRICK_SLOW = 1.6;      // i giochetti al menu vanno più piano che in partita (si vedono meglio)
-export const RUN_T = 2.4;           // corsa sul posto palla al piede
+export const RUN_T = 2.4;           // corsa sul posto palla al piede (clip)
 export const RUN_V = 6.5;           // velocità finta della corsa (solo per l'animazione)
-export const SHOT_T = 0.35;         // calcio (come kickAnim del motore)
-export const REST_T = 1.4;          // pausa dopo il tiro, senza pallone
-const PEAKS = [0.75, 0.6, 0.95, 0.7, 0.85, 0.65, 1.05, 0.7, 0.8, 0.6, 0.9, 0.75, 0.7]; // altezze dei palleggi (m)
-const FOOT_H = 0.22, FOOT_F = 0.32;
+export const BLEND_T = 0.25;        // s: passaggio dalla posa calcolata alla corsa del clip e ritorno
+export const FAR = 18;              // m: oltre, il pallone del tiro sparisce (è un puntino)
+const RUN_STEP = 9;                 // rad/s: ritmo del pallone nella corsa
 
-const trickDur = k => TRICKS[k].dur * TRICK_SLOW;
-export function cycleLength(k) { return JUGGLE_T + trickDur(k) + RUN_T + SHOT_T + REST_T; }
+let M = null;
+const moves = () => M || (M = { juggle: juggleMove(), shot: shotMove(), roll: rollInMove(), tricks: TRICKS.map(T => trickMove(T.id, MENU_OPT)) });
+export const juggleTime = () => moves().juggle.T;
+export function cycleLength(k) { const m = moves(); return m.juggle.T + m.tricks[k].T + RUN_T + m.shot.T + m.roll.T; }
 
-// t = secondi dall'inizio; ogni giro usa il giochetto successivo
+// pallone nella corsa: parte da dove l'ha lasciato il giochetto, va avanti e rimbalza davanti ai piedi, finisce dove
+// parte il tiro; ruota come rotola (angolo = strada / raggio)
+function runBall(u) {
+  const a = Math.min(1, u / 0.35), b = Math.min(1, (RUN_T - u) / 0.35), k = a * a * (3 - 2 * a), e = b * b * (3 - 2 * b);
+  const z0 = BASE[2] + (0.75 - BASE[2]) * k, z = z0 + (SHOT_BALL[2] - z0) * (1 - e) + 0.15 * Math.sin(u * RUN_STEP) * k * e;
+  const h = BALL_R + 0.05 * Math.abs(Math.sin(u * RUN_STEP)) * k * e;
+  return { p: [0, h, z], q: qAxis([1, 0, 0], (z - BASE[2]) / BALL_R), vis: true };
+}
+
+// t = secondi dall'inizio; ogni giro usa il giochetto successivo.
+// Ritorna { seg, vx, frame (posa calcolata o null), w (quanto pesa la posa calcolata sul clip), ball {p, q, vis}, cycle, trick }
 export function menuRoutine(t) {
+  const m = moves();
   let k = 0, u = Math.max(0, t);
   while (u >= cycleLength(k)) { u -= cycleLength(k); k = (k + 1) % TRICKS.length; }
-  const out = { seg: '', vx: 0, kickAnim: 0, trick: null, leg: null, ball: { f: FOOT_F, s: 0, h: FOOT_H, visible: true }, cycle: k };
-  if (u < JUGGLE_T) {
-    // palleggi: il pallone sale e scende tra un tocco e l'altro, piede alternato; la gamba si alza sul tocco
-    const n = Math.floor(u / TOUCH_T), q = u / TOUCH_T - n, side = n % 2 ? -1 : 1, peak = PEAKS[n % PEAKS.length];
-    out.seg = 'juggle';
-    out.ball = { f: FOOT_F, s: 0.1 * side, h: FOOT_H + peak * 4 * q * (1 - q), visible: true };
-    const near = Math.min(q, 1 - q) * TOUCH_T; // tempo dal tocco più vicino
-    out.leg = { side: q < 0.5 ? side : -side, lift: Math.max(0, 1 - near / 0.16) };
-    return out;
-  }
-  u -= JUGGLE_T;
-  if (u < trickDur(k)) {
-    const q = u / trickDur(k), o = ballOffset(TRICKS[k].id, q);
-    out.seg = 'trick'; out.trick = { id: TRICKS[k].id, q, side: 1 };
-    out.ball = { f: FOOT_F + o.f, s: o.s, h: FOOT_H * 0.5 + o.h, visible: true };
-    return out;
-  }
-  u -= trickDur(k);
+  const out = (seg, mv, tt, extra) => { const fr = mv.at(tt); return { seg, vx: 0, frame: fr, w: 1, ball: fr.ball, cycle: k, trick: null, ...extra }; };
+  if (u < m.juggle.T) return out('juggle', m.juggle, u);
+  u -= m.juggle.T;
+  const tr = m.tricks[k];
+  if (u < tr.T) return out('trick', tr, u, { trick: { id: TRICKS[k].id, q: u / tr.T, side: 1 } });
+  u -= tr.T;
   if (u < RUN_T) {
-    out.seg = 'run'; out.vx = RUN_V;
-    out.ball = { f: 0.75 + 0.15 * Math.sin(u * 9), s: 0, h: 0.11 + 0.05 * Math.abs(Math.sin(u * 9)), visible: true };
-    return out;
+    // corsa del clip; all'inizio e alla fine la posa calcolata (fine del giochetto, inizio del tiro) sfuma
+    const wIn = Math.max(0, 1 - u / BLEND_T), wOut = Math.max(0, 1 - (RUN_T - u) / BLEND_T);
+    const frame = wIn > 0 ? tr.at(tr.T) : wOut > 0 ? m.shot.at(0) : null;
+    return { seg: 'run', vx: RUN_V, frame, w: Math.max(wIn, wOut), ball: runBall(u), cycle: k, trick: null };
   }
   u -= RUN_T;
-  if (u < SHOT_T) {
-    out.seg = 'shot'; out.kickAnim = SHOT_T - u;
-    out.ball = { f: 0.5, s: 0, h: 0.11, visible: true };
-    return out;
+  if (u < m.shot.T) {
+    const o = out('shot', m.shot, u);
+    o.ball.vis = o.ball.p[2] < FAR;
+    return o;
   }
-  // dopo il tiro: il pallone vola via davanti e sparisce, il giocatore resta fermo
-  u -= SHOT_T;
-  out.seg = 'rest';
-  const fly = u * 22, a = u / REST_T;
-  out.ball = { f: 0.5 + fly, s: 0, h: 0.11 + 12 * a * (1 - a), visible: fly < 30 };
-  return out;
+  u -= m.shot.T;
+  return out('rest', m.roll, u);
 }
