@@ -38,7 +38,9 @@ const urls = await p.evaluate((color) => {
     e.d.look = { ...e.d.look, hair: h, hairColor: color, skin: tones[h % 4] + 1, beard: 0 };
     v.setPlayer(e.kitFor(), e.d.look, e.d.num, e.d.name);
     v.swing = false; v.drag = { x: 0, yaw: 0 };
-    v.cur = { y: 2.12, z: 2.2, look: 2.04 };
+    // inquadratura sulla testa del modello in uso (il modello realistico ha la testa più alta e più piccola)
+    const hy = v.p3d && v.p3d.headY ? v.p3d.headY * 1.25 : 2.04;
+    v.cur = { y: hy + 0.08, z: v.p3d && v.p3d.headY ? 1.3 : 2.2, look: hy };
     yaws.forEach((y, i) => { v.yaw = y; v.tick(0); g.drawImage(v.cv, 0, 0, v.cv.width, v.cv.height, i * CW, row * CH, CW, CH * v.cv.height / v.cv.width); });
     // piccolo, come in campo (testa di pochi pixel): corpo intero ridotto
     v.cur = { y: 1.35, z: 5.0, look: 1.2 }; v.yaw = 0.7; v.tick(0);

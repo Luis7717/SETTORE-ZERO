@@ -7,7 +7,8 @@ import { mkdirSync } from 'node:fs';
 import puppeteer from 'puppeteer-core';
 import { serve } from './lib/serve.mjs';
 
-const out = process.argv[2] || 'shots', noModel = process.argv.includes('--senza-modello'), tag = noModel ? 'box' : 'p3d';
+const out = process.argv[2] || 'shots', noModel = process.argv.includes('--senza-modello'), oldModel = process.argv.includes('--solo-kenney');
+const tag = noModel ? 'box' : oldModel ? 'kenney' : 'p3d';
 mkdirSync(out, { recursive: true });
 const b = await puppeteer.launch({ executablePath: process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: 'new', args: ['--no-sandbox', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 const p = await b.newPage();
@@ -15,9 +16,11 @@ await p.setViewport({ width: 390, height: 844, deviceScaleFactor: +(process.env.
 const errs = [];
 p.on('pageerror', e => errs.push('PAGEERR ' + e.message));
 p.on('console', m => { if (m.type() === 'error' && !/404/.test(m.text())) errs.push('CONSOLE ' + m.text()); });
-if (noModel) {
+// --senza-modello: nessun modello (figure a box) · --solo-kenney: manca il modello realistico, si ripiega sul Kenney
+if (noModel || oldModel) {
   await p.setRequestInterception(true);
-  p.on('request', r => r.url().includes('models/player.glb') ? r.respond({ status: 404, body: '' }) : r.continue());
+  const block = noModel ? /models\/(player|athlete)\.glb/ : /models\/athlete\.glb/;
+  p.on('request', r => block.test(r.url()) ? r.respond({ status: 404, body: '' }) : r.continue());
 }
 const srv = await serve('www');
 await p.goto(srv.url + 'index.html');

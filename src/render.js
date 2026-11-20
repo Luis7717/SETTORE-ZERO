@@ -3,7 +3,7 @@ import { chooseTrick, ballOffset } from './tricks.js';
 import * as THREE from 'three';
 import { W, HL, GW, GH } from './sim.js';
 import { buildStadium } from './stadium.js';
-import { loadPlayers3D } from './players3d.js';
+import { loadBestPlayers } from './athlete3d.js';
 import { buildPitch, buildLights, setupRenderer, fitSun, playerShadowTexture, shadowYaw, SHADOWS } from './pitch.js';
 
 const SKIN = [0xf1c9a5, 0xd9a47a, 0xa9744f, 0x6b4630];
@@ -138,10 +138,10 @@ export class View {
     this.offside.renderOrder = 14; this.offside.visible = false; s.add(this.offside);
   }
 
-  // modello 3D dei giocatori (assets 'player'): se manca o non si legge restano le figure a box
+  // modello 3D dei giocatori: 'athlete' (realistico), se manca o non si legge 'player' (Kenney), altrimenti figure a box
   useAssets(assets) {
-    if (this.p3d || this.p3dLoading || !assets.has('player')) return this.p3dLoading || Promise.resolve(null);
-    this.p3dLoading = loadPlayers3D(assets.get('player')).then((m) => {
+    if (this.p3d || this.p3dLoading || !(assets.has('athlete') || assets.has('player'))) return this.p3dLoading || Promise.resolve(null);
+    this.p3dLoading = loadBestPlayers(assets).then((m) => {
       this.p3d = m; this.p3dLoading = null;
       if (m && this.match) this.setMatch(this.match, this.me);
       return m;

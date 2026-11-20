@@ -42,6 +42,8 @@ const rgb = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), pars
 const shade = (h, f) => { const c = rgb(h); return '#' + c.map(x => Math.max(0, Math.min(255, Math.round(x * f))).toString(16).padStart(2, '0')).join(''); };
 const lumH = h => { const c = rgb(h); return (0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]) / 255; };
 const DEG = Math.PI / 180;
+// canvas di appoggio in memoria (non sulla GPU): copiarli e rileggerli costa poco
+const cpuCanvas = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d', { willReadFrequently: true }); return c; };
 const GETS = ['getX', 'getY', 'getZ', 'getW'];
 const SCALP = 2;               // passo (px su 1024) della mappa testa → direzione usata per dipingere la cute
 
@@ -58,9 +60,10 @@ function withRim(mat) {
   return mat;
 }
 
-class Players3D {
+export class Players3D {
   constructor(gltf) {
     this.scene = gltf.scene;
+    this.setup();
     this.mesh = null; this.scene.traverse(o => { if (o.isSkinnedMesh && !this.mesh) this.mesh = o; });
     if (!this.mesh) throw new Error('nessuna SkinnedMesh nel modello');
     this.clips = {}; for (const c of gltf.animations) this.clips[c.name] = c;
@@ -69,6 +72,9 @@ class Players3D {
     this.measure();
     this.headFrame();
   }
+
+  // costanti del modello (la sottoclasse di src/athlete3d.js le cambia)
+  setup() { this.modelH = MODEL_H; this.hairRect = R.hair; this.fitRe = /Spine|Chest|Shoulder|^(Left|Right)Arm$/; }
 
   // scala e verso: il modello deve guardare +z ed essere alto MODEL_H con i piedi a y = 0
   measure() {
@@ -80,10 +86,10 @@ class Players3D {
     if (f && t) { f.getWorldPosition(v); t.getWorldPosition(w); yaw = Math.atan2(w.x - v.x, w.z - v.z); }
     const box = new THREE.Box3().setFromObject(s, true);
     const h = box.max.y - box.min.y || 1;
-    this.fixScale = MODEL_H / h; this.fixYaw = -yaw;
+    this.fixScale = this.modelH / h; this.fixYaw = -yaw;
     this.fixY = -box.min.y * this.fixScale;
     this.fixQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.fixYaw);
-    const sph = new THREE.Sphere(); box.getBoundingSphere(sph); this.radius = sph.radius / h * MODEL_H * 1.6;
+    const sph = new THREE.Sphere(); box.getBoundingSphere(sph); this.radius = sph.radius / h * this.modelH * 1.6;
   }
 
   // testa nello spazio della mesh: centro, assi (su, avanti, destra), raggio, triangoli (per i raggi e per dipingere la cute)
@@ -144,7 +150,7 @@ class Players3D {
   // ---------------------------------------------------------------- geometria: capelli fusi col corpo, maglia larga o aderente
   // capelli: pezzi lisci costruiti in coordinate locali della testa (src/hair3d.js), portati nello spazio della mesh
   hairGeo(style) {
-    const h = this.head, hr = h.R, pc = hairPieces(style, this.hairBase.base), [sx, sy, sw, sh] = R.hair;
+    const h = this.head, hr = h.R, pc = hairPieces(style, this.hairBase.base), [sx, sy, sw, sh] = this.hairRect;
     const n = pc.pos.length / 3, pos = new Float32Array(n * 3), nrm = new Float32Array(n * 3), uv = new Float32Array(n * 2);
     for (let i = 0; i < n; i++) {
       const x = pc.pos[i * 3], y = pc.pos[i * 3 + 1], z = pc.pos[i * 3 + 2], a = pc.nrm[i * 3], b = pc.nrm[i * 3 + 1], c = pc.nrm[i * 3 + 2];
@@ -178,7 +184,7 @@ class Players3D {
     cat('skinIndex', 4, (i, k) => (k === 0 ? this.headJoint : 0)); cat('skinWeight', 4, (i, k) => (k === 0 ? 1 : 0));
     // maglia aderente o larga: il busto e le spalle si gonfiano un poco lungo la normale
     const off = FIT_OFF[fit] * this.head.R, P = out.attributes.position.array, N = A.normal;
-    for (let i = 0; i < nb; i++) if (/Spine|Chest|Shoulder|^(Left|Right)Arm$/.test(this.boneOf[i])) for (let k = 0; k < 3; k++) P[i * 3 + k] += N[GET[k]](i) * off;
+    for (let i = 0; i < nb; i++) if (this.fitRe.test(this.boneOf[i])) for (let k = 0; k < 3; k++) P[i * 3 + k] += N[GET[k]](i) * off;
     const bi = base.index.array, hi = hg.index ? hg.index.array : [], idx = new (nb + nh > 65535 ? Uint32Array : Uint16Array)(bi.length + hi.length);
     idx.set(bi); for (let i = 0; i < hi.length; i++) idx[bi.length + i] = hi[i] + nb;
     out.setIndex(new THREE.BufferAttribute(idx, 1));
@@ -243,8 +249,12 @@ class Players3D {
       if (lid) { g.moveTo(-rx, -ry + ry * 2 * lid); g.lineTo(rx, -ry + ry * 2 * lid); } else if (L.eyes === 1 || L.eyes === 4) { g.moveTo(-rx, 0); g.quadraticCurveTo(0, -ry * 2, rx, 0); } else g.ellipse(0, 0, rx, ry, 0, Math.PI * 1.05, Math.PI * 1.95);
       g.stroke(); g.restore();
     }
-    // sopracciglia (colore dei capelli, un po' più scuro)
-    const bc = shade(hairC, lumH(hairC) > 0.6 ? 0.7 : 0.85);
+    this.paintBrows(g, L, hairC);
+  }
+
+  // sopracciglia (colore dei capelli, un po' più scuro), in coordinate della zona viso Kenney (FACE)
+  paintBrows(g, L, hairC) {
+    const F = FACE, bc = shade(hairC, lumH(hairC) > 0.6 ? 0.7 : 0.85);
     g.strokeStyle = bc; g.lineCap = 'round';
     for (const s of [-1, 1]) {
       const x = F.x + s * F.eyeDX, y = F.browY;
@@ -258,12 +268,12 @@ class Players3D {
     let g = g0;
     if (!L.beard) return;
     const F = FACE, x = F.x, y = F.mouthY, col = hairC, out = g;
-    const lay = document.createElement('canvas'); lay.width = 640; lay.height = 440; g = lay.getContext('2d');
+    const lay = cpuCanvas(640, 440); g = lay.getContext('2d');
     g.save(); g.fillStyle = col;
     const jaw = () => { g.beginPath(); g.moveTo(x - 92, F.eyeY + 42); g.lineTo(x - 82, y + 34); g.quadraticCurveTo(x, y + 78, x + 82, y + 34); g.lineTo(x + 92, F.eyeY + 42); g.lineTo(x + 62, F.eyeY + 48); g.quadraticCurveTo(x + 40, y - 10, x + 24, y - 8); g.quadraticCurveTo(x, y - 18, x - 24, y - 8); g.quadraticCurveTo(x - 40, y - 10, x - 62, F.eyeY + 48); g.closePath(); };
     const mouth = () => { g.globalCompositeOperation = 'destination-out'; g.beginPath(); g.ellipse(x, y + 2, 17, 7, 0, 0, Math.PI * 2); g.fill(); g.globalCompositeOperation = 'source-over'; };
     if (L.beard === 1) { // ombra: puntinato leggero
-      const sl = document.createElement('canvas'); sl.width = 300; sl.height = 200; const q = sl.getContext('2d');
+      const sl = cpuCanvas(300, 200); const q = sl.getContext('2d');
       q.translate(150 - x, 100 - y - 10); q.fillStyle = col;
       q.beginPath(); q.moveTo(x - 92, F.eyeY + 42); q.lineTo(x - 82, y + 34); q.quadraticCurveTo(x, y + 78, x + 82, y + 34); q.lineTo(x + 92, F.eyeY + 42); q.lineTo(x + 50, y - 2); q.lineTo(x - 50, y - 2); q.closePath(); q.clip();
       const r = (() => { let a = 7; return () => { a = (a * 16807) % 2147483647; return a / 2147483647; }; })();
@@ -360,20 +370,23 @@ class Players3D {
     fix.rotation.y = this.fixYaw; fix.scale.setScalar(this.fixScale); fix.position.y = this.fixY;
     let mesh = null; const bones = {};
     model.traverse(o => { if (o.isSkinnedMesh) mesh = o; if (o.isBone) bones[o.name] = o; });
+    this.aliasBones(bones);
     const size = opt.tex || TEX, canvas = this.paint(kit, L, { num: opt.num, name: opt.name ? backName(opt.name) : '' }, size);
     const tex = new THREE.CanvasTexture(canvas); tex.flipY = false; tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4; tex.generateMipmaps = true;
     const mat = new THREE.MeshLambertMaterial({ map: tex }); withRim(mat);
     mesh.geometry = this.bodyGeo(L.hair, st.fit);
     mesh.material = mat; mesh.frustumCulled = true;
-    mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, MODEL_H / 2 / this.fixScale, 0), this.radius / this.fixScale);
+    mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, this.modelH / 2 / this.fixScale, 0), this.radius / this.fixScale);
     const mixer = new THREE.AnimationMixer(model), act = {}, ph = (hash32(L.hair, L.skin, opt.num || 0) % 1000) / 1000;
-    for (const n of ['idle', 'run', 'jump']) {
+    for (const n of ['idle', 'run', 'sprint', 'jump']) {
       if (!this.clips[n]) continue;
       const a = mixer.clipAction(this.clips[n]); a.play(); a.setEffectiveWeight(n === 'idle' ? 1 : 0);
       a.time = ph * this.clips[n].duration; act[n] = a;
     }
     return { g, body, fix, model, mesh, mixer, act, bones, mat, tex, saved: [], m3d: true, tris: mesh.geometry.index.count / 3 };
   }
+  // nomi delle ossa usati dalle pose (quelli del modello Kenney): la sottoclasse aggiunge i suoi
+  aliasBones(bones) { }
   // libera la texture di un giocatore tolto dalla scena (la geometria è condivisa e resta in cache)
   dispose(f) { if (f && f.tex) { f.tex.dispose(); f.mat.dispose(); } }
 
@@ -460,6 +473,14 @@ class Players3D {
     }
   }
 
+  // pesi delle clip (la sottoclasse aggiunge lo scatto)
+  blend(A, wIdle, wRun, wJump, v, cele) {
+    if (A.idle) A.idle.setEffectiveWeight(wIdle);
+    if (A.run) { A.run.setEffectiveWeight(wRun); A.run.timeScale = Math.min(1.5, Math.max(0.55, v / RUN_REF)); }
+    if (A.sprint) A.sprint.setEffectiveWeight(0);
+    if (A.jump) { A.jump.setEffectiveWeight(wJump); A.jump.timeScale = cele ? 1.3 : 1.6; }
+  }
+
   // ctx: { t, phase, flip, yaw, ball, scale, trick }
   pose(p, f, dt, ctx) {
     const body = f.body, A = f.act, X = 0, Z = 2, sv = f.saved;
@@ -474,9 +495,7 @@ class Players3D {
     const header = p.kickAnim > 0 && nearBall && b.h > HEAD_H;
     if (st === 'slide' || st === 'down' || (st === 'dive' && p.dive)) { wIdle = 1; wRun = 0; }
     else if (cele || header) { wIdle = 0; wRun = 0; wJump = 1; }
-    if (A.idle) A.idle.setEffectiveWeight(wIdle);
-    if (A.run) { A.run.setEffectiveWeight(wRun); A.run.timeScale = Math.min(1.5, Math.max(0.55, v / RUN_REF)); }
-    if (A.jump) { A.jump.setEffectiveWeight(wJump); A.jump.timeScale = cele ? 1.3 : 1.6; }
+    this.blend(A, wIdle, wRun, wJump, v, cele);
     f.mixer.update(dt);
 
     if (st === 'slide') {
@@ -527,7 +546,7 @@ class Players3D {
     } else if (run > 0.3) {
       body.rotation.x = 0.08 * run;
     }
-    if (this.todo.length) this.flush(f);
+    this.flush(f);
   }
 }
 
@@ -547,3 +566,6 @@ export function loadPlayers3D(buf) {
   loaded.set(buf, pr);
   return pr;
 }
+
+// per il modello realistico (src/athlete3d.js): stessi colori, stesso viso, stessa luce di contorno
+export { hex, rgb, shade, lumH, FACE, SOLE, withRim, cpuCanvas };
