@@ -95,10 +95,12 @@ jobs:
           set -euo pipefail
           # 3 secondi di scena di prova: un errore di script qui vuol dire un'app rotta sul telefono
           "$GODOT" --headless --path godot -- --esci-dopo=3 2>&1 | tee build-run.log
+          # anche la partita da sola (la scena principale ora è il menu)
+          "$GODOT" --headless --path godot res://scenes/partita.tscn -- --esci-dopo=3 2>&1 | tee -a build-run.log
           if grep -E "SCRIPT ERROR|^ERROR:|Parse Error" build-run.log; then
             echo "::error::la scena di prova stampa errori (vedi sopra)"; exit 1
           fi
-          grep -q "FPS medi" build-run.log || { echo "::error::la scena di prova non è arrivata in fondo"; exit 1; }
+          [ "$(grep -c "FPS medi" build-run.log)" -ge 2 ] || { echo "::error::la scena di prova non è arrivata in fondo"; exit 1; }
 
       - name: Esporta il progetto Xcode
         run: |

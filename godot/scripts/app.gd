@@ -67,7 +67,12 @@ func avvio() -> void:
 		return
 	_avviata = true
 	if opzioni.has("esci-dopo"):
-		get_tree().create_timer(float(opzioni["esci-dopo"])).timeout.connect(func() -> void: get_tree().quit(0))
+		var t0 := Time.get_ticks_msec()
+		var f0 := Engine.get_process_frames()
+		get_tree().create_timer(float(opzioni["esci-dopo"])).timeout.connect(func() -> void:
+			var secondi := maxf(0.001, (Time.get_ticks_msec() - t0) / 1000.0)
+			print("FPS medi %.1f · schermata %s" % [(Engine.get_process_frames() - f0) / secondi, schermata]) # la build lo cerca
+			get_tree().quit(0))
 	if not opzioni.has("app") and OPZIONI_PARTITA.any(func(k: String) -> bool: return opzioni.has(k)):
 		_metti((load(SCENA_PARTITA) as PackedScene).instantiate()) # partita di prova: parte da sola
 		schermata = "partita"
