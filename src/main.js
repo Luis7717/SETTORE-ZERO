@@ -256,6 +256,7 @@ function frame(now) {
     }
     if (G.bigT && now > G.bigT) { G.bigT = 0; $('big').className = ''; }
     view.rdt = G.paused ? 0 : dt; // tempo vero per la telecamera
+    view.drawing = input.drawing; // col pallone, mentre si disegna: visuale larga del rallenty
     view.update(G.paused ? 0 : dt * Math.max(G.ts, 0.25));
     view.render();
   }
