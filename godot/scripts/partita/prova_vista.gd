@@ -5,7 +5,8 @@
 # Opzioni da riga di comando (dopo "--"):
 #   --scena=NOME          partita (predefinita) · rallenty (visuale larga col dito che disegna) · girata (rallenty con la
 #                         visuale girata) · parata (tiro avversario, visuale dietro la porta) · angolo (calcio d'angolo)
-#                         · giochetto (arcobaleno da vicino) · gol (la rete si gonfia) · linea (passaggio disegnato, anteprima e linee di difesa)
+#                         · giochetto (arcobaleno da vicino) · gol (la rete si gonfia) · rete (la stessa vista di fianco,
+#                         da dietro la linea) · linea (passaggio disegnato, anteprima e linee di difesa)
 #   --schermata=PERCORSO.png [--dopo=SEC]   salva una schermata dopo SEC secondi ed esce (percorso relativo = dal repo)
 #   --sequenza=N [--ogni=SEC]               con --schermata: N schermate a distanza di SEC secondi (_1, _2, ...)
 #   --esci-dopo=SEC       esce dopo SEC secondi e stampa FPS medi e tempo del fotogramma
@@ -36,6 +37,9 @@ var _ms := PackedFloat32Array()
 var _us_motore := 0             # microsecondi spesi nel motore e nella vista (per le misure)
 var _us_vista := 0
 var _n := 0
+var _gpu_ms := 0.0             # tempo della scheda video e del disegno sul processore (misurati da Godot)
+var _cpu_ms := 0.0
+var _n_misure := 0
 
 
 func _ready() -> void:
@@ -47,6 +51,9 @@ func _ready() -> void:
 	if _opz.has("senza-vsync"):
 		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 		Engine.max_fps = 0
+	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), true)
+	if _opz.has("scala3d"):   # 2 = tanti pixel 3D quanti sull'iPhone (780 px di larghezza)
+		get_viewport().scaling_3d_scale = float(_opz["scala3d"])
 	vista = VISTA.instantiate()
 	add_child(vista)
 	_hud = HUD.new()
@@ -97,11 +104,19 @@ func _process(delta: float) -> void:
 	_us_motore += t1 - t0
 	_us_vista += Time.get_ticks_usec() - t1
 	_n += 1
+	if _ms.size() > 60:
+		var rid := get_viewport().get_viewport_rid()
+		_gpu_ms += RenderingServer.viewport_get_measured_render_time_gpu(rid)
+		_cpu_ms += RenderingServer.viewport_get_measured_render_time_cpu(rid)
+		_n_misure += 1
 	if _scena == "giochetto":
 		_telecamera_vicina(m.ball.owner)
 	elif _scena == "gol":
 		vista.cam.fov = 55.0
 		vista.cam.look_at_from_position(Vector3(9.0, 2.6, -40.0), Vector3(0.0, 1.0, -51.5), Vector3.UP)
+	elif _scena == "rete":
+		vista.cam.fov = 50.0
+		vista.cam.look_at_from_position(Vector3(11.0, 2.4, -53.5), Vector3(0.5, 1.0, -51.2), Vector3.UP)
 	elif _opz.has("vicino"):
 		_telecamera_vicina(m.players[int(_opz["vicino"])])
 
@@ -136,7 +151,7 @@ func _prepara_scena() -> void:
 			_tiro_avversario()
 			_ts = SLOW
 			_tuffo_dopo(0.36)   # senza await: le schermate partono subito, il tuffo arriva dopo
-		"gol":
+		"gol", "rete":
 			await _corri(1.0)
 			_tiro_in_porta()
 		"angolo":
@@ -317,6 +332,7 @@ func _esci() -> void:
 		media += x
 	media /= maxf(1.0, v.size())
 	var p99: float = v[int(v.size() * 0.99)] if not v.is_empty() else 0.0
+	print("GPU %.3f ms · disegno CPU %.3f ms per fotogramma" % [_gpu_ms / maxi(1, _n_misure), _cpu_ms / maxi(1, _n_misure)])
 	print("FPS medi %.1f · fotogramma medio %.2f ms, 99%% sotto %.2f ms · motore %.2f ms + vista %.2f ms per fotogramma · %s · disegni %d · partita %.0f s, %d-%d" % [
 		_hud.fps_medi(), media, p99, _us_motore / 1000.0 / maxi(1, _n), _us_vista / 1000.0 / maxi(1, _n), _hud.testo_memoria(),
 		int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)), m.time, m.score[0], m.score[1]])
