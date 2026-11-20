@@ -15,6 +15,8 @@ const OFFSIDE_COLOR = 0xff5a5a; // linea del fuorigioco
 const GK_CAM_BACK = 6.5;       // parata: telecamera dietro la propria linea di porta (m)
 const GK_CAM_H = 2.6;          // parata: altezza della telecamera (m)
 const RUN_LINES = 10, RUN_PTS = 64, RUN_COLOR = 0x7dd3ff; // linee di difesa a schermo
+const CAM_BACK = 16;           // telecamera di gioco (schermo verticale): distanza dietro il pallone (m)
+const CAM_H = 10.5;            // ... e altezza (m); più bassa e vicina = giocatori più grandi
 const DUEL_LOW = 0.42;          // quanto si abbassa la telecamera nel duello (0 = niente, 1 = a terra)
 
 function canvasTex(w, h, draw) {
@@ -319,7 +321,7 @@ export class View {
     const nearT = mine ? Math.max(0, Math.min(1, (this.cy * dir - 14) / 18)) : 0;
     this.near = (this.near || 0) + (nearT - (this.near || 0)) * Math.min(1, dt * 3);
     const a = this.near, z = this.zoom * (1 - 0.75 * a), port = this.w < this.h;
-    const back = ((port ? 22 : 26) + z * 10) * (1 - 0.34 * a), hgt = ((port ? 16.5 : 13) + z * 11) * (1 - 0.46 * a), ahead = 9 + z * 4 + a * 9;
+    const back = ((port ? CAM_BACK : 26) + z * 6) * (1 - 0.3 * a), hgt = ((port ? CAM_H : 13) + z * 5) * (1 - 0.4 * a), ahead = 9 + z * 4 + a * 9;
     // difesa vicino alla propria porta: inquadratura da dietro la porta, bassa, per leggere i tiri
     const defT = !mine ? Math.max(0, Math.min(1, (-this.cy * dir - 14) / 16)) : 0;
     this.defk = (this.defk || 0) + (defT - (this.defk || 0)) * Math.min(1, dt * 3);

@@ -309,3 +309,9 @@ maglia, maniche, calzettoni…), poi nome e numero sulla schiena e uno stemma in
   bello che si sa fare (60%), a volte uno o due più semplici. Si usa il dribbling del momento (cala con l'uso).
 - Valgono anche per gli avversari. Per i nostri compare il nome del giochetto in grande.
 - Prova a schermo: `node test/tricks-shot.mjs shots`.
+
+## 2026-11-20 — Tutorial passaggio più largo, telecamera più vicina
+- Lezione Passaggio: il difensore parte a 11 m (`PASS_DEF_DIST`; prima 3,5 m, il duello si apriva subito), compagni
+  un po' più lontani. Prima si corre verso il difensore, poi nel duello si passa.
+- Telecamera di gioco (verticale): `CAM_BACK` 16 m dietro il pallone e `CAM_H` 10,5 m d'altezza (prima 22 e 16,5);
+  l'allargamento su rimesse e disegno pesa meno (+6/+5 m invece di +10/+11). Giocatori più grandi a schermo.
