@@ -44,7 +44,6 @@ gioco, i gesti e l'interfaccia sono un altro lavoro (`partita.tscn`). Contratto 
 | `shaders/divisa.gdshader` | colori della divisa per zone del corpo, come `src/athlete3d.js` |
 | `assets/` | modelli, suoni, icona (licenze in `CREDITI.md`) |
 | `tools/` | strumenti di sviluppo (icona, ispezione dei modelli): non finiscono nell'app |
-<<<<<<< HEAD
 | `scenes/partita.tscn` | **partita** (scena principale): `scripts/partita/gioco.gd` |
 | `scenes/hud_partita.tscn` | interfaccia della partita: `scripts/partita/hud_partita.gd` |
 | `scripts/partita/gioco.gd` | ciclo della partita (`frame()` di `src/main.js`): gesti → motore col tempo scalato → eventi → vista; pausa, intervallo, fine |
@@ -58,8 +57,6 @@ gioco, i gesti e l'interfaccia sono un altro lavoro (`partita.tscn`). Contratto 
 | `scripts/partita/bot_dito.gd` | "dito finto" per le prove: gioca coi gesti veri |
 | `shaders/rallenty.gdshader` | bordo scuro del rallenty |
 | `sim/`, `tests/` | motore di gioco in GDScript e i suoi test (`tests/test_gesti.gd` = gesti) |
-=======
-| `sim/`, `tests/` | motore di gioco in GDScript e i suoi test (altro lavoro in parallelo) |
 | `scenes/vista_partita.tscn` | vista della partita: cielo, sole, telecamera, campo, stadio, giocatori, linee (`PartitaVista`) |
 | `scripts/partita/vista.gd` | `PartitaVista`: giocatori, pallone, anello, reti, giochetti, conversioni schermo ↔ campo |
 | `scripts/partita/telecamera_partita.gd` | telecamera come `View.update` del web: normale, vicino alla porta, difesa, duello, rallenty largo, angolo, parata, girata |
@@ -69,7 +66,6 @@ gioco, i gesti e l'interfaccia sono un altro lavoro (`partita.tscn`). Contratto 
 | `scripts/partita/nastri.gd`, `texture_vista.gd` | linee disegnate a nastro, linee di difesa, anteprima, fuorigioco; texture fatte a codice |
 | `shaders/rete.gdshader`, `bandierina.gdshader` | rete che si gonfia sul gol, bandierine che sventolano |
 | `scenes/prova_vista.tscn` | prova: computer contro computer disegnato dalla vista, scene per le schermate e misure |
->>>>>>> wt-godot-vista
 
 ## Coordinate
 

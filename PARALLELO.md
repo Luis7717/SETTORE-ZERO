@@ -69,5 +69,5 @@ Limite di 2 subagenti insieme tolto più tardi lo stesso giorno (richiesta di Lu
 | 31 | Stadio che manca su iPhone, memoria dei canvas, riga Diagnostica | `TAG-wt-ios` / `wt-ios` | fatto (`2b95e95`), unito |
 | 32 | Godot fase 1: progetto, build IPA (`tiro-a-giro-godot-ipa`), scena di prova | `TAG-wt-godot-base` / `wt-godot-base` | fatto (`b2b1883`), unito |
 | 33 | Godot: motore portato in GDScript con prova di equivalenza | `TAG-wt-godot-sim` / `wt-godot-sim` | fatto (`0daad91`), unito |
-| 34 | Godot fase 2: vista della partita (giocatori, animazioni, IK, telecamere) | `TAG-wt-godot-vista` / `wt-godot-vista` | in corso |
-| 35 | Godot fase 2: ciclo di gioco, gesti, rallenty, HUD, audio, squadre di prova | `TAG-wt-godot-gioco` / `wt-godot-gioco` | in corso |
+| 34 | Godot fase 2: vista della partita (giocatori, animazioni, IK, telecamere) | `TAG-wt-godot-vista` / `wt-godot-vista` | fatto (`878ac81`), unito |
+| 35 | Godot fase 2: ciclo di gioco, gesti, rallenty, HUD, audio, squadre di prova | `TAG-wt-godot-gioco` / `wt-godot-gioco` | fatto (`9dd0d1c`), unito |

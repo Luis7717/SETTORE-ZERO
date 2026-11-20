@@ -725,7 +725,6 @@ di costanti, metodi e campi; dettagli e corrispondenza dei file in `godot/sim/RE
   Un passo a fotogramma è ~3% dei 16,7 ms; su iPhone stimati 0,5-1 ms a passo. **Da misurare sul telefono.**
 - `m.dispose()` a fine partita: i riferimenti circolari tra giocatori (`supC`, `beatBy`) Godot non li libera da solo.
 
-<<<<<<< HEAD
 ## 2026-11-20 — Godot fase 2: gioco
 Partita giocabile in Godot, parte "gioco" (la vista con giocatori, animazioni e telecamere la fa un altro lavoro in
 parallelo). Scena principale ora `godot/scenes/partita.tscn`; dettagli e contratto della vista in `godot/README.md`
@@ -766,7 +765,7 @@ Verificato sul PC: 20 test dei gesti verdi più tutti quelli del motore; partite
 (`--bot`) che usa solo i gesti veri, senza errori; schermate 390×844 con la vista finta (partita, rallenty con frecce,
 disegno di un passaggio con anteprima, angolo, pausa, fine partita). **Non verificato**: iPhone (tocchi veri, aree
 sicure vere, suoni, prestazioni) e la vista vera.
-=======
+
 ## 2026-11-20 — Godot fase 2: vista
 La vista della partita (`godot/scripts/partita/`, `scenes/vista_partita.tscn`, classe `PartitaVista`) porta in Godot
 quello che si vede in partita nel web: telecamere, giocatori animati, giochetti, pallone, reti, bandierine, linee.
@@ -802,4 +801,3 @@ Legge `SimMatch` e non lo cambia; contratto nel README di `godot/`. Ciclo di gio
   vicino, linee (passaggio, anteprima, fuorigioco, difesa), gol. FPS senza vsync con 22 giocatori: ~315-340
   (fotogramma 2,8-3 ms; vista 1,5 ms di CPU, di cui ~0,6 ms le 22 AnimationTree; motore 0,2 ms).
   **Non verificato sull'iPhone.**
->>>>>>> wt-godot-vista
