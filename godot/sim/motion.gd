@@ -70,6 +70,8 @@ func movePlayers(dt: float) -> void:
 			p.dribCd -= dt
 		if p.beat > 0.0:
 			p.beat -= dt
+		if p.burst > 0.0:
+			p.burst -= dt
 		if p.state == "play":
 			_moveRunning(p, dt, b)
 		elif p.state == "prep":
@@ -142,7 +144,7 @@ func _moveRunning(p: R.Player, dt: float, b: R.Ball) -> void:
 	var dx: float = p.tx - p.x
 	var dy: float = p.ty - p.y
 	var d: float = C.hyp(dx, dy)
-	var vm: float = vmax(p) * ((0.86 + p.st.dri * 0.001) if b.owner == p else 1.0) * p.spdF * ((1.0 + SPRINT_BONUS * (0.3 + 0.7 * p.energy)) if p.sprint else 1.0) * (DRIB_BEAT_SPD if p.beat > 0.0 else 1.0) # saltato col dribbling: corre piano
+	var vm: float = vmax(p) * ((0.86 + p.st.dri * 0.001) if b.owner == p else 1.0) * p.spdF * ((1.0 + SPRINT_BONUS * (0.3 + 0.7 * p.energy)) if p.sprint else 1.0) * (DRIB_BEAT_SPD if p.beat > 0.0 else 1.0) * (BURST_SPD if p.burst > 0.0 else 1.0) # saltato col dribbling: corre piano; Scatto: più veloce
 	var sp: float = 0.0 if p.stun > 0.0 else minf(vm, d * 3.2)
 	if d < 0.15:
 		sp = 0.0

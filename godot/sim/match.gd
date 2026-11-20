@@ -959,6 +959,18 @@ func userDribble(tm: int) -> bool:
 	return true
 
 
+# Scatto nel duello aperto per la squadra T (tasto in basso, al posto del Dribbling). Come userDribble.
+func userSprint(tm: int) -> bool:
+	var d := duel
+	if d == null or d.team != tm or phase != "play":
+		return false
+	var p := d.p
+	if ball.owner != p or p.stun > 0.0 or p.state != "play":
+		return false
+	dribble(p, d.o, true)
+	return true
+
+
 func hint(tm: int) -> String:
 	var b := ball
 	if phase == "restart":

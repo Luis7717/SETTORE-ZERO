@@ -20,7 +20,7 @@ const DONE_PAUSE := 1.3       # secondi di "Bravo!" prima della prova successiva
 const FREEZE := 0.2           # stordimento rinnovato a ogni fotogramma per tenere fermi i giocatori fuori dalla prova
 const REPS := 3               # prove per ogni meccanica
 const PASS_DEF_DIST := 11.0   # lezione Passaggio: distanza iniziale del difensore davanti al portatore (m)
-const DRIB_DEF_DIF := 15.0      # lezione Dribbling: difesa del difensore, così il dribbling riesce quasi sempre
+const DRIB_DEF_DIF := 15.0    # lezione Scatto: difesa del difensore, così lo scatto riesce quasi sempre (è una lezione)
 const HALF_LEN := 99999.0     # in allenamento il tempo non finisce mai
 const BRAVO := "Bravo!"
 
@@ -53,10 +53,10 @@ const LESSONS := [
 		"freeze": "opp", "noAutoDef": true,
 	},
 	{
-		"id": "dribbling", "title": "Dribbling",
-		"short": "Avvicinati al difensore e tocca Dribbling.",
-		"text": "Quando arrivi addosso a un difensore la visuale si abbassa e il tempo rallenta: puoi <b>passare</b> a un compagno libero oppure toccare <b>Dribbling</b> in basso per saltarlo.",
-		"needs": "userDribble",
+		"id": "scatto", "title": "Scatto", # era "Dribbling" (Luis 2026-11-20: nel duello il tasto è Scatto)
+		"short": "Avvicinati al difensore e tocca Scatto.",
+		"text": "Quando arrivi addosso a un difensore la visuale si abbassa e il tempo rallenta: puoi <b>passare</b> a un compagno libero oppure toccare <b>Scatto</b> in basso per bruciarlo in velocità e proseguire dritto.",
+		"needs": "userSprint",
 		"freeze": "opp-but-o",
 	},
 	{
@@ -193,6 +193,7 @@ func reset() -> void:
 		p.tackleCd = 0.0
 		p.protect = 0.0
 		p.beat = 0.0
+		p.burst = 0.0
 	m.duel = null
 	m.duelCd = [0.0, 0.0]
 	m.duelCdP = [null, null]
@@ -338,7 +339,7 @@ func _poll_recupera() -> bool:
 	return m.ball.owner != null and m.ball.owner.team == 0
 
 
-func _setup_dribbling(kk: int) -> Dictionary:
+func _setup_scatto(kk: int) -> Dictionary:
 	var c := carrier(7, [0.0, -10.0, 10.0][kk], [-6.0, 0.0, -2.0][kk])
 	clear_opp()
 	var o: R.Player = m.players[16]
@@ -350,7 +351,7 @@ func _setup_dribbling(kk: int) -> Dictionary:
 	return {"c": c, "o": o}
 
 
-func _check_dribbling(e: Dictionary) -> bool:
+func _check_scatto(e: Dictionary) -> bool:
 	return e.type == "dribble" and (e.p as R.Player).team == 0 and e.ok
 
 

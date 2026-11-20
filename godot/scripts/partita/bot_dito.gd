@@ -1,6 +1,6 @@
 # "Dito finto" per le prove senza persona (gioco.gd --bot): gioca la squadra 0 SOLO coi gesti veri, cioè posizioni
 # sullo schermo passate a scripts/partita/gesti.gd come farebbe un dito (giù, trascina, su). Disegna strade, passaggi,
-# tiri, linee di difesa e tuffi del portiere, tiene premuto per muovere il controllato, preme Dribbling nel duello e
+# tiri, linee di difesa e tuffi del portiere, tiene premuto per muovere il controllato, preme Scatto nel duello (userSprint) e
 # gira la visuale nel rallenty. Non è un giocatore bravo: serve a far passare una partita intera da tutti i gesti.
 extends RefCounted
 
@@ -14,7 +14,7 @@ const ATTESA_MIN := 6          # fotogrammi tra un gesto e l'altro (più un po' 
 const ATTESA_CASO := 10
 
 var r: SimRng
-var conti := {"strada": 0, "passaggio": 0, "tiro": 0, "difesa": 0, "tuffo": 0, "dribbling": 0, "visuale": 0, "tieni": 0, "saltati": 0}
+var conti := {"strada": 0, "passaggio": 0, "tiro": 0, "difesa": 0, "tuffo": 0, "scatto": 0, "scatto_riuscito": 0, "visuale": 0, "tieni": 0, "saltati": 0}
 var _gesto: Array[Vector2] = []
 var _attesa := 0
 
@@ -75,14 +75,22 @@ func _decidi(g, now: int) -> void:
 				_tieni(g, now, _sch(g, b.x + (r.next() - 0.5) * 6.0, b.y - dir * 3.0, 0.0))
 
 
+# tocca il tasto Scatto del duello (gioco.gd → m.userSprint) e conta com'è andata (evento 'dribble' con sprint)
+func tocca_scatto(g) -> void:
+	g._dribbling()
+	conti.scatto += 1
+	for e: Dictionary in g.m.events:
+		if e.type == "dribble" and e.get("sprint", false) and e.ok:
+			conti.scatto_riuscito += 1
+
+
 func _attacca(g, now: int, c: R.Player, dir: float) -> void:
 	var m = g.m
 	var me: int = g.me
 	var tiro := r.next()
 	if m.duelFor(me):
 		if tiro < 0.35:
-			g._dribbling()
-			conti.dribbling += 1
+			tocca_scatto(g)
 		elif tiro < 0.5:
 			var w: float = g.gesti.dim.x
 			var y0: float = g.gesti.dim.y * 0.3

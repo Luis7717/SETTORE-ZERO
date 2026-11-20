@@ -9,9 +9,12 @@
 //  - trace_N.json: partite intere a seme fisso: un'impronta a 32 bit dello stato a OGNI passo (pallone e giocatori,
 //    bit per bit), gli eventi con il passo in cui avvengono, lo stato in chiaro ogni FRAME_EVERY passi
 //    (per misurare di quanto divergono le partite, se divergono), punteggio, statistiche e numero di passi.
+//  - sprint.json: il tasto Scatto nel duello (userSprint), che le partite col bot non toccano mai: per alcune scene
+//    l'esito e l'impronta dello stato a ogni passo per SPRINT_SEC secondi dopo il tocco.
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { rng32 } from '../src/sim.js';
 import { playMatch } from './lib/harness.mjs';
+import { scene, wake, give } from './lib/scene.mjs';
 
 const OUT = 'godot/tests/fixtures';
 const FRAME_EVERY = 120;
@@ -64,6 +67,28 @@ function trace(sc) {
   return { scenario: sc, steps, score: m.score, stats: m.stats, frameEvery: FRAME_EVERY, hashes: hashes.join(''), events, frames };
 }
 
+// Scatto nel duello: portatore umano verso +y in (px, py), difensore davanti a `dist` m e di lato di `ox` m
+const SPRINT_SEC = 2.4;
+export const SPRINT_SCENES = [];
+for (let seed = 1; seed <= 12; seed++) SPRINT_SCENES.push({ seed, px: 0, py: 0, ox: [0.6, -0.6, 0, 0.02, 1.5, -2][seed % 6], dist: [4, 3, 6][seed % 3], vel: 70, dif: 50 });
+SPRINT_SCENES.push({ seed: 13, px: 30, py: 40, ox: -0.5, dist: 4, vel: 80, dif: 40 }, { seed: 14, px: -30.5, py: -10, ox: 0.4, dist: 3.5, vel: 60, dif: 60 });
+function sprintScene(sc) {
+  const m = scene({ seed: sc.seed }), p = m.players[9], o = m.players[11 + 3];
+  wake(p, sc.px, sc.py); p.fx = 0; p.fy = 1; p.st.vel = sc.vel; give(m, p); m.updateCtrl(0);
+  wake(o, sc.px + sc.ox, sc.py + sc.dist); o.st.dif = sc.dif; o.fx = 0; o.fy = -1;
+  m.userMove(0, p.x, p.y, true); m.step(1 / 60); m.events.length = 0;
+  const duel = m.duelFor(0), tapped = m.userSprint(0), e = m.events.find(x => x.type === 'dribble'), burst = p.burst;
+  m.events.length = 0;
+  const hashes = [], events = [];
+  for (let n = 0; n < Math.round(SPRINT_SEC * 60); n++) {
+    m.step(1 / 60);
+    hashes.push(stepHash(m).toString(16).padStart(8, '0'));
+    for (const x of m.events) events.push([n, x.type, x.p ? x.p.team * 11 + x.p.i : -1]);
+    m.events.length = 0;
+  }
+  return { scene: sc, duel, tapped, ok: e ? e.ok : null, burst, hashes: hashes.join(''), events };
+}
+
 function main() {
   mkdirSync(OUT, { recursive: true });
   // numeri casuali
@@ -80,6 +105,8 @@ function main() {
     math.hypot.push([hex(y), hex(x), hex(Math.hypot(y, x))]);
   }
   writeFileSync(`${OUT}/math.json`, JSON.stringify(math) + '\n');
+  // Scatto nel duello
+  writeFileSync(`${OUT}/sprint.json`, JSON.stringify({ sec: SPRINT_SEC, scenes: SPRINT_SCENES.map(sprintScene) }) + '\n');
   // partite
   for (const [i, sc] of TRACE_SCENARIOS.entries()) {
     const t = trace(sc);
