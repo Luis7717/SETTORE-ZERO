@@ -1,15 +1,18 @@
 // Giochetti del dribbling: solo grafica (il motore decide se il dribbling riesce, qui si sceglie come farlo vedere).
 // Più è alto il dribbling del giocatore, più i giochetti possibili sono belli. Nessuna dipendenza da three.js.
+import { trickMove, trickDuration, MATCH_OPT, MATCH_SCALE } from './moves/tricks.js';
 
-// in ordine di bellezza; dur = durata dell'animazione (s, nel tempo della grafica)
+// in ordine di bellezza; dur = durata dell'animazione (s, nel tempo della grafica): quella del movimento calcolato
+// per la partita (src/moves/tricks.js), letta la prima volta che serve
 export const TRICKS = [
-  { id: 'finta', name: 'Finta di corpo', dur: 0.55 },
-  { id: 'doppiopasso', name: 'Doppio passo', dur: 0.75 },
-  { id: 'elastico', name: 'Elastico', dur: 0.6 },
-  { id: 'veronica', name: 'Veronica', dur: 0.7 },
-  { id: 'sombrero', name: 'Sombrero', dur: 0.8 },
-  { id: 'arcobaleno', name: 'Colpo dell\'arcobaleno', dur: 0.85 },
+  { id: 'finta', name: 'Finta di corpo' },
+  { id: 'doppiopasso', name: 'Doppio passo' },
+  { id: 'elastico', name: 'Elastico' },
+  { id: 'veronica', name: 'Veronica' },
+  { id: 'sombrero', name: 'Sombrero' },
+  { id: 'arcobaleno', name: "Colpo dell'arcobaleno" },
 ];
+for (const T of TRICKS) Object.defineProperty(T, 'dur', { get: () => trickDuration(T.id), enumerable: true });
 const DRI_FIRST = 35; // sotto questo dribbling solo la finta di corpo
 const DRI_STEP = 10;  // ogni 10 punti di dribbling si sblocca un giochetto più bello
 
@@ -22,22 +25,11 @@ export function chooseTrick(dri, r) {
   return TRICKS[Math.max(0, top - down)];
 }
 
-const bump = q => Math.sin(Math.PI * Math.min(1, Math.max(0, q)));
-
-// spostamento del pallone rispetto alla posizione vera durante il giochetto (q = avanzamento 0..1):
-// { f: avanti (m), s: di lato (m, verso `side`), h: altezza (m) }
+// spostamento del pallone rispetto alla posizione vera durante il giochetto (q = avanzamento 0..1), preso dal pallone
+// del movimento calcolato (mosso dal piede, voli con la gravità vera): { f: avanti (m), s: di lato (m, verso `side`:
+// col destro, side = 1, è la sinistra del giocatore), h: altezza (m) }. A inizio e fine è zero.
 export function ballOffset(id, q) {
-  switch (id) {
-    case 'finta': return { f: 0, s: 0.18 * Math.sin(2 * Math.PI * q), h: 0 };
-    case 'doppiopasso': return { f: 0.1 * bump(q), s: 0, h: 0 };
-    // fuori con l'esterno, poi dentro di colpo dall'altra parte
-    case 'elastico': { if (q < 0.45) return { f: 0, s: 0.5 * bump(q / 0.9), h: 0 }; const u = (q - 0.45) / 0.55; return { f: 0, s: 0.5 * Math.cos(Math.PI * u * 1.5) * (1 - u), h: 0 }; }
-    // il giocatore gira sul pallone: il pallone gli fa un giro intorno ai piedi
-    case 'veronica': { const a = 2 * Math.PI * q; return { f: 0.35 * (Math.cos(a) - 1), s: 0.35 * Math.sin(a), h: 0 }; }
-    // pallone alzato sopra la testa del difensore
-    case 'sombrero': return { f: 0.8 * bump(q), s: 0, h: 1.9 * bump(q) };
-    // di tacco da dietro, sopra la propria testa, e giù davanti
-    case 'arcobaleno': return { f: q < 0.5 ? -0.6 * bump(2 * q) : 0.6 * bump(2 * q - 1), s: 0, h: 2.3 * bump(q) };
-    default: return { f: 0, s: 0, h: 0 };
-  }
+  const mv = trickMove(TRICKS.some(T => T.id === id) ? id : 'finta', MATCH_OPT), B = MATCH_OPT.B, S = MATCH_SCALE;
+  const p = mv.at(Math.min(1, Math.max(0, q)) * mv.T).ball.p;
+  return { f: (p[2] - B[2]) * S, s: (p[0] - B[0]) * S, h: (p[1] - B[1]) * S };
 }

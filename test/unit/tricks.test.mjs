@@ -28,5 +28,6 @@ test('giochetti: il pallone parte e torna al suo posto (nessuno scatto a inizio 
     }
     let maxH = 0; for (let q = 0; q <= 1; q += 0.05) maxH = Math.max(maxH, ballOffset(T.id, q).h);
     if (T.id === 'sombrero' || T.id === 'arcobaleno') assert.ok(maxH > 1.5, `${T.id}: pallone alto ${maxH.toFixed(2)} m`);
+    assert.ok(T.dur > 0.4 && T.dur < 2.6, `${T.id}: durata ${T.dur}`);
   }
 });

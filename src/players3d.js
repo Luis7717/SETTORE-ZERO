@@ -14,6 +14,11 @@ import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { SKINS, HAIR_COLORS, EYE_COLORS, BOOTS, normalizeLook, lookFromSeed, normalizeKitStyle, backName, hash32 } from './looks.js';
 import { drawCrest } from './crest.js';
 import { makeBase, hairPieces, scalpPaint, paintHairTex } from './hair3d.js';
+import { applyMove, canMove } from './move-pose.js';
+import { trickMove, MATCH_OPT } from './moves/tricks.js';
+import { mirrorFrame } from './moves/core.js';
+
+const TRICK_BLEND = 0.12; // s: entrata e uscita dal movimento calcolato del giochetto (dalla corsa del clip e ritorno)
 
 const MODEL_H = 1.86;          // altezza del modello prima di SCALE (la testa è grande: un po' più alto della figura a box, che arriva a 1,75)
 export const TEX = 512;        // lato della texture dipinta per ogni giocatore in partita
@@ -484,7 +489,7 @@ export class Players3D {
   // ctx: { t, phase, flip, yaw, ball, scale, trick }
   pose(p, f, dt, ctx) {
     const body = f.body, A = f.act, X = 0, Z = 2, sv = f.saved;
-    for (let i = sv.length - 2; i >= 0; i -= 2) sv[i].quaternion.copy(sv[i + 1]);
+    for (let i = sv.length - 2; i >= 0; i -= 2) { const o = sv[i + 1]; if (o.isVector3) sv[i].position.copy(o); else sv[i].quaternion.copy(o); } // anche le posizioni (src/move-pose.js)
     sv.length = 0;
     const v = Math.hypot(p.vx, p.vy), run = Math.min(1, Math.max(0, (v - 0.25) / RUN_FULL));
     body.rotation.set(0, 0, 0); body.position.set(0, 0, 0);
@@ -523,7 +528,7 @@ export class Players3D {
       this.rot(f, 'LeftArm', Z, 1.05 + w); this.rot(f, 'RightArm', Z, -1.05 - w);
       this.rot(f, 'LeftForeArm', Z, 0.4); this.rot(f, 'RightForeArm', Z, -0.4);
     } else if (ctx.trick && st === 'play') {
-      this.trickPose(f, body, ctx.trick, S);
+      if (!canMove(f)) this.trickPose(f, body, ctx.trick, S); // l'atleta: movimento calcolato, dopo flush
     } else if (header) {
       const q = 1 - p.kickAnim / KICK_T;
       body.position.y = Math.sin(q * Math.PI) * 0.35;
@@ -547,6 +552,16 @@ export class Players3D {
       body.rotation.x = 0.08 * run;
     }
     this.flush(f);
+    if (ctx.trick && st === 'play' && !cele && canMove(f)) this.trickMove(f, ctx.trick);
+  }
+
+  // giochetto dell'atleta (tr = { id, q 0..1, side ±1 }): tutto il corpo nella posa del movimento calcolato per la
+  // partita (src/moves/tricks.js, lo stesso che muove il pallone in render.js); col sinistro (side -1) specchiato.
+  // Entra ed esce sfumando dal clip. Si annulla da solo al fotogramma dopo (f.saved).
+  trickMove(f, tr) {
+    const mv = trickMove(tr.id, MATCH_OPT), u = Math.min(1, Math.max(0, tr.q)) * mv.T;
+    const fr = tr.side < 0 ? mirrorFrame(mv.at(u)) : mv.at(u);
+    applyMove(this, f, fr, { w: Math.max(0, Math.min(1, u / TRICK_BLEND, (mv.T - u) / TRICK_BLEND)) });
   }
 }
 

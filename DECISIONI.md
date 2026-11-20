@@ -452,3 +452,38 @@ Richieste di Luis dopo la prova sull'iPhone: "in difesa restano tutti fermi e in
 - **Da provare sull'iPhone**: rientro e pressing quando si perde palla; linea di difesa lunga che si ferma a 14 m;
   contrasto vicino al portatore; intercetto in corsa; scatto lungo una strada (velocità e animazione); smarcamento a
   centrocampo.
+
+## 2026-11-20 — Palleggio, giochetti e tiro con fisica vera e cinematica inversa
+Richiesta di Luis: il giocatore sullo sfondo del menu faceva movimenti senza senso (palleggio e giochetti), solo la
+corsa andava bene. Non ci sono clip CC0/CC-BY di palleggio o skill per questo scheletro, quindi i movimenti sono
+**calcolati**: posa del corpo come funzione del tempo + cinematica inversa sulle ossa, pallone con la fisica vera.
+- **Come funziona** (`src/moves/*`, nessuna dipendenza grafica): per ogni movimento si danno chiavi per bacino, busto,
+  testa, caviglie (o il punto del piede che deve toccare il pallone: collo, suola, punta, interno, esterno, tallone,
+  coscia, testa) e mani; curve morbide fra le chiavi. Il pallone è a pezzi: fermo, rotola, vola (gravità vera, tempo
+  di volo = sqrt(2(H-y0)/g) + sqrt(2(H-y1)/g)), portato dal piede (pallone = punto del piede + normale × raggio). La
+  rotazione del pallone è integrata: rotola senza strisciare, in volo ha un effetto costante. Lo sguardo segue il pallone.
+- `src/ik.js`: IK a due ossa (anca-ginocchio-caviglia col ginocchio verso il davanti del piede, spalla-gomito-mano).
+  `src/move-pose.js` mette la posa sul modello dopo il clip; le ossa toccate (anche la posizione del bacino) si
+  salvano in `f.saved` e si rimettono al fotogramma dopo, quindi la seconda passata si annulla da sola.
+- **Palleggio** (`src/moves/juggle.js`, 11 s): alzata con la suola e la punta, collo destro e sinistro, coscia, un
+  colpo alto, testa, rimbalzi a terra e stop di suola. Gamba d'appoggio piegata, bacino sul piede d'appoggio, braccia
+  che bilanciano, saltelli tra un tocco e l'altro.
+- **Giochetti** (`src/moves/tricks.js`): finta (peso a sinistra e via a destra), doppio passo (le gambe girano sopra
+  il pallone fermo), elastico (esterno fuori e interno dentro dello stesso piede, il pallone rotola e si ferma),
+  veronica (suola sul pallone e mezzo giro su un piede, poi sull'altro), sombrero e arcobaleno a parabola vera.
+  Due versioni: menu (gesti 1,6 volte più lenti, i voli no, finiscono con lo stop) e partita (pallone grande e 0,6 m
+  davanti, finisce quando il pallone ricade). In partita l'atleta fa il movimento intero (`Players3D.trickMove`, col
+  sinistro specchiato), `ballOffset` prende il pallone dallo stesso movimento e le durate in `TRICKS` sono quelle dei
+  movimenti (finta 0,55 s, doppio passo 0,85, elastico 0,75, veronica 1,0, sombrero 1,5, arcobaleno 2,0: i due voli
+  alti durano di più perché con la gravità vera un pallone a 2-2,9 m non può scendere prima). Il motore non è toccato.
+- **Tiro del menu** (`src/moves/shot.js`): passo col sinistro, destro indietro, collo pieno sul pallone, che parte a
+  21 m/s e vola con la gravità; poi un pallone nuovo arriva rotolando per il giro dopo. La corsa resta il clip.
+- **Verifiche in Node** (`test/unit/moves.test.mjs`, modello vero): IK entro 1 cm su tutte le pose, contatto a ogni
+  tocco entro 2 cm (di solito 0), pelle mai più di 1,5 cm dentro il pallone (2,5 cm col pallone grande della partita),
+  accelerazione del pallone in volo = -g. A schermo: `node test/menu-anim-shot.mjs shots [passo] [vicino]` e
+  `node test/tricks-shot.mjs shots mosaico [passo] [lato]` fanno mosaici di fotogrammi fitti.
+- **Non ancora**: niente rimbalzi del pallone sul corpo né scarpe che scivolano zero (in partita il giocatore si muove
+  col motore mentre i piedi fanno il giochetto). Col pallone grande della partita restano compenetrazioni di 1-2 cm
+  in qualche fotogramma (punta e polpaccio nell'arcobaleno).
+- **Da provare sull'iPhone**: palleggio e giochetti nel menu (fluidità, se il contatto si vede), giochetti in partita
+  nel duello (tasto Dribbling, anche col sinistro), durata dei voli di sombrero e arcobaleno in partita.
