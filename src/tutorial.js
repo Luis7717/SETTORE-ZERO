@@ -11,6 +11,7 @@ export const REPS = 3;    // prove per ogni meccanica
 // Ogni lezione: testo della scheda, 3 situazioni (setup con indice k), come si riconosce la riuscita,
 // chi resta fermo. `needs`: metodo del motore senza il quale la lezione si salta.
 const PASS_DEF_DIST = 11; // lezione Passaggio: distanza iniziale del difensore davanti al portatore (m)
+const DRIB_DEF_DIF = 15;  // lezione Dribbling: difesa del difensore, così il dribbling riesce quasi sempre (è una lezione)
 
 export const LESSONS = [
   {
@@ -69,6 +70,7 @@ export const LESSONS = [
     setup(m, T, k) {
       const c = T.carrier(m, 7, [0, -10, 10][k], [-6, 0, -2][k]); T.clearOpp(m);
       const o = m.players[16]; T.put(m, o, c.x + [0, 1, -1][k], c.y + 7); o.fx = 0; o.fy = -1;
+      o.st.dif = Math.min(o.st.dif, DRIB_DEF_DIF);
       T.put(m, m.players[9], c.x + [12, 14, -14][k], c.y + 4);
       return { c, o };
     },
@@ -126,7 +128,10 @@ export class Tutorial {
     m.phase = 'play'; m.restart = null; m.move = [null, null]; m.runs = [[], []]; m.lastPass = null; m.resetStates();
     m.autoDef = [!L.noAutoDef, true]; // in "Recupera palla" la CPU non difende: si impara a disegnare la linea
     // in allenamento niente espulsioni né stanchezza: ogni prova riparte con tutti in campo
-    for (const p of m.players) { p.off = false; p.yellow = 0; p.energy = 1; p.vx = p.vy = 0; p.stun = 0; }
+    // e niente attese rimaste dalla prova prima: duello, dribbling e contrasti ripartono da zero
+    // (prima, dopo un dribbling fallito, il tasto Dribbling della prova nuova non faceva nulla per secondi)
+    for (const p of m.players) { p.off = false; p.yellow = 0; p.energy = 1; p.vx = p.vy = 0; p.stun = 0; p.dribCd = 0; p.tackleCd = 0; p.protect = 0; p.beat = 0; }
+    m.duel = null; m.duelCd = [0, 0]; m.duelCdP = [null, null];
     m.ctrl[0] = null;
     m.place(m.gk(0), 0, -49); m.place(m.gk(1), 0, 49);
     for (const p of m.team(0)) if (p.pos !== 'P' && p.i !== 7 && p.i !== 9) { const [ax, ay] = m.anchor(p); this.put(m, p, ax, Math.min(ay, -5)); }

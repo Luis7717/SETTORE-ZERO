@@ -1,81 +1,80 @@
 [
  {
-  "score": "1-0",
-  "steps": 7815,
-  "stats": "{\"shots\":[5,0],\"onT\":[3,0],\"poss\":[65.6333333333309,52.61666666666496],\"fouls\":[0,0],\"corners\":[0,0],\"saves\":[0,0],\"headers\":[0,0],\"volleys\":[0,0]}",
+  "score": "0-0",
+  "steps": 7503,
+  "stats": "{\"shots\":[2,0],\"onT\":[1,0],\"poss\":[63.51666666666434,53.99999999999822],\"fouls\":[0,0],\"corners\":[0,0],\"saves\":[0,1],\"headers\":[0,0],\"volleys\":[0,0]}",
   "events": {
-   "restart:kickoff": 3,
+   "restart:kickoff": 2,
    "kick:ground": 81,
-   "control": 92,
+   "control": 87,
    "duel_start": 26,
    "duel_end": 26,
+   "kick:loft": 5,
+   "tackle": 2,
+   "kick:shot": 2,
+   "dive": 2,
+   "out:goalkick": 1,
+   "restart:goalkick": 1,
+   "half": 1,
+   "block": 1,
+   "dribble": 1,
+   "save": 1,
+   "full": 1
+  },
+  "hash": "f0c259f42e0663dd"
+ },
+ {
+  "score": "2-0",
+  "steps": 8112,
+  "stats": "{\"shots\":[6,0],\"onT\":[5,0],\"poss\":[70.36666666666396,40.499999999998984],\"fouls\":[0,0],\"corners\":[1,0],\"saves\":[0,0],\"headers\":[1,1],\"volleys\":[0,0]}",
+  "events": {
+   "restart:kickoff": 4,
+   "kick:ground": 81,
+   "control": 92,
+   "duel_start": 35,
+   "duel_end": 35,
    "kick:loft": 8,
-   "tackle": 3,
+   "kick:header": 2,
+   "dribble": 3,
+   "block": 10,
+   "tackle": 1,
+   "half": 1,
    "kick:shot": 5,
    "dive": 2,
-   "out:goalkick": 1,
-   "restart:goalkick": 1,
-   "half": 1,
-   "block": 6,
-   "dribble": 1,
-   "goal": 1,
-   "full": 1
-  },
-  "hash": "1760c4396ebce630"
- },
- {
-  "score": "0-0",
-  "steps": 7567,
-  "stats": "{\"shots\":[1,1],\"onT\":[1,1],\"poss\":[59.5499999999979,54.13333333333154],\"fouls\":[0,0],\"corners\":[1,0],\"saves\":[1,1],\"headers\":[0,2],\"volleys\":[0,0]}",
-  "events": {
-   "restart:kickoff": 2,
-   "kick:ground": 78,
-   "control": 87,
-   "duel_start": 32,
-   "duel_end": 32,
-   "kick:loft": 10,
-   "kick:header": 2,
-   "dribble": 2,
-   "tackle": 2,
-   "out:throw": 1,
-   "restart:throw": 1,
-   "block": 7,
-   "half": 1,
-   "kick:shot": 2,
-   "dive": 2,
-   "save": 2,
+   "goal": 2,
    "out:corner": 1,
    "restart:corner": 1,
+   "aerial": 1,
    "full": 1
   },
-  "hash": "87432ac19e4f2485"
+  "hash": "435cbe115351caf2"
  },
  {
   "score": "0-0",
-  "steps": 7570,
-  "stats": "{\"shots\":[2,0],\"onT\":[1,0],\"poss\":[64.08333333333098,52.566666666664965],\"fouls\":[0,0],\"corners\":[1,0],\"saves\":[0,1],\"headers\":[0,1],\"volleys\":[0,0]}",
+  "steps": 7696,
+  "stats": "{\"shots\":[3,0],\"onT\":[1,0],\"poss\":[62.066666666664425,53.849999999998225],\"fouls\":[0,0],\"corners\":[1,0],\"saves\":[0,1],\"headers\":[0,1],\"volleys\":[0,0]}",
   "events": {
    "restart:kickoff": 2,
-   "kick:ground": 81,
-   "control": 89,
-   "duel_start": 28,
-   "duel_end": 28,
+   "kick:ground": 88,
+   "control": 93,
+   "duel_start": 29,
+   "duel_end": 29,
    "dribble": 4,
-   "kick:shot": 2,
-   "dive": 2,
-   "out:goalkick": 1,
-   "restart:goalkick": 1,
-   "tackle": 4,
+   "kick:shot": 3,
+   "dive": 3,
+   "out:goalkick": 2,
+   "restart:goalkick": 2,
+   "tackle": 3,
    "save": 1,
    "out:corner": 1,
    "restart:corner": 1,
-   "kick:loft": 6,
+   "kick:loft": 7,
    "kick:header": 1,
-   "block": 1,
+   "block": 5,
    "half": 1,
    "full": 1
   },
-  "hash": "03e3b86e4ef5c553"
+  "hash": "8b691b8e63395b02"
  },
  {
   "score": "1-1",
@@ -103,7 +102,7 @@
    "restart:corner": 1,
    "full": 1
   },
-  "hash": "623147ad47549896"
+  "hash": "5dc115e286a62e9c"
  },
  {
   "score": "0-2",
@@ -128,6 +127,6 @@
    "dribble": 1,
    "full": 1
   },
-  "hash": "f12cdbf5bdeb17d6"
+  "hash": "0b00ced84d288c77"
  }
 ]
