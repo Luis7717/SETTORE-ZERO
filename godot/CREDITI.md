@@ -11,6 +11,18 @@ Licenze: tutto **CC0 1.0** (pubblico dominio; attribuzione non obbligatoria, la 
 | models/player.glb (riserva, non usato nella fase 1) | Kenney "Animated Characters 1" / "Animated Characters: Protagonists", https://kenney.nl/assets/animated-characters-protagonists | Kenney (www.kenney.nl) | CC0 1.0 | — |
 | models/player_skin.png | texture incorporata in `player.glb`, estratta da Godot all'importazione | Kenney | CC0 1.0 | generata dall'importazione: si ricrea da sola |
 
+## Animazioni mocap
+
+| File | Origine | Autore | Licenza | Note |
+|------|---------|--------|---------|------|
+| mocap/mocap.res | "Free mocap pack 05: Soccer", https://andersonrohr.gumroad.com/l/mocap_pack5 (versione UE5, file FBX 01-21) | Anderson Rohr (https://andersonrohr.gumroad.com) | pack gratuito, uso secondo la pagina Gumroad confermata da Luis (vedi sotto) | Reindirizzate sul nostro scheletro da `tools/converti_mocap.gd`: solo le clip usate, tagliate, bacino senza spostamento orizzontale, compresse |
+
+Licenza: nel pack non c'è un testo di licenza (il PDF `Importing_into_UE5.pdf` spiega solo come importare in Unreal e
+finisce coi link alla pagina Gumroad e al LinkedIn dell'autore; nei file nessun LICENSE o README). Anche il testo della
+pagina Gumroad letto il 2026-11-20 non riporta condizioni scritte. Vale quindi la licenza della pagina Gumroad del
+pack, che Luis ha confermato. Citiamo comunque l'autore, qui e nel README. Se l'autore pubblica condizioni diverse,
+valgono quelle.
+
 ## Suoni (non ancora usati nella fase 1)
 
 Tutti da Freesound, **CC0 1.0**, ritagliati per il web (dettagli e tempi in `assets/CREDITI.md`):

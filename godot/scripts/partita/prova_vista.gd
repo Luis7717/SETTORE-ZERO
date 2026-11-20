@@ -14,6 +14,10 @@
 #   --controlla           controlla le conversioni schermo/campo/porta della vista (anche con --me=1 e girata) ed esce
 #   --me=0|1              squadra umana (1 = campo capovolto, si attacca sempre "in su")
 #   --vicino=N            telecamera fissa vicina al giocatore m.players[N] (0 = portiere di casa)
+#   animazioni mocap (figura_mocap.gd), telecamera vicina a chi le fa:
+#   --scena=esultanza | tiro | piatto | rimessa | difesa   (e parata con --tuffo=X,ALTEZZA per scegliere il tuffo)
+#   --senza-mocap         le stesse scene con le pose calcolate (per confronto)
+#   --traccia=N|segui     stampa a ogni fotogramma lo stato mocap di m.players[N] o di quello seguito (clip, tempo, peso)
 extends Node
 
 const VISTA := preload("res://scenes/vista_partita.tscn")
@@ -23,6 +27,7 @@ const R := preload("res://sim/records.gd")
 const SimRng := preload("res://sim/rng.gd")
 const DT := 1.0 / 60.0
 const SLOW := 0.22             # rallenty (come l'area di tiro del gioco web)
+const FiguraMocap := preload("figura_mocap.gd")
 
 var vista: PartitaVista
 var m: SimMatch
@@ -36,6 +41,7 @@ var _ms := PackedFloat32Array()
 var _us_motore := 0             # microsecondi spesi nel motore e nella vista (per le misure)
 var _us_vista := 0
 var _n := 0
+var _segui: Object = null      # giocatore da guardare da vicino (scene mocap)
 
 
 func _ready() -> void:
@@ -44,6 +50,7 @@ func _ready() -> void:
 			var parti := arg.substr(2).split("=", true, 1)
 			_opz[parti[0]] = parti[1] if parti.size() > 1 else "1"
 	_scena = _opz.get("scena", "partita")
+	FiguraMocap.spento = _opz.has("senza-mocap")
 	if _opz.has("senza-vsync"):
 		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 		Engine.max_fps = 0
@@ -104,6 +111,14 @@ func _process(delta: float) -> void:
 		vista.cam.look_at_from_position(Vector3(9.0, 2.6, -40.0), Vector3(0.0, 1.0, -51.5), Vector3.UP)
 	elif _opz.has("vicino"):
 		_telecamera_vicina(m.players[int(_opz["vicino"])])
+	elif _segui != null:
+		_telecamera_vicina(_segui)
+	if _opz.has("traccia"):
+		var q: Object = _segui if _opz["traccia"] == "segui" else m.players[int(_opz["traccia"])]
+		var i := m.players.find(q)
+		var o: Object = m.ball.owner
+		var d := -1.0 if o == null else Vector2(o.x - q.x, o.y - q.y).length()
+		print("%.2f %s %s t=%.2f %s f=(%.2f,%.2f) v=%.1f portatore a %.1f m" % [m.time, m.phase, q.state, q.t, str(vista._figs[i].mocap.stato()), q.fx, q.fy, Vector2(q.vx, q.vy).length(), d])
 
 
 func _eventi() -> void:
@@ -136,6 +151,19 @@ func _prepara_scena() -> void:
 			_tiro_avversario()
 			_ts = SLOW
 			_tuffo_dopo(0.36)   # senza await: le schermate partono subito, il tuffo arriva dopo
+		"esultanza":
+			await _corri(1.0)
+			_tiro_in_porta()
+			_segui = m.players[9]
+		"tiro", "piatto":
+			await _corri(1.0)
+			_calcio_da_vicino(_scena == "tiro")
+		"rimessa":
+			await _corri(1.0)
+			m.setRestart("throw", 0, 32.0, 6.0)
+			_segui = m.restart.taker
+		"difesa":
+			await _difensore_vicino()
 		"gol":
 			await _corri(1.0)
 			_tiro_in_porta()
@@ -192,10 +220,66 @@ func _tiro_in_porta() -> void:
 	m.kick(p, {"type": "shot", "tx": 2.0, "ty": 50.0, "th": 1.2, "curve": 0.0})
 
 
-# il portiere si tuffa verso il palo dove va il tiro (sec di gioco dopo il tiro)
+# il portiere si tuffa verso il palo dove va il tiro (sec di gioco dopo il tiro); --tuffo=X,ALTEZZA lo cambia
 func _tuffo_dopo(sec: float) -> void:
 	await _corri(sec)
-	m.userDive(0, -2.4, 1.3)
+	var tf: PackedStringArray = str(_opz.get("tuffo", "-2.4,1.3")).split(",")
+	m.userDive(0, float(tf[0]), float(tf[1]))
+
+
+# mocap: il numero 9 col pallone, fermo, calcia dopo un attimo (tiro in porta o passaggio a terra a un compagno);
+# tempo rallentato per vedere il movimento in sequenza
+func _calcio_da_vicino(tiro: bool) -> void:
+	var p: R.Player = m.players[9]
+	var q: R.Player = m.players[10]
+	p.x = 4.0
+	p.y = 26.0
+	p.fx = 0.0
+	p.fy = 1.0
+	p.vx = 0.0
+	p.vy = 0.0
+	q.x = -8.0
+	q.y = 30.0
+	m.ball.owner = p
+	m.ball.x = p.x
+	m.ball.y = p.y + 0.6
+	_segui = p
+	_ts = SLOW
+	await _corri(0.25)
+	if tiro:
+		m.kick(p, {"type": "shot", "tx": 1.5, "ty": 50.0, "th": 1.4, "curve": 0.0})
+	else:
+		m.kick(p, {"type": "ground", "tx": q.x, "ty": q.y})
+
+
+# mocap: un avversario col pallone fermo davanti a un nostro difensore a 3 m; il motore si ferma (come nel
+# giochetto) e la vista continua: il difensore resta in posizione di difesa
+func _difensore_vicino() -> void:
+	await _corri(1.0)
+	var o: R.Player = m.players[20]
+	var d: R.Player = m.players[4]
+	o.x = 2.0
+	o.y = 6.0
+	o.fx = 0.0
+	o.fy = -1.0
+	d.x = 2.0
+	d.y = 3.0
+	d.fx = 0.0
+	d.fy = 1.0
+	for q: R.Player in [o, d]:
+		q.vx = 0.0
+		q.vy = 0.0
+		q.state = "play"
+	m.ball.owner = o
+	m.ball.x = o.x
+	m.ball.y = o.y - 0.6
+	m.ball.h = 0.0
+	m.ball.vx = 0.0
+	m.ball.vy = 0.0
+	m.phase = "play"   # anche se il motore era in una ripresa
+	m.restart = null
+	_segui = d
+	_fermo = true
 
 
 # tiro della squadra 1 verso la porta della squadra 0 (y = −50), dal limite dell'area

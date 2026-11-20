@@ -62,6 +62,8 @@ gioco, i gesti e l'interfaccia sono un altro lavoro (`partita.tscn`). Contratto 
 | `scripts/partita/telecamera_partita.gd` | telecamera come `View.update` del web: normale, vicino alla porta, difesa, duello, rallenty largo, angolo, parata, girata |
 | `scripts/partita/camfit.gd`, `camuser.gd` | inquadrature calcolate e visuale girata col dito (conti puri, provati senza schermo) |
 | `scripts/partita/figura.gd` | un giocatore in partita: clip fermo/corsa/scatto/salto, pose (calcio, testa, tuffo, scivolata, esultanza), giochetti con la IK |
+| `scripts/partita/figura_mocap.gd` | animazioni mocap vere sopra la figura: esultanze, parate, piatto/collo/rigore, rimessa, difesa (vedi "Animazioni mocap") |
+| `assets/mocap/mocap.res` | le clip mocap reindirizzate sul nostro scheletro (AnimationLibrary compressa, ~436 KB), fatte da `tools/converti_mocap.gd` |
 | `scripts/partita/mosse/` | movimenti calcolati dei giochetti (`mossa.gd`, `corpo.gd`, `giochetti.gd`) e IK a due ossa (`ik.gd`) |
 | `scripts/partita/nastri.gd`, `texture_vista.gd` | linee disegnate a nastro, linee di difesa, anteprima, fuorigioco; texture fatte a codice |
 | `shaders/rete.gdshader`, `bandierina.gdshader` | rete che si gonfia sul gol, bandierine che sventolano |
@@ -146,6 +148,59 @@ spenti (non si sentono e col driver audio finto resterebbero in memoria all'usci
 Non ancora fatti (fasi dopo): menu e carriera (la partita parte subito con le squadre di prova), cambi in pausa,
 allenamento guidato, salvataggio della scritta "Trascina il campo" (si ricorda solo finché l'app è aperta), musica.
 
+## Animazioni mocap
+
+Clip vere del **"Free mocap pack 05: Soccer"** di Anderson Rohr (licenza in `CREDITI.md`), reindirizzate sul nostro
+scheletro (stessi nomi di ossa Unreal, tutti e due in posa a T) e salvate in `assets/mocap/mocap.res`: una
+AnimationLibrary compressa con solo le clip usate (25 clip, ~436 KB). Le usa `scripts/partita/figura_mocap.gd`,
+agganciato a `figura.gd` con poche righe segnate `[mocap]` (e due in `vista.gd`).
+
+| Clip | Quando | Come |
+|---|---|---|
+| `esulta1..3` | gol | il marcatore e fino a 3 compagni entro 14 m, clip scelta col seme (stesso gol = stesse esultanze); gli altri compagni restano con l'esultanza calcolata |
+| `parata_alta/media/bassa_sx/dx` | tuffo del portiere | se lato, distanza e altezza del tuffo somigliano a quelle della clip (`raggio_x`, `raggio_h` misurati); altrimenti resta il tuffo calcolato. Petto verso il campo; la clip arriva al punto più lontano quando il tuffo del motore è a pieno |
+| `piatto_dx/sx` | passaggio a terra | la clip parte **dal fotogramma del contatto** quando il motore calcia (il calcio del motore è istantaneo); il corpo si gira verso dove va il pallone |
+| `collo_dx/sx`, `rigore1/2_dx/sx` | passaggio alto, tiro, rigore | come il piatto; il tiro alterna collo e rigore. Destro, mancino un giocatore su cinque (fisso per nome). Colpo di testa = posa calcolata |
+| `rimessa` | rimessa laterale | il battitore tiene il pallone sopra la testa (avanti e indietro nel tratto "presa") finché il motore non lancia, poi parte dal rilascio; la vista mette il pallone tra le mani (`pallone_in_mano`) |
+| `difesa1/2` | difesa | in loop per chi sta entro 5,5 m dal portatore avversario, lo guarda e va piano (peso che cala sopra 1,2 m/s, nullo a 3 m/s: la clip sta sul posto) |
+| `giallo`, `giallo_rosso` | — | **pronte, non usate**: il motore dà i cartellini (evento `foul` con `card`) ma non c'è un arbitro da animare |
+| `palleggio1..3` | — | **pronte, non usate** (vedi sotto) |
+
+- Le clip vanno nell'AnimationTree della figura (Blend2 `mocap` in fondo, Transition `mc_clip` → TimeSeek → TimeScale),
+  che avanza col tempo di gioco: **rallentano col rallenty**. Entrata 0,12 s (calcio 0,05 s), uscita 0,25 s, tra due
+  clip 0,08 s. Con la clip attiva le pose calcolate non si mettono (il corpo lo fa tutto la clip).
+- Root motion: il bacino **non si sposta in orizzontale** (lo spostamento lo dà il motore), l'altezza resta (scalata
+  sulle nostre gambe). Le clip sono girate in modo che il giocatore guardi avanti: calci verso dove va il piede al
+  contatto, rimessa verso dove va la mano al rilascio, il resto verso dove guarda il bacino.
+- `FiguraMocap.spento = true` le spegne tutte (pose calcolate); senza `mocap.res` il gioco va come prima.
+
+**Palleggi (per lo sfondo del menu o altro):** la libreria si aggiunge a qualunque AnimationPlayer del modello
+`athlete.glb` (le tracce sono `Armature/Skeleton3D:<osso>`, come le clip di base):
+
+```gdscript
+const FiguraMocap := preload("res://scripts/partita/figura_mocap.gd")
+var lib := FiguraMocap.libreria()          # null se manca il file
+if lib != null:
+    player.add_animation_library(&"mocap", lib)
+    player.play(&"mocap/palleggio1")      # 23 s; palleggio2 20,5 s, palleggio3 20,6 s (non in loop: metterlo se serve)
+```
+
+Il pallone non c'è nella clip: va messo a mano sul piede (osso `ball_r`/`ball_l`) o sulla testa nei momenti giusti.
+
+**Rifare la libreria** (i file del pack sono dati: si leggono gli FBX della cartella UE5, non si esegue niente da lì):
+
+```sh
+$G --headless --path godot -s res://tools/converti_mocap.gd                         # cartella predefinita
+$G --headless --path godot -s res://tools/converti_mocap.gd -- C:/.../mocap/UE5      # altra cartella
+$G --headless --path godot -s res://tools/converti_mocap.gd -- --tutte               # anche i dribbling (non usati)
+$G --headless --path godot -s res://tools/converti_mocap.gd -- --analizza            # stampa le misure delle clip
+```
+
+Tagli, piede, contatto, stacco e raggio delle parate sono nell'elenco `CLIP` in cima allo strumento e nei metadati
+della libreria (`FiguraMocap.info("piatto_dx")`). Test: `tests/test_mocap.gd`. Prove a schermo:
+`prova_vista.tscn -- --scena=esultanza|tiro|piatto|rimessa|difesa` (e `parata --tuffo=X,ALTEZZA --vicino=0`),
+`--senza-mocap` per le stesse scene con le pose calcolate, `--traccia=N|segui` per stampare clip, tempo e peso.
+
 ## Build per iPhone (GitHub Actions)
 
 Workflow `.github/workflows/tiro-a-giro-godot-ipa.yml`: parte a ogni push sul ramo `tiro-a-giro` **solo se cambia
@@ -182,6 +237,7 @@ Il preset si può provare anche da Windows: con i template installati
 $G --path godot res://scenes/prova_vista.tscn -- --schermata=shots/vista/partita.png --dopo=6
 #   --scena=rallenty | girata | parata | angolo | giochetto | linea | gol    (più --sequenza=N --ogni=SEC)
 #   --me=1 (campo capovolto) · --vicino=N (telecamera vicina a m.players[N]) · --senza-vsync --esci-dopo=15
+#   mocap: --scena=esultanza | tiro | piatto | rimessa | difesa · --tuffo=X,H · --senza-mocap · --traccia=N|segui
 $G --headless --path godot res://scenes/prova_vista.tscn -- --controlla --me=1   # conversioni schermo/campo/porta
 $G --headless --path godot -s res://tests/run_tests.gd -- test_camfit    # anche test_camuser, test_mosse, test_figura
 node test/export-vista.mjs     # rigenera tests/fixtures/vista.json dal JS (camfit, camuser, giochetti, IK)

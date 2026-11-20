@@ -73,7 +73,8 @@ var _ring: MeshInstance3D
 var _marker: Sprite3D
 var _tex_warn: Texture2D
 var _nets := {}                # lato in Godot (1 / −1) → {d, v, hit, entered, sp}
-var _ctx := {"t": 0.0, "phase": "", "flip": 1.0, "yaw": 0.0, "ball": null, "trick": null}   # riusato per tutti
+var _ctx := {"t": 0.0, "phase": "", "flip": 1.0, "yaw": 0.0, "ball": null, "trick": null, "m": null}   # riusato per tutti
+var _mano_i := -1              # [mocap] figura col pallone tra le mani (rimessa)
 var _zoom_t := -1.0            # zoom voluto dal gioco (set_zoom); < 0 = lo calcola la telecamera
 
 @onready var cam: Camera3D = $Telecamera
@@ -153,6 +154,11 @@ func update_view(dt_game: float, dt_real: float) -> void:
 		by += c.fy * o.x + c.fx * o.y * tk.side
 		bh += o.z
 	by = _dentro_la_rete(bx, by, bh)
+	var pm := _pallone_in_mano(b)   # [mocap] rimessa: il pallone tra le mani del battitore
+	if pm.w > 0.0:
+		bx = lerpf(bx, s * pm.x, pm.w)
+		by = lerpf(by, -s * pm.z, pm.w)
+		bh = lerpf(bh, maxf(0.0, pm.y - BALL_R), pm.w)
 	_aggiorna_pallone(b, bx, by, bh, dt_game)
 	_aggiorna_segni()
 	# visuale girata dalla persona: resta finché dura il rallenty in attacco con lo stesso portatore e mentre si
@@ -290,8 +296,22 @@ func _posa(i: int, p: Object, dt: float) -> void:
 	_ctx.flip = s
 	_ctx.yaw = yaw
 	_ctx.ball = m.ball
+	_ctx.m = m   # [mocap] figura_mocap.gd legge gol, rimesse e portatore
 	_ctx.trick = null if tk.is_empty() else tk
 	f.posa(p, dt, _ctx)
+
+
+# [mocap] figura che tiene il pallone tra le mani (rimessa laterale, figura_mocap.gd): Vector4(x, y, z, peso) nel
+# mondo; continua a guardare la stessa figura dopo il lancio, finché il pallone non è tornato su quello vero
+func _pallone_in_mano(b: Object) -> Vector4:
+	if b.owner != null:
+		_mano_i = m.players.find(b.owner)
+	if _mano_i < 0 or _mano_i >= _figs.size() or not is_instance_valid(_figs[_mano_i]) or _figs[_mano_i].mocap == null:
+		return Vector4.ZERO
+	var v: Vector4 = _figs[_mano_i].mocap.pallone_in_mano()
+	if v.w <= 0.0 and b.owner == null:
+		_mano_i = -1
+	return v
 
 
 func _trick_of(p: Object) -> Dictionary:
