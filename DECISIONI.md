@@ -333,3 +333,12 @@ maglia, maniche, calzettoni…), poi nome e numero sulla schiena e uno stemma in
   (|x| > 4 m, del tutto da 12 m) resta normale, così il portatore non esce dallo schermo (tutorial Tiro, prova 2).
 - Tutorial: ogni prova cancella le linee di difesa rimaste (`m.runs`) e il gesto in corso; prima in "Recupera palla" il
   giocatore poteva partire da solo su una linea vecchia. Prova a schermo: `node test/tut-lessons-shot.mjs shots`.
+
+## 2026-11-20 — Corpo rifinito a parti (busto, gambe, testa), braccia da fermo
+- Uniti busto (`src/body/busto.js`), gambe (`src/body/gambe.js`) e testa (`src/body/testa.js`), ognuno chiamato da
+  `src/athlete3d.js` con una riga; ordine: testa, busto, gambe. Il test delle gambe ora confronta col modello che ha già testa e busto.
+- **Posa da fermo**: `IDLE_FIX.arms` da 0,28 a −0,05 rad. La vecchia chiusura delle braccia, pensata per le braccia
+  corte del primo modello, con le braccia nuove (dita a 3,3 T) metteva mani e avambracci dentro cosce e busto:
+  da davanti il giocatore sembrava senza braccia e le dita spuntavano dai pantaloncini come una macchia color pelle.
+  Due test lo controllano (`gambe.test.mjs`, `busto.test.mjs`). Non controllato: le mani durante la corsa.
+- **Da provare sull'iPhone**: giocatore fermo da davanti, di lato e da dietro; visi e capelli sulla testa nuova.

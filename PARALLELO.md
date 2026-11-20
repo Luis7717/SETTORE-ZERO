@@ -49,6 +49,6 @@ Il terminale si è chiuso a metà (un'altra sessione ha chiuso processi per nome
 | 17 | Busto, spalle, braccia, mani | `TAG-wt-busto` / `wt-busto` | unito (`bc6e6ff`) | `src/body/busto.js`, `test/unit/busto.test.mjs`, `test/busto-shot.mjs` |
 | 18 | Bacino, gambe, piedi | `TAG-wt-gambe` / `wt-gambe` | lavoro non salvato ma finito e verde: salvato (`781d30f`) e unito; test aggiornato per confrontare col modello con busto e testa | `src/body/gambe.js`, `test/unit/gambe.test.mjs`, `test/legs-shot.mjs` |
 | 19 | Testa, viso, collo | `TAG-wt-testa` / `wt-testa` | come sopra (`68e50ed`), unito (`f50795a`) | `src/body/testa.js`, `test/unit/head.test.mjs`, `test/head-measure.mjs` |
-| 20a | Braccia nascoste dietro il busto da fermo (difetto del 17) | `TAG-wt-braccia` / `wt-braccia` | in corso | `src/body/busto.js` |
-| 20b | Macchia color pelle sui pantaloncini (difetto del 18) | `TAG-wt-macchia` / `wt-macchia` | in corso | `src/body/gambe.js` |
+| 20a | Braccia nascoste dietro il busto da fermo (difetto del 17) | `TAG-wt-braccia` / `wt-braccia` | fatto: stessa causa del 20b, resta solo il test della posa (`827c427`), unito | `src/body/busto.js` |
+| 20b | Macchia color pelle sui pantaloncini (difetto del 18) | `TAG-wt-macchia` / `wt-macchia` | fatto (`a739d31`, unito `f9f41e2`): erano le dita che bucavano i pantaloncini; corretto `IDLE_FIX.arms` in `src/athlete3d.js` | `src/body/gambe.js` |
 Massimo 2 subagenti insieme (richiesta di Luis del 2026-11-20).
