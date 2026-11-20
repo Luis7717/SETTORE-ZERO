@@ -13,6 +13,7 @@ import { Players3D, loadPlayers3D, hex, rgb, shade, lumH, FACE, SOLE, cpuCanvas 
 import { SKINS, HAIR_COLORS, EYE_COLORS, BOOTS, normalizeKitStyle } from './looks.js';
 import { drawCrest } from './crest.js';
 import { makeRadialBase, scalpAt, paintHairTex } from './hair3d.js';
+import { applyBusto } from './body/busto.js';
 
 const MODEL_H = 1.84;                 // altezza prima di SCALE (come il vecchio modello: la scala del gioco resta quella)
 const HAIR_RECT = [16, 916, 200, 92]; // zona della tinta dei capelli (coordinate su 1024, fascia libera in basso)
@@ -68,6 +69,7 @@ export class Athlete3D extends Players3D {
 
   // testa, punti di riferimento del corpo in posa a T, occhi (tutto nello spazio della mesh)
   headFrame() {
+    applyBusto(this); // busto, spalle, braccia, mani e maglia (src/body/busto.js)
     const geo = this.mesh.geometry, P = geo.attributes.position, UV = geo.attributes.uv, J = geo.attributes.skinIndex, W = geo.attributes.skinWeight;
     const names = this.mesh.skeleton.bones.map(b => b.name), H = names.indexOf('Head');
     this.headJoint = H; this.boneOf = []; this.boneIdx = new Uint8Array(P.count);
