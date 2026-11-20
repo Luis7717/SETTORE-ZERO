@@ -60,6 +60,9 @@ func _ready() -> void:
 		get_tree().quit(2))
 	_carriera_nuova()
 	await get_tree().process_frame
+	if _args.has("controlli"):
+		get_tree().quit(_controlli())
+		return
 	if _args.has("tutte"):
 		await _tutte(_args.tutte)
 	elif _args.has("fps"):
@@ -73,6 +76,28 @@ func _ready() -> void:
 		if _args.has("foto"):
 			foto(_args.foto)
 	get_tree().quit()
+
+
+## tests/controlli_menu.gd: ogni metodo test_* con le schermate nell'albero; 0 se tutti verdi
+func _controlli() -> int:
+	var falliti := 0
+	var fatti := 0
+	var obj: Object = (load("res://tests/controlli_menu.gd") as GDScript).new()
+	for m in obj.get_method_list():
+		var n: String = m.name
+		if not n.begins_with("test_"):
+			continue
+		obj.failures.clear()
+		var ok: Variant = obj.call(n)
+		var verde: bool = ok == true and obj.failures.is_empty()
+		fatti += 1
+		if not verde:
+			falliti += 1
+		print("%s controlli_menu :: %s" % ["ok      " if verde else "FALLITO ", n])
+		for f: String in obj.failures:
+			print("         ", f)
+	print("controlli menu: %d passati, %d falliti" % [fatti - falliti, falliti])
+	return 0 if falliti == 0 else 1
 
 
 func _carriera_nuova() -> void:

@@ -1,34 +1,17 @@
 # Menu principale (title() di src/ui.js senza "new"): logo TIRO A GIRO, frase, tre etichette, "Continua carriera"
 # e "Nuova carriera". Senza carriera salvata porta subito alla nuova carriera (come il web).
-# Dietro i pulsanti c'è il nodo `Sfondo`: se esiste res://scenes/menu/sfondo_menu.tscn (giocatore che palleggia,
-# altro lavoro) lo si mette lì dentro, altrimenti resta la sfumatura con il campo disegnato.
+# Dietro i pulsanti c'è lo sfondo 3D del campione che palleggia (con_3d, vedi MenuSchermata.crea_sfondo); senza
+# (--senza-3d o scena mancante) resta la sfumatura con il campo disegnato.
 extends MenuSchermata
 
 const I := preload("res://scripts/menu/icone.gd")
-const SFONDO_3D := "res://scenes/menu/sfondo_menu.tscn"
-
-var sfondo_3d: Node = null
 
 
 func prepara() -> void:
 	con_testata = false
 	ferma = true
-
-
-func crea_sfondo() -> Control:
-	var box := Control.new()
-	box.name = "Sfondo"
-	box.set_anchors_preset(Control.PRESET_FULL_RECT)
-	box.mouse_filter = Control.MOUSE_FILTER_PASS
-	var grad := super.crea_sfondo()
-	grad.name = "Sfumatura"
-	box.add_child(grad)
-	if ResourceLoader.exists(SFONDO_3D) and not OS.get_cmdline_user_args().has("--senza-3d"):
-		var sc := load(SFONDO_3D) as PackedScene
-		if sc != null:
-			sfondo_3d = sc.instantiate()
-			box.add_child(sfondo_3d)
-	return box
+	con_3d = true
+	velo_3d = 0.2
 
 
 func costruisci() -> void:

@@ -11,6 +11,8 @@ const PULSA := 2.4                 # s: un respiro del pulsante GIOCA (uiPulse)
 
 func prepara() -> void:
 	con_testata = false
+	con_3d = true      # il campione palleggia anche dietro la casa della carriera (come il web)
+	velo_3d = 0.55
 
 
 func costruisci() -> void:

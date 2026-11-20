@@ -56,7 +56,9 @@ interfaccia dei menu, sfondo del menu e allenamento guidato, grafica.
 | `scripts/carriera/carriera.gd` | **`Carriera`**: porting 1:1 di `src/career.js` (stessi nomi, stato in `c.s`) |
 | `scripts/carriera/aspetto.gd`, `stemma_dati.gd` | `src/looks.js` e la parte dati di `src/crest.js` (forme, motivi, simboli, colori) |
 | `scripts/carriera/salvataggio.gd`, `js.gd` | file `user://salvataggio.json` (scrittura sicura, ripiego); aiuti per rifare il JS esatto (ordinamento di V8, toFixed, …) |
-| `scenes/menu/segnaposto.tscn` | menu provvisorio in testo (finché non ci sono le schermate vere in `scenes/menu/`) |
+| `scenes/menu/<nome>.tscn` | **schermate dei menu** (`scripts/menu/<nome>.gd`, sotto "Menu (fase 3)"); `segnaposto.tscn` resta per un nome che non esiste |
+| `scripts/menu/` | interfaccia dei menu: tema, stemmi e visi in SVG, carte della Rosa, editor con anteprima 3D |
+| `assets/tema/tema.tres` | tema dei menu (generato da `tools/crea_tema.gd`) |
 | `scenes/partita.tscn` | **partita**: `scripts/partita/gioco.gd` (dall'app con `avvia(opz)`, da sola con le squadre di prova) |
 | `scenes/hud_partita.tscn` | interfaccia della partita: `scripts/partita/hud_partita.gd` |
 | `scripts/partita/gioco.gd` | ciclo della partita (`frame()` di `src/main.js`): gesti → motore col tempo scalato → eventi → vista; pausa, intervallo, fine |
@@ -278,6 +280,58 @@ cambia schermata. "Esci" dalla pausa: in
 campionato sconfitta 0-3 a tavolino (come il web), in amichevole si torna al menu senza conseguenze. Senza `avvia`
 la partita parte da sola con le squadre di prova (opzioni da riga di comando come prima).
 La vista colora pelle e capelli dal `look` della carriera (indici di `Aspetto`) con `Aspetto.colori`.
+
+## Menu (fase 3)
+
+Schermate del web (`src/ui.js`, `ui-squad.js`, `editor.js`) rifatte in Godot, una scena per schermata in
+`scenes/menu/<nome>.tscn` con lo script `scripts/menu/<nome>.gd` (tutte estendono `MenuSchermata`, `schermata.gd`).
+Il nome della scena è il nome per `App.vai(nome, arg)`:
+
+| schermata | web | arg |
+|---|---|---|
+| `principale` | title | – (senza carriera va subito a `nuova_carriera`) |
+| `nuova_carriera` | title('new') | `{club, kit}` facoltativo |
+| `editor` | editor.js | `{flow: "new", club, kit}` · `{flow: "crest"}` · `{flow: "kit"}` · `{flow: "look", id}` |
+| `hub` | hub | – |
+| `rosa` | squad | `{sel, tgt}` facoltativo (id dei giocatori) |
+| `mercato` | market | `{filtro: "T"/"P"/"D"/"C"/"A", aperto}` facoltativo |
+| `classifica` | table | `{div}` facoltativo |
+| `calendario`, `amichevole`, `uno_contro_uno`, `impostazioni` | calendar, friendly, vsfriend, settings | – |
+| `come_si_gioca` | howto | numero della pagina (0..4) |
+| `dopo_partita` | post | `App.ultimo_esito` (`{esito, res, titolo, tipo}`) oppure `{m, res, title}` come il web |
+| `fine_stagione` | season | risultato di `endSeason` (`{pos, prize, bonus, outcome, div, newDiv}`) |
+
+- **Contratto con `App`**: le schermate chiamano `App.vai`, `App.gioca_campionato()`, `App.gioca_amichevole(livello)`,
+  `App.allenamento()` e leggono `App.carriera` (`s == null` = nessuna carriera). Facoltativi: `App.clic()` (suono del
+  tocco) e `App.impostazioni()` (chiamata dopo ogni scelta in Impostazioni, per applicare suono e musica). Senza `App`
+  (scena aperta da sola) si cambia scena con `change_scene_to_file` e la carriera è `MenuSchermata.carriera_prova`.
+- **Dati**: tutto passa da `menu_dati.gd` (`MenuDati`), che gira le chiamate a `Carriera`, `Aspetto`, `StemmaDati`.
+- **Tema** (`tema_menu.gd` → `assets/tema/tema.tres`, `tools/crea_tema.gd` lo rigenera): colori, raggi e varianti dei
+  pulsanti del CSS del web (`ui-style.js`); carattere di sistema (San Francisco su iPhone, Segoe UI su Windows) come il
+  web, niente file di caratteri. Pulsanti alti 48-60 px, entrata a cascata (sale di 12 px e compare), aree sicure
+  dell'iPhone da `DisplayServer.get_display_safe_area()` (`--tacca=47,34` le simula sul PC).
+- **Stemmi e visi** (`stemma.gd` = `crestSvg`, `faccia.gd` = `faceSvg`): lo stesso testo SVG del web, disegnato da
+  ThorVG (`Image.load_svg_from_string`) alla risoluzione dello schermo, con una cache (`svg.gd`).
+- **Rosa** (`rosa.gd`, `carta_giocatore.gd`, `rosa_logica.gd` = `squad-layout.js`): carte FUT sul campo, panchina che
+  scorre, tocco = scegli, secondo tocco = confronta, terzo = scambia (come il web); confronto delle statistiche e
+  variazione della forza.
+- **Editor** (`editor.gd`, `anteprima_giocatore.gd`): palco fisso in alto (stemma grande, oppure il giocatore della
+  partita in una SubViewport che gira piano e si gira col dito, inquadratura della testa per Viso e Capelli, più il
+  viso disegnato in alto a destra), schede, scelte che scorrono, Casuale e Avanti/Salva in fondo.
+- **Sfondo 3D** (`sfondo_menu.tscn`, altro lavoro) dietro `principale` e `hub` (con un velo scuro), col campione
+  della carriera (`MenuSchermata.giocatore_sfondo()`); `--senza-3d` lo toglie.
+
+Prove:
+```
+$G --path godot res://tests/prova_menu.tscn -- --tutte=shots/menu          # 24 schermate 390×844 (carriera di prova)
+$G --path godot res://tests/prova_menu.tscn -- --schermata=rosa --arg='{"sel":"titolare:9"}' --foto=shots/r.png
+$G --path godot res://tests/prova_menu.tscn -- --fps=mercato               # FPS e scorrimento col dito finto
+$G --headless --path godot res://tests/prova_menu.tscn -- --controlli      # gesti delle schermate (controlli_menu.gd)
+$G --headless --path godot -s res://tests/run_tests.gd -- menu             # visi, stemmi, Rosa uguali al web
+node godot/tools/dati_menu_web.mjs   # rigenera tests/fixtures/menu_ui.json e carriera_menu.json dal JS
+```
+La carriera di prova (`tests/fixtures/carriera_menu.json`, 3 giornate giocate) salva su `user://prova_menu.json`,
+mai sul salvataggio vero.
 
 ## Build per iPhone (GitHub Actions)
 

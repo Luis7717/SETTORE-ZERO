@@ -13,6 +13,7 @@ const T := preload("res://scripts/menu/tema_menu.gd")
 const U := preload("res://scripts/menu/ui.gd")
 const D := preload("res://scripts/menu/menu_dati.gd")
 const SHADER_SFONDO := preload("res://shaders/sfondo_menu.gdshader")
+const SFONDO_3D := "res://scenes/menu/sfondo_menu.tscn"
 const CARTELLA := "res://scenes/menu/%s.tscn"
 
 const LARGHEZZA_MAX := 520.0     # .scr{max-width:520px}
@@ -43,6 +44,9 @@ var ferma := false               # true = niente scorrimento (Rosa): il contenut
 var con_testata := true
 var titolo := ""
 var indietro := "hub"            # dove porta il pulsante ‹ ("" = niente pulsante)
+var con_3d := false              # dietro c'è lo sfondo 3D del menu (principale e casa della carriera)
+var velo_3d := 0.0               # velo scuro sopra lo sfondo 3D (0 = niente) perché i pannelli si leggano
+var sfondo_3d: Node = null       # res://scenes/menu/sfondo_menu.tscn se c'è
 var soldi := true                # soldi a destra nella barra in alto
 var pillola := ""                # scritta a destra nella barra in alto al posto dei soldi ("1 di 2")
 
@@ -218,8 +222,51 @@ func _monta() -> void:
 	_area_cambiata()
 
 
-## sfondo a sfumatura coi colori della squadra (le schermate col 3D dietro lo ridefiniscono)
+## sfondo a sfumatura coi colori della squadra; con con_3d il campione che palleggia (sfondo_menu.tscn) con la
+## divisa e l'aspetto del campione della carriera, e la sfumatura solo se il 3D manca
 func crea_sfondo() -> Control:
+	if con_3d and ResourceLoader.exists(SFONDO_3D) and not OS.get_cmdline_user_args().has("--senza-3d"):
+		var sc := load(SFONDO_3D) as PackedScene
+		sfondo_3d = sc.instantiate() if sc != null else null
+	if sfondo_3d == null:
+		return _sfumatura()
+	var box := Control.new()
+	box.name = "Sfondo"
+	box.set_anchors_preset(Control.PRESET_FULL_RECT)
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if sfondo_3d.has_method("imposta_giocatore"):
+		var g := giocatore_sfondo()
+		sfondo_3d.imposta_giocatore(g[0], g[1])
+	box.add_child(sfondo_3d)
+	if velo_3d > 0.0:
+		var velo := ColorRect.new()
+		velo.color = Color(T.BG0, velo_3d)
+		velo.set_anchors_preset(Control.PRESET_FULL_RECT)
+		velo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(velo)
+	return box
+
+
+## divisa {shirt, shorts, socks} e aspetto {skin, hair} del campione (o del primo della rosa) per lo sfondo 3D
+func giocatore_sfondo() -> Array:
+	var s := stato()
+	if s.is_empty():
+		var k0 := D.kit(kit_scelto())
+		return [{"shirt": int(k0[1]), "shorts": int(k0[2]), "socks": int(k0[1])}, {}]
+	var p: Variant = null
+	for q: Dictionary in s.squad:
+		if q.get("champ", false):
+			p = q
+			break
+	if p == null and not s.squad.is_empty():
+		p = s.squad[0]
+	var k := D.kit(s.kit)
+	var l := D.look_of(p)
+	return [{"shirt": int(k[1]), "shorts": int(k[2]), "socks": int(k[1])},
+		{"skin": D.SKINS[l.skin][1], "hair": D.HAIR_COLORS[l.hairColor][1]}]
+
+
+func _sfumatura() -> Control:
 	var r := ColorRect.new()
 	r.set_anchors_preset(Control.PRESET_FULL_RECT)
 	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -353,8 +400,7 @@ func _costruisci_testata() -> void:
 	testata.add_child(col)
 	# riga coi colori della squadra sotto la barra (.top::after)
 	var cs := colori_squadra()
-	var linea := Control.new()
-	linea.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	var linea := Control.new()   # posizione e misura a mano (sotto la barra, oltre i margini)
 	linea.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	linea.draw.connect(func() -> void:
 		var w := linea.size.x
