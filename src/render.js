@@ -6,6 +6,7 @@ import { buildStadium } from './stadium.js';
 import { loadBestPlayers } from './athlete3d.js';
 import { buildPitch, buildLights, setupRenderer, fitSun, playerShadowTexture, shadowYaw, SHADOWS } from './pitch.js';
 import { Props, makeRibbon, fillRibbon } from './props.js';
+import { saveView, wideView } from './camfit.js';
 
 const _rp = [0, 0, 0]; // punto riusato per i nastri delle linee
 
@@ -15,8 +16,8 @@ const SCALE = 1.25;
 const PL_SHADOW = SHADOWS ? 1.5 : 3.4; // lato (m) dell'ombra finta di un giocatore 3D (con le ombre vere solo il contatto ai piedi)
 const PREVIEW_COLOR = 0x7dd3ff; // puntini dell'anteprima della traiettoria
 const OFFSIDE_COLOR = 0xff5a5a; // linea del fuorigioco
-const GK_CAM_BACK = 6.5;       // parata: telecamera dietro la propria linea di porta (m)
-const GK_CAM_H = 2.6;          // parata: altezza della telecamera (m)
+const POSE_K = 5;              // visuali calcolate (parata, rallenty largo): quanto in fretta inseguono l'inquadratura giusta (1/s, tempo vero)
+const WIDE_IN = 4;             // rallenty largo: velocità di entrata e uscita (1/s, tempo vero)
 const RUN_LINES = 10, RUN_PTS = 64, RUN_COLOR = 0x7dd3ff; // linee di difesa a schermo
 const CAM_BACK = 16;           // telecamera di gioco (schermo verticale): distanza dietro il pallone (m)
 const NEAR_X0 = 4, NEAR_XW = 8;  // vicino alla porta: da |x| > 4 m la telecamera si avvicina meno, da 12 m per niente
@@ -28,6 +29,16 @@ const DUEL_BACK = 0.12;         // nel duello la telecamera si allontana di ques
 const DUEL_AHEAD_R = 35;        // duello: compagni "davanti" entro questa distanza (m) e in un cono di ~45°
 const DUEL_SIDE_MAX = 1.2;      // duello senza compagni davanti: la visuale gira intorno al portatore verso i compagni, al massimo di tanto (rad, ~70°)
 const DUEL_SIDE_K = 0.85;       // ... di questa frazione dell'angolo tra "avanti" e la media dei compagni di quel lato
+
+// insegue l'inquadratura calcolata v ({ pos, look, fov }); la prima volta ci va subito
+function smoothPose(s, v, k) {
+  if (!s) return { pos: v.pos.slice(), look: v.look.slice(), fov: v.fov };
+  return { pos: s.pos.map((x, i) => x + (v.pos[i] - x) * k), look: s.look.map((x, i) => x + (v.look[i] - x) * k), fov: s.fov + (v.fov - s.fov) * k };
+}
+// mescola la visuale (P, L, fov) con la posa calcolata q, di peso w
+function mixPose(P, L, fov, q, w) {
+  return { P: P.map((x, i) => x + (q.pos[i] - x) * w), L: L.map((x, i) => x + (q.look[i] - x) * w), fov: fov + (q.fov - fov) * w };
+}
 
 function canvasTex(w, h, draw) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
@@ -56,7 +67,7 @@ export class View {
     this.w = w; this.h = h; this.r.setSize(w, h, false);
     this.cam.aspect = w / h;
     // in verticale serve un campo visivo più alto, in orizzontale più basso
-    this.cam.fov = w < h ? 70 : 42;
+    this.cam.fov = this.baseFov = w < h ? 70 : 42; // le visuali calcolate lo allargano solo quando serve
     this.cam.updateProjectionMatrix();
   }
 
@@ -250,12 +261,7 @@ export class View {
     if (camY < minY) { hh += Math.min(6, (minY - camY) * 0.35); camY = minY; }
     camY += (-HL - 12.5 - camY) * dk; hh += (10.5 - hh) * dk; lookY += ((this.cy * dir - HL) / 2 + 3 - lookY) * dk;
     const du = this.duelK; hh *= 1 - DUEL_LOW * du; camY += back * (0.3 - DUEL_BACK) * du; lookY += 8 * du;
-    // parata: telecamera bassa dietro la propria porta, guarda verso chi tira
-    const gkOn = !!(m.diveWin && m.diveWin(this.me) && !(m.autoGk && m.autoGk[this.me]));
-    this.gkK = (this.gkK || 0) + ((gkOn ? 1 : 0) - (this.gkK || 0)) * Math.min(1, dt * 6);
-    const gk = this.gkK;
-    camY += (-HL - GK_CAM_BACK - camY) * gk; hh += (GK_CAM_H - hh) * gk; lookY += (b.y * dir - lookY) * gk;
-    const camX = this.cx * dir * (0.82 - 0.3 * a) * (1 - 0.55 * dk) * (1 - 0.8 * gk);
+    const camX = this.cx * dir * (0.82 - 0.3 * a) * (1 - 0.55 * dk);
     let px = camX, py = camY, lx = this.cx * dir * (0.9 - 0.45 * a) * (1 - 0.45 * dk), ly = lookY;
     const phi = this.sideK * du; // duello senza compagni davanti: la visuale gira intorno al portatore verso i compagni
     if (Math.abs(phi) > 1e-3) {
@@ -263,10 +269,47 @@ export class View {
       const rot = (x, y) => [ox + (x - ox) * cs + (y - oy) * sn, oy - (x - ox) * sn + (y - oy) * cs];
       [px, py] = rot(px, py); [lx, ly] = rot(lx, ly);
     }
-    this.cam.position.set(px, hh, -py);
-    this.cam.lookAt(lx, 0, -ly);
+    // visuali calcolate (src/camfit.js), nello spazio "orientato" (si attacca verso +y): rallenty largo, poi parata
+    let P = [px, hh, py], L = [lx, 0, ly], fov = this.baseFov || this.cam.fov;
+    const pk = Math.min(1, rdt * POSE_K);
+    const wk = this.wideStep(m, mine, duel, du, rdt, pk);
+    if (wk > 1e-3) ({ P, L, fov } = mixPose(P, L, fov, this.wideP, wk));
+    const gk = this.saveStep(m, dir, rdt, pk);
+    if (gk > 1e-3) ({ P, L, fov } = mixPose(P, L, fov, this.saveP, gk));
+    this.cam.position.set(P[0], P[1], -P[2]);
+    this.cam.lookAt(L[0], L[1], -L[2]);
+    if (Math.abs(this.cam.fov - fov) > 0.01) { this.cam.fov = fov; this.cam.updateProjectionMatrix(); }
     // pallone (dove lo mettono il motore e i giochetti), rete, bandierine, effetti
     this.props.update(dt, m, s, this.cam, this.me, bx, by, bh);
+  }
+
+  // rallenty in attacco (duello, area di tiro, disegno col pallone): visuale larga che tiene a schermo i compagni
+  // davanti e di fianco al portatore; restituisce quanto pesa (0..1, entra ed esce col tempo vero)
+  wideStep(m, mine, duel, du, rdt, pk) {
+    const c = m.ball.owner, zone = !duel && !!(m.inZone && m.inZone(this.me));
+    const on = !!(mine && c && m.phase === 'play' && (duel || zone || this.drawing));
+    this.wideK = (this.wideK || 0) + ((on ? 1 : 0) - (this.wideK || 0)) * Math.min(1, rdt * WIDE_IN);
+    if (this.wideK < 1e-3 && !on) { this.wideK = 0; this.wideP = null; return 0; }
+    if (on) {
+      const dir = this.me === 1 ? -1 : 1, mates = [];
+      for (const p of m.players) if (p.team === this.me && !p.off && p !== c && p.pos !== 'P') mates.push([p.x * dir, p.y * dir]);
+      // nel duello resta la rotazione verso i compagni di fianco (duelSide); nell'area di tiro anche la porta a schermo
+      const v = wideView({ carrier: [c.x * dir, c.y * dir], yaw: duel ? (this.sideK || 0) * du : 0, mates, goal: zone, aspect: this.cam.aspect, fov: this.baseFov || 70 });
+      this.wideP = smoothPose(this.wideP, v, pk);
+    }
+    return this.wideP ? this.wideK : 0;
+  }
+  // parata: dietro la propria porta, porta intera + portiere + pallone sempre a schermo; restituisce quanto pesa
+  saveStep(m, dir, rdt, pk) {
+    const on = !!(m.diveWin && m.diveWin(this.me) && !(m.autoGk && m.autoGk[this.me]));
+    this.gkK = (this.gkK || 0) + ((on ? 1 : 0) - (this.gkK || 0)) * Math.min(1, rdt * 6);
+    if (this.gkK < 1e-3 && !on) { this.gkK = 0; this.saveP = null; return 0; }
+    if (on) {
+      const b = m.ball, g = m.gk(this.me);
+      const v = saveView({ ball: [b.x * dir, b.h, b.y * dir], keeper: [g.x * dir, g.y * dir], aspect: this.cam.aspect, fov: this.baseFov || 70 });
+      this.saveP = smoothPose(this.saveP, v, pk);
+    }
+    return this.saveP ? this.gkK : 0;
   }
 
   pose(p, f, dt) {

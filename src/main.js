@@ -265,11 +265,12 @@ function frame(now) {
     }
     if (G.bigT && now > G.bigT) { G.bigT = 0; $('big').className = ''; }
     view.rdt = G.paused ? 0 : dt; // tempo vero per la telecamera
+    view.drawing = input.drawing; // col pallone, mentre si disegna: visuale larga del rallenty
     view.update(G.paused ? 0 : dt * Math.max(G.ts, 0.25));
     view.render();
   } else if (G.demo && ui.screen === 'title') {
     const d = G.demo; d.step(dt); d.events.length = 0; if (d.phase === 'half') d.startSecondHalf();
-    view.rdt = null; view.update(dt); view.render();
+    view.rdt = null; view.drawing = false; view.update(dt); view.render();
   }
 }
 

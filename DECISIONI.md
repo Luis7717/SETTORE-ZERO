@@ -342,3 +342,36 @@ maglia, maniche, calzettoni…), poi nome e numero sulla schiena e uno stemma in
   da davanti il giocatore sembrava senza braccia e le dita spuntavano dai pantaloncini come una macchia color pelle.
   Due test lo controllano (`gambe.test.mjs`, `busto.test.mjs`). Non controllato: le mani durante la corsa.
 - **Da provare sull'iPhone**: giocatore fermo da davanti, di lato e da dietro; visi e capelli sulla testa nuova.
+
+## 2026-11-20 — Visuale della parata con la porta intera, visuale larga nel rallenty in attacco
+Richieste di Luis dopo la prova sull'iPhone: "quando devo parare a volte non vedo nemmeno tutta la porta" e "durante il
+rallenty deve allargare un po' la visuale, direi un 180 gradi almeno, ho più scelte".
+- **Inquadratura calcolata** (`src/camfit.js`, conti puri testati in Node): con l'orientamento della telecamera fissato,
+  `fitView` la sposta di lato e all'indietro lungo l'asse finché i punti scelti stanno nel riquadro coi margini (punteggio
+  in alto, suggerimento e Dribbling in basso); se arretrare non basta allarga il campo visivo; se nemmeno così salta i
+  punti meno importanti (prima i più lontani). La telecamera insegue l'inquadratura col tempo vero (`POSE_K` 5/s in
+  `render.js`) ed entra/esce con una transizione morbida.
+- **Parata** (`saveView`): telecamera dietro la propria porta, girata verso chi tira dell'80% dell'angolo del tiro (al
+  massimo ~54°, `SAVE_YAW_K`, `SAVE_YAW_MAX`), parte 7 m dietro la linea (`SAVE_BACK`) e arretra fino a 15 m
+  (`SAVE_MAX_BACK`, la tribuna di fondo è a 18 m), poi allarga il campo visivo fino a 96° (`SAVE_FOV_MAX`). Tiene
+  **sempre** la porta intera con 0,9 m di margine ai lati e 0,7 m sopra la traversa (`SAVE_PAD`, `SAVE_PAD_TOP`) e il
+  portiere; poi il pallone. Tolte `GK_CAM_BACK`/`GK_CAM_H`. Prima, in verticale, a 6,5 m dalla porta si vedevano solo
+  ~4 m di larghezza: i pali restavano fuori in tutti e 5 i tiri provati. Il prezzo: la porta è più piccola a schermo
+  (occupa la larghezza dello schermo, non di più).
+- **Rallenty in attacco** (`wideView`): nel duello, nell'area di tiro e mentre si disegna col pallone (`view.drawing` da
+  `main.js`) la telecamera va più alta e più indietro (inclinata ~38°, `WIDE_PITCH`), guarda 13 m davanti al portatore
+  (`WIDE_AHEAD`; nell'area di tiro non oltre 6 m prima della porta) e tiene a schermo il portatore (con 2,5 m d'aria ai
+  lati), nell'area di tiro la porta avversaria, poi i compagni entro 35 m davanti o di fianco (`WIDE_R`, `WIDE_BEHIND`),
+  dal più vicino. Distanza 22–36 m (`WIDE_MIN_DIST`, `WIDE_MAX_DIST`), campo visivo fino a 88° (`WIDE_FOV_MAX`).
+  La rotazione del duello verso il lato con i compagni (`duelSide`) resta com'era.
+- **Limite onesto**: in verticale "180°" alla lettera non ci sta. Un compagno 25 m di fianco **sulla stessa linea** del
+  portatore entra solo con il portatore alto ~16 px: resta fuori (c'è un test che lo dice). Entrano i compagni larghi un
+  po' più avanti (la visuale si allarga con la distanza) e, nel duello senza nessuno davanti, la visuale gira verso di loro.
+  Il portatore scende fino a ~27–30 px nei casi più larghi (era 45–75 px); l'anello giallo e la freccia restano.
+- Prove: `node --test test/unit/camfit.test.mjs` (telecamera three messa come in render.js: pali, traversa, portiere,
+  pallone, compagni tenuti = compagni a schermo); a schermo `node test/save-cam-shot.mjs shots` (5 tiri: prima 4–5 punti
+  della porta fuori per tiro, ora nessuno) e `node test/wide-cam-shot.mjs shots` (duello, area di tiro, disegno).
+- **Da provare sull'iPhone**: parate da vari punti (si vede tutta la porta? la linea dal portiere si tira bene anche
+  con la porta vista di sbieco?); nel duello e nell'area di tiro, i compagni larghi ora a schermo e il portatore non
+  troppo piccolo; mentre si disegna la corsa la telecamera si sposta un poco nei primi istanti (il disegno resta
+  attaccato al campo). Se il portatore è troppo piccolo: abbassare `WIDE_MAX_DIST`/`WIDE_FOV_MAX` in `src/camfit.js`.
