@@ -704,3 +704,6 @@ in `godot/` (dettagli in `godot/README.md`). Scelte fatte in autonomia:
 Verificato sul PC (Windows, RTX 3070): importazione senza errori, scena senza schermo senza errori, schermate
 390×844 (campo, giocatore da vicino, porta, campo intero), prova dei tocchi automatica, export iOS (progetto Xcode) ed
 export Windows. **Non verificato**: la build su GitHub (niente push in questa fase) e tutto ciò che riguarda l'iPhone.
+
+## 2026-11-20 — Godot fase 1 provata sull'iPhone
+Luis: "Tutto funzionante", contatore a **60 fps fissi** con la scena di prova (22 giocatori, stadio semplice, ombre del sole). Fase 1 chiusa; la fase 2 (partita giocabile) parte quando il motore in GDScript è pronto.
