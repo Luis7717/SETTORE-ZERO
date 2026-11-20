@@ -342,3 +342,67 @@ maglia, maniche, calzettoni…), poi nome e numero sulla schiena e uno stemma in
   da davanti il giocatore sembrava senza braccia e le dita spuntavano dai pantaloncini come una macchia color pelle.
   Due test lo controllano (`gambe.test.mjs`, `busto.test.mjs`). Non controllato: le mani durante la corsa.
 - **Da provare sull'iPhone**: giocatore fermo da davanti, di lato e da dietro; visi e capelli sulla testa nuova.
+
+## 2026-11-20 — La squadra umana senza palla torna a muoversi (pressing, rientro, smarcamento), linee corte, scatto visibile
+Richieste di Luis dopo la prova sull'iPhone: "in difesa restano tutti fermi e in attacco", "non fanno pressing",
+"linee di difesa troppo lunghe", "rendilo più magnetico", "l'intercetto in corsa rimbalza", "lo scatto non si vede",
+"non passo il centrocampo, si raggruppano". **Cambia la regola "La CPU non difende al posto della persona"** (sopra).
+- **Difesa senza linea né dito** (`humanDefend` in `src/sim/ai.js`): la linea disegnata vale sempre più di tutto
+  (anche del pressing), il controllato col dito segue il dito; tutti gli altri li muove la CPU:
+  - **pressing**: il più vicino al portatore va sul pallone e prova a rubarlo (`hPress`, calcolato con
+    `computeChasers`); due se il portatore è nella nostra trequarti (`HUM_PRESS_ZONE` = 33 m dalla nostra linea di fondo).
+    Chi pressa già conta come 4 m più vicino (`HUM_PRESS_KEEP`), così due quasi alla pari non si scambiano di continuo.
+    Il controllato fa parte del conto: se la persona lo sta già portando sul portatore la CPU non ne aggiunge un altro.
+  - **posizione**: posto di squadra (`anchor`) con marcatura a zona dell'avversario più vicino (`HUM_MARK_R` 7,5 m);
+    difensori almeno `HUM_BEHIND_D` = 2 m dietro la palla, centrocampisti al massimo 1 m davanti (`HUM_BEHIND_C`) e
+    stretti sulla linea palla-porta (`HUM_MID_LANE` 0,3: chiudono i passaggi centrali); chi non pressa resta ad almeno
+    `HUM_SCREEN` = 4 m dal portatore. Lontano più di `HUM_RECOVER` = 8 m dal posto, verso la propria porta: rientro con lo scatto.
+  - **pallone vagante** (rimpallo, contrasto): ci va il più rapido. I **passaggi avversari in volo no**: l'intercetto
+    resta alla persona (col pallone in volo la CPU che correva a intercettare toglieva all'IA quasi tutti i tiri).
+  - Allenamento "Recupera palla": `m.autoDef[0] = false` (lezione con `noAutoDef`), lì chi non ha linea resta fermo.
+- **Linee di difesa corte**: `RUN_MAX_LEN` = 14 m dal giocatore (`clipLen` in `src/sim/match.js`), tagliate nel motore e
+  già mentre si disegnano (`src/input.js`; `render.js` disegna `r.path`, quindi la linea si vede tagliata senza toccarlo).
+  Finita la linea il giocatore torna subito alla CPU; se è finita addosso al pallone resta attaccato al pallone per
+  `HUM_STICK_T` = 1,5 s.
+- **Contrasto magnetico** (solo per chi muove la persona: controllato, linea, linea appena finita — `directed()`):
+  entro `HUM_MAGNET_R` = 3 m dal pallone l'ultimo tratto va dritto sul pallone; raggio di contrasto +`HUM_TACKLE_R` 0,3 m;
+  pallone libero (non calciato) agganciato da +`HUM_REACH_FREE` 0,25 m; niente rallentamento ×2,4 del contrasto.
+  I giocatori mossi dalla CPU (anche il pressatore) rubano palla come prima (più piano del controllato).
+- **Intercetto in corsa**: un passaggio avversario intercettato da un giocatore della squadra umana si controlla sempre
+  (niente deviazione del 30% né respinta per velocità alta). L'IA resta com'era (deviazioni e respinte): è realistico e
+  il suo equilibrio era già misurato.
+- **Scatto**: lungo una strada disegnata il portatore puntava sempre al punto successivo, a 1-2 m, e `movePlayers`
+  frenava (velocità = distanza × 3,2): 5-6,8 m/s invece di 7,6, scatto invisibile. Ora punta a un punto almeno
+  `PATH_LOOK` = 3 m più avanti (anche le linee di difesa). `SPRINT_BONUS` da 0,16 a 0,22. Animazione: il clip di scatto
+  dipende da `p.sprint` (`sprintMix` in `src/athlete3d.js`: chi scatta lo usa da 5-6,6 m/s, la corsa normale solo da 7,6 m/s).
+- **Attacco della squadra umana** (`support`/`offerSupport`): i compagni senza palla evitano i punti a meno di
+  `SPACE_MIN` = 9 m da un compagno (penalità `SPACE_PEN` nella scelta, poi spostamento `SPACE_PUSH`), le punte attaccano
+  la linea del fuorigioco già da `DEEP_FROM` = −30 m, il secondo d'appoggio si offre a 15-18 m (`SUPPORT_FAR`), chi è già
+  d'appoggio conta 4 m più vicino (`HELP_KEEP`: prima i due d'appoggio cambiavano ogni 0,1 s e i giocatori zigzagavano).
+- **Numeri** (umano simulato contro IA a pari forza 60; `node test/diag-flow.mjs 60 20 bot` e `npm run balance -- 60 60 20`):
+
+  | | prima (fermi) | dopo |
+  |---|---|---|
+  | balance: V-N-P, gol, tiri | 0-2-18, 0,5-3,3, 6,0-19,1 | 4-7-9, 0,2-0,7, 6,5-4,3 |
+  | diag umano: tiri / gol | 5,7 / 0,5 | 9,3 / 0,8 |
+  | diag umano: azioni oltre metà campo / negli ultimi 30 m | 9,8 / 5,3 (su 15,6) | 15,2 / 8,4 (su 19,7) |
+  | diag umano: palle perse centro / ultimi 30 / difesa | 11,0 / 4,5 / 0,1 | 12,3 / 7,0 / 0,3 |
+  | diag IA: tiri / gol | 9,3 / 1,6 | 2,6 / 0,3 |
+  | in difesa nella nostra metà: nostri giocatori davanti alla palla | 7,05 | 2,24 (IA 2,94) |
+  | compagni entro 6 m dal portatore / coppie di compagni a meno di 6 m | 0,19 / 0,15 | 0,23 / 0,13 |
+  | distanza media dal compagno più vicino | 13,7 m | 13,3 m |
+
+  L'IA tira molto meno: prima la difesa era fatta di statue. Riferimento IA contro IA (`diag-flow 60 20 ai`): circa
+  7 tiri e 0,5-0,8 gol a squadra. Nella prova con l'umano simulato, che pressa sempre col controllato e insegue ogni
+  pallone libero, l'IA scende sotto quel livello. Nessuno dei pezzi da solo (intercetto, pressing in due, linea dietro
+  la palla, contrasto più largo) lo spiega: tolti uno alla volta l'IA resta a 1-4 tiri. **Obiettivo non raggiunto**:
+  meno angoli (circa 0,8-1,1 a squadra; il test degli angoli ora è `todo`).
+  Spazi in partita: con l'umano simulato i grappoli erano già pochi; il test `attack-spacing.test.mjs` parte dai
+  compagni ammucchiati intorno al portatore: prima, dopo 5-8 s, 1,75 coppie a meno di 6 m e 7,5 m di distanza media; ora
+  meno di 0,3 coppie e più di 12 m. Il numero che conta di più per "passare il centrocampo" (passaggi intercettati in
+  mezzo, circa 10 a partita) non è cambiato.
+- Test: `defense-shape`, `defense-help`, `attack-spacing` (nuovi), `defense-runs` e `sprint` aggiornati.
+  `test/diag-flow.mjs` ora stampa anche gli spazi. Impronta golden rigenerata.
+- **Da provare sull'iPhone**: rientro e pressing quando si perde palla; linea di difesa lunga che si ferma a 14 m;
+  contrasto vicino al portatore; intercetto in corsa; scatto lungo una strada (velocità e animazione); smarcamento a
+  centrocampo.

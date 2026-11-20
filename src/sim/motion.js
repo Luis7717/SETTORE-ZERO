@@ -13,7 +13,7 @@ const TACKLE_LOOSE = 0.3;   // contrasti vinti in cui la palla schizza via invec
 const PASS_DEFLECT = 0.3;
 // raggio difensivo sui passaggi avversari (m): INT_BASE a parità 60 contro 60, più difesa e meno passaggio lo allargano
 const INT_BASE = 0.95, INT_REF = 60, INT_DIF = 0.008, INT_PAS = 0.008, INT_MIN = 0.6, INT_MAX = 1.35;   // passaggi intercettati che vengono solo deviati
-const SPRINT_BONUS = 0.16;  // velocità in più nello scatto a energia piena (a energia bassa rende meno)
+const SPRINT_BONUS = 0.22;  // velocità in più nello scatto a energia piena (a energia bassa rende meno); era 0,16, poco visibile
 const SPRINT_DRAIN = 3.5;   // lo scatto consuma energia questo numero di volte più in fretta della corsa
 const RECOVER_V = 2.5;      // sotto questa velocità (camminata, fermo) l'energia si recupera (m/s)
 const RECOVER_RATE = 0.004; // energia recuperata al secondo camminando o da fermi
@@ -28,13 +28,18 @@ const VOLLEY_V0 = 18;       // velocità base del tiro al volo (m/s), più la br
 const AIR_TES_K = 1.5;      // contrasto aereo: quanto pesa la differenza di colpi di testa (per punto / 100)
 const AIR_DIST_K = 0.6;     // ... e quanto pesa essere più vicini al pallone (per metro)
 const AIR_WIN_MIN = 0.15, AIR_WIN_MAX = 0.85; // limiti della probabilità di vincere il contrasto aereo
+// Aiuti ai giocatori mossi dalla persona in difesa (controllato, linea, linea appena finita: vedi directed() in ai.js)
+// (richiesta del 2026-11-20: "rendilo un attimino più magnetico")
+const HUM_TACKLE_R = 0.3;   // raggio di contrasto sul portatore più largo di così (m)
+const HUM_REACH_FREE = 0.25; // pallone libero (non calciato da nessuno) agganciato da così più lontano (m)
 
 export class MotionMethods {
   // Raggio entro cui p tocca il pallone libero. Sui passaggi avversari è il "raggio difensivo":
   // cresce con la difesa di p e cala con il passaggio di chi ha calciato (un buon passaggio passa più vicino).
   reachOf(p) {
     const k = this.ball.kick;
-    if (!k || k.team === p.team) return 0.95;
+    if (!k) return 0.95 + (this.directed(p) ? HUM_REACH_FREE : 0);
+    if (k.team === p.team) return 0.95;
     if (k.type === 'shot') return SHOT_BLOCK_R;
     const pas = k.kicker && k.kicker.st ? k.kicker.st.pas : 60;
     return clamp(INT_BASE + (p.st.dif - INT_REF) * INT_DIF - (pas - INT_REF) * INT_PAS, INT_MIN, INT_MAX);
@@ -271,13 +276,13 @@ export class MotionMethods {
       if (c.protect > 0) return;
       for (const o of this.players) {
         if (o.team === c.team || o.off || o.state !== 'play' || o.stun > 0 || o.tackleCd > 0 || this.duelGuard(o)) continue;
-        const d = hyp(o.x - b.x, o.y - b.y);
-        if (d < 0.85 + o.st.dif * 0.0025) {
+        const d = hyp(o.x - b.x, o.y - b.y), hc = this.human[c.team], ho = this.human[o.team], dir = ho && this.directed(o);
+        if (d < 0.85 + o.st.dif * 0.0025 + (dir ? HUM_TACKLE_R : 0)) {
           o.contact += dt;
-          const hc = this.human[c.team], ho = this.human[o.team];
           let need = 0.10 + 0.22 * c.st.dri / (c.st.dri + o.st.dif);
           if (hc && !ho) need *= 2.5 - 1.3 * this.teams[o.team].skill;
-          if (ho && this.ctrl[o.team] !== o) need *= 2.4;
+          // chi va sul portatore da solo (CPU) ruba più piano di chi muove la persona (controllato, linea, linea appena finita)
+          if (ho && !dir) need *= 2.4;
           if (o.contact >= need && this.rnd() < TACKLE_LOOSE) {
             o.contact = 0; o.tackleCd = 0.5; c.stun = 0.3; c.tackleCd = 0.6;
             const side = Math.abs(b.x) > HW - 12 ? Math.sign(b.x) : (this.rnd() < 0.5 ? -1 : 1);
@@ -320,6 +325,9 @@ export class MotionMethods {
     const p = best, sp = hyp(b.vx - p.vx, b.vy - p.vy), gk = p.pos === 'P' && this.inOwnBox(p);
     if (gk && b.shot && b.shot.team !== p.team) { this.save(p, true); return; }
     const mate = b.kick && b.kick.team === p.team;
+    // squadra umana: un passaggio avversario intercettato (anche in corsa) si controlla sempre, niente rimbalzi né deviazioni.
+    // L'IA resta com'era: deviazioni e respinte quando la palla arriva forte (realismo, ed equilibrio già misurato)
+    if (!gk && !mate && !b.shot && b.kick && b.kick.type !== 'shot' && this.human[p.team]) { this.give(p); return; }
     const fresh = b.kick && b.kick.age < 0.22 && sp > 6;
     if (!gk && !mate && ((b.shot && sp > 14) || sp > 22 + p.st.dri * 0.06 || fresh)) {
       const hard = !!b.shot;

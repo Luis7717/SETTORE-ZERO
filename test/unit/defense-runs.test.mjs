@@ -70,19 +70,25 @@ test('lo stesso passaggio a 1,15 m dal difensore: preso se passa male, non preso
   assert.equal(run(45, 90), false, 'difensore debole contro passaggio preciso: passa');
 });
 
-test('in difesa chi non ha una linea resta fermo: la CPU non muove i giocatori al posto della persona', () => {
-  // Arrange
-  const { m, c } = scene(), d = m.players[3], k = m.ctrl[0] || m.players[7];
+test('in difesa chi ha una linea la segue senza che la CPU la sovrascriva; gli altri li muove la CPU', () => {
+  // Arrange (prima del 2026-11-20 sera gli altri restavano fermi: ora rientrano, pressano, marcano)
+  const { m, c } = scene(), d = m.players[3];
   const start = m.team(0).filter(p => p.pos !== 'P').map(p => [p, p.x, p.y]);
-  m.userRun(0, d, [{ x: d.x + 6, y: d.y }]);
+  const end = { x: d.x + 6, y: d.y };
+  m.userRun(0, d, [end]);
   // Act: 2 s di gioco con l'avversario fermo col pallone
-  for (let i = 0; i < 120; i++) { hold(m, c); m.step(DT); m.events.length = 0; }
-  // Assert
-  for (const [p, x, y] of start) {
-    const moved = Math.hypot(p.x - x, p.y - y);
-    if (p === d) assert.ok(moved > 4, 'chi ha la linea corre');
-    else assert.ok(moved < 1, `giocatore ${p.i} fermo (si è mosso di ${moved.toFixed(2)} m)`);
+  let off = 0, reached = 99;
+  for (let i = 0; i < 120; i++) {
+    hold(m, c); m.step(DT); m.events.length = 0;
+    if (m.runOf(d)) off = Math.max(off, Math.abs(d.y - end.y));
+    reached = Math.min(reached, Math.hypot(d.x - end.x, d.y - end.y));
   }
+  // Assert
+  assert.ok(reached < 1, 'chi ha la linea arriva in fondo');
+  assert.equal(m.runOf(d), null, 'linea finita: il giocatore torna alla CPU');
+  assert.ok(off < 0.8, `resta sulla sua linea (scarto ${off.toFixed(2)} m)`);
+  const moved = start.filter(([p, x, y]) => p !== d && Math.hypot(p.x - x, p.y - y) > 1).length;
+  assert.ok(moved >= 3, `la CPU muove gli altri (${moved} si sono mossi)`);
 });
 
 test('in difesa il giocatore controllato si muove col dito tenuto premuto', () => {
@@ -91,15 +97,6 @@ test('in difesa il giocatore controllato si muove col dito tenuto premuto', () =
   const x0 = k.x, y0 = k.y;
   for (let i = 0; i < 60; i++) { hold(m, c); m.userMove(0, x0 + 8, y0, true); m.step(DT); m.events.length = 0; }
   assert.ok(Math.hypot(k.x - x0, k.y - y0) > 3, 'il controllato segue il dito');
-});
-
-test('pallone libero dopo un rimpallo: nessuno della squadra umana ci corre da solo', () => {
-  const { m } = scene(), b = m.ball;
-  b.owner = null; b.kick = null; b.x = 0; b.y = 0; b.vx = 0; b.vy = 0; b.h = 0; b.vh = 0;
-  for (const o of m.team(1)) m.place(o, o.x, 45);
-  const start = m.team(0).filter(p => p.pos !== 'P').map(p => [p, p.x, p.y]);
-  for (let i = 0; i < 60; i++) { m.step(DT); m.events.length = 0; }
-  for (const [p, x, y] of start) assert.ok(Math.hypot(p.x - x, p.y - y) < 1, `giocatore ${p.i} fermo`);
 });
 
 test('una linea disegnata fin sull’avversario col pallone porta al contrasto', () => {

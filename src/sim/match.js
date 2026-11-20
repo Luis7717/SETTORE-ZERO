@@ -20,7 +20,27 @@ const PATH_REACH = 1.3;  // punto raggiunto quando il portatore è più vicino d
 const RUN_END_REACH = 0.4;  // linea di difesa: l'ultimo punto va raggiunto davvero (così una linea fin sull'avversario arriva al contrasto) (m)
 const PATH_SPRINT = 6;   // scatta finché davanti resta più strada di così (m)
 const PATH_TTL = 20;     // durata massima di una strada disegnata (s)
+const PATH_LOOK = 3;     // il giocatore punta a un punto della strada almeno così avanti: un punto troppo vicino lo frenava e lo scatto non si vedeva (m)
+export const RUN_MAX_LEN = 14; // lunghezza massima di una linea di difesa, misurata dal giocatore: il resto si taglia (m)
 export const SPRINT_DIST = 6; // dito più lontano di così dal giocatore controllato (m) = scatto
+
+// Taglia una linea che parte da (x0, y0) e passa per pts alla lunghezza max (m): l'ultimo punto cade esattamente a max.
+// Usata dal motore (userRun) e dal disegno della linea (src/input.js), così a schermo si vede già tagliata.
+export function clipLen(x0, y0, pts, max) {
+  const out = []; let px = x0, py = y0, left = max;
+  for (const q of pts) {
+    const d = hyp(q.x - px, q.y - py);
+    if (d >= left) { const k = d > 0 ? left / d : 0; out.push({ ...q, x: px + (q.x - px) * k, y: py + (q.y - py) * k }); return out; }
+    out.push(q); left -= d; px = q.x; py = q.y;
+  }
+  return out;
+}
+// indice del primo punto della strada (da i in poi) lontano almeno PATH_LOOK da (x, y); l'ultimo se nessuno lo è
+function lookAhead(path, i, x, y) {
+  let j = i;
+  while (j < path.length - 1 && hyp(path[j].x - x, path[j].y - y) < PATH_LOOK) j++;
+  return j;
+}
 
 export class Match {
   constructor(o) {
@@ -40,6 +60,7 @@ export class Match {
     this.stats = { shots: [0, 0], onT: [0, 0], poss: [0, 0], fouls: [0, 0], corners: [0, 0], saves: [0, 0], headers: [0, 0], volleys: [0, 0] };
     this.ctrl = [null, null]; this.move = [null, null]; this.switchCd = [0, 0]; this.runs = [[], []];
     this.chase = [null, null]; this.presser = [null, null]; this.cover = [null, null]; this.offLine = [HL, HL];
+    this.autoDef = [true, true]; // squadra umana senza palla: false = chi non ha linea né dito resta fermo (allenamento "Recupera palla")
     this.predT = 0; this.att = -1; this.dtT = 0; this.lastPass = null; this.restart = null;
     this.goalsLog = []; this.advantage = null;
     this.duel = null; this.duelCd = [0, 0]; this.duelCdP = [null, null];
@@ -519,7 +540,7 @@ export class Match {
     const T = p.team;
     if (this.ball.owner !== mv.owner || p !== mv.owner) { this.move[T] = null; return; }
     while (mv.i < mv.path.length - 1 && hyp(mv.path[mv.i].x - p.x, mv.path[mv.i].y - p.y) < PATH_REACH) mv.i++;
-    const q = mv.path[mv.i]; mv.x = q.x; mv.y = q.y;
+    const q = mv.path[mv.i], a = mv.path[lookAhead(mv.path, mv.i, p.x, p.y)]; mv.x = a.x; mv.y = a.y;
     let left = hyp(q.x - p.x, q.y - p.y);
     for (let k = mv.i + 1; k < mv.path.length; k++) left += hyp(mv.path[k].x - mv.path[k - 1].x, mv.path[k].y - mv.path[k - 1].y);
     mv.sprint = left > PATH_SPRINT;
@@ -530,6 +551,7 @@ export class Match {
   userRun(T, p, pts) {
     const b = this.ball;
     if (!p || p.team !== T || p.off || p.pos === 'P' || b.owner === p || this.phase !== 'play' || !Array.isArray(pts) || !pts.length) return false;
+    pts = clipLen(p.x, p.y, pts, RUN_MAX_LEN);
     const path = [];
     for (const q of pts) {
       const x = clamp(q.x, -HW + 0.5, HW - 0.5), y = clamp(q.y, -HL + 0.5, HL - 0.5), l = path[path.length - 1];
@@ -551,8 +573,8 @@ export class Match {
     r.ttl -= this.dtT;
     while (r.i < r.path.length - 1 && hyp(r.path[r.i].x - p.x, r.path[r.i].y - p.y) < PATH_REACH) r.i++;
     const q = r.path[r.i];
-    if (r.ttl <= 0 || (r.i === r.path.length - 1 && hyp(q.x - p.x, q.y - p.y) < RUN_END_REACH)) { this.runs[p.team] = this.runs[p.team].filter(z => z !== r); return false; }
-    p.tx = q.x; p.ty = q.y;
+    if (r.ttl <= 0 || (r.i === r.path.length - 1 && hyp(q.x - p.x, q.y - p.y) < RUN_END_REACH)) { this.runs[p.team] = this.runs[p.team].filter(z => z !== r); this.runEnded(p); return false; }
+    const a = r.path[lookAhead(r.path, r.i, p.x, p.y)]; p.tx = a.x; p.ty = a.y;
     let left = hyp(q.x - p.x, q.y - p.y);
     for (let k = r.i + 1; k < r.path.length; k++) left += hyp(r.path[k].x - r.path[k - 1].x, r.path[k].y - r.path[k - 1].y);
     p.sprint = left > PATH_SPRINT;
