@@ -8,13 +8,14 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { loadAthlete3D } from '../../src/athlete3d.js';
 import { measureLegs, LEG } from '../../src/body/gambe.js';
 import { deformBusto } from '../../src/body/busto.js';
+import { shapeHead } from '../../src/body/testa.js';
 
 const buf = (() => { const b = readFileSync(new URL('../../assets/models/athlete.glb', import.meta.url)); return b.buffer.slice(b.byteOffset, b.byteOffset + b.length); })();
 const m = await loadAthlete3D(buf);
 const raw = await new Promise((ok, ko) => new GLTFLoader().parse(buf.slice(0), '', ok, ko));
 let rawMesh = null; raw.scene.traverse(o => { if (o.isSkinnedMesh && !rawMesh) rawMesh = o; });
-// riferimento: modello originale col solo busto applicato (il busto è di un'altra parte: qui si controlla che le gambe non tocchino altro)
-deformBusto(rawMesh);
+// riferimento: modello originale con testa e busto applicati (sono di altre parti: qui si controlla che le gambe non tocchino altro)
+shapeHead(rawMesh); deformBusto(rawMesh); // stesso ordine di src/athlete3d.js
 const G = m.legs, T = G.T, gr = G.ground, H = y => (y - gr) / T;
 const I = m.mesh.geometry.index.array;
 // geometria come in partita (con il gonfiaggio dei pantaloncini di athlete3d.js), solo il corpo
