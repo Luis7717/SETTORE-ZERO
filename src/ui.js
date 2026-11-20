@@ -1,16 +1,10 @@
 // Menu e schermate della carriera (HTML sopra la scena 3D).
-import { FORMATIONS, headingOf } from './sim.js';
 import { UI_CSS, teamMixVars } from './ui-style.js';
-import { DIV_NAMES, POS_NAME, KITS, overall, overallAs, value, fmtMoney } from './career.js';
+import { DIV_NAMES, POS_NAME, KITS, overall, value, fmtMoney } from './career.js';
 import { Editor } from './editor.js';
 import { crestSvg, crestFromSeed } from './crest.js';
-
-const hex = n => '#' + n.toString(16).padStart(6, '0');
-const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-// statistiche nella scheda giocatore; 'fis' è la resistenza, 'tes' i colpi di testa (calcolati se il salvataggio è vecchio)
-const STATS = [['vel', 'VEL'], ['fis', 'RES'], ['tir', 'TIR'], ['pas', 'PAS'], ['dri', 'DRI'], ['dif', 'DIF'], ['tes', 'TES']];
-const statOf = (p, k) => (k === 'tes' ? headingOf(p) : p[k]);
-const ovrCls = o => (o >= 75 ? 'o4' : o >= 65 ? 'o3' : o >= 55 ? 'o2' : 'o1');
+import { hex, esc, STATS, GK_STATS, statOf, ovrCls } from './ui-util.js';
+import { squadHtml, placeSquad, benchScroll, pickCard } from './ui-squad.js';
 
 
 // stemma di una squadra (src/crest.js): sagoma, motivo e simbolo, coi colori della maglia
@@ -50,7 +44,7 @@ export const HOWTO = [
 export class UI {
   constructor(root, career, api) {
     this.ed = new Editor(this);
-    this.root = root; this.c = career; this.api = api; this.screen = ''; this.sel = null; this.tabDiv = null; this.mfilter = 'T'; this.kit = 0; this.msg = '';
+    this.root = root; this.c = career; this.api = api; this.screen = ''; this.sel = null; this.tgt = null; this.just = null; this.tabDiv = null; this.mfilter = 'T'; this.kit = 0; this.msg = '';
     if (typeof document !== 'undefined') { const st = document.createElement('style'); st.textContent = UI_CSS; document.head.appendChild(st); }
     root.addEventListener('click', e => {
       const t = e.target.closest('[data-a]'); if (!t) return;
@@ -64,9 +58,11 @@ export class UI {
     if (name !== 'editor') this.ed.unmount();
     this.screen = name; this.arg = arg; this.root.style.display = 'block';
     const s = this.c.s, k = s ? KITS[s.kit] : KITS[this.kit]; if (k) { this.root.style.setProperty('--k1', hex(k[1])); this.root.style.setProperty('--k2', hex(k[2])); for (const [n, v] of teamMixVars(hex(k[1]))) this.root.style.setProperty(n, v); }
-    const fresh = !this.quiet; this.quiet = false;
-    this.root.innerHTML = '<div class="scr' + (fresh ? ' in' : '') + '">' + this[name](arg) + '</div>'; this.root.firstChild.scrollTop = this.keepScroll || 0; this.keepScroll = 0;
-    if (name === 'editor') this.ed.mount(this.root); }
+    const fresh = !this.quiet, bs = benchScroll(this.root, !fresh); this.quiet = false;
+    // la Rosa è una schermata ferma (classe fix): niente scorrimento, il campo riempie lo spazio libero
+    this.root.innerHTML = '<div class="scr' + (fresh ? ' in' : '') + (name === 'squad' ? ' fix' : '') + '">' + this[name](arg) + '</div>'; this.root.firstChild.scrollTop = this.keepScroll || 0; this.keepScroll = 0;
+    if (name === 'editor') this.ed.mount(this.root);
+    if (name === 'squad') placeSquad(this, bs); }
   redraw() { this.quiet = true; const sc = this.root.firstChild ? this.root.firstChild.scrollTop : 0; this.keepScroll = sc; this.show(this.screen, this.arg); }
   toast(m) { this.msg = m; this.redraw(); this.msg = ''; }
 
@@ -74,7 +70,7 @@ export class UI {
     const c = this.c, s = c.s;
     if (a.startsWith('ed') && this.ed.act(a, v, el)) return;
     switch (a) {
-      case 'go': this.sel = null; this.show(v); break;
+      case 'go': this.sel = null; this.tgt = null; this.just = null; this.show(v); break;
       case 'kit': this.quiet = true; this.kit = +v; this.nameVal = this.root.querySelector('#club') ? this.root.querySelector('#club').value : ''; this.show('title', 'new'); break;
       case 'new': this.show('title', 'new'); break;
       case 'create': { const n = (this.root.querySelector('#club').value || '').trim().slice(0, 18) || 'FC Tiro a Giro'; this.nameVal = n; this.ed.openNew(n, this.kit); this.show('editor'); break; }
@@ -85,10 +81,12 @@ export class UI {
       case 'tutorial': this.api.play('tutorial'); break;
       case 'play': this.api.play('league'); break;
       case 'friendly': this.api.play('friendly', +v); break;
-      case 'form': s.formation = v; c.autoLineup(); c.save(); this.sel = null; this.redraw(); break;
-      case 'auto': c.autoLineup(); c.save(); this.sel = null; this.redraw(); break;
-      case 'pl': { const id = +v; if (this.sel === null) this.sel = id; else if (this.sel === id) this.sel = null; else { const st = s.lineup.includes(this.sel) || s.lineup.includes(id); if (st) { c.swap(this.sel, id); this.sel = null; } else this.sel = id; } this.redraw(); break; }
-      case 'sell': { const p = c.player(+v); if (el.dataset.ok !== '1') { el.dataset.ok = '1'; el.textContent = 'Conferma: vendi per ' + fmtMoney(c.sellPrice(p)); el.classList.add('warn'); return; } const err = c.sell(+v); this.sel = null; if (err) this.toast(err); else this.redraw(); break; }
+      case 'form': s.formation = v; c.autoLineup(); c.save(); this.sel = null; this.tgt = null; this.just = null; this.redraw(); break;
+      case 'auto': c.autoLineup(); c.save(); this.sel = null; this.tgt = null; this.just = null; this.redraw(); break;
+      case 'pl': pickCard(this, +v); this.redraw(); break;
+      case 'swp': if (this.sel !== null && this.tgt !== null) pickCard(this, this.tgt); this.redraw(); break;
+      case 'unsel': this.sel = null; this.tgt = null; this.just = null; this.redraw(); break;
+      case 'sell': { const p = c.player(+v); if (el.dataset.ok !== '1') { el.dataset.ok = '1'; el.textContent = 'Conferma vendita'; el.classList.add('warn'); return; } const err = c.sell(+v); this.sel = null; this.tgt = null; this.just = null; if (err) this.toast(err); else this.redraw(); break; }
       case 'buy': { if (el.dataset.ok !== '1') { el.dataset.ok = '1'; el.textContent = 'Conferma'; el.classList.add('warn'); return; } const err = c.buy(+v); if (err) this.toast(err); else this.toast('Acquistato!'); break; }
       case 'mf': this.mfilter = v; this.redraw(); break;
       case 'mrow': this.sel = this.sel === +v ? null : +v; this.redraw(); break;
@@ -127,23 +125,13 @@ export class UI {
     <div class="grid">${tile('go', 'squad', 'squad', 'Rosa', 'Formazione e titolari')}${tile('go', 'market', 'market', 'Mercato', 'Compra e vendi')}${tile('go', 'table', 'table', 'Classifica', pos + '° su 10')}${tile('go', 'calendar', 'calendar', 'Calendario', 'Risultati e prossime')}${tile('go', 'friendly', 'friendly', 'Amichevole', 'Allenati senza rischi')}${tile('go', 'vsfriend', 'vs', '1 contro 1', 'Sfida un amico')}${tile('howto', 0, 'howto', 'Come si gioca', 'I comandi')}${tile('go', 'settings', 'settings', 'Impostazioni', 'Durata, difficoltà')}</div>`;
   }
 
-  prow(p, slotPos, extra = '') {
-    const o = slotPos ? overallAs(p, slotPos) : overall(p), off = slotPos && slotPos !== p.pos;
-    return `<div class="prow ${this.sel === p.id ? 'sel' : ''}" data-a="pl" data-v="${p.id}"><span class="pos p${slotPos || p.pos}">${POS_NAME[slotPos || p.pos]}</span><span class="pn">${esc(p.name)}${off ? ` <em>(${POS_NAME[p.pos]})</em>` : ''}</span><span class="age">${p.age}a</span><span class="ovr ${ovrCls(o)}">${o}</span>${extra}</div>`;
-  }
   pcard(p, btn) {
     return `<div class="pcard"><div class="pc1"><b>${esc(p.name)}</b><span>${POS_NAME[p.pos]} · ${p.age} anni · valore ${fmtMoney(value(p))}${p.num ? ` · n. ${p.num}` : ''}${p.apps !== undefined && p.apps > 0 ? ` · ${p.apps} pres. ${p.goals} gol` : ''}</span></div>
-      <div class="stats">${(p.pos === 'P' ? [['por', 'POR'], ['pas', 'PAS'], ['fis', 'RES'], ['vel', 'VEL']] : STATS).map(([k, n]) => { const v = statOf(p, k); return `<div class="${ovrCls(v)}"><i>${n}</i><b>${v}</b><u style="--w:${Math.max(6, Math.min(100, v))}%"></u></div>`; }).join('')}</div>${btn || ''}</div>`;
+      <div class="stats">${(p.pos === 'P' ? GK_STATS : STATS).map(([k, n]) => { const v = statOf(p, k); return `<div class="${ovrCls(v)}"><i>${n}</i><b>${v}</b><u style="--w:${Math.max(6, Math.min(100, v))}%"></u></div>`; }).join('')}</div>${btn || ''}</div>`;
   }
 
-  squad() {
-    const c = this.c, s = c.s, F = FORMATIONS[s.formation], sp = this.sel !== null ? c.player(this.sel) : null;
-    return this.head('Rosa') + `<div class="chips">${Object.keys(FORMATIONS).map(f => `<button class="chip ${f === s.formation ? 'on' : ''}" data-a="form" data-v="${f}">${f}</button>`).join('')}<button class="chip" data-a="auto">Migliori 11</button></div>
-    <p class="note">Tocca due giocatori per scambiarli. Forza della squadra: <b style="color:var(--gold)">${c.myRating()}</b></p>
-    ${sp ? this.pcard(sp, `<div class="pbtns"><button class="btn sm" data-a="edlook" data-v="${sp.id}">Aspetto</button><button class="btn ghost sm" data-a="sell" data-v="${sp.id}">Vendi per ${fmtMoney(c.sellPrice(sp))}</button></div>`) : ''}
-    <h3>Titolari</h3>${s.lineup.map((id, i) => this.prow(c.player(id), F[i][0])).join('')}
-    <h3>Panchina</h3>${c.bench().sort((a, b) => 'PDCA'.indexOf(a.pos) - 'PDCA'.indexOf(b.pos) || overall(b) - overall(a)).map(p => this.prow(p)).join('')}`;
-  }
+  // Rosa: campo con le carte dei titolari, panchina scorrevole, pannello del giocatore e confronto (src/ui-squad.js)
+  squad() { return this.head('Rosa') + squadHtml(this); }
 
   market() {
     const c = this.c, s = c.s, f = this.mfilter;
