@@ -9,9 +9,10 @@
 //    orecchie più caldi, ombra sotto la mascella), labbra del colore giusto per ogni pelle, sopracciglia a peli con
 //    bordi morbidi, barba con bordi sfumati che continua sotto la mascella, linea delle ciglia, niente macchie chiare
 //    della mappa di dettaglio attorno agli occhi; collo sempre pelle fino allo scollo (prima la parte sotto il mento
-//    prendeva il colore del bordino). Tassello degli occhi: iride più piccola e con venature, palpebre per le forme.
+//    prendeva il colore del bordino). Tassello degli occhi (forme dell'editor): src/body/occhi.js.
 // Uso (una riga, nel costruttore del modello, prima delle misure): installHead(this)
-import { SKINS, HAIR_COLORS, EYE_COLORS } from '../looks.js';
+import { SKINS, HAIR_COLORS } from '../looks.js';
+import { paintEyesFine } from './occhi.js';
 import { scalpPaint } from '../hair3d.js';
 import { FACE, rgb, shade, lumH, cpuCanvas } from '../players3d.js';
 
@@ -117,13 +118,11 @@ export function shapeHead(mesh) {
 // ---------------------------------------------------------------- pittura del viso
 const C_HEAD = 5, C_NECK = 7;  // classi dei texel (come in src/athlete3d.js)
 const AA = 0.005;              // m: bordo morbido dello scollo (come in src/athlete3d.js)
-const EYE_PX = [896, 896, 128, 128]; // tassello degli occhi (EYE_PX di src/athlete3d.js)
 const DETAIL_SKIN = 0.95;      // quanto si vede la mappa di dettaglio sulla pelle
 const DETAIL_CLAMP = [0.62, 1.1]; // limiti della mappa di dettaglio sul viso (via le macchie chiare attorno agli occhi)
 const NECK_FRONT = 0.03, NECK_RELAX = 0.75; // gola (davanti all'osso del collo di 3 cm): scollo misurato come se fosse più vicina
 const BEARD_UNDER = [0.012, 0.034]; // m: sotto il mento la barba sfuma tra queste distanze
 const LASH = { w: 0.0024, k: 0.75 }; // linea delle ciglia: larghezza (m) e intensità
-const IRIS_K = 0.85;           // iride rispetto a prima (era grande per l'apertura dell'occhio)
 const RING = 3;                // texel di allargamento fuori dalle isole UV (come il dilate di src/athlete3d.js)
 
 const mixc = (c, t, a) => { c[0] += (t[0] - c[0]) * a; c[1] += (t[1] - c[1]) * a; c[2] += (t[2] - c[2]) * a; };
@@ -337,42 +336,6 @@ function repaintHead(model, cv, kit, L, S) {
   for (let k = 0; k < H.ring.length; k += 2) { const a = at(H.ring[k]), b = at(H.ring[k + 1]); px[a] = px[b]; px[a + 1] = px[b + 1]; px[a + 2] = px[b + 2]; px[a + 3] = px[b + 3]; }
   lg.putImageData(img, 0, 0);
   const g = cv.getContext('2d'); g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; g.drawImage(lay, rx, ry); g.restore();
-}
-
-// tassello degli occhi: sclera sfumata, iride più piccola con venature e anello scuro, pupilla, due riflessi;
-// palpebre (pelle) per le forme dell'editor: tondi, a mandorla, sottili, grandi, allungati, assonnati
-const EYE_SHAPE = [ // iride (frazione del tassello), palpebra sopra, palpebra sotto (frazioni dell'apertura)
-  [0.105, 0, 0], [0.1, 0.12, 0.08], [0.095, 0.2, 0.12], [0.115, 0, 0], [0.1, 0.1, 0.12], [0.105, 0.34, 0.04]];
-function paintEyesFine(g, L, skinH) {
-  const [x, y, w, h] = EYE_PX, cx = x + w / 2, cy = y + h / 2, iris = EYE_COLORS[L.eyeColor][1], [ik, top, bot] = EYE_SHAPE[L.eyes] || EYE_SHAPE[0];
-  g.save(); g.beginPath(); g.rect(x, y, w, h); g.clip();
-  g.fillStyle = shade(skinH, 0.85); g.fillRect(x, y, w, h);
-  const sc = g.createRadialGradient(cx, cy, 4, cx, cy, w * 0.44);
-  sc.addColorStop(0, '#f4f0ea'); sc.addColorStop(0.6, '#ebe3da'); sc.addColorStop(0.9, '#d9c9bf'); sc.addColorStop(1, shade(skinH, 0.9));
-  g.fillStyle = sc; g.beginPath(); g.ellipse(cx, cy, w * 0.44, h * 0.32, 0, 0, Math.PI * 2); g.fill();
-  const ir = w * ik * IRIS_K, ig = g.createRadialGradient(cx, cy, ir * 0.3, cx, cy, ir);
-  ig.addColorStop(0, shade(iris, 1.25)); ig.addColorStop(0.7, iris); ig.addColorStop(1, shade(iris, 0.6));
-  g.fillStyle = ig; g.beginPath(); g.arc(cx, cy, ir, 0, Math.PI * 2); g.fill();
-  g.strokeStyle = shade(iris, 0.7); g.lineWidth = 0.8; g.globalAlpha = 0.6;
-  for (let k = 0; k < 28; k++) { const a = k / 28 * Math.PI * 2; g.beginPath(); g.moveTo(cx + Math.cos(a) * ir * 0.45, cy + Math.sin(a) * ir * 0.45); g.lineTo(cx + Math.cos(a + 0.08) * ir * 0.95, cy + Math.sin(a + 0.08) * ir * 0.95); g.stroke(); }
-  g.globalAlpha = 1; g.strokeStyle = 'rgba(20,14,10,0.75)'; g.lineWidth = 1.6; g.beginPath(); g.arc(cx, cy, ir, 0, Math.PI * 2); g.stroke();
-  g.fillStyle = '#0b0806'; g.beginPath(); g.arc(cx, cy, ir * 0.42, 0, Math.PI * 2); g.fill();
-  g.fillStyle = 'rgba(255,255,255,0.92)'; g.beginPath(); g.arc(cx - ir * 0.38, cy - ir * 0.38, ir * 0.2, 0, Math.PI * 2); g.fill();
-  g.fillStyle = 'rgba(255,255,255,0.45)'; g.beginPath(); g.arc(cx + ir * 0.35, cy + ir * 0.3, ir * 0.09, 0, Math.PI * 2); g.fill();
-  // ombra della palpebra in alto, poi le palpebre della forma scelta con il bordo delle ciglia
-  const sh = g.createLinearGradient(0, y + h * 0.18, 0, cy); sh.addColorStop(0, 'rgba(40,25,20,0.45)'); sh.addColorStop(1, 'rgba(40,25,20,0)');
-  g.fillStyle = sh; g.fillRect(x, y, w, h / 2);
-  const lidC = shade(skinH, 0.9);
-  if (top > 0) {
-    const ly = cy - h * 0.32 + h * 0.64 * top;
-    g.fillStyle = lidC; g.beginPath(); g.moveTo(x, y); g.lineTo(x + w, y); g.lineTo(x + w, ly - h * 0.06); g.quadraticCurveTo(cx, ly + h * 0.05, x, ly - h * 0.06); g.fill();
-    g.strokeStyle = 'rgba(25,16,12,0.85)'; g.lineWidth = 2.2; g.beginPath(); g.moveTo(x + w * 0.08, ly - h * 0.05); g.quadraticCurveTo(cx, ly + h * 0.05, x + w * 0.92, ly - h * 0.05); g.stroke();
-  }
-  if (bot > 0) {
-    const ly = cy + h * 0.32 - h * 0.64 * bot;
-    g.fillStyle = lidC; g.beginPath(); g.moveTo(x, y + h); g.lineTo(x + w, y + h); g.lineTo(x + w, ly + h * 0.04); g.quadraticCurveTo(cx, ly - h * 0.04, x, ly + h * 0.04); g.fill();
-  }
-  g.restore();
 }
 
 // punti del viso dopo la deformazione (toni della pelle, ciglia, fine della barba)
