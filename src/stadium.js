@@ -10,6 +10,7 @@ import { canvasTex, rnd, pick, C, placeMatrix, fitText, fanColors, QuadBuilder, 
 import { CELLS, TILE, CROWD_H, CROWD_VARIANTS, crowdTexture, crowdMaterial, flagTexture, flagMaterial, FlagBuilder } from './stadium-crowd.js';
 import { adsTexture, adsMaterial, adsTicker, ledStrip } from './stadium-ads.js';
 import { makeScreen, SCREEN_ASPECT } from './stadium-screen.js';
+import { logError } from './diag.js';
 
 // ---------------------------------------------------------------- misure (metri)
 const SIDE_GAP = 12;          // dalla linea laterale al muretto della tribuna laterale
@@ -285,16 +286,14 @@ function addStewards(sb, len) {
   }
 }
 
-// una tribuna completa: struttura, pubblico, luci, fascia LED (geometrie già nel sistema del mondo) e bandiere
-function buildStand(len, matrix, opts, fb) {
+// una tribuna completa: struttura, pubblico, luci, fascia LED (geometrie già nel sistema del mondo)
+function buildStand(len, matrix, opts) {
   const sb = new QuadBuilder(), cb = new QuadBuilder(), lb = new QuadBuilder(), ab = new QuadBuilder();
   addSteps(sb, len, opts); addShell(sb, len, opts); addCrowd(cb, len, opts); addLights(lb, len); addStewards(sb, len);
   if (opts.ribbon) ledStrip(ab, len / 2, -len / 2, PROFILE.z1 - 0.03, PROFILE.y2 - RIBBON.y0, PROFILE.y2 - RIBBON.y1, opts.ribbonStart || 0);
   const screen = opts.screen ? screenGeo(sb) : null;
-  const out = { struct: sb.geometry(matrix), crowd: cb.geometry(matrix), lights: lb.geometry(matrix),
+  return { struct: sb.geometry(matrix), crowd: cb.geometry(matrix), lights: lb.geometry(matrix),
     ads: ab.pos.length ? ab.geometry(matrix) : null, screen: screen && screen.geometry(matrix) };
-  if (fb) addFlags(fb, len, matrix, opts);
-  return out;
 }
 
 // bandiere: a mano tra il pubblico (più fitte in curva) e grandi sul bordo del tetto, mosse dal vento
@@ -382,62 +381,126 @@ function awaySector(len) {
 }
 
 // ---------------------------------------------------------------- stadio
+export const FALLBACK_SKY = 0x1b2852; // sfondo se il cielo non si costruisce: blu di sera, non nero
+const SKY_BG = 0x0b1028;              // sfondo dietro la cupola del cielo
+
+// le quattro tribune: misure, posizione e opzioni (la quarta, alle spalle della telecamera, è a parte)
+function standPlan() {
+  const sx = HW + SIDE_GAP, ez = HL + END_GAP, bz = HL + END_GAP + BACK_EXTRA;
+  const sideLen = 2 * (bz + PROFILE.zb), endLen = 2 * sx, lower = 0x2c64a8, upper = 0x9aa3b0;
+  return {
+    main: [
+      { len: sideLen, m: placeMatrix(Math.PI / 2, sx, 0), o: { seats: [lower, upper], banners: true, vom: true, ribbon: true } },
+      { len: sideLen, m: placeMatrix(-Math.PI / 2, -sx, 0), o: { seats: [lower, upper], banners: true, vom: true, ribbon: true, ribbonStart: 40, away: awaySector(sideLen) } },
+      { len: endLen, m: placeMatrix(Math.PI, 0, -ez), o: { seats: [0xb3263a, upper], banners: true, screen: true, curva: true, vom: true, ribbon: true, ribbonStart: 20, wing: PROFILE.zb + 2 } },
+    ],
+    back: { len: endLen, m: placeMatrix(0, 0, bz), o: { seats: [0xb3263a, upper], banners: false, vom: true, wing: PROFILE.zb + 2 } },
+  };
+}
+const merged = geos => { const g = mergeGeometries(geos); if (!g) throw new Error('mergeGeometries: attributi diversi'); return g; };
+const need = (t, what) => { if (!t) throw new Error(`manca la texture ${what}`); return t; };
+
 /**
- * Aggiunge lo stadio alla scena.
+ * Aggiunge lo stadio alla scena. Ogni pezzo (texture, tribune, pubblico, luci, cartelloni, bandiere, maxischermo,
+ * tribuna alle spalle, terreno, cielo) si costruisce per conto suo: se uno fallisce (es. canvas negato da Safari) gli
+ * altri restano, l'errore va in window.__errs (src/diag.js) e `parts` dice cosa c'è.
  * @param {THREE.Scene} scene
- * @param {{ home?: {shirt:number, shorts?:number}, away?: {shirt:number, shorts?:number}, sky?: boolean }} opts
+ * @param {{ home?: {shirt:number, shorts?:number}, away?: {shirt:number, shorts?:number}, sky?: boolean,
+ *   onError?: (where:string, e:any) => void }} opts
  *   divise delle due squadre (colori dei tifosi); sky:false lascia lo sfondo com'è
  * @returns {{ crowdMats: THREE.Material[], backStand: THREE.Object3D, root: THREE.Group, buildMs: number,
+ *   parts: Object<string, boolean>, textures: THREE.Texture[],
  *   update(dt:number, excitement?:number, match?:object):void, setTeams(home:object, away:object):void }}
  */
 export function buildStadium(scene, opts = {}) {
-  const t0 = performance.now();
+  const t0 = performance.now(), parts = {}, report = opts.onError || logError;
+  // esegue un pezzo: se lancia, il pezzo manca (parts[name] = false) e l'errore si registra
+  const part = (name, fn) => {
+    try { const v = fn(); parts[name] = true; return v; } catch (e) { parts[name] = false; report('stadio/' + name, e); return null; }
+  };
   let home = opts.home ? fanColors(opts.home) : ['#d23b3b', '#f4f4f4'], away = opts.away ? fanColors(opts.away) : ['#2f6fd6', '#f2c230'];
   const root = new THREE.Group(); root.name = 'stadium';
   const uniforms = { uTime: { value: 0 }, uExcite: { value: 0 }, uOla: { value: 0 }, uOlaAmp: { value: 0 },
     uAdA: { value: 0 }, uAdB: { value: 0 }, uAdFlip: { value: 0 }, uAdMosA: { value: 0 }, uAdMosB: { value: 0 } };
-  const atlas = structureTexture(), crowdTex = crowdTexture(home, away), adTex = adsTexture(), glowTex = glowTexture(), flagTex = flagTexture(home, away);
-  const structMat = () => new THREE.MeshBasicMaterial({ map: atlas, vertexColors: true });
-  const lightMat = () => new THREE.MeshBasicMaterial({ map: glowTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
 
-  const sx = HW + SIDE_GAP, ez = HL + END_GAP, bz = HL + END_GAP + BACK_EXTRA;
-  const sideLen = 2 * (bz + PROFILE.zb), endLen = 2 * sx;
-  const lower = 0x2c64a8, upper = 0x9aa3b0, fb = new FlagBuilder();
-  const stands = [
-    buildStand(sideLen, placeMatrix(Math.PI / 2, sx, 0), { seats: [lower, upper], banners: true, vom: true, ribbon: true }, fb),
-    buildStand(sideLen, placeMatrix(-Math.PI / 2, -sx, 0), { seats: [lower, upper], banners: true, vom: true, ribbon: true, ribbonStart: 40, away: awaySector(sideLen) }, fb),
-    buildStand(endLen, placeMatrix(Math.PI, 0, -ez), { seats: [0xb3263a, upper], banners: true, screen: true, curva: true, vom: true, ribbon: true, ribbonStart: 20, wing: PROFILE.zb + 2 }, fb),
-  ];
-  const back = buildStand(endLen, placeMatrix(0, 0, bz), { seats: [0xb3263a, upper], banners: false, vom: true, wing: PROFILE.zb + 2 }, null);
+  // cielo per primo: anche se tutto il resto fallisse, sopra il campo non resta il nero
+  let skyTex = null;
+  if (opts.sky !== false) {
+    scene.background = new THREE.Color(FALLBACK_SKY);
+    part('cielo', () => { const sky = skyMesh(); skyTex = sky.material.map; root.add(sky); scene.background = new THREE.Color(SKY_BG); });
+  }
+
+  const atlas = part('texture tribune', structureTexture), crowdTex = part('texture pubblico', () => crowdTexture(home, away));
+  const adTex = part('texture cartelloni', adsTexture), glowTex = part('texture luci', glowTexture), flagTex = part('texture bandiere', () => flagTexture(home, away));
+  const structMat = () => new THREE.MeshBasicMaterial({ map: atlas, vertexColors: true }); // senza atlante: solo i colori
+  const lightMat = () => new THREE.MeshBasicMaterial({ map: need(glowTex, 'delle luci'), vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+
+  const plan = standPlan();
+  const stands = part('tribune (forma)', () => plan.main.map(s => buildStand(s.len, s.m, s.o))) || [];
+  const back = part('tribuna dietro (forma)', () => buildStand(plan.back.len, plan.back.m, plan.back.o));
+  const needStands = () => { if (!stands.length) throw new Error('mancano le tribune'); };
 
   // gruppo principale: 1 draw call ciascuno per struttura, pubblico, luci, cartelloni+fascia LED, bandiere, maxischermo
-  const adGeos = stands.map(s => s.ads).filter(Boolean), boardGeos = [];
-  addBoardLine(adGeos, boardGeos, 2 * BOARD.zMax, placeMatrix(Math.PI / 2, BOARD.side, 0), 0);
-  addBoardLine(adGeos, boardGeos, 2 * BOARD.zMax, placeMatrix(-Math.PI / 2, -BOARD.side, 0), 31);
-  addBoardLine(adGeos, boardGeos, 2 * BOARD.side, placeMatrix(Math.PI, 0, -BOARD.end), 57);
-  const structGeo = mergeGeometries([...stands.map(s => s.struct), ...boardGeos, benchGeometry()]);
-  const crowdMain = crowdMaterial(crowdTex, uniforms), crowdBack = crowdMaterial(crowdTex, uniforms);
-  root.add(new THREE.Mesh(structGeo, structMat()));
-  // il pubblico si disegna prima della struttura: i gradini nascosti dalle persone non vengono colorati
-  const crowdMesh = new THREE.Mesh(mergeGeometries(stands.map(s => s.crowd)), crowdMain); crowdMesh.renderOrder = -1; root.add(crowdMesh);
-  const lights = new THREE.Mesh(mergeGeometries(stands.map(s => s.lights)), lightMat()); lights.renderOrder = 5; root.add(lights);
-  root.add(new THREE.Mesh(mergeGeometries(adGeos), adsMaterial(adTex, uniforms)));
-  const flags = new THREE.Mesh(fb.geometry(), flagMaterial(flagTex, uniforms)); flags.frustumCulled = false; root.add(flags);
-  const screen = makeScreen(); root.add(new THREE.Mesh(stands[2].screen, screen.material));
+  const boards = part('cartelloni (forma)', () => {
+    const adGeos = [], boardGeos = [];
+    addBoardLine(adGeos, boardGeos, 2 * BOARD.zMax, placeMatrix(Math.PI / 2, BOARD.side, 0), 0);
+    addBoardLine(adGeos, boardGeos, 2 * BOARD.zMax, placeMatrix(-Math.PI / 2, -BOARD.side, 0), 31);
+    addBoardLine(adGeos, boardGeos, 2 * BOARD.side, placeMatrix(Math.PI, 0, -BOARD.end), 57);
+    return { adGeos, boardGeos };
+  }) || { adGeos: [], boardGeos: [] };
+  const bench = part('panchine', benchGeometry);
+  part('tribune', () => {
+    const geos = [...stands.map(s => s.struct), ...boards.boardGeos, ...(bench ? [bench] : [])];
+    if (!geos.length) throw new Error('nessuna geometria');
+    root.add(new THREE.Mesh(merged(geos), structMat()));
+  });
+  const crowdMats = [];
+  part('pubblico', () => {
+    needStands();
+    const mat = crowdMaterial(need(crowdTex, 'del pubblico'), uniforms);
+    // il pubblico si disegna prima della struttura: i gradini nascosti dalle persone non vengono colorati
+    const crowdMesh = new THREE.Mesh(merged(stands.map(s => s.crowd)), mat); crowdMesh.renderOrder = -1; root.add(crowdMesh);
+    crowdMats.push(mat);
+  });
+  part('luci', () => {
+    needStands();
+    const lights = new THREE.Mesh(merged(stands.map(s => s.lights)), lightMat()); lights.renderOrder = 5; root.add(lights);
+  });
+  part('cartelloni', () => {
+    const geos = [...stands.map(s => s.ads).filter(Boolean), ...boards.adGeos];
+    if (!geos.length) throw new Error('nessun cartellone');
+    root.add(new THREE.Mesh(merged(geos), adsMaterial(need(adTex, 'dei cartelloni'), uniforms)));
+  });
+  part('bandiere', () => {
+    need(flagTex, 'delle bandiere');
+    const fb = new FlagBuilder();
+    for (const s of plan.main) addFlags(fb, s.len, s.m, s.o);
+    const flags = new THREE.Mesh(fb.geometry(), flagMaterial(flagTex, uniforms)); flags.frustumCulled = false; root.add(flags);
+  });
+  const screen = part('maxischermo', () => {
+    const geo = stands[2] && stands[2].screen; if (!geo) throw new Error('manca la tribuna del maxischermo');
+    const sc = makeScreen(); root.add(new THREE.Mesh(geo, sc.material)); return sc;
+  });
 
   // tribuna alle spalle della telecamera: oggetto unico con materiali propri (si può nascondere o dissolvere)
   const backStand = new THREE.Group(); backStand.name = 'backStand';
-  backStand.add(new THREE.Mesh(back.struct, structMat()));
-  const backCrowd = new THREE.Mesh(back.crowd, crowdBack); backCrowd.renderOrder = -1; backStand.add(backCrowd);
-  const backLights = new THREE.Mesh(back.lights, lightMat()); backLights.renderOrder = 5; backStand.add(backLights);
+  if (back) {
+    part('tribuna dietro', () => backStand.add(new THREE.Mesh(back.struct, structMat())));
+    part('pubblico dietro', () => {
+      const mat = crowdMaterial(need(crowdTex, 'del pubblico'), uniforms);
+      const backCrowd = new THREE.Mesh(back.crowd, mat); backCrowd.renderOrder = -1; backStand.add(backCrowd);
+      crowdMats.push(mat);
+    });
+    part('luci dietro', () => { const l = new THREE.Mesh(back.lights, lightMat()); l.renderOrder = 5; backStand.add(l); });
+  }
   root.add(backStand);
-
-  root.add(groundMesh());
-  if (opts.sky !== false) { root.add(skyMesh()); scene.background = new THREE.Color(0x0b1028); }
+  part('terreno', () => root.add(groundMesh()));
   scene.add(root);
 
   const tickAds = adsTicker(uniforms);
   let calm = 0, ola = -1, goalT = 0;
+  // un ridisegno che fallisce (es. canvas negato) non deve fermare la partita: si registra e basta
+  const safe = (where, fn) => { try { fn(); } catch (e) { report('stadio/' + where, e); } };
   const update = (dt, excitement = 0, match = null) => {
     uniforms.uTime.value += dt;
     const e = Math.max(0, Math.min(1, excitement || 0));
@@ -451,18 +514,28 @@ export function buildStadium(scene, opts = {}) {
       uniforms.uOlaAmp.value = Math.min(1, ola * 2, (OLA_LAPS * 2 * Math.PI - ola) * 2);
       if (ola > OLA_LAPS * 2 * Math.PI || e > 0.5) { ola = -1; uniforms.uOlaAmp.value = 0; }
     }
-    if (match) {
+    if (match && screen) {
       goalT = match.phase === 'goal' ? goalT + dt : 0;
-      screen.set({ score: [match.score[0], match.score[1]], goal: goalT > 0 && goalT < 4 });
+      safe('maxischermo', () => screen.set({ score: [match.score[0], match.score[1]], goal: goalT > 0 && goalT < 4 }));
     }
   };
   const setTeams = (homeKit, awayKit, names) => {
     if (!homeKit || !awayKit) return;
     const h = fanColors(homeKit), a = fanColors(awayKit);
-    if (names) screen.set({ names: names.map(n => String(n || '').slice(0, 4).toUpperCase()) });
-    screen.set({ colors: [h, a] });
+    if (screen) safe('maxischermo', () => { if (names) screen.set({ names: names.map(n => String(n || '').slice(0, 4).toUpperCase()) }); screen.set({ colors: [h, a] }); });
     if (h.join() === home.join() && a.join() === away.join()) return;
-    home = h; away = a; crowdTex.redraw(h, a); flagTex.redraw(h, a);
+    home = h; away = a;
+    if (crowdTex) safe('pubblico', () => crowdTex.redraw(h, a));
+    if (flagTex) safe('bandiere', () => flagTex.redraw(h, a));
   };
-  return { crowdMats: [crowdMain, crowdBack], backStand, root, update, setTeams, buildMs: performance.now() - t0 };
+  // texture disegnate su canvas (render.js le carica sulla GPU e ne svuota i canvas: src/canvas-mem.js)
+  const textures = [skyTex, atlas, crowdTex, adTex, glowTex, flagTex, screen && screen.material.map].filter(Boolean);
+  return { crowdMats, backStand, root, update, setTeams, parts, textures, buildMs: performance.now() - t0 };
+}
+
+// riga breve per la diagnostica: "ok" o i pezzi che mancano
+export function stadiumSummary(st) {
+  if (!st) return 'manca';
+  const miss = Object.keys(st.parts).filter(k => !st.parts[k]);
+  return miss.length ? 'senza ' + miss.join(', ') : 'ok';
 }

@@ -9,6 +9,7 @@ import { normalizeLook } from './looks.js';
 import { ballTexture } from './props.js';
 import { menuRoutine } from './menu-routine.js';
 import { applyMove } from './move-pose.js';
+import { releaseCanvas, watchRestore } from './canvas-mem.js';
 
 const FIG_S = 1.25;                 // scala della figura (come l'anteprima dell'editor)
 const BALL_R = 0.11;                // raggio vero del pallone (m)
@@ -50,6 +51,7 @@ class Stage {
   constructor(canvas) {
     this.cv = canvas;
     this.r = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    watchRestore(this.r); // texture svuotate ridisegnate se il contesto WebGL torna
     this.r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.scene = new THREE.Scene();
     this.scene.add(new THREE.HemisphereLight(0xeef4ff, 0x40506a, 1.6));
@@ -77,6 +79,7 @@ class Stage {
     if (this.fig) { this.root.remove(this.fig.g); this.p3d.dispose(this.fig); }
     this.fig = this.p3d.make(who.kit, normalizeLook(who.look), { num: who.num, name: who.name, tex: TEX });
     this.root.add(this.fig.g);
+    releaseCanvas(this.r, this.fig.tex); // sulla GPU subito, canvas svuotato (memoria dei canvas di Safari iOS)
     this.t = 0;
   }
   tick(dt) {

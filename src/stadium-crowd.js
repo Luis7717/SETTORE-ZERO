@@ -42,6 +42,13 @@ function personLook(variant, home, away) {
     clap: Math.random() < 0.25,
   };
 }
+// rettangolo con gli angoli in alto arrotondati (raggio rr). Niente ctx.roundRect: manca nei Safari prima di iOS 16
+// e lì faceva fallire tutta la texture del pubblico (e con lei lo stadio intero).
+export function roundTop(g, x, y, w, h, rr) {
+  const r = Math.max(0, Math.min(rr, w / 2, h));
+  g.beginPath(); g.moveTo(x, y + h); g.lineTo(x, y + r); g.arcTo(x, y, x + r, y, r);
+  g.lineTo(x + w - r, y); g.arcTo(x + w, y, x + w, y + r, r); g.lineTo(x + w, y + h); g.closePath();
+}
 function drawPerson(g, x, y, p, up) {
   const cx = x + CELL_W / 2, base = y + STRIP - 1, top = base - p.h + p.dy, l = cx - p.w / 2, hy = top - 7, r = p.w / 2;
   if (p.flag && up) {
@@ -54,7 +61,7 @@ function drawPerson(g, x, y, p, up) {
     g.beginPath(); g.moveTo(l + p.w - 2, top + 8); g.lineTo(l + p.w + 4, top - 30); g.lineTo(l + p.w - 2, top - 31); g.lineTo(l + p.w - 7, top + 6); g.fill();
   }
   // busto con spalle arrotondate, luce dall'alto
-  g.beginPath(); g.roundRect(l, top, p.w, base - top + 1, [r * 0.8, r * 0.8, 0, 0]); g.fill();
+  roundTop(g, l, top, p.w, base - top + 1, r * 0.8); g.fill();
   // luce dall'alto sulle spalle, ombra in basso (fasce semitrasparenti: molto più veloci dei gradienti)
   g.fillStyle = 'rgba(255,255,255,0.16)'; g.fillRect(l + 3, top + 1, p.w - 6, 4);
   const hgt = base - top;

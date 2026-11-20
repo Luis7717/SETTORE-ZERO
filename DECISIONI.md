@@ -585,3 +585,41 @@ corsa andava bene. Non ci sono clip CC0/CC-BY di palleggio o skill per questo sc
   in qualche fotogramma (punta e polpaccio nell'arcobaleno).
 - **Da provare sull'iPhone**: palleggio e giochetti nel menu (fluidità, se il contatto si vede), giochetti in partita
   nel duello (tasto Dribbling, anche col sinistro), durata dei voli di sombrero e arcobaleno in partita.
+
+## 2026-11-20 — "In partita manca lo sfondo" sull'iPhone: stadio robusto, diagnostica, canvas più leggeri
+Segnalazione di Luis (foto, IPA di `2931068`): campo, giocatori, tabellone e minimappa ci sono, sopra il campo tutto nero
+(niente tribune, pubblico, tetto, cartelloni, maxischermo, cielo). In Chrome sul PC lo stadio c'è.
+- **Causa trovata (molto probabile)**: la texture del pubblico (`src/stadium-crowd.js`) usava `ctx.roundRect`, che Safari
+  ha solo da iOS 16. Su un iOS più vecchio la chiamata lancia, `buildStadium` (in un `setTimeout`) si ferma e lo stadio
+  resta `null` senza che nessuno lo sappia; il cielo era aggiunto alla fine, quindi niente cielo e sfondo nero.
+  Riprodotto in WebKit (Playwright 1.49 / WebKit 18.2 su Windows, nello scratchpad, niente dipendenze nel progetto)
+  togliendo `roundRect` dal prototipo: stessa identica schermata della foto ed errore
+  `i.roundRect is not a function`. Coerente con la correzione di stamattina su `color-mix()` (manca prima di iOS 16.2):
+  l'iPhone di Luis ha probabilmente un iOS 15 o 16.0/16.1. Con WebKit 18.2 normale lo stadio c'è anche col codice vecchio.
+- **Altre ipotesi controllate**: three in un file a parte (`824c3b8`) va in WebKit (stadio presente, addons uguali);
+  memoria dei canvas: misurata in WebKit (WeakRef su ogni canvas creato, conta anche quelli non ancora raccolti) al
+  massimo **85 MB** (hub e partita, dpr 1; su iPhone con dpr 3 i due canvas WebGL aggiungono ~20 MB): sotto il limite di
+  Safari iOS (224-384 MB secondo il modello), quindi non è la causa, ma l'abbiamo ridotta lo stesso.
+- **Correzioni**:
+  1. `roundTop()` con `arcTo` al posto di `roundRect` (va su tutti i Safari).
+  2. `buildStadium` a pezzi: cielo (per primo), 5 texture, forma delle tribune, cartelloni, panchine, struttura, pubblico,
+     luci, bandiere, maxischermo, tribuna alle spalle (struttura, pubblico, luci), terreno: ognuno nel suo try/catch;
+     se uno fallisce gli altri restano (senza atlante le tribune hanno i soli colori), `stadium.parts` dice cosa c'è.
+     Ridisegni durante la partita (colori dei tifosi, risultato sul maxischermo) protetti allo stesso modo.
+     Sfondo di riserva blu di sera (`FALLBACK_SKY`) messo subito in `render.js`: mai più nero. Se la texture del campo
+     non si disegna, prato verde semplice (`plainPitch`).
+  3. **Diagnostica** (`src/diag.js`): errori in `window.__errs` (anche quelli globali, catturati da uno script in testa a
+     `index.html` prima di three, e le promesse rifiutate), `console.error`, conteggio dei canvas vivi. In **pausa** una
+     riga piccola "Diagnostica · stadio: ok · canvas: 25 · 11 MB · WebGL2 · dpr 3" e il primo e gli ultimi errori.
+  4. **Canvas svuotati dopo il caricamento sulla GPU** (`src/canvas-mem.js`): `renderer.initTexture` e poi canvas a 0×0 per
+     le texture dello stadio, del campo e dei giocatori (partita, sfondo del menu, editor). Chi ridisegna (tifosi,
+     maxischermo) rifà il canvas, lo ricarica e lo svuota di nuovo; se il contesto WebGL si perde e torna, i canvas si
+     ridisegnano (`userData.rebuild`) prima che three ricarichi. Canvas di passaggio della barba e dei capelli liberati
+     subito; texture dei giocatori tolti liberate senza aspettare il garbage collector. Memoria dei canvas in WebKit:
+     menu 34 → 8 MB, hub e rosa 85 → 13 MB, partita 82 → 11,5 MB.
+- **Prove**: `test/unit/stadium-robust.test.mjs` (stadio con un finto canvas: completo; senza `roundRect`; canvas del
+  pubblico negato = manca solo il pubblico; nessun canvas = tribune, terreno e sfondo blu; bandiere negate; svuotamento,
+  ridisegno e ritorno del contesto; diagnostica). In WebKit: partita con lo stadio intero anche senza `roundRect`;
+  pubblico negato → riga Diagnostica con l'errore; tutti i canvas ≥1024 negati → cielo blu, tribune a colori, campo verde.
+- **Da provare sull'iPhone**: lo stadio si vede? Se manca ancora (anche solo un pezzo), mettere in pausa e fotografare la
+  riga "Diagnostica" in fondo.

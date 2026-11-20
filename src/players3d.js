@@ -284,6 +284,7 @@ export class Players3D {
       const r = (() => { let a = 7; return () => { a = (a * 16807) % 2147483647; return a / 2147483647; }; })();
       for (let i = 0; i < 900; i++) q.fillRect(x - 100 + r() * 200, y - 70 + r() * 150, 2.2, 2.2);
       g.globalAlpha = 0.5; g.drawImage(q.canvas, x - 150, y + 10 - 100); g.globalAlpha = 1;
+      sl.width = sl.height = 0; // canvas di passaggio: liberato subito (memoria dei canvas di Safari iOS)
     } else if (L.beard === 2 || L.beard === 4) { // pizzetto (+ baffi)
       g.beginPath(); g.moveTo(x - 16, y + 12); g.quadraticCurveTo(x, y + 8, x + 16, y + 12); g.lineTo(x + 12, y + 40); g.quadraticCurveTo(x, y + 48, x - 12, y + 40); g.closePath(); g.fill();
     }
@@ -294,6 +295,7 @@ export class Players3D {
     if (L.beard === 6) { jaw(); g.fill(); g.fillRect(x - 80, y + 30, 160, 70); mouth(); }
     g.restore();
     out.drawImage(lay, 0, 0);
+    lay.width = lay.height = 0; // canvas di passaggio: liberato subito
   }
 
   // cute sotto i capelli (attaccatura morbida o nuca rasata a puntini) e tinta dei capelli per le UV della mesh
@@ -308,6 +310,7 @@ export class Players3D {
       }
       q.putImageData(img, 0, 0);
       g.save(); g.imageSmoothingEnabled = true; g.drawImage(lay, 0, 0, 640, 440); g.restore();
+      lay.width = lay.height = 0; // canvas di passaggio: liberato subito
     }
     paintHairTex(g, L.hair, hairC, skin, R.hair);
   }
@@ -376,8 +379,9 @@ export class Players3D {
     let mesh = null; const bones = {};
     model.traverse(o => { if (o.isSkinnedMesh) mesh = o; if (o.isBone) bones[o.name] = o; });
     this.aliasBones(bones);
-    const size = opt.tex || TEX, canvas = this.paint(kit, L, { num: opt.num, name: opt.name ? backName(opt.name) : '' }, size);
+    const size = opt.tex || TEX, paintOpt = { num: opt.num, name: opt.name ? backName(opt.name) : '' }, canvas = this.paint(kit, L, paintOpt, size);
     const tex = new THREE.CanvasTexture(canvas); tex.flipY = false; tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4; tex.generateMipmaps = true;
+    tex.userData.rebuild = () => this.paint(kit, L, paintOpt, size); // canvas rifatto se è stato svuotato (src/canvas-mem.js)
     const mat = new THREE.MeshLambertMaterial({ map: tex }); withRim(mat);
     mesh.geometry = this.bodyGeo(L.hair, st.fit);
     mesh.material = mat; mesh.frustumCulled = true;
@@ -393,7 +397,11 @@ export class Players3D {
   // nomi delle ossa usati dalle pose (quelli del modello Kenney): la sottoclasse aggiunge i suoi
   aliasBones(bones) { }
   // libera la texture di un giocatore tolto dalla scena (la geometria è condivisa e resta in cache)
-  dispose(f) { if (f && f.tex) { f.tex.dispose(); f.mat.dispose(); } }
+  dispose(f) {
+    if (!f || !f.tex) return;
+    const c = f.tex.image; if (c && c.getContext) c.width = c.height = 0; // pixel del canvas liberati subito, senza aspettare il garbage collector
+    f.tex.dispose(); f.mat.dispose();
+  }
 
   // rotazione di un osso attorno a un asse del corpo (x = di lato, y = su, z = avanti), sopra la posa del clip
   rot(f, name, ax, ang) {

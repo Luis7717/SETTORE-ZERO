@@ -8,6 +8,7 @@ import { KITS, POS_NAME, randomName } from './career.js';
 import { SKINS, HAIR_COLORS, HAIR_STYLES, EYE_SHAPES, EYE_COLORS, BROWS, BEARDS, BOOTS, KIT_OPTS, lookFromSeed, lookOf, normalizeLook, normalizeKitStyle, kitStyleFromSeed, hash32, seeded } from './looks.js';
 import { CREST_SHAPES, CREST_PATTERNS, CREST_ICONS, crestSvg, crestFromSeed } from './crest.js';
 import { loadBestPlayers } from './athlete3d.js';
+import { releaseCanvas, watchRestore } from './canvas-mem.js';
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const PREVIEW_TEX = 1024;     // texture dell'anteprima: più fine che in partita (si vede da vicino)
@@ -198,6 +199,7 @@ class Preview {
   constructor(canvas) {
     this.cv = canvas;
     this.r = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    watchRestore(this.r); // texture svuotate ridisegnate se il contesto WebGL torna
     this.r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.scene = new THREE.Scene();
     this.scene.add(new THREE.HemisphereLight(0xeef4ff, 0x40506a, 1.6));
@@ -224,6 +226,7 @@ class Preview {
     if (this.fig) { this.scene.remove(this.fig.g); this.p3d.dispose(this.fig); }
     this.fig = this.p3d.make(kit, normalizeLook(look), { num, name, tex: PREVIEW_TEX });
     this.fig.g.scale.setScalar(1.25); this.scene.add(this.fig.g);
+    releaseCanvas(this.r, this.fig.tex); // sulla GPU subito, canvas svuotato (memoria dei canvas di Safari iOS)
   }
   tick(dt) {
     const w = this.cv.clientWidth, h = this.cv.clientHeight; if (!w || !h) return;

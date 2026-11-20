@@ -2,7 +2,9 @@
 import { chooseTrick, ballOffset } from './tricks.js';
 import * as THREE from 'three';
 import { W, HL, GW, GH } from './sim.js';
-import { buildStadium } from './stadium.js';
+import { buildStadium, FALLBACK_SKY, stadiumSummary } from './stadium.js';
+import { logError } from './diag.js';
+import { releaseCanvas, watchRestore } from './canvas-mem.js';
 import { loadBestPlayers } from './athlete3d.js';
 import { buildPitch, buildLights, setupRenderer, fitSun, playerShadowTexture, shadowYaw, SHADOWS } from './pitch.js';
 import { Props, makeRibbon, fillRibbon } from './props.js';
@@ -46,6 +48,13 @@ function canvasTex(w, h, draw) {
   return t;
 }
 
+// prato di riserva (un solo colore, niente canvas) se la texture del campo non si può disegnare
+function plainPitch(scene) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(W + 20, 2 * HL + 24), new THREE.MeshLambertMaterial({ color: 0x3f9a37 }));
+  m.rotation.x = -Math.PI / 2; m.receiveShadow = true; scene.add(m);
+  return { mesh: m, ms: 0, textures: [] };
+}
+
 export class View {
   constructor(canvas) {
     this.canvas = canvas;
@@ -57,8 +66,26 @@ export class View {
     this.flip = 1; this.zoom = 0; this.zoomT = 0; this.w = 1; this.h = 1;
     this.cx = 0; this.cy = -20; this.match = null; this.me = 0;
     this.v3 = new THREE.Vector3(); this.figs = []; this.t = 0;
+    // contesto WebGL perso e tornato (iOS lo fa sotto pressione di memoria): si registra, e al ritorno si
+    // ridisegnano i canvas svuotati delle texture (src/canvas-mem.js) prima che three le ricarichi
+    canvas.addEventListener('webglcontextlost', () => logError('webgl', 'contesto perso'));
+    watchRestore(this.r, e => logError('webgl/ripristino', e));
     this.buildWorld();
     this.resize();
+  }
+
+  // carica le texture sulla GPU e svuota i loro canvas (memoria dei canvas di Safari iOS)
+  freeCanvases(textures) {
+    let bytes = 0;
+    for (const t of textures) { try { bytes += releaseCanvas(this.r, t); } catch (e) { logError('texture/gpu', e); } }
+    return bytes;
+  }
+
+  // riga per la diagnostica in pausa
+  diagInfo() {
+    const gl = this.r.getContext(), webgl2 = typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext;
+    return { stadium: this.stadium ? stadiumSummary(this.stadium) : this.stadiumTried ? 'manca' : 'in costruzione',
+      gl: `${webgl2 ? 'WebGL2' : 'WebGL1'}${gl.isContextLost && gl.isContextLost() ? ' PERSO' : ''} · dpr ${this.r.getPixelRatio()}` };
   }
 
   resize() {
@@ -74,11 +101,20 @@ export class View {
     const s = this.scene;
     // luci (sole caldo con ombre vere, cielo, controluce), campo (erba e linee): src/pitch.js
     this.lights = buildLights(s);
-    this.pitchMs = buildPitch(s, this.r).ms;
+    let pitch;
+    try { pitch = buildPitch(s, this.r); } catch (e) { logError('campo', e); pitch = plainPitch(s); } // senza canvas: prato verde semplice
+    this.pitchMs = pitch.ms; this.freeCanvases(pitch.textures);
     // stadio intorno al campo (tribune, pubblico, tetto, cartelloni, cielo): src/stadium.js
     // costruito subito dopo il primo disegno del menu, così il menu compare prima
-    this.stadium = null; this.crowdMats = []; this.backStand = null;
-    setTimeout(() => { const st = buildStadium(s); this.stadium = st; this.crowdMats = st.crowdMats; this.backStand = st.backStand; this.stadiumTeams(); }, 0);
+    // se lo stadio (o il suo cielo) non si costruisce, sopra il campo resta questo blu di sera invece del nero
+    this.stadium = null; this.crowdMats = []; this.backStand = null; s.background = new THREE.Color(FALLBACK_SKY);
+    setTimeout(() => {
+      this.stadiumTried = true;
+      try {
+        const st = buildStadium(s); this.stadium = st; this.crowdMats = st.crowdMats; this.backStand = st.backStand;
+        this.stadiumTeams(); this.freeCanvases(st.textures);
+      } catch (e) { logError('stadio', e); }
+    }, 0);
 
     // porte, pallone, bandierine ed effetti: src/props.js
     this.props = new Props(s); this.ballM = this.props.ball;
@@ -140,7 +176,7 @@ export class View {
 
   makeFig(kit, look, num, name) {
     if (this.p3d) {
-      const f = this.p3d.make(kit, look, { num, name }); f.g.scale.setScalar(SCALE);
+      const f = this.p3d.make(kit, look, { num, name }); f.g.scale.setScalar(SCALE); this.freeCanvases([f.tex]);
       f.sh = new THREE.Mesh(this.shGeo, this.plShMat); f.sh.position.y = 0.025; f.sh.scale.set(PL_SHADOW, 1, PL_SHADOW); f.sh.rotation.y = shadowYaw(this.flip);
       f.g.traverse(o => { if (o.isMesh) o.castShadow = SHADOWS; });
       f.warn = new THREE.Sprite(this.warnMat); f.warn.scale.set(0.7, 0.7, 1); f.warn.position.y = 2.25; f.warn.visible = false; f.warn.renderOrder = 22; f.g.add(f.warn);

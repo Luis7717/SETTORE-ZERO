@@ -1,18 +1,37 @@
 // Attrezzi comuni dello stadio: texture disegnate su canvas, colori, costruttore di geometrie a quadrilateri.
 // Coordinate three: x = larghezza, y = altezza, z = -y del motore.
 import * as THREE from 'three';
+import { releaseCanvas } from './canvas-mem.js';
 
+// contesto 2D di un canvas: su Safari iOS, finita la memoria dei canvas, getContext restituisce null
+export function ctx2d(c) {
+  const g = c.getContext('2d');
+  if (!g) throw new Error(`canvas ${c.width}×${c.height} senza contesto 2D (memoria dei canvas finita?)`);
+  return g;
+}
+// disegna (o ridisegna) un canvas w×h con draw; riusa quello dato se c'è
+function paint(c, w, h, draw) {
+  const cv = c && typeof c.getContext === 'function' ? c : document.createElement('canvas');
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  const g = ctx2d(cv);
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, w, h);
+  draw(g, w, h);
+  return cv;
+}
+// texture disegnata su canvas. userData.rebuild ridisegna il canvas (dopo che è stato svuotato: src/canvas-mem.js)
 export function canvasTex(w, h, draw) {
-  const c = document.createElement('canvas'); c.width = w; c.height = h;
-  draw(c.getContext('2d'), w, h);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  const t = new THREE.CanvasTexture(paint(null, w, h, draw)); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  t.userData.draw = draw;
+  t.userData.rebuild = () => paint(t.image, w, h, t.userData.draw);
   return t;
 }
-// ridisegna una texture fatta con canvasTex e la rimanda alla GPU
+// ridisegna una texture fatta con canvasTex e la rimanda alla GPU (se il canvas era stato svuotato, lo si rifà e
+// poi lo si svuota di nuovo)
 export function redrawTex(t, draw) {
-  const c = t.image, g = c.getContext('2d');
-  g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.clearRect(0, 0, c.width, c.height);
-  draw(g, c.width, c.height); t.needsUpdate = true;
+  t.userData.draw = draw;
+  t.image = t.userData.rebuild ? t.userData.rebuild() : paint(t.image, t.image.width, t.image.height, draw);
+  t.needsUpdate = true;
+  if (t.userData.releasedBy) releaseCanvas(t.userData.releasedBy, t);
 }
 
 export const rnd = (a, b) => a + Math.random() * (b - a);
