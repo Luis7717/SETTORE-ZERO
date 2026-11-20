@@ -61,6 +61,6 @@ Limite di 2 subagenti insieme tolto più tardi lo stesso giorno (richiesta di Lu
 | 23 | Motore: difesa che rientra e pressa, attacco largo, linee di difesa corte, contrasto magnetico, intercetto, scatto | `TAG-wt-tattica` / `wt-tattica` | fatto (`6564220`), unito |
 | 25 | Schermata Rosa sul campo con carte, panchina e confronto | `TAG-wt-rosa` / `wt-rosa` | fatto (`5056553`), unito |
 | 26 | Palleggio e giochetti con fisica e IK | `TAG-wt-anim` / `wt-anim` | in corso |
-| 27 | Ricerca animazioni CC0/CC-BY | nessuno (solo ricerca) | in corso |
-| 28 | three.js in un file separato (index.html sotto 1 MB) | `TAG-wt-split` / `wt-split` | in corso |
+| 27 | Ricerca animazioni CC0/CC-BY | nessuno (solo ricerca) | fatto: UAL2 senza calcio; pack Soccer di Anderson Rohr confermato da Luis |
+| 28 | three.js in un file separato (index.html sotto 1 MB) | `TAG-wt-split` / `wt-split` | fatto (`824c3b8`), unito |
 | 24 | Menu principale col campione che si allena; menu opachi senza color-mix | coordinatore, in `gioco2` | fatto |
