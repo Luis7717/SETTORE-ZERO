@@ -2,7 +2,7 @@
 
 Coordinatore: sessione principale (Opus), che integra i risultati nei file comuni
 (`main.js`, `render.js`, `build.mjs`, `index.tpl.html`) uno alla volta.
-Massimo quattro subagenti insieme. Nel repo entra solo il materiale scelto dal coordinatore.
+Nessun limite fisso al numero di subagenti insieme (Luis, 2026-11-20): se ne usano quanti servono, uno per pezzo indipendente. Nel repo entra solo il materiale scelto dal coordinatore.
 I subagenti che modificano file lavorano in un worktree proprio, creato dal ramo `gioco2`
 (l'isolamento automatico creava i worktree dal repo principale, cioè da Settore Zero: non va usato).
 
@@ -51,7 +51,7 @@ Il terminale si è chiuso a metà (un'altra sessione ha chiuso processi per nome
 | 19 | Testa, viso, collo | `TAG-wt-testa` / `wt-testa` | come sopra (`68e50ed`), unito (`f50795a`) | `src/body/testa.js`, `test/unit/head.test.mjs`, `test/head-measure.mjs` |
 | 20a | Braccia nascoste dietro il busto da fermo (difetto del 17) | `TAG-wt-braccia` / `wt-braccia` | fatto: stessa causa del 20b, resta solo il test della posa (`827c427`), unito | `src/body/busto.js` |
 | 20b | Macchia color pelle sui pantaloncini (difetto del 18) | `TAG-wt-macchia` / `wt-macchia` | fatto (`a739d31`, unito `f9f41e2`): erano le dita che bucavano i pantaloncini; corretto `IDLE_FIX.arms` in `src/athlete3d.js` | `src/body/gambe.js` |
-Massimo 2 subagenti insieme (richiesta di Luis del 2026-11-20).
+Limite di 2 subagenti insieme tolto più tardi lo stesso giorno (richiesta di Luis): vedi in cima.
 
 ## 21-24 — Prove di Luis sull'iPhone (2026-11-20) · Opus
 | # | Compito | Worktree / ramo | Stato |
