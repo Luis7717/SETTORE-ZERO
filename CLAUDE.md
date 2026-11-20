@@ -83,3 +83,15 @@
   intercetto = difesa del difensore contro passaggio di chi passa.
 - Portiere: sul tiro la visuale va dietro la propria porta e il tempo rallenta; linea dal portiere al punto della porta,
   il tuffo parte quando si alza il dito.
+
+## Versione Godot (in costruzione)
+- Cartella **`godot/`** (Godot 4.7.2-stable, GDScript, renderer Mobile, 390×844 verticale): `project.godot`,
+  `export_presets.cfg` (preset `iOS` e `Windows Desktop`), `scenes/`, `scripts/`, `shaders/`, `assets/` (licenze in
+  `godot/CREDITI.md`), `sim/` + `tests/` = motore in GDScript. Guida completa: `godot/README.md`.
+- Coordinate: Godot X = x, Y = altezza, Z = −y (come three.js nel web), funzioni in `godot/scripts/coord.gd`.
+- Comandi (G = `Godot_v4.7.2-stable_win64_console.exe`, in `C:\Users\forma\Documents\godot-tools`):
+  `$G --headless --path godot --import` · `$G --headless --path godot -- --esci-dopo=4` (niente errori) ·
+  `$G --path godot -- --schermata=shots/x.png --dopo=3` (anche `--vista=vicina|porta|alta`, `--senza-vsync`, `--prova-tocchi`).
+- Build: workflow `.github/workflows/tiro-a-giro-godot-ipa.yml` (push su `tiro-a-giro` che tocca `godot/**`) →
+  release **`tiro-a-giro-godot-ipa`**, `TiroAGiroGodot.ipa`, bundle `it.tiroagiro.godot` ("Tiro a Giro 3D"), iOS 15+,
+  chip A12+. Il workflow web ignora i cambi solo in `godot/`.
