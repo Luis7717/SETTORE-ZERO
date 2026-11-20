@@ -63,4 +63,5 @@ Limite di 2 subagenti insieme tolto più tardi lo stesso giorno (richiesta di Lu
 | 26 | Palleggio e giochetti con fisica e IK | `TAG-wt-anim` / `wt-anim` | in corso |
 | 27 | Ricerca animazioni CC0/CC-BY | nessuno (solo ricerca) | fatto: UAL2 senza calcio; pack Soccer di Anderson Rohr confermato da Luis |
 | 28 | three.js in un file separato (index.html sotto 1 MB) | `TAG-wt-split` / `wt-split` | fatto (`824c3b8`), unito |
+| 29 | Telecamera girata col dito nel rallenty, passaggio solo disegnato | `TAG-wt-camuser` / `wt-camuser` | fatto (`d94cefc`), unito |
 | 24 | Menu principale col campione che si allena; menu opachi senza color-mix | coordinatore, in `gioco2` | fatto |
