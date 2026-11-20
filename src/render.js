@@ -4,6 +4,9 @@ import * as THREE from 'three';
 import { W, L, HW, HL, GW, GH, BOX_W, BOX_D, SIX_W, SIX_D, PEN_D, CIRCLE } from './sim.js';
 import { buildStadium } from './stadium.js';
 import { loadPlayers3D } from './players3d.js';
+import { Props, makeRibbon, fillRibbon } from './props.js';
+
+const _rp = [0, 0, 0]; // punto riusato per i nastri delle linee
 
 const SKIN = [0xf1c9a5, 0xd9a47a, 0xa9744f, 0x6b4630];
 const HAIR = [0x1c1410, 0x4a2f1b, 0x8a5a2b, 0xd9b66a, 0x222222, 0x2b2b2b];
@@ -128,30 +131,8 @@ export class View {
     this.stadium = null; this.crowdMats = []; this.backStand = null;
     setTimeout(() => { const st = buildStadium(s); this.stadium = st; this.crowdMats = st.crowdMats; this.backStand = st.backStand; }, 0);
 
-    // porte
-    const postM = new THREE.MeshLambertMaterial({ color: 0xffffff });
-    const netTex = canvasTex(128, 128, (g, w, h) => { g.clearRect(0, 0, w, h); g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = 3; for (let i = 0; i <= 8; i++) { g.beginPath(); g.moveTo(i * 16, 0); g.lineTo(i * 16, h); g.stroke(); g.beginPath(); g.moveTo(0, i * 16); g.lineTo(w, i * 16); g.stroke(); } });
-    netTex.wrapS = netTex.wrapT = THREE.RepeatWrapping;
-    this.netMats = [];
-    for (const d of [1, -1]) {
-      const g = new THREE.Group(); g.position.z = -d * HL; s.add(g);
-      const post = (x) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, GH + 0.07), postM); m.position.set(x, GH / 2, 0); g.add(m); };
-      post(-GW / 2); post(GW / 2);
-      const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, GW + 0.15), postM); bar.rotation.z = Math.PI / 2; bar.position.y = GH; g.add(bar);
-      const nm = new THREE.MeshBasicMaterial({ map: netTex, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false });
-      this.netMats.push(nm);
-      const pl = (w, h, x, y, z, rx, ry, rep) => { const t = netTex.clone(); t.repeat.set(rep[0], rep[1]); t.needsUpdate = true; const m2 = nm.clone(); m2.map = t; const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), m2); m.position.set(x, y, z); m.rotation.set(rx, ry, 0); g.add(m); this.netMats.push(m2); m2.userData.d = d; };
-      const dz = -d * 1.9;
-      pl(GW, GH, 0, GH / 2, dz, 0, 0, [6, 2]);
-      pl(GW, 1.9, 0, GH, dz / 2, Math.PI / 2, 0, [6, 1.5]);
-      pl(1.9, GH, -GW / 2, GH / 2, dz / 2, 0, Math.PI / 2, [1.5, 2]);
-      pl(1.9, GH, GW / 2, GH / 2, dz / 2, 0, Math.PI / 2, [1.5, 2]);
-    }
-
-    // palla
-    const bt = canvasTex(128, 64, (g, w, h) => { g.fillStyle = '#f6f6f6'; g.fillRect(0, 0, w, h); g.fillStyle = '#1b1b1f'; for (const [x, y] of [[16, 16], [48, 44], [80, 14], [112, 40], [34, 58], [96, 60], [64, 30], [0, 44], [128, 44]]) { g.beginPath(); for (let k = 0; k < 5; k++) { const a = k * 1.2566 - 1.57; g.lineTo(x + Math.cos(a) * 8, y + Math.sin(a) * 7); } g.fill(); } });
-    this.ballM = new THREE.Mesh(new THREE.SphereGeometry(0.21, 20, 14), new THREE.MeshLambertMaterial({ map: bt }));
-    s.add(this.ballM);
+    // porte, pallone, bandierine ed effetti: src/props.js
+    this.props = new Props(s); this.ballM = this.props.ball;
     const shT = canvasTex(64, 64, (g) => { const gr = g.createRadialGradient(32, 32, 2, 32, 32, 30); gr.addColorStop(0, 'rgba(0,0,0,0.55)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); });
     this.shMat = new THREE.MeshBasicMaterial({ map: shT, transparent: true, depthWrite: false });
     this.shGeo = new THREE.PlaneGeometry(1, 1); this.shGeo.rotateX(-Math.PI / 2);
@@ -166,7 +147,6 @@ export class View {
       g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
     });
     this.plShMat = new THREE.MeshBasicMaterial({ map: plT, transparent: true, depthWrite: false });
-    this.ballSh = new THREE.Mesh(this.shGeo, this.shMat); this.ballSh.position.y = 0.02; s.add(this.ballSh);
 
     // anello del giocatore controllato e bersagli
     const ringT = canvasTex(128, 128, (g) => { g.strokeStyle = '#ffe14a'; g.lineWidth = 12; g.beginPath(); g.arc(64, 64, 52, 0, 7); g.stroke(); });
@@ -182,29 +162,25 @@ export class View {
     this.recv.scale.set(1.6, 1, 1.6); this.recv.position.y = 0.04; this.recv.visible = false; s.add(this.recv);
     // difesa: linee disegnate che i giocatori stanno seguendo (resta solo il tratto ancora da fare)
     this.runLines = [];
-    for (let i = 0; i < RUN_LINES; i++) {
-      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(RUN_PTS * 3), 3)); g.setDrawRange(0, 0);
-      const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color: RUN_COLOR, transparent: true, opacity: 0.85, depthTest: false }));
-      l.renderOrder = 13; l.frustumCulled = false; l.visible = false; s.add(l); this.runLines.push(l);
-    }
+    for (let i = 0; i < RUN_LINES; i++) { const l = makeRibbon(RUN_PTS, RUN_COLOR, 0.92, 13); l.visible = false; s.add(l); this.runLines.push(l); }
 
     // linea disegnata
     this.pathMax = 160;
-    const pg = new THREE.BufferGeometry();
-    pg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(this.pathMax * 2 * 3), 3));
-    const idx = []; for (let i = 0; i < this.pathMax - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
-    pg.setIndex(idx); pg.setDrawRange(0, 0);
-    this.path = new THREE.Mesh(pg, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, depthTest: false, side: THREE.DoubleSide }));
-    this.path.renderOrder = 15; this.path.frustumCulled = false; s.add(this.path);
-    this.arrow = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.1, 12), new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false })); this.arrow.renderOrder = 16; this.arrow.visible = false; s.add(this.arrow);
+    this.path = makeRibbon(this.pathMax, 0xffffff, 0.95, 15); this.path.visible = false; s.add(this.path);
 
     // anteprima della traiettoria vera (puntini azzurri) e linea del fuorigioco (rossa), solo mentre si disegna
     this.prevMax = 80;
     const pvg = new THREE.BufferGeometry();
     pvg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(this.prevMax * 3), 3));
-    const dot = canvasTex(32, 32, (g) => { g.fillStyle = '#fff'; g.beginPath(); g.arc(16, 16, 13, 0, 7); g.fill(); });
-    this.preview = new THREE.Points(pvg, new THREE.PointsMaterial({ map: dot, color: PREVIEW_COLOR, size: 0.7, sizeAttenuation: true, depthTest: false, transparent: true, alphaTest: 0.3 }));
+    // puntino: anima chiara con bordo scuro morbido (si legge sull'erba e sul pubblico)
+    const dot = canvasTex(64, 64, (g) => { const gr = g.createRadialGradient(32, 32, 0, 32, 32, 31); gr.addColorStop(0, '#fff'); gr.addColorStop(0.5, '#fff'); gr.addColorStop(0.62, 'rgba(10,25,40,0.75)'); gr.addColorStop(1, 'rgba(10,25,40,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); });
+    this.preview = new THREE.Points(pvg, new THREE.PointsMaterial({ map: dot, color: PREVIEW_COLOR, size: 0.62, sizeAttenuation: true, depthTest: false, depthWrite: false, transparent: true }));
     this.preview.renderOrder = 17; this.preview.frustumCulled = false; this.preview.visible = false; s.add(this.preview);
+    // ombra dell'anteprima sull'erba: fa capire quanto si alza il pallone
+    const psg = new THREE.BufferGeometry(); psg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(this.prevMax * 3), 3));
+    const sdot = canvasTex(32, 32, (g) => { const gr = g.createRadialGradient(16, 16, 0, 16, 16, 15); gr.addColorStop(0, 'rgba(0,0,0,0.55)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, 32, 32); });
+    this.prevSh = new THREE.Points(psg, new THREE.PointsMaterial({ map: sdot, size: 0.5, sizeAttenuation: true, depthTest: false, depthWrite: false, transparent: true }));
+    this.prevSh.renderOrder = 12; this.prevSh.frustumCulled = false; this.prevSh.visible = false; s.add(this.prevSh);
     const og = new THREE.PlaneGeometry(W, 0.4); og.rotateX(-Math.PI / 2);
     this.offside = new THREE.Mesh(og, new THREE.MeshBasicMaterial({ color: OFFSIDE_COLOR, transparent: true, opacity: 0.85, depthTest: false }));
     this.offside.renderOrder = 14; this.offside.visible = false; s.add(this.offside);
@@ -295,10 +271,6 @@ export class View {
       const o = ballOffset(tk.id, tk.q), c = b.owner, fx = c.fx, fy = c.fy;
       bx += fx * o.f - fy * o.s * tk.side; by += fy * o.f + fx * o.s * tk.side; bh += o.h;
     }
-    this.ballM.position.set(s * bx, bh + 0.21, -s * by);
-    const sp = Math.hypot(b.vx, b.vy);
-    if (sp > 0.2) { this.v3.set(-s * b.vy, 0, -s * b.vx).normalize(); this.ballM.rotateOnWorldAxis(this.v3, -sp * dt / 0.21); }
-    const hs = 0.75 + Math.min(bh, 8) * 0.12; this.ballSh.position.set(s * bx, 0.03, -s * by); this.ballSh.scale.set(hs, 1, hs);
     // anello
     const c = m.ctrl[this.me];
     if (c && !c.off) {
@@ -338,8 +310,8 @@ export class View {
     const camX = this.cx * dir * (0.82 - 0.3 * a) * (1 - 0.55 * dk) * (1 - 0.8 * gk);
     this.cam.position.set(camX, hh, -camY);
     this.cam.lookAt(this.cx * dir * (0.9 - 0.45 * a) * (1 - 0.45 * dk), 0, -lookY);
-    // rete della porta vicina più trasparente
-    for (const nm of this.netMats) if (nm.userData.d !== undefined) nm.opacity = (nm.userData.d * s < 0) ? 0.22 : 0.6;
+    // pallone (dove lo mettono il motore e i giochetti), rete, bandierine, effetti
+    this.props.update(dt, m, s, this.cam, this.me, bx, by, bh);
   }
 
   pose(p, f, dt) {
@@ -382,11 +354,9 @@ export class View {
     const runs = (m.runs && m.runs[this.me]) || [], s = this.flip;
     this.runLines.forEach((l, k) => {
       const r = runs[k]; l.visible = !!r; if (!r) return;
-      const a = l.geometry.attributes.position.array; let n = 0;
-      const put = (x, y) => { a[n * 3] = s * x; a[n * 3 + 1] = 0.08; a[n * 3 + 2] = -s * y; n++; };
-      put(r.p.x, r.p.y);
-      for (let i = r.i; i < r.path.length && n < RUN_PTS; i++) put(r.path[i].x, r.path[i].y);
-      l.geometry.attributes.position.needsUpdate = true; l.geometry.setDrawRange(0, n);
+      const n = Math.min(RUN_PTS, 1 + Math.max(0, r.path.length - r.i));
+      const get = i => { _rp[0] = i ? r.path[r.i + i - 1].x : r.p.x; _rp[1] = i ? r.path[r.i + i - 1].y : r.p.y; _rp[2] = 0.08; return _rp; };
+      fillRibbon(l, n, get, (i, n) => 0.2 * Math.min(1, 0.45 + i * 0.25), s, 0.75);
     });
   }
   render() { this.r.render(this.scene, this.cam); }
@@ -415,22 +385,12 @@ export class View {
   }
 
   setPath(pts, shot, recv) {
-    const s = this.flip, n = Math.min(pts.length, this.pathMax), pos = this.path.geometry.attributes.position.array;
+    const s = this.flip, n = Math.min(pts.length, this.pathMax);
     if (n < 2) { this.clearPath(); return; }
-    for (let i = 0; i < n; i++) {
-      const a = pts[Math.max(0, i - 1)], c = pts[Math.min(n - 1, i + 1)], p = pts[i];
-      let tx = c.x - a.x, ty = c.y - a.y; const l = Math.hypot(tx, ty) || 1; tx /= l; ty /= l;
-      const wd = 0.22 + 0.2 * (i / n);
-      const nx = -ty * wd, ny = tx * wd, hh = (p.h || 0) + 0.08;
-      pos[i * 6] = s * (p.x + nx); pos[i * 6 + 1] = hh; pos[i * 6 + 2] = -s * (p.y + ny);
-      pos[i * 6 + 3] = s * (p.x - nx); pos[i * 6 + 4] = hh; pos[i * 6 + 5] = -s * (p.y - ny);
-    }
-    this.path.geometry.attributes.position.needsUpdate = true;
-    this.path.geometry.setDrawRange(0, (n - 1) * 6);
-    this.path.visible = true;
-    const e = pts[n - 1], q = pts[Math.max(0, n - 3)];
-    this.arrow.visible = !shot;
-    if (!shot) { this.arrow.position.set(s * e.x, 0.1, -s * e.y); this.v3.set(s * (e.x - q.x), 0, -s * (e.y - q.y)).normalize(); this.arrow.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), this.v3); }
+    // nastro con bordo scuro morbido: sottile all'inizio, più largo verso la fine, freccia finale (non nel tiro)
+    const get = i => { const p = pts[i]; _rp[0] = p.x; _rp[1] = p.y; _rp[2] = (p.h || 0) + 0.08; return _rp; };
+    fillRibbon(this.path, n, get, (i, n) => (0.3 + 0.16 * (i / n)) * Math.min(1, 0.4 + i * 0.2), s, shot ? 0 : 1.5);
+    const e = pts[n - 1];
     this.target.visible = !!shot; if (shot) this.target.position.set(s * e.x, e.h, -s * e.y);
     this.path.material.color.setHex(shot ? 0xffe14a : 0xffffff);
     if (recv) { this.recv.visible = true; this.recv.position.set(s * recv.x, 0.04, -s * recv.y); } else this.recv.visible = false;
@@ -441,8 +401,11 @@ export class View {
     for (let i = 0; i < n; i++) { pos[i * 3] = s * pts[i].x; pos[i * 3 + 1] = pts[i].h + 0.12; pos[i * 3 + 2] = -s * pts[i].y; }
     this.preview.geometry.attributes.position.needsUpdate = true;
     this.preview.geometry.setDrawRange(0, n); this.preview.visible = n > 1;
+    const sh = this.prevSh.geometry.attributes.position.array;
+    for (let i = 0; i < n; i++) { sh[i * 3] = pos[i * 3]; sh[i * 3 + 1] = 0.03; sh[i * 3 + 2] = pos[i * 3 + 2]; }
+    this.prevSh.geometry.attributes.position.needsUpdate = true; this.prevSh.geometry.setDrawRange(0, n); this.prevSh.visible = n > 1;
     this.offside.visible = offY !== null;
     if (offY !== null) this.offside.position.set(0, 0.05, -s * offY);
   }
-  clearPath() { this.path.visible = false; this.arrow.visible = false; this.target.visible = false; this.recv.visible = false; this.preview.visible = false; this.offside.visible = false; }
+  clearPath() { this.path.visible = false; this.prevSh.visible = false; this.target.visible = false; this.recv.visible = false; this.preview.visible = false; this.offside.visible = false; }
 }
