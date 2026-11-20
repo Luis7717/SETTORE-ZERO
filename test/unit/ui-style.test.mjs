@@ -1,20 +1,22 @@
-// Stili dei menu: i Safari per iPhone più vecchi non conoscono color-mix() e scartano l'intera regola.
-// Ogni sfondo che lo usa deve avere subito prima uno sfondo di riserva senza color-mix, altrimenti il menu
-// resta trasparente (si vede la partita dietro e le opzioni scorrono dietro l'anteprima del giocatore).
+// Stili dei menu: i Safari per iPhone più vecchi non conoscono color-mix(). Con var() dentro, la regola non viene
+// scartata ma diventa "vuota" al calcolo (sfondo trasparente, anche con una riserva prima): si vedeva la partita
+// dietro i menu e le opzioni dell'editor scorrevano dietro l'anteprima. I colori mescolati li calcola teamMixVars().
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { UI_CSS } from '../../src/ui-style.js';
+import { UI_CSS, teamMixVars } from '../../src/ui-style.js';
 
-test('ogni sfondo con color-mix ha prima uno sfondo di riserva senza color-mix', () => {
-  const decls = [...UI_CSS.matchAll(/([a-z-]+)\s*:\s*([^;{}]*)/g)];
-  let checked = 0;
-  decls.forEach(([, prop, val], k) => {
-    if (!val.includes('color-mix')) return;
-    checked++;
-    const prev = decls[k - 1];
-    assert.ok(prev && prev[1] === prop && !prev[2].includes('color-mix'), `manca la riserva prima di "${prop}:${val.slice(0, 60)}…"`);
-  });
-  assert.ok(checked > 0);
+test('nessun color-mix negli stili dei menu', () => {
+  assert.ok(!UI_CSS.includes('color-mix'));
+});
+
+test('colori della squadra mescolati: uno per ogni variabile usata, valori giusti', () => {
+  const used = new Set(UI_CSS.match(/--k1m\d+-[0-9a-f]{6}/g));
+  const vars = new Map(teamMixVars('#ff0000'));
+  assert.deepEqual(new Set(vars.keys()), used);
+  assert.ok(used.size >= 7);
+  // 38% di rosso puro su #0b1426: (255·0,38 + 11·0,62, 20·0,62, 38·0,62)
+  assert.equal(vars.get('--k1m38-0b1426'), '#680c18');
+  for (const v of vars.values()) assert.match(v, /^#[0-9a-f]{6}$/);
 });
 
 test("la barra delle schede dell'editor è opaca", () => {

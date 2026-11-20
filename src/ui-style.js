@@ -3,8 +3,8 @@
 // Colori squadra: --k1 / --k2 (impostati da UI.show quando c'è una carriera).
 export const UI_CSS = `
 #ui{--bg0:#050912;--bg1:#0b1426;--panel:#111c31;--panel2:#18263f;--line:#ffffff14;--line2:#ffffff26;--txt:#eef3fb;--dim:#93a4c3;--gold:#ffd93d;--gold2:#c9a410;--good:#4aeb9f;--bad:#ff7079;--k1:#1746a2;--k2:#ffffff;--r:18px;
-  background:radial-gradient(120% 60% at 50% -5%,#0b1426 0%,#0a1224 48%,var(--bg0) 100%);background:radial-gradient(120% 60% at 50% -5%,color-mix(in srgb,var(--k1) 38%,#0b1426) 0%,#0a1224 48%,var(--bg0) 100%);color:var(--txt);font-variant-numeric:tabular-nums}
-#ui.clear{background:radial-gradient(120% 60% at 50% -5%,#0b1426 0%,#0a1224 50%,var(--bg0) 100%);background:radial-gradient(120% 60% at 50% -5%,color-mix(in srgb,var(--k1) 32%,#0b1426) 0%,#0a1224 50%,var(--bg0) 100%)}
+  background:radial-gradient(120% 60% at 50% -5%,var(--k1m38-0b1426,#0b1426) 0%,#0a1224 48%,var(--bg0) 100%);color:var(--txt);font-variant-numeric:tabular-nums}
+#ui.clear{background:radial-gradient(120% 60% at 50% -5%,var(--k1m32-0b1426,#0b1426) 0%,#0a1224 50%,var(--bg0) 100%)}
 #ui .scr{padding:0 16px calc(env(safe-area-inset-bottom) + 32px);max-width:520px}
 #ui .scr::before{content:"";display:block;height:calc(env(safe-area-inset-top) + 14px)}
 #ui .scr.in>*{animation:uiUp .38s cubic-bezier(.2,.8,.25,1) both}
@@ -72,7 +72,7 @@ export const UI_CSS = `
 #ui .pill.gold{background:#ffd93d20;color:var(--gold)}
 
 /* hub: prossima partita */
-#ui .card.next{position:relative;overflow:hidden;padding:16px 16px 18px;background:linear-gradient(160deg,#14213a 0%,#101a2f 62%);background:linear-gradient(160deg,color-mix(in srgb,var(--k1) 34%,#14213a) 0%,#101a2f 62%);border-color:#ffffff1f}
+#ui .card.next{position:relative;overflow:hidden;padding:16px 16px 18px;background:linear-gradient(160deg,var(--k1m34-14213a,#14213a) 0%,#101a2f 62%);border-color:#ffffff1f}
 #ui .card.next::after{content:"";position:absolute;right:-40px;top:-40px;width:160px;height:160px;border-radius:50%;background:radial-gradient(#ffffff14,transparent 70%);pointer-events:none}
 #ui .nx-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
 #ui .nx-top .lbl{font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:800;color:#b7c7e3}
@@ -89,7 +89,7 @@ export const UI_CSS = `
 #ui .wl.w{background:var(--good)}#ui .wl.d{background:#f1c75a}#ui .wl.l{background:var(--bad)}
 #ui .grid{gap:10px;margin-top:16px}
 #ui .tile{position:relative;background:linear-gradient(180deg,#15233c,#111c31);border:1px solid var(--line);border-radius:var(--r);padding:14px 12px 14px 14px;min-height:88px;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;transition:transform .12s,filter .12s}
-#ui .tile .ic{position:absolute;right:10px;top:10px;width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:#1c2b49;background:color-mix(in srgb,var(--k1) 38%,#1c2b49);border:1px solid #ffffff1c}
+#ui .tile .ic{position:absolute;right:10px;top:10px;width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:var(--k1m38-1c2b49,#1c2b49);border:1px solid #ffffff1c}
 #ui .tile .ic svg{width:20px;height:20px;stroke:#fff;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 #ui .tile b{font-size:16px;margin:12px 0 3px;letter-spacing:-.005em}
 #ui .tile span{font-size:12.5px;color:var(--dim);line-height:1.25}
@@ -150,7 +150,7 @@ export const UI_CSS = `
 
 /* come si gioca / stagione */
 #ui .how{padding-top:5vh}
-#ui .how .ill{width:112px;height:112px;border-radius:30px;background:linear-gradient(160deg,#1b2b49,#101a2f);background:linear-gradient(160deg,color-mix(in srgb,var(--k1) 40%,#1b2b49),#101a2f);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;margin:2vh 0 18px;box-shadow:0 12px 30px #0007}
+#ui .how .ill{width:112px;height:112px;border-radius:30px;background:linear-gradient(160deg,var(--k1m40-1b2b49,#1b2b49),#101a2f);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;margin:2vh 0 18px;box-shadow:0 12px 30px #0007}
 #ui .how .ill svg{width:72px;height:72px;stroke:#fff;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
 #ui .how h1{font-size:32px;margin:6px 0 12px;letter-spacing:-.015em}
 #ui .how p{font-size:17.5px;line-height:1.55;color:#d7e1f3}
@@ -166,7 +166,7 @@ export const UI_CSS = `
 /* risultato */
 #ui .res{text-align:center;padding-top:2vh}
 #ui .res .dim{font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:750}
-#ui .scoreboard{position:relative;margin:12px 0 4px;border-radius:22px;padding:18px 12px 16px;background:linear-gradient(160deg,#16253f,#0f192c 70%);background:linear-gradient(160deg,color-mix(in srgb,var(--k1) 38%,#16253f),#0f192c 70%);border:1px solid var(--line2);box-shadow:0 12px 32px #0007}
+#ui .scoreboard{position:relative;margin:12px 0 4px;border-radius:22px;padding:18px 12px 16px;background:linear-gradient(160deg,var(--k1m38-16253f,#16253f),#0f192c 70%);border:1px solid var(--line2);box-shadow:0 12px 32px #0007}
 #ui .score{gap:6px;margin:8px 0 10px}
 #ui .score b{font-size:56px;letter-spacing:.02em;text-shadow:0 4px 0 #0006;min-width:0;flex:none}
 #ui .score span{flex:1;font-size:20px;font-weight:850;letter-spacing:.05em}
@@ -195,7 +195,7 @@ export const UI_CSS = `
 
 /* editor: stemma, campione, aspetto, divisa */
 #ui .edtop .pill{margin-left:auto}
-#ui .edstage{position:sticky;top:calc(env(safe-area-inset-top) + 56px);z-index:4;height:min(38vh,320px);margin:0 -16px;background:radial-gradient(70% 80% at 50% 38%,#1d2c4b 0%,#0c1528 72%);background:radial-gradient(70% 80% at 50% 38%,color-mix(in srgb,var(--k1) 45%,#1d2c4b) 0%,#0c1528 72%);border-bottom:1px solid var(--line);overflow:hidden}
+#ui .edstage{position:sticky;top:calc(env(safe-area-inset-top) + 56px);z-index:4;height:min(38vh,320px);margin:0 -16px;background:radial-gradient(70% 80% at 50% 38%,var(--k1m45-1d2c4b,#1d2c4b) 0%,#0c1528 72%);border-bottom:1px solid var(--line);overflow:hidden}
 #ui .edstage canvas{display:block;width:100%;height:100%;border:0;touch-action:none}
 #ui .edstage.cst{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;height:min(34vh,290px)}
 #ui .edstage .crest.big{width:auto;height:72%;filter:drop-shadow(0 10px 22px #000a)}
@@ -224,3 +224,15 @@ export const UI_CSS = `
 #ui .edbar .btn{min-height:56px}
 #ui .edbar .btn.big{font-size:16px}
 `;
+
+// Colori della squadra mescolati con lo sfondo (al posto di color-mix(), che i Safari per iPhone più vecchi non
+// conoscono: con var() dentro, la regola diventa "vuota" e il menu trasparente). Nel CSS: var(--k1m<p>-<base>,#<base>).
+const MIX_VARS = [...new Set(UI_CSS.match(/--k1m\d+-[0-9a-f]{6}/g))];
+export function teamMixVars(k1) {
+  const c = parseInt(k1.slice(1), 16);
+  return MIX_VARS.map(name => {
+    const [, p, base] = name.match(/--k1m(\d+)-([0-9a-f]{6})/), b = parseInt(base, 16), t = +p / 100;
+    const ch = sh => Math.round(((c >> sh) & 255) * t + ((b >> sh) & 255) * (1 - t));
+    return [name, '#' + ((ch(16) << 16) | (ch(8) << 8) | ch(0)).toString(16).padStart(6, '0')];
+  });
+}

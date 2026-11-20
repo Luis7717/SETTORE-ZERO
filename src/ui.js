@@ -1,6 +1,6 @@
 // Menu e schermate della carriera (HTML sopra la scena 3D).
 import { FORMATIONS, headingOf } from './sim.js';
-import { UI_CSS } from './ui-style.js';
+import { UI_CSS, teamMixVars } from './ui-style.js';
 import { DIV_NAMES, POS_NAME, KITS, overall, overallAs, value, fmtMoney } from './career.js';
 import { Editor } from './editor.js';
 import { crestSvg, crestFromSeed } from './crest.js';
@@ -63,7 +63,7 @@ export class UI {
   show(name, arg) {
     if (name !== 'editor') this.ed.unmount();
     this.screen = name; this.arg = arg; this.root.style.display = 'block';
-    const s = this.c.s, k = s ? KITS[s.kit] : KITS[this.kit]; if (k) { this.root.style.setProperty('--k1', hex(k[1])); this.root.style.setProperty('--k2', hex(k[2])); }
+    const s = this.c.s, k = s ? KITS[s.kit] : KITS[this.kit]; if (k) { this.root.style.setProperty('--k1', hex(k[1])); this.root.style.setProperty('--k2', hex(k[2])); for (const [n, v] of teamMixVars(hex(k[1]))) this.root.style.setProperty(n, v); }
     const fresh = !this.quiet; this.quiet = false;
     this.root.innerHTML = '<div class="scr' + (fresh ? ' in' : '') + '">' + this[name](arg) + '</div>'; this.root.firstChild.scrollTop = this.keepScroll || 0; this.keepScroll = 0;
     if (name === 'editor') this.ed.mount(this.root); }
