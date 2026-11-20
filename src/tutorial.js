@@ -10,15 +10,18 @@ export const REPS = 3;    // prove per ogni meccanica
 
 // Ogni lezione: testo della scheda, 3 situazioni (setup con indice k), come si riconosce la riuscita,
 // chi resta fermo. `needs`: metodo del motore senza il quale la lezione si salta.
+const PASS_DEF_DIST = 11; // lezione Passaggio: distanza iniziale del difensore davanti al portatore (m)
+
 export const LESSONS = [
   {
     title: 'Passaggio',
-    short: 'Davanti al difensore disegna dalla palla fino a un compagno, uno qualunque.',
+    short: 'Corri verso il difensore; quando il tempo rallenta disegna dalla palla fino a un compagno.',
     text: 'Si passa quando ti avvicini a un difensore (la visuale si abbassa e il tempo rallenta) e negli ultimi 20 metri prima della porta. Allora <b>disegna dalla palla fino a un compagno</b>, chiunque sia (o toccalo). I puntini azzurri mostrano dove andrà davvero la palla.',
     setup(m, T, k) {
       const c = T.carrier(m, 7, [0, -6, 4][k], [0, -4, 6][k]); T.clearOpp(m);
-      const o = m.players[16]; T.put(m, o, c.x + [0, 1, -1][k], c.y + 3.5); o.fx = 0; o.fy = -1;
-      const mate = [[7, 14], [-20, 6], [14, 2]][k]; T.put(m, m.players[9], mate[0], mate[1]); return { c, o };
+      // difensore a una decina di metri: prima ci si avvicina, poi parte il duello (DUEL_R = 7 m)
+      const o = m.players[16]; T.put(m, o, c.x + [0, 1.5, -1.5][k], c.y + PASS_DEF_DIST); o.fx = 0; o.fy = -1;
+      const mate = [[9, 18], [-22, 10], [17, 6]][k]; T.put(m, m.players[9], mate[0], mate[1]); return { c, o };
     },
     check(e, m, st) { return e.type === 'control' && e.p.team === 0 && e.p !== st.c; },
     freeze: 'opp-but-o',

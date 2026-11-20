@@ -13,7 +13,12 @@ const frame = (m, t) => { t.before(); m.step(DT); t.after(DT); m.events.length =
 // comandi "da telefono" che superano ogni lezione
 const DRIVE = {
   // il passaggio si fa solo nel duello (come in input.js)
-  Passaggio(m) { const c = m.ctrl[0], q = m.players[9]; if (m.ball.owner === c && c && m.duelFor(0)) m.userKick(0, { type: 'auto', tx: q.x, ty: q.y, curve: 0 }); },
+  Passaggio(m) {
+    const c = m.ctrl[0], q = m.players[9], o = m.players[16];
+    if (!c || m.ball.owner !== c) return;
+    if (m.duelFor(0)) m.userKick(0, { type: 'auto', tx: q.x, ty: q.y, curve: 0 });
+    else m.userMove(0, o.x, o.y, true); // prima si corre verso il difensore
+  },
   Tiro(m) { const c = m.ctrl[0]; if (c && m.ball.owner === c) m.userKick(0, { type: 'shot', tx: 2, ty: 50, th: 1, curve: 0 }); },
   // strada disegnata dal giocatore (una volta per prova)
   'Corsa e scatto'(m, t) {
@@ -68,4 +73,15 @@ test('se la prova non riesce entro il tempo si rimette tutto a posto', () => {
   assert.equal(t.li, 0); assert.equal(t.k, 0);
   assert.ok(r.texts.length >= 2, 'la prova è stata riproposta');
   assert.equal(m.ball.owner, m.players[7]);
+});
+
+test('passaggio: il difensore parte lontano, il duello si apre solo dopo essersi avvicinati', () => {
+  for (let k = 0; k < REPS; k++) {
+    const m = newMatch(), r = recorder(), t = new Tutorial(m, r.ui);
+    t.go(); t.k = k; t.reset();
+    const c = m.ball.owner, o = m.players[16];
+    assert.ok(Math.hypot(o.x - c.x, o.y - c.y) > 9, `prova ${k}: difensore a ${Math.hypot(o.x - c.x, o.y - c.y).toFixed(1)} m`);
+    t.before(); m.step(DT); t.after(DT); m.events.length = 0;
+    assert.equal(m.duelFor(0), false, `prova ${k}: niente duello subito`);
+  }
 });
