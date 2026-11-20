@@ -1,5 +1,5 @@
 # Menu: disegni e dati uguali al web (valori presi da src/ con godot/tools/dati_menu_web.mjs →
-# tests/fixtures/menu.json). Visi e stemmi: lo stesso testo SVG di faceSvg / crestSvg; aspetti e stemmi dal seme
+# tests/fixtures/menu_ui.json). Visi e stemmi: lo stesso testo SVG di faceSvg / crestSvg; aspetti e stemmi dal seme
 # (hash32, seeded, lookFromSeed, crestFromSeed, lookOf): stessi numeri.
 extends "test_base.gd"
 
@@ -12,7 +12,7 @@ static var _fx: Dictionary = {}
 
 static func fx() -> Dictionary:
 	if _fx.is_empty():
-		_fx = JSON.parse_string(FileAccess.get_file_as_string("res://tests/fixtures/menu.json"))
+		_fx = JSON.parse_string(FileAccess.get_file_as_string("res://tests/fixtures/menu_ui.json"))
 	return _fx
 
 

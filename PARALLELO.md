@@ -71,3 +71,9 @@ Limite di 2 subagenti insieme tolto più tardi lo stesso giorno (richiesta di Lu
 | 33 | Godot: motore portato in GDScript con prova di equivalenza | `TAG-wt-godot-sim` / `wt-godot-sim` | fatto (`0daad91`), unito |
 | 34 | Godot fase 2: vista della partita (giocatori, animazioni, IK, telecamere) | `TAG-wt-godot-vista` / `wt-godot-vista` | fatto (`878ac81`), unito |
 | 35 | Godot fase 2: ciclo di gioco, gesti, rallenty, HUD, audio, squadre di prova | `TAG-wt-godot-gioco` / `wt-godot-gioco` | fatto (`9dd0d1c`), unito |
+| 36 | Godot fase 3: carriera, salvataggio nuovo, flusso dell'app (autoload `App`) | `TAG-wt-godot-carriera` / `wt-godot-carriera` | fatto (`528684f`), unito |
+| 37 | Godot fase 3: interfaccia dei menu, Rosa FUT, editor, stemma, facce | `TAG-wt-godot-menu` / `wt-godot-menu` | in corso |
+| 38 | Godot fase 3: sfondo 3D del menu (palleggio) e allenamento guidato | `TAG-wt-godot-intro` / `wt-godot-intro` | fatto (`6b18cce`), unito |
+| 39 | Godot fase 4: pubblico 3D, stadio, effetti, stoffa, texture HD, aspetto giocatori | `TAG-wt-godot-grafica` / `wt-godot-grafica` | in corso |
+| 40 | Godot: animazioni mocap del pack Soccer di Anderson Rohr (esultanze, parate, tiri, rimessa, difesa) | `TAG-wt-godot-mocap` / `wt-godot-mocap` | in corso |
+| 41 | Godot: tasto Scatto nel duello (porting di `595493c`), anche nella lezione dell'allenamento | `TAG-wt-godot-fuga` / `wt-godot-fuga` | in corso |

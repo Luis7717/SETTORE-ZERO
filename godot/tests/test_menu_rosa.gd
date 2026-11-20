@@ -1,5 +1,5 @@
 # Rosa: logica pura (scripts/menu/rosa_logica.gd, porting di src/squad-layout.js e src/ui-squad.js).
-# Posizioni delle carte uguali al web (tests/fixtures/menu.json, entro 1/1000 di px: Vector2 è a 32 bit), niente sovrapposizioni, scambi, ordine della
+# Posizioni delle carte uguali al web (tests/fixtures/menu_ui.json, entro 1/1000 di px: Vector2 è a 32 bit), niente sovrapposizioni, scambi, ordine della
 # panchina, tocchi sulle carte (scegli → confronta → scambia), stessi casi di test/unit/squad-layout.test.mjs.
 extends "test_base.gd"
 

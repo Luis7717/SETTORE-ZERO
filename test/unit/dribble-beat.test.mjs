@@ -77,11 +77,11 @@ test('difensore saltato: finito il tempo torna normale e può contrastare di nuo
   assert.ok(ev.some(e => e.type === 'tackle' && e.p === o), 'il contrasto torna possibile');
 });
 
-// ---------------------------------------------------------------- lezione Dribbling, come sul telefono
+// ---------------------------------------------------------------- lezione Scatto (era Dribbling), come sul telefono
 const newTut = (seed) => {
   const m = new Match({ seed, halfLen: 99999, human: [true, false], teams: [mkTeam('A', 55, seed), mkTeam('B', 40, seed + 1)] });
   const t = new Tutorial(m, { text() {}, card() {} });
-  while (t.lesson.title !== 'Dribbling') t.nextLesson();
+  while (t.lesson.title !== 'Scatto') t.nextLesson();
   t.go();
   return { m, t };
 };
@@ -93,7 +93,7 @@ function frame(m, t, g) {
   t.before(); m.step(sdt); t.after(sdt); m.events.length = 0;
 }
 
-test('lezione Dribbling: dopo un tentativo fallito il tasto della prova nuova funziona subito', () => {
+test('lezione Scatto: dopo un tentativo fallito il tasto della prova nuova funziona subito', () => {
   // Arrange: come dopo un dribbling fallito, attese ancora in corso quando la prova riparte
   const { m, t } = newTut(3);
   const c0 = t.st.c;
@@ -103,10 +103,10 @@ test('lezione Dribbling: dopo un tentativo fallito il tasto della prova nuova fu
   const g = { ts: 1 }; frame(m, t, g);
   // Assert
   assert.equal(m.duelFor(0), true, 'duello aperto subito');
-  assert.equal(m.userDribble(0), true, 'il tasto Dribbling funziona');
+  assert.equal(m.userSprint(0), true, 'il tasto Scatto funziona');
 });
 
-test('lezione Dribbling: si supera con facilità toccando il tasto dopo un attimo, e il difensore saltato non si attacca', () => {
+test('lezione Scatto: si supera con facilità toccando il tasto dopo un attimo, e il difensore saltato non si attacca', () => {
   const SEEDS = 8;
   let attempts = 0, sticky = 0, passed = 0;
   for (let seed = 1; seed <= SEEDS; seed++) {
@@ -117,7 +117,7 @@ test('lezione Dribbling: si supera con facilità toccando il tasto dopo un attim
     for (let f = 0; f < 60 * 120 && t.lesson === L; f++) {
       if (m.duelFor(0)) {
         since += DT;
-        if (since >= 1 && !tapC && m.userDribble(0)) { attempts++; tapC = t.st.c; tapO = t.st.o; }
+        if (since >= 1 && !tapC && m.userSprint(0)) { attempts++; tapC = t.st.c; tapO = t.st.o; }
       } else since = 0;
       frame(m, t, g);
       // durante il "Bravo!" (giochetto in corso) il difensore saltato, ormai superato, non deve stare addosso al portatore

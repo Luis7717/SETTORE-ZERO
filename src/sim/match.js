@@ -73,7 +73,7 @@ export class Match {
     return {
       team, i, src, name: src.name, pos: slot[0], bx: slot[1], by: slot[2], st: effStats(src, slot[0]),
       x: 0, y: 0, vx: 0, vy: 0, fx: 0, fy: dir, tx: 0, ty: 0, spdF: 1, state: 'play', t: 0, stun: 0, protect: 0,
-      contact: 0, tackleCd: 0, kickAnim: 0, energy: 1, sprint: false, dribCd: 0, beat: 0, beatBy: null, wear: { dri: 1, tes: 1 }, wall: null, yellow: 0, off: false, sdx: 0, sdy: 0, hit: false,
+      contact: 0, tackleCd: 0, kickAnim: 0, energy: 1, sprint: false, dribCd: 0, beat: 0, beatBy: null, burst: 0, wear: { dri: 1, tes: 1 }, wall: null, yellow: 0, off: false, sdx: 0, sdy: 0, hit: false,
       dive: null, phase: this.rnd() * 6, aiT: 0, dx: 0, dy: 0, reactT: 0, decided: true, warn: false,
       sox: 0, soy: 0, soT: this.rnd(), cele: 0, look: this.lookFor(src),
     };
@@ -614,6 +614,15 @@ export class Match {
     // l'attesa durava molti secondi veri col tasto in vista che non faceva nulla
     if (this.ball.owner !== p || p.stun > 0 || p.state !== 'play') return false;
     this.dribble(p, d.o);
+    return true;
+  }
+  // Scatto nel duello aperto per la squadra T (tasto in basso, al posto del Dribbling). Come userDribble.
+  userSprint(T) {
+    const d = this.duel;
+    if (!d || d.team !== T || this.phase !== 'play') return false;
+    const p = d.p;
+    if (this.ball.owner !== p || p.stun > 0 || p.state !== 'play') return false;
+    this.dribble(p, d.o, true);
     return true;
   }
   hint(T) {

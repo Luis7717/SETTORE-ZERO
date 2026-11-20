@@ -11,7 +11,7 @@ export const REPS = 3;    // prove per ogni meccanica
 // Ogni lezione: testo della scheda, 3 situazioni (setup con indice k), come si riconosce la riuscita,
 // chi resta fermo. `needs`: metodo del motore senza il quale la lezione si salta.
 const PASS_DEF_DIST = 11; // lezione Passaggio: distanza iniziale del difensore davanti al portatore (m)
-const DRIB_DEF_DIF = 15;  // lezione Dribbling: difesa del difensore, così il dribbling riesce quasi sempre (è una lezione)
+const DRIB_DEF_DIF = 15;  // lezione Scatto: difesa del difensore, così il dribbling riesce quasi sempre (è una lezione)
 
 export const LESSONS = [
   {
@@ -63,10 +63,10 @@ export const LESSONS = [
     freeze: 'opp', noAutoDef: true,
   },
   {
-    title: 'Dribbling',
-    short: 'Avvicinati al difensore e tocca Dribbling.',
-    text: 'Quando arrivi addosso a un difensore la visuale si abbassa e il tempo rallenta: puoi <b>passare</b> a un compagno libero oppure toccare <b>Dribbling</b> in basso per saltarlo.',
-    needs: 'userDribble',
+    title: 'Scatto',
+    short: 'Avvicinati al difensore e tocca Scatto.',
+    text: 'Quando arrivi addosso a un difensore la visuale si abbassa e il tempo rallenta: puoi <b>passare</b> a un compagno libero oppure toccare <b>Scatto</b> in basso per bruciarlo in velocità e proseguire dritto.',
+    needs: 'userSprint',
     setup(m, T, k) {
       const c = T.carrier(m, 7, [0, -10, 10][k], [-6, 0, -2][k]); T.clearOpp(m);
       const o = m.players[16]; T.put(m, o, c.x + [0, 1, -1][k], c.y + 7); o.fx = 0; o.fy = -1;
@@ -130,7 +130,7 @@ export class Tutorial {
     // in allenamento niente espulsioni né stanchezza: ogni prova riparte con tutti in campo
     // e niente attese rimaste dalla prova prima: duello, dribbling e contrasti ripartono da zero
     // (prima, dopo un dribbling fallito, il tasto Dribbling della prova nuova non faceva nulla per secondi)
-    for (const p of m.players) { p.off = false; p.yellow = 0; p.energy = 1; p.vx = p.vy = 0; p.stun = 0; p.dribCd = 0; p.tackleCd = 0; p.protect = 0; p.beat = 0; }
+    for (const p of m.players) { p.off = false; p.yellow = 0; p.energy = 1; p.vx = p.vy = 0; p.stun = 0; p.dribCd = 0; p.tackleCd = 0; p.protect = 0; p.beat = 0; p.burst = 0; }
     m.duel = null; m.duelCd = [0, 0]; m.duelCdP = [null, null];
     m.ctrl[0] = null;
     m.place(m.gk(0), 0, -49); m.place(m.gk(1), 0, 49);

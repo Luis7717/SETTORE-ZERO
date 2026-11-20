@@ -159,6 +159,9 @@ func _partita(tipo: String, avversario: Dictionary, titolo: String, durata: floa
 # fischio finale o "Esci": il risultato si registra subito; la schermata cambia con "Continua" (o subito se si esce)
 func _fine_partita(esito: Dictionary, titolo: String) -> void:
 	var tipo: String = esito.tipo
+	if tipo == "allenamento" and esito.get("completato", false): # allenamento finito (come il web: tutDone)
+		carriera.s.tutDone = true
+		carriera.save()
 	if tipo == "allenamento" or (tipo == "amichevole" and esito.abbandonata):
 		ultimo_esito = {}
 		vai(PRINCIPALE)

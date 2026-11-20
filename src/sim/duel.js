@@ -29,6 +29,12 @@ const AI_DRIB_TRY = 0.22;      // probabilità di tentare a pari dribbling e dif
 export const WEAR_DRI = 0.03, WEAR_DRI_MIN = 0.8; // ogni dribbling riuscito: -3% di dribbling, fino all'80%
 export const ZONE_DIST = 20;   // negli ultimi metri prima della porta avversaria: area di tiro (rallenty, si può passare)
 export const WEAR_TES = 0.02, WEAR_TES_MIN = 0.85; // ogni colpo di testa vinto: -2% di colpi di testa, fino all'85%
+// Scatto (Luis 2026-11-20): nel duello il tasto in basso è Scatto, non più Dribbling. Il portatore prova a bruciare il
+// difensore in velocità e prosegue dritto (riesce più spesso se è veloce e il difensore difende male)
+export const BURST_T = 1.2;    // riuscito: per questo tempo il portatore corre più veloce (s)
+export const BURST_SPD = 1.15; // ... di questo fattore (sopra lo scatto normale)
+export const BURST_RUN = 14;   // ... e prosegue dritto fino a questa distanza (m)
+const BURST_SIDE = 2;          // ... passando di fianco al difensore a questa distanza, dalla parte opposta, poi dritto (m)
 
 export class DuelMethods {
   duelFor(T) { return !!(this.duel && this.duel.team === T); }
@@ -89,15 +95,34 @@ export class DuelMethods {
     this.ev('duel_end', { p: d.p, o: d.o, reason });
   }
 
+  sprintChance(p, o) { return clamp(DRIB_BASE + DRIB_SKILL * (p.st.vel - o.st.dif) / 100, DRIB_MIN, DRIB_MAX); }
   dribbleChance(p, o) { return clamp(DRIB_BASE + DRIB_SKILL * (p.st.dri - o.st.dif) / 100, DRIB_MIN, DRIB_MAX); }
 
   // Tentativo di dribbling del portatore p contro o (stessa regola per umano e IA). Ritorna true se riesce.
-  dribble(p, o) {
+  // sprint = Scatto della persona: velocità contro difesa, e se riesce il portatore prosegue dritto
+  dribble(p, o, sprint = false) {
     const b = this.ball, T = p.team;
-    const ok = this.rnd() < this.dribbleChance(p, o);
+    const ok = this.rnd() < (sprint ? this.sprintChance(p, o) : this.dribbleChance(p, o));
     p.dribCd = DRIB_CD;
     const dx = o.x - p.x, dy = o.y - p.y, d = hyp(dx, dy) || 1, ux = dx / d, uy = dy / d;
-    if (ok) {
+    if (ok && sprint) {
+      // dritto nel verso di corsa, un po' di lato dalla parte opposta al difensore
+      const [rx, ry] = this.runDir(p), lat = (o.x - p.x) * -ry + (o.y - p.y) * rx;
+      const side = Math.abs(lat) > 0.05 ? -Math.sign(lat) : -Math.sign(p.x || 1), nx = -ry * side, ny = rx * side;
+      const along = Math.max(0, (o.x - p.x) * rx + (o.y - p.y) * ry), L = Math.max(BURST_RUN, along + DRIB_PAST);
+      const cx = (x, y) => ({ x: clamp(x, -HW + 1, HW - 1), y: clamp(y, -HL + 1, HL - 1) });
+      // curva di fianco al difensore, poi dritto nel verso di corsa
+      const side1 = cx(o.x + nx * BURST_SIDE, o.y + ny * BURST_SIDE), side2 = cx(o.x + nx * BURST_SIDE + rx * DRIB_PAST * 0.5, o.y + ny * BURST_SIDE + ry * DRIB_PAST * 0.5);
+      const end = cx(p.x + rx * L + nx * BURST_SIDE, p.y + ry * L + ny * BURST_SIDE), tx = side1.x, ty = side1.y;
+      const wx = tx - p.x, wy = ty - p.y, wn = hyp(wx, wy) || 1, sp = this.vmax(p) * 1.05;
+      p.vx = wx / wn * sp; p.vy = wy / wn * sp; p.fx = wx / wn; p.fy = wy / wn;
+      p.dx = p.tx = tx; p.dy = p.ty = ty; p.aiT = Math.max(p.aiT, 0.35);
+      p.protect = Math.max(p.protect, DRIB_PROTECT); p.burst = BURST_T;
+      o.stun = DRIB_STUN + Math.max(0, d - DRIB_REACH) / sp; o.contact = 0; o.vx *= 0.3; o.vy *= 0.3;
+      o.beat = o.stun + DRIB_BEAT; o.beatBy = p;
+      if (o.state === 'prep') { o.state = 'play'; o.warn = false; }
+      if (this.human[T] && this.ctrl[T] === p) this.move[T] = { x: tx, y: ty, ttl: BURST_T + 2, held: false, sprint: true, path: [side1, side2, end], i: 0, owner: p };
+    } else if (ok) {
       // di lato verso il centro se si è vicini alla linea laterale, altrimenti a caso
       const side = Math.abs(p.x) > HW - 8 ? -Math.sign(p.x) * Math.sign(uy || 1) : (this.rnd() < 0.5 ? -1 : 1);
       const nx = -uy * side, ny = ux * side;
@@ -128,7 +153,7 @@ export class DuelMethods {
         b.kick = null; b.shot = null; b.noP = p; b.noT = 0.4; this.lastPass = null; this.predT = 0;
       }
     }
-    this.ev('dribble', { p, o, ok });
+    this.ev('dribble', sprint ? { p, o, ok, sprint: true } : { p, o, ok });
     if (this.duel && this.duel.p === p) this.endDuel(ok ? 'dribbling' : 'palla persa');
     return ok;
   }

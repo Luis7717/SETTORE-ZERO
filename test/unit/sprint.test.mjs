@@ -1,78 +1,65 @@
+// Scatto (Luis 2026-11-20): nel duello il tasto in basso è Scatto (era Dribbling): il portatore brucia il difensore
+// in velocità e prosegue dritto.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { BURST_T, BURST_RUN } from '../../src/sim.js';
 import { scene, wake, give, run } from '../lib/scene.mjs';
+const hyp = Math.hypot;
 
-// portatore della squadra 0 che corre in avanti per 2 s tenendo il dito 20 m davanti
-function runFor(sprint, energy) {
-  const m = scene({ seed: 3 }), p = m.players[9];
-  wake(p, 0, -30); p.fx = 0; p.fy = 1; p.energy = energy; give(m, p);
-  const y0 = p.y, e0 = p.energy;
-  run(m, 2, mm => mm.userMove(0, p.x, p.y + 20, true, sprint));
-  return { dist: p.y - y0, used: e0 - p.energy };
+// portatore umano (squadra 0) a centrocampo che guarda verso +y, difensore della squadra 1 davanti a `dist` m
+function setup(seed, { dist = 4, vel = 70, dif = 50, ox = 0.6 } = {}) {
+  const m = scene({ seed }), p = m.players[9], o = m.players[11 + 3];
+  wake(p, 0, 0); p.fx = 0; p.fy = 1; p.st.vel = vel; give(m, p); m.updateCtrl(0);
+  wake(o, ox, dist); o.st.dif = dif; o.fx = 0; o.fy = -1;
+  return { m, p, o };
 }
+const hold = (m, p) => () => m.userMove(0, p.x, p.y, true);
 
-test('scatto: più veloce della corsa e consuma più energia', () => {
-  // Arrange / Act
-  const corsa = runFor(false, 1), scatto = runFor(true, 1);
-  // Assert
-  assert.ok(scatto.dist > corsa.dist * 1.08, `scatto ${scatto.dist.toFixed(2)} m, corsa ${corsa.dist.toFixed(2)} m`);
-  assert.ok(scatto.used > corsa.used * 2, `energia scatto ${scatto.used}, corsa ${corsa.used}`);
+test('Scatto: fuori dal duello non fa niente', () => {
+  const { m, p } = setup(1, { dist: 20 });
+  run(m, 1 / 60, hold(m, p));
+  assert.equal(m.duelFor(0), false);
+  assert.equal(m.userSprint(0), false);
 });
 
-test('scatto: a energia bassa rende meno', () => {
-  // Arrange / Act
-  const pieno = runFor(true, 1).dist / runFor(false, 1).dist;
-  const stanco = runFor(true, 0.3).dist / runFor(false, 0.3).dist;
-  // Assert
-  assert.ok(pieno > stanco + 0.02, `guadagno a energia piena ${pieno.toFixed(3)}, stanco ${stanco.toFixed(3)}`);
+test('Scatto riuscito: il portatore prosegue dritto, più veloce, oltre il difensore che non lo contrasta', () => {
+  let ok = 0;
+  for (let seed = 1; seed <= 20; seed++) {
+    // Arrange
+    const { m, p, o } = setup(seed);
+    run(m, 1 / 60, hold(m, p));
+    assert.equal(m.duelFor(0), true);
+    let res = null; const orig = m.ev.bind(m); m.ev = (t, d) => { if (t === 'dribble') res = d; return orig(t, d); };
+    // Act
+    assert.equal(m.userSprint(0), true);
+    const ev = run(m, BURST_T, () => {});
+    // Assert
+    assert.ok(res && res.sprint === true, 'evento dribble con sprint');
+    assert.equal(m.duelFor(0), false, 'il duello si chiude');
+    if (!res.ok) continue;
+    ok++;
+    assert.equal(p.burst > 0 || m.time > 0, true);
+    assert.equal(m.ball.owner, p, 'ha ancora il pallone');
+    assert.ok(!ev.some(e => e.type === 'tackle'), 'nessun contrasto');
+    assert.ok(p.y > o.y + 1, `è passato oltre il difensore (${p.y.toFixed(1)} contro ${o.y.toFixed(1)})`);
+    assert.ok(Math.abs(p.x) < 2, `dritto, non di lato (x ${p.x.toFixed(1)})`);
+    assert.ok(p.x * o.x <= 0, 'passa dalla parte opposta al difensore');
+    const mv = m.move[0];
+    assert.ok(!mv || mv.y > BURST_RUN - 2, 'prosegue dritto verso la meta davanti');
+  }
+  assert.ok(ok >= 10, `riusciti ${ok} su 20 (veloce contro difesa scarsa)`);
 });
 
-test('scatto: camminando o da fermi l\'energia si recupera', () => {
-  // Arrange
-  const m = scene({ seed: 4 }), p = m.players[9];
-  wake(p, 0, -30); p.energy = 0.5; give(m, p);
-  // Act: dito sul giocatore (fermo)
-  run(m, 3, mm => mm.userMove(0, p.x, p.y, true));
-  // Assert
-  assert.ok(p.energy > 0.505, `energia ${p.energy}`);
-});
-
-test('scatto: senza flag esplicito scatta solo se il dito è lontano dal giocatore', () => {
-  // Arrange
-  const m = scene({ seed: 5 }), p = m.players[9];
-  wake(p, 0, -30); give(m, p); m.updateCtrl(0);
-  // Act / Assert
-  m.userMove(0, p.x + 2, p.y + 3, true); assert.equal(m.move[0].sprint, false);
-  m.userMove(0, p.x, p.y + 15, true); assert.equal(m.move[0].sprint, true);
-  m.userMove(0, p.x, p.y + 15, false); assert.equal(m.move[0].sprint, false, 'un tocco singolo non è uno scatto');
-});
-
-// strada disegnata lunga davanti (gesto del telefono): prima il punto da raggiungere era sempre a 1-2 m e frenava
-// il portatore (circa 5-6,8 m/s invece di 7,6), così lo scatto non si vedeva (2026-11-20)
-test('scatto lungo una strada disegnata: raggiunge la stessa velocità dello scatto col dito', () => {
-  // Arrange
-  const speed = path => {
-    const m = scene({ seed: 3 }), p = m.players[9];
-    wake(p, 0, -30); p.fx = 0; p.fy = 1; give(m, p); m.updateCtrl(0);
-    if (path) { const pts = []; for (let k = 1; k <= 40; k++) pts.push({ x: 0, y: -30 + k }); m.userPath(0, pts); }
-    run(m, 2.5, mm => { if (!path) mm.userMove(0, p.x, p.y + 20, true, true); });
-    return { v: Math.hypot(p.vx, p.vy), sprint: p.sprint };
+test('Scatto: riesce più spesso col portatore veloce e il difensore scarso', () => {
+  const rate = (vel, dif) => {
+    let ok = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      const { m, p } = setup(seed + 100, { vel, dif });
+      run(m, 1 / 60, hold(m, p));
+      let r = null; const orig = m.ev.bind(m); m.ev = (t, d) => { if (t === 'dribble') r = d; return orig(t, d); };
+      m.userSprint(0); if (r && r.ok) ok++;
+    }
+    return ok;
   };
-  // Act
-  const strada = speed(true), dito = speed(false);
-  // Assert
-  assert.equal(strada.sprint, true, 'con tanta strada davanti scatta');
-  assert.ok(strada.v > dito.v * 0.97, `strada ${strada.v.toFixed(2)} m/s, scatto col dito ${dito.v.toFixed(2)} m/s`);
-});
-
-test('scatto: la differenza con la corsa è chiara (in 2 s almeno il 17% di strada in più)', () => {
-  const corsa = runFor(false, 1), scatto = runFor(true, 1);
-  assert.ok(scatto.dist > corsa.dist * 1.17, `scatto ${scatto.dist.toFixed(2)} m, corsa ${corsa.dist.toFixed(2)} m in 2 s`);
-});
-
-test('animazione: chi scatta usa il clip di scatto, la corsa normale alla stessa velocità no', async () => {
-  const { sprintMix } = await import('../../src/athlete3d.js');
-  assert.ok(sprintMix(7.0, true) > 0.95, `scatto a 7 m/s: ${sprintMix(7.0, true)}`);
-  assert.ok(sprintMix(7.0, false) < 0.05, `corsa a 7 m/s: ${sprintMix(7.0, false)}`);
-  assert.ok(sprintMix(7.2, false) < 0.05, 'corsa al massimo di un giocatore medio (7,2 m/s): ancora clip di corsa');
+  assert.ok(rate(85, 40) > rate(45, 80), 'veloce contro difesa scarsa > lento contro difesa forte');
 });

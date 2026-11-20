@@ -16,6 +16,8 @@
 #   --scena=area|duello|angolo|pausa   mette la partita in una situazione da fotografare
 #   --schermata=PERCORSO.png [--dopo=SEC] [--alla-fine]   schermata dopo SEC secondi veri, o alla fine partita
 #   --esci-dopo=SEC     esce dopo SEC secondi veri
+#   --allenamento       allenamento guidato (tipo "allenamento", scripts/partita/allenamento.gd) invece dell'amichevole;
+#                       con --lezione=N [--prova=K] parte da lì, con --scheda mostra la scheda della lezione N
 #
 # Dall'app (scripts/app.gd): chi crea la scena chiama `avvia(opz)` prima di aggiungerla o entro il primo fotogramma,
 # con opz = {squadra_a, squadra_b, me, tipo: "campionato"|"amichevole"|"allenamento", durata_tempo, seme,
@@ -42,6 +44,9 @@ const BotDito := preload("res://scripts/partita/bot_dito.gd")
 const Minimappa := preload("res://scripts/partita/minimappa.gd")
 const HudPartita := preload("res://scripts/partita/hud_partita.gd")
 const HudFase1 := preload("res://scripts/hud.gd")
+const Allenamento := preload("res://scripts/partita/allenamento.gd")
+const AllenamentoHud := preload("res://scripts/partita/allenamento_hud.gd")
+const BotAllenamento := preload("res://scripts/partita/bot_allenamento.gd")
 const SCENA_VISTA := "res://scenes/vista_partita.tscn"
 
 # velocità del tempo (rallenty), come src/main.js
@@ -114,6 +119,8 @@ func avviata_da_app() -> bool:
 
 
 func tipo() -> String:
+	if _opzioni.has("allenamento"): # prova da riga di comando
+		return "allenamento"
 	return String(_avvio.get("tipo", "amichevole"))
 
 
@@ -144,10 +151,14 @@ func _parti() -> void:
 	audio = AudioPartita.new()
 	add_child(audio)
 	audio.folla(FOLLA_BASE)
-	hud.big(_titolo(), "", 1800)
+	if tipo() == "allenamento":
+		_avvia_allenamento()
+	else:
+		hud.big(_titolo(), "", 1800)
 	stato = "partita"
 	if _opzioni.has("bot"):
-		bot = BotDito.new(int(_opzioni.get("seme", "1")) + 99)
+		var seme_bot := int(_opzioni.get("seme", "1")) + 99
+		bot = BotAllenamento.new(seme_bot) if allenamento != null else BotDito.new(seme_bot)
 	_avvia_prove()
 
 
@@ -164,6 +175,10 @@ func _crea_partita() -> void:
 	var auto_gk: bool = _avvio.get("autoGk", false)
 	m = SimMatchScript.new({"seed": seme, "halfLen": tempo, "human": [me == 0, me == 1],
 		"autoGk": [auto_gk and me == 0, auto_gk and me == 1], "teams": squadre})
+	if tipo() == "allenamento":
+		tempo = Allenamento.HALF_LEN
+		if not avviata_da_app():
+			squadre[1] = Allenamento.squadra_ospite()
 	gesti = Gesti.new()
 	gesti.out = Gesti.ComandiPartita.new(m, me)
 
@@ -198,6 +213,8 @@ func _process(delta: float) -> void:
 	gesti.dim = get_viewport().get_visible_rect().size
 	if paused and bot != null and m.phase == "half":
 		_secondo_tempo() # il dito finto preme "Secondo tempo"
+	elif paused and bot != null and _all_hud != null and _all_hud.scheda_aperta():
+		_all_hud.premi_prova() # ... e "Prova (3 volte)" sulla scheda dell'allenamento
 	if not paused:
 		if bot != null:
 			bot.passo(self, now)
@@ -244,8 +261,12 @@ func _passi_motore(dt: float) -> void:
 	ts += (target - ts) * minf(1.0, dt * TEMPO_K)
 	var sdt := dt * ts * _velocita
 	var n := maxi(1, ceili(sdt / PASSO_MAX))
+	if allenamento != null:
+		allenamento.before()
 	for i in n:
 		m.step(sdt / n)
+	if allenamento != null:
+		_allenamento_dopo(sdt)
 	hud.rallenty(ts < RALLENTY_SOTTO)
 	audio.folla(FOLLA_BASE, AudioPartita.eccitazione(m.ball.y))
 
@@ -264,11 +285,13 @@ func _aggiorna_hud() -> void:
 	# visuale girata col dito: frecce ai lati nel rallenty, la prima volta anche la scritta
 	if gesti.cam_used:
 		_cam_tip_visto = true
-	var on: bool = not paused and not gesti.drawing and VD.user_cam_on(m, me)
+	var on: bool = allenamento == null and not paused and not gesti.drawing and VD.user_cam_on(m, me)
 	hud.aiuto_visuale(("arr" if _cam_tip_visto else "tip") if on else "")
 	var h: String = "duel" if m.duelFor(me) else ("zone" if m.inZone(me) else m.hint(me))
 	var txt: String = RHINT.get(m.restart.type, "") if h == "restart" else HINTS.get(h, "")
 	var caldo := h == "dive" or (h == "restart" and m.restart.type == "penalty")
+	if allenamento != null:
+		txt = "" # in allenamento parla il riquadro in alto
 	hud.suggerimento(txt, caldo)
 
 
@@ -413,7 +436,12 @@ func _mostra_pausa() -> void:
 	gesti.cancel()
 	hud.mostra_dribbling(false)
 	hud.aiuto_visuale("")
-	hud.mostra_pausa("Abbandona (sconfitta 0–3)" if avviata_da_app() and tipo() == "campionato" else "Esci dall'amichevole")
+	var esci := "Esci dall'amichevole"
+	if allenamento != null:
+		esci = "Esci dall'allenamento"
+	elif avviata_da_app() and tipo() == "campionato":
+		esci = "Abbandona (sconfitta 0–3)"
+	hud.mostra_pausa(esci)
 
 
 func _riprendi() -> void:
@@ -435,6 +463,9 @@ func _secondo_tempo() -> void:
 
 
 func _finisci(forfait: bool) -> void:
+	if allenamento != null:
+		_fine_allenamento(forfait)
+		return
 	stato = "fine"
 	abbandonata = forfait
 	gesti.enabled = false
@@ -487,6 +518,8 @@ func riassunto() -> String:
 		m.teams[0].short, m.score[0], m.score[1], m.teams[1].short, m.time, "abbandonata" if abbandonata else ("finita" if stato == "fine" else "in corso")]
 	if bot != null:
 		testo += "\n" + bot.riassunto()
+	if allenamento != null:
+		testo += "\n" + _riassunto_allenamento()
 	return testo
 
 
@@ -643,3 +676,90 @@ func _sposta(p: R.Player, x: float, y: float) -> void:
 	p.fy = 1.0 if p.team == 0 else -1.0
 	p.state = "play"
 	p.stun = 0.0
+
+
+# ---------------------------------------------------------------- allenamento guidato (tipo "allenamento")
+# Come startMatch('tutorial') di src/main.js: partita senza fine contro la squadra "Allenamento", la logica in
+# allenamento.gd (before/after attorno ai passi del motore), il riquadro e le schede in allenamento_hud.gd.
+var allenamento: Allenamento = null
+var _all_hud: AllenamentoHud = null
+
+
+func _avvia_allenamento() -> void:
+	_all_hud = AllenamentoHud.new()
+	add_child(_all_hud)
+	_all_hud.scheda.connect(_scheda_allenamento)
+	_all_hud.prova.connect(_prova_allenamento)
+	_all_hud.salta.connect(func() -> void: _finisci(true))
+	_all_hud.finito.connect(func() -> void: hud.big("Allenamento finito!", "g", 2400, "Ora sei pronto per il campionato"))
+	# creato per ultimo: la sua prima scheda ferma la partita
+	allenamento = Allenamento.new(m, _all_hud)
+	_vai_alla_lezione.call_deferred()
+
+
+# scheda aperta: partita ferma (come showLesson del web); chiusa: si riprende con _prova_allenamento
+func _scheda_allenamento(aperta: bool) -> void:
+	if aperta:
+		paused = true
+		gesti.cancel()
+		hud.mostra_dribbling(false)
+		hud.aiuto_visuale("")
+
+
+func _prova_allenamento() -> void:
+	paused = false
+	gesti.cancel()
+	allenamento.go()
+
+
+# dopo i passi del motore, prima che _eventi() consumi m.events
+func _allenamento_dopo(sdt: float) -> void:
+	allenamento.after(sdt)
+	if allenamento.finished and _fine_ms == 0 and stato == "partita":
+		_fine_ms = Time.get_ticks_msec() + 2600
+
+
+# fine (tutte le lezioni) o "Salta l'allenamento" / "Esci dall'allenamento". Nel web si torna al menu: qui, se c'è
+# il segnale `finita` (carriera, fase 3) lo si manda; senza, si chiude (prove) o si ricomincia.
+func _fine_allenamento(forfait: bool) -> void:
+	stato = "fine"
+	gesti.enabled = false
+	gesti.cancel()
+	audio.folla(0.0)
+	hud.mostra_dribbling(false)
+	hud.aiuto_visuale("")
+	hud.rallenty(false)
+	hud.suggerimento("", false)
+	hud.nascondi_overlay()
+	_all_hud.chiudi()
+	var esito := {"tipo": "allenamento", "completato": allenamento.finished, "abbandonata": forfait}
+	if _opzioni.has("esci-a-fine"):
+		print(riassunto())
+		_esci()
+	elif has_signal("finita"):
+		emit_signal("finita", esito)
+	else:
+		_nuova_partita()
+
+
+func _riassunto_allenamento() -> String:
+	var tot := 0
+	for v: int in allenamento.riuscite.values():
+		tot += v
+	return "allenamento: %s · lezione %d di %d · prove riuscite %d · per lezione %s" % [
+		"finito" if allenamento.finished else "in corso", mini(allenamento.li + 1, allenamento.lessons.size()),
+		allenamento.lessons.size(), tot, allenamento.riuscite]
+
+
+# prove: --lezione=N [--prova=K] parte da quella prova; con --scheda resta sulla scheda della lezione N
+func _vai_alla_lezione() -> void:
+	if not _opzioni.has("lezione"):
+		return
+	var n := clampi(int(_opzioni["lezione"]), 1, allenamento.lessons.size())
+	while allenamento.li < n - 1:
+		allenamento.next_lesson()
+	if _opzioni.has("scheda"):
+		return
+	_all_hud.premi_prova()
+	allenamento.k = clampi(int(_opzioni.get("prova", "1")), 1, Allenamento.REPS) - 1
+	allenamento.reset()

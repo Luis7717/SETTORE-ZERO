@@ -119,7 +119,7 @@ const HINTS = {
   defend: 'Difende la CPU: disegna una linea da un tuo giocatore per guidarlo tu',
   loose: 'Palla libera: disegna una linea da un tuo giocatore per andarci',
   dive: 'PARA! Tira una linea dal portiere al punto della porta',
-  duel: 'Disegna fino a un compagno per passare · oppure tocca Dribbling',
+  duel: 'Disegna fino a un compagno per passare · oppure tocca Scatto',
   zone: 'Area di tiro: linea in porta = tiro · fino a un compagno = passaggio',
 };
 const RHINT = { kickoff: 'Calcio d\'inizio: disegna il passaggio', throw: 'Rimessa: disegna il passaggio', corner: 'Calcio d\'angolo: disegna il cross', goalkick: 'Rinvio: disegna il passaggio', freekick: 'Punizione: disegna il passaggio o il tiro', penalty: 'RIGORE: disegna il tiro in porta', gk: 'Rilancio del portiere: disegna il passaggio' };
@@ -135,7 +135,8 @@ function events(m) {
       case 'advantage': big('Vantaggio!', '', 1100); break;
       case 'advantage_back': sfx.whistle(); big('Si torna alla punizione', '', 1300); break;
       case 'tackle': case 'block': sfx.kick(9); break;
-      case 'dribble': { const T = view.trick(e.p); if (e.p.team === 0) big(T.name + (e.ok ? '!' : ''), e.ok ? 'g' : '', 1000); break; }
+      case 'dribble': if (e.sprint) { sfx.kick(6); if (e.p.team === 0) big(e.ok ? 'Scatto!' : 'Fermato!', e.ok ? 'g' : '', 900); break; }
+      { const T = view.trick(e.p); if (e.p.team === 0) big(T.name + (e.ok ? '!' : ''), e.ok ? 'g' : '', 1000); break; }
       case 'goal':
         if (e.team === 0) { sfx.goal(); big('GOL!', 'g', 2600, (e.scorer ? e.scorer.name : 'Autogol') + ' · ' + e.minute + '\''); }
         else { sfx.ooh(); big('Gol subito', 'b', 2400, (e.scorer ? e.scorer.name : 'Autogol') + ' · ' + e.minute + '\''); }
@@ -208,7 +209,7 @@ ov.addEventListener('click', e => {
   } else if (a === 'back') { if (m.phase === 'half') showHalf(); else showPause(); }
 });
 $('pause').addEventListener('click', () => { if (G.state === 'match' && !G.paused) showPause(); });
-$('drib').addEventListener('click', () => { if (G.state === 'match' && !G.paused && G.match.userDribble) G.match.userDribble(0); });
+$('drib').addEventListener('click', () => { if (G.state === 'match' && !G.paused && G.match.userSprint) G.match.userSprint(0); }); // tasto Scatto (era Dribbling)
 document.addEventListener('visibilitychange', () => { if (document.hidden && G.state === 'match' && !G.paused && G.match.phase !== 'half') showPause(); });
 
 // ---------------------------------------------------------------- radar

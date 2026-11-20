@@ -1,5 +1,5 @@
-# I sei giochetti del dribbling come movimenti calcolati (porting di src/moves/tricks.js, solo la versione "partita")
-# e la loro scelta (src/tricks.js). Il pallone lo muove il piede (il punto del piede è sul pallone quando lo spinge),
+# I sei giochetti del dribbling come movimenti calcolati (porting di src/moves/tricks.js: versione "partita" e versione
+# "menu", quella del campione sullo sfondo del menu) e la loro scelta (src/tricks.js). Il pallone lo muove il piede (il punto del piede è sul pallone quando lo spinge),
 # a terra rotola, in aria vola con la gravità vera. Solo grafica: se il dribbling riesce lo decide il motore.
 # Riferimento: x = sinistra del giocatore, y = su, z = avanti, metri del modello. Lato 1 = col destro (per −1 si
 # specchia la posa con Mossa.mirror_frame).
@@ -7,6 +7,7 @@ extends RefCounted
 
 const Mossa := preload("mossa.gd")
 const Corpo := preload("corpo.gd")
+const Palleggi := preload("palleggi.gd")
 
 # in ordine di bellezza (src/tricks.js)
 const TRICKS := [
@@ -32,8 +33,12 @@ const MATCH_B := Vector3(0, 0.21 / MATCH_SCALE, 0.6 / MATCH_SCALE)
 const PIVOT_OUT := 0.4
 const ARMS_WIDE := Vector3(0.42, -0.3, 0.05)
 const ARMS_REST := Vector3(0.2, -0.5, 0.05)
-const SOMBRERO_H := 1.6
-const RAINBOW_H := 2.3
+const SOMBRERO_H := {"menu": 1.9, "match": 1.6}   # punto più alto del volo (m)
+const RAINBOW_H := {"menu": 2.3, "match": 2.3}
+# opzioni (opt di src/moves/tricks.js): R raggio del pallone, B pallone fermo all'inizio e alla fine, k lentezza dei
+# gesti (i voli no: quelli li decide la gravità), match = in partita (finisce quando il pallone torna giù, niente stop)
+const MENU_OPT := {"R": BALL_R, "B": Vector3(0, BALL_R, 0.3), "k": 1.6, "match": false}
+const MATCH_OPT := {"R": MATCH_R, "B": MATCH_B, "k": 1.0, "match": true}
 const Y := Vector3(0, 1, 0)
 
 static var _cache := {}
@@ -50,19 +55,20 @@ static func choose_trick(dri: float, r: float) -> Dictionary:
 	return TRICKS[maxi(0, best_trick(dri) - down)]
 
 
-## movimento del giochetto `id` (in cache: è sempre lo stesso)
-static func trick_move(id: String) -> Mossa:
-	if not _cache.has(id):
+## movimento del giochetto `id` (in cache: è sempre lo stesso per le stesse opzioni); opt = MATCH_OPT o MENU_OPT
+static func trick_move(id: String, opt: Dictionary = MATCH_OPT) -> Mossa:
+	var key := id + (":partita" if opt.match else ":menu")
+	if not _cache.has(key):
 		var mv: Mossa
 		match id:
-			"doppiopasso": mv = _doppiopasso()
-			"elastico": mv = _elastico()
-			"veronica": mv = _veronica()
-			"sombrero": mv = _sombrero()
-			"arcobaleno": mv = _arcobaleno()
-			_: mv = _finta()
-		_cache[id] = mv
-	return _cache[id]
+			"doppiopasso": mv = _doppiopasso(opt)
+			"elastico": mv = _elastico(opt)
+			"veronica": mv = _veronica(opt)
+			"sombrero": mv = _sombrero(opt)
+			"arcobaleno": mv = _arcobaleno(opt)
+			_: mv = _finta(opt)
+		_cache[key] = mv
+	return _cache[key]
 
 
 static func duration(id: String) -> float:
@@ -95,8 +101,8 @@ static func _plant(s: String) -> Vector2:
 	return STANCE[s]
 
 
-static func _base() -> Mossa:
-	var m := Mossa.new(MATCH_R)
+static func _base(opt: Dictionary) -> Mossa:
+	var m := Mossa.new(float(opt.R))
 	m.leg("l", {"t": 0.0, "plant": STANCE.l}).leg("r", {"t": 0.0, "plant": STANCE.r})
 	m.pelvis(0.0, PELVIS).bend(0.0, Vector3(0.16, 0, 0)).arm("l", 0.0, ARMS_REST).arm("r", 0.0, ARMS_REST)
 	return m
@@ -124,10 +130,10 @@ static func _finish(m: Mossa, tt: float, yaw: float = 0.0) -> Mossa:
 
 
 # ---------------------------------------------------------------- finta di corpo: peso a sinistra, poi via a destra
-static func _finta() -> Mossa:
-	var m := _base()
-	var k := 1.0
-	var b := MATCH_B
+static func _finta(opt: Dictionary) -> Mossa:
+	var m := _base(opt)
+	var k: float = opt.k
+	var b: Vector3 = opt.B
 	var tt := 0.55 * k
 	m.ball_rest(0.0, tt, b)
 	m.leg("l", {"t": 0.06 * k, "plant": STANCE.l}).leg("l", {"t": 0.15 * k, "ankle": Vector3(0.24, 0.16, 0.06), "fq": Mossa.foot_q(-0.2, 0.2)})
@@ -145,11 +151,11 @@ static func _finta() -> Mossa:
 
 
 # ---------------------------------------------------------------- doppio passo: il destro gira sopra il pallone fermo
-static func _doppiopasso() -> Mossa:
-	var m := _base()
-	var k := 1.0
-	var b := MATCH_B
-	var r := MATCH_R
+static func _doppiopasso(opt: Dictionary) -> Mossa:
+	var m := _base(opt)
+	var k: float = opt.k
+	var b: Vector3 = opt.B
+	var r: float = opt.R
 	var tt := 0.85 * k
 	var over := 2.0 * r + 0.15
 	m.ball_rest(0.0, tt, b)
@@ -175,11 +181,11 @@ static func _step_dp(m: Mossa, s: String, t0: float, k: float, b: Vector3, r: fl
 
 
 # ---------------------------------------------------------------- elastico: esterno del destro fuori, poi interno dentro
-static func _elastico() -> Mossa:
-	var m := _base()
-	var k := 1.0
-	var b := MATCH_B
-	var r := MATCH_R
+static func _elastico(opt: Dictionary) -> Mossa:
+	var m := _base(opt)
+	var k: float = opt.k
+	var b: Vector3 = opt.B
+	var r: float = opt.R
 	var tt := 0.75 * k
 	var out := 0.18 + (r - BALL_R)
 	var fq_out := Mossa.foot_q(0.35, 0.05)
@@ -224,11 +230,11 @@ static func _rot(p: Vector3, kk: Vector3, a: float) -> Vector3:
 
 
 # ---------------------------------------------------------------- veronica: suola sul pallone e giro, due mezzi giri
-static func _veronica() -> Mossa:
-	var m := _base()
-	var k := 1.0
-	var b := MATCH_B
-	var r := MATCH_R
+static func _veronica(opt: Dictionary) -> Mossa:
+	var m := _base(opt)
+	var k: float = opt.k
+	var b: Vector3 = opt.B
+	var r: float = opt.R
 	var tt := 1.0 * k
 	var t_on := 0.12 * k
 	var t_mid := 0.42 * k
@@ -282,12 +288,12 @@ static func _veronica() -> Mossa:
 
 
 # ---------------------------------------------------------------- sombrero: suola indietro, punta sotto, pallone alto
-static func _sombrero() -> Mossa:
-	var m := _base()
-	var k := 1.0
-	var b := MATCH_B
-	var r := MATCH_R
-	var h := SOMBRERO_H
+static func _sombrero(opt: Dictionary) -> Mossa:
+	var m := _base(opt)
+	var k: float = opt.k
+	var b: Vector3 = opt.B
+	var r: float = opt.R
+	var h: float = SOMBRERO_H.match if opt.match else SOMBRERO_H.menu
 	var t_on := 0.12 * k
 	var t_rel := 0.26 * k
 	var t_toe := 0.36 * k
@@ -312,20 +318,28 @@ static func _sombrero() -> Mossa:
 	m.active("r", 0.02 * k, t_up + 0.1 * k)
 	m.pelvis(t_on, Vector3(0.06, 0.92, -0.04), 0, 0.05, 0.04).pelvis(t_up, Vector3(0.04, 0.9, 0.0), 0, -0.02, 0.04)
 	m.arm("l", t_up, ARMS_WIDE).arm("r", t_up, ARMS_WIDE)
-	# in partita il pallone ricade davanti (dove il motore lo porta) e lì finisce il giochetto
-	var t_l := t_up + Mossa.flight_time(rel.y, h, r)
-	m.ball_fly(t_up, t_l, rel, b, Vector3(-8, 0, 0))
-	m.leg("r", {"t": t_l, "plant": STANCE.r})
-	return _finish(m, t_l)
+	if opt.match: # in partita il pallone ricade davanti (dove il motore lo porta) e lì finisce il giochetto
+		var t_l := t_up + Mossa.flight_time(rel.y, h, r)
+		m.ball_fly(t_up, t_l, rel, b, Vector3(-8, 0, 0))
+		m.leg("r", {"t": t_l, "plant": STANCE.r})
+		return _finish(m, t_l)
+	# nel menu ricade, rimbalza e il destro lo ferma con la suola
+	var plants := Palleggi.start_plants()
+	plants.r.append([t_up + 0.3 * k, STANCE.r])
+	m.leg("r", {"t": t_up + 0.3 * k, "plant": STANCE.r})
+	m.pelvis(t_up + 0.5, PELVIS + Vector3(0, 0.01, 0)).bend(t_up + 0.4, Vector3.ZERO)
+	var t_end := Palleggi.land_stop(m, t_up, rel, h, b, plants, "l")
+	m.pelvis(t_end, PELVIS).arm("l", t_end, ARMS_REST).arm("r", t_end, ARMS_REST)
+	return _finish(m, t_end)
 
 
 # ---------------------------------------------------------------- arcobaleno: tacco sinistro che lancia il pallone sopra la testa
-static func _arcobaleno() -> Mossa:
-	var m := _base()
-	var k := 1.0
-	var b := MATCH_B
-	var r := MATCH_R
-	var h := RAINBOW_H
+static func _arcobaleno(opt: Dictionary) -> Mossa:
+	var m := _base(opt)
+	var k: float = opt.k
+	var b: Vector3 = opt.B
+	var r: float = opt.R
+	var h: float = RAINBOW_H.match if opt.match else RAINBOW_H.menu
 	var t_on := 0.12 * k
 	var t_a := 0.28 * k
 	var t_b := 0.4 * k
@@ -370,6 +384,13 @@ static func _arcobaleno() -> Mossa:
 	m.bend(t_toe, Vector3(0.25, 0, 0)).bend(t_flick, Vector3(0.4, -0.05, 0)).bend(t_flick + 0.45, Vector3(-0.12, 0, 0))
 	m.pelvis(t_flick + 0.6, Vector3(-0.01, 0.91, -0.09), 0, -0.08, 0)
 	m.arm("l", t_flick, Vector3(0.45, -0.2, 0.3)).arm("r", t_flick, Vector3(0.45, -0.2, 0.3))
-	var t_l := t_flick + Mossa.flight_time(heel_ball.y, h, r)
-	m.ball_fly(t_flick, t_l, heel_ball, b, Vector3(-10, 0, 0))
-	return _finish(m, t_l)
+	if opt.match:
+		var t_l := t_flick + Mossa.flight_time(heel_ball.y, h, r)
+		m.ball_fly(t_flick, t_l, heel_ball, b, Vector3(-10, 0, 0))
+		return _finish(m, t_l)
+	var plants := Palleggi.start_plants()
+	plants.l.append([t_flick + 0.18 * k, Vector2(sl.x, sl.y + 0.12)])
+	plants.r.append([t_lift + 0.12 * k, STANCE.r])
+	var t_end := Palleggi.land_stop(m, t_flick, heel_ball, h, b, plants, "l")
+	m.pelvis(t_end, PELVIS)
+	return _finish(m, t_end)

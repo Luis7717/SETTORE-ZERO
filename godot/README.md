@@ -75,10 +75,12 @@ interfaccia dei menu, sfondo del menu e allenamento guidato, grafica.
 | `scripts/partita/telecamera_partita.gd` | telecamera come `View.update` del web: normale, vicino alla porta, difesa, duello, rallenty largo, angolo, parata, girata |
 | `scripts/partita/camfit.gd`, `camuser.gd` | inquadrature calcolate e visuale girata col dito (conti puri, provati senza schermo) |
 | `scripts/partita/figura.gd` | un giocatore in partita: clip fermo/corsa/scatto/salto, pose (calcio, testa, tuffo, scivolata, esultanza), giochetti con la IK |
-| `scripts/partita/mosse/` | movimenti calcolati dei giochetti (`mossa.gd`, `corpo.gd`, `giochetti.gd`) e IK a due ossa (`ik.gd`) |
+| `scripts/partita/mosse/` | movimenti calcolati dei giochetti (`mossa.gd`, `corpo.gd`, `giochetti.gd`), palleggi e tiro del menu (`palleggi.gd`, `tiro.gd`) e IK a due ossa (`ik.gd`) |
 | `scripts/partita/nastri.gd`, `texture_vista.gd` | linee disegnate a nastro, linee di difesa, anteprima, fuorigioco; texture fatte a codice |
 | `shaders/rete.gdshader`, `bandierina.gdshader` | rete che si gonfia sul gol, bandierine che sventolano |
 | `scenes/prova_vista.tscn` | prova: computer contro computer disegnato dalla vista, scene per le schermate e misure |
+| `scenes/menu/sfondo_menu.tscn` | sfondo 3D del menu: campione che palleggia, fa giochetti e tira (`scripts/menu/sfondo_menu.gd`, `routine_menu.gd`) |
+| `scripts/partita/allenamento.gd` | allenamento guidato (logica pura); `allenamento_hud.gd` riquadro e schede; `bot_allenamento.gd` dito finto |
 
 ## Coordinate
 
@@ -165,11 +167,58 @@ $G --path godot -- --seme=4 --bot --veloce=12 --tempo=40 --esci-a-fine --alla-fi
 
 Opzioni di `gioco.gd`: `--seme=N`, `--tempo=SEC` (un tempo), `--vista-finta`, `--veloce=K` (tempo fisso K/60 s a
 fotogramma), `--bot`, `--esci-a-fine`, `--scena=area|duello|disegno|angolo|pausa`, `--schermata=… [--dopo=SEC |
---alla-fine]`, `--esci-dopo=SEC` (stampa "FPS medi", come vuole la build su GitHub). Senza schermo i suoni sono
+--alla-fine]`, `--allenamento [--lezione=N --prova=K --scheda]`, `--esci-dopo=SEC` (stampa "FPS medi", come vuole la build su GitHub). Senza schermo i suoni sono
 spenti (non si sentono e col driver audio finto resterebbero in memoria all'uscita).
 
 Non ancora fatti (fasi dopo): menu e carriera (la partita parte subito con le squadre di prova), cambi in pausa,
-allenamento guidato, salvataggio della scritta "Trascina il campo" (si ricorda solo finché l'app è aperta), musica.
+salvataggio della scritta "Trascina il campo" (si ricorda solo finché l'app è aperta), musica.
+
+## Sfondo del menu e allenamento guidato (fase 3)
+
+**Sfondo 3D del menu** (`scenes/menu/sfondo_menu.tscn`, `scripts/menu/sfondo_menu.gd`): porting di `src/menu-bg.js` e
+`src/menu-routine.js`. Un campione in divisa palleggia (suola, collo, coscia, testa), fa i giochetti a turno (finta,
+doppio passo, elastico, veronica, sombrero, arcobaleno), corre e tira in porta, poi rientra un pallone nuovo; il ciclo
+intero dura 114 s ed è identico al web (stessi movimenti calcolati: `mosse/palleggi.gd` = `src/moves/juggle.js`,
+`mosse/tiro.gd` = `shot.js`, `mosse/giochetti.gd` ora fa sia la versione del menu sia quella della partita,
+`scripts/menu/routine_menu.gd` = `menu-routine.js`). Dietro: campo e stadio della partita, luce calda del menu,
+telecamera che gira piano attorno (fov 30, 7,2 m come il web). Un solo giocatore con la stessa `figura.gd` della
+partita: leggero (sul PC ~1500 FPS senza vsync, una posa costa 0,06 ms).
+
+Contratto per il menu (altro lavoro): istanziare `res://scenes/menu/sfondo_menu.tscn` dietro i tasti.
+
+| Cosa | A cosa serve |
+|---|---|
+| `attivo = false` (o `visible = false`) | ferma tutto: niente `_process`, telecamera non corrente, cielo e sole staccati. Va messo quando parte la partita, sennò la scena resta a disegnare |
+| `imposta_giocatore(kit, aspetto)` | divisa del campione (`kit` come nella carriera: `{shirt, shorts, socks}` in colori 0xRRGGBB) e aspetto (`skin`, `hair`...) |
+| `hold`, `t` | tempo della routine (per le prove); `istanti_sequenza()` = istanti significativi |
+
+Da solo (`$G --path godot res://scenes/menu/sfondo_menu.tscn`) si apre come scena e accetta `--schermata=… --dopo=SEC`,
+`--tempo=SEC` (istante della routine), `--sequenza=cartella` (14 schermate: palleggi, giochetti, corsa, tiro),
+`--vicino`, `--senza-vsync --esci-dopo=SEC` (stampa "FPS medi").
+
+**Allenamento guidato** (`scripts/partita/allenamento.gd`, porting di `src/tutorial.js`): sei lezioni (Passaggio,
+Tiro, Corsa e scatto, Recupera palla, Dribbling, Portiere), per ognuna una scheda di spiegazione a partita ferma
+("Prova (3 volte)" / "Salta l'allenamento") e poi tre prove in situazioni diverse; avanza quando il motore manda
+l'evento giusto, rimette a posto la prova se il pallone esce, se lo prendono loro o dopo 16 s. Stessi testi e stesse
+costanti del web, compresa la correzione del dribbling (ogni prova azzera le attese di duello, dribbling e contrasto,
+e il difensore della lezione ha difesa 15). La logica è pura (gira nei test); `allenamento_hud.gd` è il riquadro in
+alto (lezione, prova k di 3, testo; verde col "Bravo!") e la scheda; `bot_allenamento.gd` è il dito finto che supera
+tutte le lezioni coi gesti veri.
+
+In `gioco.gd` l'allenamento è `tipo == "allenamento"` (per ora si sceglie con `--allenamento`): avversario "Allenamento"
+(livello 40), tempo senza fine, niente suggerimenti in basso né aiuto della visuale, `before()` prima dei passi del
+motore e `after(dt)` dopo, chiusura 2,6 s dopo l'ultima lezione con "Allenamento finito!". Alla fine (o "Salta" /
+"Esci dall'allenamento" in pausa) manda `finita({tipo: "allenamento", completato, abbandonata})` se la scena ha quel
+segnale (carriera), sennò ricomincia.
+
+```sh
+$G --headless --path godot -s res://tests/run_tests.gd -- allenamento    # 7 test (~7 s)
+$G --headless --path godot -s res://tests/run_tests.gd -- sfondo_menu    # 6 test, uguale al JS (fixture menu.json)
+$G --headless --path godot -- --allenamento --bot --veloce=4 --esci-a-fine --seme=5    # tutte le lezioni col dito finto (~30 s)
+$G --path godot -- --allenamento --lezione=1 --scheda --schermata=shots/scheda.png --dopo=1.5
+$G --path godot -- --allenamento --bot --lezione=4 --prova=2 --schermata=shots/recupera.png --dopo=2.2
+node test/export-menu.mjs        # rigenera tests/fixtures/menu.json dal JS
+```
 
 ## Carriera e flusso dell'app (fase 3)
 

@@ -1,4 +1,4 @@
-// Valori del web per i menu Godot: tests/fixtures/menu.json (visi, stemmi, semi, disposizione delle carte,
+// Valori del web per i menu Godot: tests/fixtures/menu_ui.json (visi, stemmi, semi, disposizione delle carte,
 // nomi brevi: tests/test_menu_*.gd) e tests/fixtures/carriera_menu.json (carriera di prova per le schermate).
 // Uso (dalla cartella del repo):  node godot/tools/dati_menu_web.mjs
 import { faceSvg } from '../../src/face2d.js';
@@ -22,7 +22,7 @@ const players = [{ id: 1, name: 'L. Ferrante' }, { id: 7, name: 'M. Rossi' }, { 
 const layouts = [];
 for (const f of Object.keys(FORMATIONS)) for (const [W, H] of [[358, 420], [358, 300], [300, 200], [390, 520]]) layouts.push({ f, W, H, L: fieldLayout(FORMATIONS[f], W, H) });
 const names = ['L. Ferrante', 'Ferrante', 'M. De la Fuente Gomez', 'Abc', 'X. Lungonomeassai', '', 'A. B. Carlo Magno'].map(n => [n, shortName(n)]);
-writeFileSync(out('menu.json'), JSON.stringify({ faces, crests, seeds, players, layouts, names }));
+writeFileSync(out('menu_ui.json'), JSON.stringify({ faces, crests, seeds, players, layouts, names }));
 
 // carriera di prova: seme fisso, campione, 3 giornate giocate
 let t = 1700000000000; Date.now = () => t;
@@ -34,4 +34,4 @@ c.addChampion({ name: 'L. Mancini', pos: 'A', look: { skin: 2, hair: 4, hairColo
 const res = [];
 for (const [x, y] of [[2, 1], [0, 0], [1, 3]]) res.push(c.finishMatch(x, y, [{ team: 0, name: c.s.squad[0].name, minute: 23, scorer: { id: c.s.squad[0].id } }]));
 writeFileSync(out('carriera_menu.json'), JSON.stringify({ s: c.s, lastRes: res[res.length - 1] }, null, 1));
-console.log('ok: menu.json, carriera_menu.json');
+console.log('ok: menu_ui.json, carriera_menu.json');
