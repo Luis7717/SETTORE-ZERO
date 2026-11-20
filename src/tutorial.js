@@ -55,19 +55,8 @@ export const LESSONS = [
     },
     check(e) { return e.type === 'tackle' && e.p.team === 0; },
     poll(m) { return !!(m.ball.owner && m.ball.owner.team === 0); },
-    freeze: 'all-but-duel',
-  },
-  {
-    title: 'Scivolata',
-    short: "Scorri veloce verso la palla dell'avversario.",
-    text: '<b>Scorri veloce</b> verso l\'avversario per entrare in scivolata. Se prendi la palla è tua; se prendi prima l\'uomo è fallo, da dietro è cartellino.',
-    setup(m, T, k) {
-      const o = m.players[20]; T.put(m, o, [0, 10, -10][k], [4, 0, 8][k]); o.fx = 0; o.fy = -1; m.ball.owner = o; m.ball.kick = null; m.att = 1;
-      const me = m.players[7]; T.put(m, me, o.x + [3, -3, 2][k], o.y - 4); m.ctrl[0] = me;
-      return { o };
-    },
-    check(e) { return e.type === 'tackle' && e.p.team === 0 && !!e.slide; },
-    freeze: 'all-but-duel',
+    // l'avversario resta fermo col pallone (prima lo perdeva da solo passando a vuoto); i tuoi si muovono solo con la linea
+    freeze: 'opp',
   },
   {
     title: 'Dribbling',

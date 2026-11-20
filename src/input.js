@@ -1,12 +1,11 @@
 // Comandi a un dito. Traduce i tocchi in ordini per la squadra `team`.
 import { HW, HL, GW, GH, SPRINT_DIST } from './sim.js';
 
-const SLIDE_FLICK_MS = 250; // dal giocatore controllato: tratto più rapido di così = scivolata, altrimenti linea
 const NO_OFFSIDE = ['throw', 'goalkick', 'corner']; // ripartenze senza fuorigioco
 const PASS_SNAP = 5; // la linea che finisce entro tanti metri da un compagno è un passaggio a lui (m)
 
 export class Input {
-  // out: { kick(spec), move(x,y,held,sprint), stop(), slide(dx,dy), dive(dx,th), sw(playerIndex), path(pts), run(playerIndex, pts) }
+  // out: { kick(spec), move(x,y,held,sprint), stop(), dive(dx,th), sw(playerIndex), path(pts), run(playerIndex, pts) }
   // (se `move` ignora `sprint` il motore lo ricalcola uguale)
   constructor(el, view, out) {
     this.el = el; this.view = view; this.out = out; this.match = null; this.team = 0; this.enabled = false;
@@ -180,12 +179,6 @@ export class Input {
     if (mode === 'dive') { if (dist > 22) this.doDive(); else this.view.clearPath(); return; }
     if (mode === 'dpath') {
       const r = this.runner, pts = this.pts; this.runner = null; this.pts = []; this.view.clearPath();
-      // scorrimento veloce dal giocatore controllato = scivolata (come prima)
-      // (un tratto rapido e corto; una linea più lenta o lunga è una strada da correre)
-      if (r === m.ctrl[T] && dt < SLIDE_FLICK_MS && dist > Math.max(38, this.view.w * 0.1) && dist < this.view.w * 0.45) {
-        const a = this.view.screenToGround(this.sx, this.sy), c = this.view.screenToGround(this.x, this.y);
-        if (a && c) { this.out.slide(c.x - a.x, c.y - a.y); return; }
-      }
       let len = 0; for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i].sx - pts[i - 1].sx, pts[i].sy - pts[i - 1].sy);
       if (pts.length >= 2 && len > 28) { this.out.run(r.i, pts.slice(1).map(q => ({ x: q.x, y: q.y }))); return; }
       if (dist < 16 && r !== m.ctrl[T]) this.out.sw(r.i); // tocco = passa a comandare quel giocatore
@@ -201,10 +194,6 @@ export class Input {
         else this.out.sw(mate.i);
       } else { const g = this.view.screenToGround(this.x, this.y); if (g) this.out.move(g.x, g.y, false); }
       return;
-    }
-    if ((hint === 'defend' || hint === 'loose') && dt < 300 && dist > Math.max(38, this.view.w * 0.1)) {
-      const a = this.view.screenToGround(this.sx, this.sy), c = this.view.screenToGround(this.x, this.y);
-      if (a && c) { this.out.slide(c.x - a.x, c.y - a.y); return; }
     }
     this.out.stop();
   }

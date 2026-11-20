@@ -17,6 +17,7 @@ const ADV_MIN_Y = -5; // ... e solo da qui in avanti (m nel verso d'attacco, 0 =
 const SPEED_TIRED = 0.86; // a energia 0 la velocità massima scende a questa frazione (l'energia cala più piano con più fisico = resistenza)
 const PATH_STEP = 1.2;   // distanza minima tra due punti della strada disegnata (m)
 const PATH_REACH = 1.3;  // punto raggiunto quando il portatore è più vicino di così (m)
+const RUN_END_REACH = 0.4;  // linea di difesa: l'ultimo punto va raggiunto davvero (così una linea fin sull'avversario arriva al contrasto) (m)
 const PATH_SPRINT = 6;   // scatta finché davanti resta più strada di così (m)
 const PATH_TTL = 20;     // durata massima di una strada disegnata (s)
 export const SPRINT_DIST = 6; // dito più lontano di così dal giocatore controllato (m) = scatto
@@ -550,7 +551,7 @@ export class Match {
     r.ttl -= this.dtT;
     while (r.i < r.path.length - 1 && hyp(r.path[r.i].x - p.x, r.path[r.i].y - p.y) < PATH_REACH) r.i++;
     const q = r.path[r.i];
-    if (r.ttl <= 0 || (r.i === r.path.length - 1 && hyp(q.x - p.x, q.y - p.y) < PATH_REACH)) { this.runs[p.team] = this.runs[p.team].filter(z => z !== r); return false; }
+    if (r.ttl <= 0 || (r.i === r.path.length - 1 && hyp(q.x - p.x, q.y - p.y) < RUN_END_REACH)) { this.runs[p.team] = this.runs[p.team].filter(z => z !== r); return false; }
     p.tx = q.x; p.ty = q.y;
     let left = hyp(q.x - p.x, q.y - p.y);
     for (let k = r.i + 1; k < r.path.length; k++) left += hyp(r.path[k].x - r.path[k - 1].x, r.path[k].y - r.path[k - 1].y);

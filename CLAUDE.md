@@ -57,13 +57,14 @@
 
 ## Gesti (tutto a un dito)
 - Col pallone, fuori dal duello: disegna dal giocatore = **strada da correre** (con tanta strada davanti scatta); linea che finisce in porta = tiro.
-- **Duello** (portatore a 7 m da un difensore davanti): visuale bassa, tempo al 35%. Si passa a qualunque compagno:
+- **Duello** (portatore a 7 m da un difensore davanti): visuale bassa, tempo al 20%. Si passa a qualunque compagno:
   disegna fino al compagno o toccalo; oppure tasto **Dribbling** in basso.
-- **Area di tiro** (ultimi 20 m prima della porta avversaria, col pallone): tempo al 40%; linea in porta = tiro,
+- **Area di tiro** (ultimi 20 m prima della porta avversaria, col pallone): tempo al 22%; linea in porta = tiro,
   linea fino a un compagno (entro 5 m) o tocco = passaggio, altrove = strada da correre.
 - La finta è stata tolta (2026-11-20).
-- Difesa: dito su un proprio giocatore e disegna = linea da seguire (tutti tranne il portiere); tratto rapido e corto dal
-  controllato o scorrimento veloce dal campo = scivolata; tieni premuto sul campo = muovi il controllato. Raggio di
+- Difesa: dito su un proprio giocatore e disegna = linea da seguire (tutti tranne il portiere); tieni premuto sul campo =
+  muovi il controllato. Senza linea i giocatori restano **fermi** (la CPU non difende al posto della persona). La
+  scivolata del giocatore è stata tolta (2026-11-20; l'IA avversaria la usa ancora). Raggio di
   intercetto = difesa del difensore contro passaggio di chi passa.
 - Portiere: sul tiro la visuale va dietro la propria porta e il tempo rallenta; linea dal portiere al punto della porta,
   il tuffo parte quando si alza il dito.

@@ -26,7 +26,7 @@ const ui = new UI(uiRoot, career, {
 });
 const input = new Input(canvas, view, {
   kick: s => G.match.userKick(0, s), move: (x, y, h, sp) => G.match.userMove(0, x, y, h, sp), path: pts => G.match.userPath(0, pts), run: (i, pts) => G.match.userRun(0, G.match.players[i], pts), stop: () => G.match.userStop(0),
-  slide: (dx, dy) => G.match.userSlide(0, dx, dy), dive: (dx, th) => G.match.userDive(0, dx, th), sw: i => G.match.userSwitch(0, G.match.players[i]),
+  dive: (dx, th) => G.match.userDive(0, dx, th), sw: i => G.match.userSwitch(0, G.match.players[i]),
 });
 
 // ---------------------------------------------------------------- menu con partita dimostrativa sullo sfondo
@@ -112,14 +112,14 @@ function big(text, cls, ms, small) {
 }
 function fade() { const f = $('fade'); f.style.transition = 'none'; f.style.opacity = 0.85; requestAnimationFrame(() => requestAnimationFrame(() => { f.style.transition = 'opacity .35s'; f.style.opacity = 0; })); }
 
-const RUN_DRAW_SLOW = 0.5; // velocità del tempo mentre si disegna la strada da correre
-const GK_SLOW = 0.25;
-const DEF_DRAW_SLOW = 0.3; // velocità del tempo mentre si disegna una linea di difesa      // velocità del tempo mentre si para
-const DUEL_SLOW = 0.35; // velocità del tempo durante un duello col difensore
-const ZONE_SLOW = 0.4;  // velocità del tempo negli ultimi 20 m prima della porta avversaria (area di tiro)
+const RUN_DRAW_SLOW = 0.3; // velocità del tempo mentre si disegna la strada da correre
+const GK_SLOW = 0.15;
+const DEF_DRAW_SLOW = 0.18; // velocità del tempo mentre si disegna una linea di difesa      // velocità del tempo mentre si para
+const DUEL_SLOW = 0.2; // velocità del tempo durante un duello col difensore
+const ZONE_SLOW = 0.22; // velocità del tempo negli ultimi 20 m prima della porta avversaria (area di tiro)
 const HINTS = {
   attack: 'Disegna la strada dal giocatore per correre · linea in porta = tiro',
-  defend: 'Disegna linee dai tuoi giocatori per chiudere e intercettare · scorri veloce = scivolata',
+  defend: 'Disegna linee dai tuoi giocatori: solo chi ha una linea si muove',
   loose: 'Palla libera: disegna una linea da un tuo giocatore per andarci',
   dive: 'PARA! Tira una linea dal portiere al punto della porta',
   duel: 'Disegna fino a un compagno o toccalo per passare · oppure tocca Dribbling',
@@ -175,7 +175,7 @@ function overlay(html) { ov.innerHTML = html; ov.style.display = 'block'; }
 function showPause() {
   G.paused = true; input.cancel();
   overlay(`<div class="ovh">Pausa</div><button class="btn big" data-o="resume">Riprendi</button><button class="btn" data-o="subs">Cambi (${G.subs} rimasti)</button><button class="btn ghost" data-o="quit">${G.mode === 'league' ? 'Abbandona (sconfitta 0–3)' : 'Esci dall\'amichevole'}</button>
-  <div class="card"><p class="note"><b>Attacco</b>: disegna dalla palla per passare o tirare, tieni premuto per correre.<br><b>Difesa</b>: tieni premuto per muovere il difensore, scorri veloce per la scivolata.<br><b>Portiere</b>: scorri verso il lato del tiro.</p></div>`);
+  <div class="card"><p class="note"><b>Attacco</b>: disegna dalla palla per passare o tirare, tieni premuto per correre.<br><b>Difesa</b>: disegna linee dai tuoi giocatori, oppure tieni premuto per muovere il difensore.<br><b>Portiere</b>: scorri verso il lato del tiro.</p></div>`);
 }
 function showHalf() {
   const m = G.match; G.paused = true; input.cancel();

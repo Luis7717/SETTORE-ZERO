@@ -44,7 +44,6 @@ export const HOWTO = [
   ['Duello e passaggio', 'Quando ti avvicini a un difensore la visuale si abbassa e il tempo rallenta: <b>disegna fino a un compagno</b> (uno qualunque) o toccalo per passare, oppure tocca <b>Dribbling</b> per saltarlo.'],
   ['Area di tiro', 'Negli <b>ultimi 20 metri</b> il tempo rallenta: linea in porta per <b>tirare</b>, fino a un compagno per <b>passare</b>, altrove per correre.'],
   ['Difesa', 'In difesa <b>disegna una linea dai tuoi giocatori</b> (tutti tranne il portiere): corrono lungo la strada che tracci, per chiudere l’avversario o tagliare la linea del passaggio. Ogni difensore intercetta in un piccolo raggio: più largo se è bravo in difesa, più stretto se chi passa è bravo nei passaggi. Tocca un compagno per comandarlo.'],
-  ['Scivolata', '<b>Scorri veloce</b> nella direzione in cui vuoi entrare. Se prendi la palla è tua; se prendi prima l\'uomo è fallo, da dietro è cartellino. Se sbagli il tempo resti a terra.'],
   ['Portiere', 'Quando tirano la visuale va dietro la tua porta e il tempo rallenta: <b>tira una linea dal portiere al punto della porta</b> dove arriva la palla e alza il dito al momento giusto. Più la palla è lontana dal portiere, più è difficile arrivarci.'],
 ];
 

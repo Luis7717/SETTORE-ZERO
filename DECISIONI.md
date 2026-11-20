@@ -282,3 +282,18 @@ maglia, maniche, calzettoni…), poi nome e numero sulla schiena e uno stemma in
 - **Anelli verdi tolti**: nel duello e nell'area di tiro si passa a qualunque compagno. Resta solo il cerchio sul
   ricevitore mentre il dito sta disegnando il passaggio, come conferma di chi riceverà.
 - Impronta golden rigenerata (cambia il raggio del duello).
+
+## 2026-11-20 — La CPU non difende al posto della persona, scivolata tolta, rallenty più lento
+- **Squadra umana senza palla** (avversario in possesso, o pallone libero che non viene da un nostro passaggio/tiro):
+  si muove solo chi ha una linea disegnata, e il controllato col dito tenuto premuto o col tocco sul campo. Tutti gli
+  altri restano **fermi** (`manualDef(T)` in `src/sim/ai.js`). Il portiere resta automatico nel piazzamento.
+  In attacco i compagni senza palla si smarcano ancora da soli (servono per passare).
+- Linea di difesa: l'ultimo punto va raggiunto davvero (`RUN_END_REACH` = 0,4 m invece di 1,3), così una linea
+  disegnata fin sull'avversario arriva al contrasto.
+- Tutorial "Recupera palla": l'avversario col pallone resta fermo (prima, libero di muoversi, passava a vuoto e
+  perdeva palla da solo, e il nostro controllato lo inseguiva in automatico). Si supera solo disegnando la linea.
+- **Scivolata tolta** dai gesti e dal tutorial (ora 6 lezioni). Nel motore `userSlide` resta solo per le prove a schermo;
+  l'IA avversaria entra ancora in scivolata.
+- **Rallenty più lento**: duello 20% (era 35%), area di tiro 22% (era 40%), parata 15% (era 25%), mentre si disegna
+  la corsa 30% (era 50%), mentre si disegna una linea di difesa 18% (era 30%).
+- Bot dei test: insegue col dito anche il pallone libero (come farebbe una persona). Impronta golden rigenerata.

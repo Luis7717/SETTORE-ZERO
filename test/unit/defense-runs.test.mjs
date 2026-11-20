@@ -69,3 +69,44 @@ test('lo stesso passaggio a 1,15 m dal difensore: preso se passa male, non preso
   assert.equal(run(85, 40), true, 'difensore forte contro passaggio scarso: preso');
   assert.equal(run(45, 90), false, 'difensore debole contro passaggio preciso: passa');
 });
+
+test('in difesa chi non ha una linea resta fermo: la CPU non muove i giocatori al posto della persona', () => {
+  // Arrange
+  const { m, c } = scene(), d = m.players[3], k = m.ctrl[0] || m.players[7];
+  const start = m.team(0).filter(p => p.pos !== 'P').map(p => [p, p.x, p.y]);
+  m.userRun(0, d, [{ x: d.x + 6, y: d.y }]);
+  // Act: 2 s di gioco con l'avversario fermo col pallone
+  for (let i = 0; i < 120; i++) { hold(m, c); m.step(DT); m.events.length = 0; }
+  // Assert
+  for (const [p, x, y] of start) {
+    const moved = Math.hypot(p.x - x, p.y - y);
+    if (p === d) assert.ok(moved > 4, 'chi ha la linea corre');
+    else assert.ok(moved < 1, `giocatore ${p.i} fermo (si è mosso di ${moved.toFixed(2)} m)`);
+  }
+});
+
+test('in difesa il giocatore controllato si muove col dito tenuto premuto', () => {
+  const { m, c } = scene(), k = m.ctrl[0];
+  assert.ok(k, 'c’è un controllato');
+  const x0 = k.x, y0 = k.y;
+  for (let i = 0; i < 60; i++) { hold(m, c); m.userMove(0, x0 + 8, y0, true); m.step(DT); m.events.length = 0; }
+  assert.ok(Math.hypot(k.x - x0, k.y - y0) > 3, 'il controllato segue il dito');
+});
+
+test('pallone libero dopo un rimpallo: nessuno della squadra umana ci corre da solo', () => {
+  const { m } = scene(), b = m.ball;
+  b.owner = null; b.kick = null; b.x = 0; b.y = 0; b.vx = 0; b.vy = 0; b.h = 0; b.vh = 0;
+  for (const o of m.team(1)) m.place(o, o.x, 45);
+  const start = m.team(0).filter(p => p.pos !== 'P').map(p => [p, p.x, p.y]);
+  for (let i = 0; i < 60; i++) { m.step(DT); m.events.length = 0; }
+  for (const [p, x, y] of start) assert.ok(Math.hypot(p.x - x, p.y - y) < 1, `giocatore ${p.i} fermo`);
+});
+
+test('una linea disegnata fin sull’avversario col pallone porta al contrasto', () => {
+  const { m, c } = scene(), d = m.players[3];
+  m.place(d, c.x - 6, c.y - 6); d.st.dif = 70;
+  m.userRun(0, d, [{ x: c.x - 3, y: c.y - 3 }, { x: c.x, y: c.y }]);
+  let won = false;
+  for (let i = 0; i < 6 * 60 && !won; i++) { hold(m, c); c.stun = 0; c.vx = c.vy = 0; m.step(DT); won = m.events.some(e => e.type === 'tackle' && e.p === d); m.events.length = 0; }
+  assert.ok(won, 'il difensore arriva sull’avversario e contrasta');
+});

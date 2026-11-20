@@ -23,7 +23,6 @@ const DRIVE = {
   },
   // linea disegnata dal proprio giocatore fino al portatore avversario
   'Recupera palla'(m) { const c = m.ctrl[0], b = m.ball; if (c && b.owner && b.owner.team === 1 && !m.runOf(c)) m.userRun(0, c, [{ x: (c.x + b.x) / 2, y: (c.y + b.y) / 2 }, { x: b.x, y: b.y }]); },
-  Scivolata(m) { const c = m.ctrl[0], b = m.ball; if (c && b.owner && Math.hypot(b.x - c.x, b.y - c.y) < 3) m.userSlide(0, b.x - c.x, b.y - c.y); else if (b.owner) m.userMove(0, b.x, b.y, true); },
   Dribbling(m) { if (m.duelFor && m.duelFor(0)) m.userDribble(0); else { const c = m.ctrl[0]; if (c) m.userMove(0, c.x, c.y + 4, true); } },
   Portiere(m) { if (m.diveWin(0)) { const s = m.ball.shot, g = m.gk(0); m.userDive(0, s.cx - g.x, s.ch); } },
 };

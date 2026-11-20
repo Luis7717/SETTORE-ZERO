@@ -243,6 +243,9 @@ export class AIMethods {
     }
   }
 
+  // la squadra T è senza palla: possesso avversario, oppure pallone libero che non viene da un nostro passaggio o tiro
+  manualDef(T) { const b = this.ball; return b.owner ? b.owner.team !== T : !(b.kick && b.kick.team === T); }
+
   assign(p) {
     const b = this.ball, T = p.team, dir = T ? -1 : 1, hum = this.human[T];
     if (this.phase === 'restart' && this.restart.taker === p) { p.tx = p.x; p.ty = p.y; return; }
@@ -251,6 +254,12 @@ export class AIMethods {
     if (mv && mv.path) this.followPath(p, mv);
     // linea disegnata in difesa: vale più di tutto il resto finché non è finita
     if (hum && b.owner !== p && this.runs[T].length) { const r = this.runOf(p); if (r && this.followRun(p, r)) return; }
+    // senza palla (avversario in possesso o pallone libero non passato da noi) la squadra umana non fa nulla da sola:
+    // si muove solo chi ha una linea (sopra) o il controllato col dito; gli altri restano fermi (il portiere no)
+    if (hum && p.pos !== 'P' && this.phase === 'play' && this.manualDef(T)) {
+      if (mv && !mv.path) { p.tx = mv.x; p.ty = mv.y; p.sprint = !!mv.sprint; } else { p.tx = p.x; p.ty = p.y; }
+      return;
+    }
     if (mv && mv.sprint) p.sprint = true;
     if (b.owner === p) {
       if (hum) {

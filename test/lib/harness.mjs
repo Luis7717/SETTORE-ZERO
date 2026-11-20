@@ -28,6 +28,7 @@ export function makeBot(seed, press = 1) {
         if (m.phase === 'restart') { if (m.restart.t > 1.2) { m.human[0] = false; m.aiRestart(); m.human[0] = true; } }
         else { m.dtT = 1 / 60; m.human[0] = false; m.carrierAI(c); m.human[0] = true; if (b.owner === c) m.userMove(0, c.tx, c.ty, true); }
       } else if (b.owner && b.owner.team === 1) { if (press && r() < 0.9) m.userMove(0, b.x + b.owner.vx * 0.25, b.y + b.owner.vy * 0.25, true); }
+      else if (!b.owner && m.manualDef(0) && press) m.userMove(0, b.x + b.vx * 0.3, b.y + b.vy * 0.3, true);
     }
     if (m.diveWin(0)) {
       if (diveAt < 0) diveAt = m.time + 0.12 + r() * 0.16;
