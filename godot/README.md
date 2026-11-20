@@ -77,7 +77,16 @@ interfaccia dei menu, sfondo del menu e allenamento guidato, grafica.
 | `scripts/partita/figura.gd` | un giocatore in partita: clip fermo/corsa/scatto/salto, pose (calcio, testa, tuffo, scivolata, esultanza), giochetti con la IK |
 | `scripts/partita/mosse/` | movimenti calcolati dei giochetti (`mossa.gd`, `corpo.gd`, `giochetti.gd`), palleggi e tiro del menu (`palleggi.gd`, `tiro.gd`) e IK a due ossa (`ik.gd`) |
 | `scripts/partita/nastri.gd`, `texture_vista.gd` | linee disegnate a nastro, linee di difesa, anteprima, fuorigioco; texture fatte a codice |
-| `shaders/rete.gdshader`, `bandierina.gdshader` | rete che si gonfia sul gol, bandierine che sventolano |
+| `shaders/rete.gdshader`, `bandierina.gdshader` | rete a molle (legge `scripts/rete_molle.gd`), bandierine col vento a raffiche |
+| `scripts/rete_molle.gd` | rete di una porta con una molla per nodo (logica pura, `tests/test_rete.gd`) |
+| `scripts/stadio/pubblico.gd`, `shaders/pubblico.gdshader` | pubblico 3D: migliaia di tifosi in MultiMesh, colori delle squadre, animati nello shader |
+| `scripts/stadio/cartelloni.gd`, `shaders/led.gdshader` | cartelloni a led con sponsor inventati che scorrono (`src/stadium-ads.js`) |
+| `scripts/stadio/maxischermo.gd` | maxischermi col risultato e "GOOOL!" (`src/stadium-screen.js`) |
+| `scripts/partita/effetti.gd` | scia del pallone, sbuffi d'erba, coriandoli |
+| `scripts/partita/qualita.gd` | livelli grafici automatici (logica pura, `tests/test_qualita.gd`) |
+| `scripts/partita/aspetto.gd` | porting di `src/looks.js` (look e stile della divisa dal seme, uguali al web: `tests/test_aspetto.gd`) |
+| `scripts/partita/schiene.gd` | atlante di cognomi e numeri sulle schiene |
+| `tools/genera_texture.gd` | genera `assets/textures/` (pallone HD e normal map, fili d'erba) |
 | `scenes/prova_vista.tscn` | prova: computer contro computer disegnato dalla vista, scene per le schermate e misure |
 | `scenes/menu/sfondo_menu.tscn` | sfondo 3D del menu: campione che palleggia, fa giochetti e tira (`scripts/menu/sfondo_menu.gd`, `routine_menu.gd`) |
 | `scripts/partita/allenamento.gd` | allenamento guidato (logica pura); `allenamento_hud.gd` riquadro e schede; `bot_allenamento.gd` dito finto |
@@ -313,8 +322,12 @@ Il preset si può provare anche da Windows: con i template installati
 
 ```sh
 $G --path godot res://scenes/prova_vista.tscn -- --schermata=shots/vista/partita.png --dopo=6
-#   --scena=rallenty | girata | parata | angolo | giochetto | linea | gol    (più --sequenza=N --ogni=SEC)
+#   --scena=rallenty | girata | parata | angolo | giochetto | linea | gol | rete | festa | primo | volti
+#           (più --sequenza=N --ogni=SEC)
 #   --me=1 (campo capovolto) · --vicino=N (telecamera vicina a m.players[N]) · --senza-vsync --esci-dopo=15
+#   --qualita=0..3 (livello grafico fisso) · --senza=pubblico,cartelloni,schermi,tetti,fari,bagliore,dof,ombre,effetti,aspetto
+#   --scala3d=2 (tanti pixel 3D quanti sull'iPhone): con --esci-dopo stampa anche GPU e disegno CPU per fotogramma
+$G --headless --path godot -s res://tools/genera_texture.gd   # rigenera assets/textures/ (poi --import)
 $G --headless --path godot res://scenes/prova_vista.tscn -- --controlla --me=1   # conversioni schermo/campo/porta
 $G --headless --path godot -s res://tests/run_tests.gd -- test_camfit    # anche test_camuser, test_mosse, test_figura
 node test/export-vista.mjs     # rigenera tests/fixtures/vista.json dal JS (camfit, camuser, giochetti, IK)
@@ -333,10 +346,27 @@ Contratto di `PartitaVista` (`scripts/partita/vista.gd`, radice di `scenes/vista
 | `show_path(points, kind, end_h := 0.0, recv := null)` / `clear_path()` | linea a nastro: "run", "pass" (anello verde sul compagno entro 5 m), "shot" (gialla col mirino), "def" |
 | `show_preview(points, offside_y := NAN)` | puntini del volo e linea del fuorigioco (facoltativo: nel gioco li fa l'interfaccia) |
 | `trick(p, r := -1.0) -> Dictionary` | giochetto del dribbling per p (solo grafica): {id, name, dur} |
+| `tifo(tipo: String, squadra: int)` | reazione del pubblico: "gol", "occasione" (tiro), "parata", "palo", "fischio"; squadra = chi segna / tira / para / prende il palo / subisce il fischio. Il gol la vista lo vede da sola dal punteggio (festa una volta per gol: tifosi, maxischermo, coriandoli) |
+| `set_rallenty(k: float)` | facoltativa: 0..1 quanto è "rallenty" (profondità di campo); < 0 = la vista lo ricava da `dt_game / dt_real` |
+| `set_qualita(l: int)` | livello grafico 3 alto, 2 medio, 1 basso, 0 minimo; `qualita_auto` (vero) lo abbassa da sola sotto 58 fps, `livello_qualita` dice quello in uso |
 | `dispose()` | via figure e riferimenti; va bene anche da `_exit_tree` del padre |
 | `user_yaw`, `cam_drag`, `drawing` | scritti da chi gestisce il dito |
 
 Le linee di difesa assegnate (`m.runs[me]`) si disegnano da sole a ogni `update_view`.
+Aspetto dei giocatori: `src.look` (campi di `src/looks.js`) se c'è, sennò dal seme come `lookOf`; stile della divisa da
+`team.kit.style`, sennò dal nome della squadra (`kitStyleFromSeed`); numero `src.num` (sennò posto + 1), cognome da `src.name`.
+
+### Livelli grafici (fase 4)
+
+| Livello | Cosa c'è |
+|---|---|
+| 3 alto | tutto: profondità di campo nel rallenty e nei primi piani, ombre morbide (filtro "soft low", sfocatura 1,6), bagliore, pubblico pieno, coriandoli pieni |
+| 2 medio | niente profondità di campo, ombre con filtro "very low" |
+| 1 basso | anche senza bagliore, metà pubblico, metà particelle |
+| 0 minimo | niente pubblico 3D (torna quello dipinto), niente scia e sbuffi, coriandoli a un quarto |
+
+Sotto 58 fps per 3 secondi di fila (finestre di 1 s, dopo 4 s dall'inizio) si scende di un livello; non si risale
+(meglio stabile che altalenante). Il contatore FPS resta.
 
 ## Prestazioni sul telefono
 

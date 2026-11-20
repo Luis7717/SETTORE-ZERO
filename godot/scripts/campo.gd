@@ -6,10 +6,12 @@ const Coord := preload("res://scripts/coord.gd")
 const SHADER_ERBA := preload("res://shaders/erba.gdshader")
 const SHADER_RETE := preload("res://shaders/rete.gdshader")
 const SHADER_BANDIERINA := preload("res://shaders/bandierina.gdshader")
+const ReteMolle := preload("res://scripts/rete_molle.gd")
 
 const MX := 10.0               # margine d'erba oltre le linee laterali (m)
 const MY := 12.0               # margine d'erba oltre le linee di porta (m)
 const ERBA_FUORI := Color("#2c6428")   # terreno oltre i margini
+const ERBA_N := "res://assets/textures/erba_n.png"
 const GRANA_LATO := 256         # lato della texture di grana dell'erba (px)
 const PALO_R := 0.06            # raggio di pali e traversa (m)
 const RETE_FONDO := 2.0         # profondità della rete a terra (m)
@@ -17,9 +19,9 @@ const RETE_ALTO := 1.0          # profondità della rete all'altezza della trave
 const RETE_MAGLIA := 0.14       # lato di una maglia della rete (m)
 const BANDIERINA_H := 1.5       # altezza dell'asta della bandierina (m)
 const RETE_CELLA := 0.3         # lato dei quadratini in cui è divisa la rete, per farla gonfiare (m)
-const RETE_LIBERA := 0.7        # a questa distanza dal bordo di un telo la rete si muove già del tutto (m)
 
 var _reti := {}                 # lato (1 / −1) → ShaderMaterial della rete
+var _molle := {}                # lato (1 / −1) → rete a molle (scripts/rete_molle.gd)
 
 
 func _ready() -> void:
@@ -36,6 +38,8 @@ func _costruisci_erba() -> void:
 	var mat := ShaderMaterial.new()
 	mat.shader = SHADER_ERBA
 	mat.set_shader_parameter("grana", _texture_grana())
+	if ResourceLoader.exists(ERBA_N):   # fili d'erba da vicino (tools/genera_texture.gd)
+		mat.set_shader_parameter("dettaglio_n", load(ERBA_N))
 	var piano := PlaneMesh.new()
 	piano.size = Vector2(Coord.W + MX * 2.0, Coord.L + MY * 2.0)
 	var erba := MeshInstance3D.new()
@@ -95,12 +99,14 @@ func _costruisci_porta(lato: float) -> void:
 		_tubo(porta, Coord.a_godot(x, sul, gh), Coord.a_godot(x, alto, gh), sottile, bianco)
 		_tubo(porta, Coord.a_godot(x, alto, gh), Coord.a_godot(x, fondo, 0.0), sottile, bianco)
 	_tubo(porta, Coord.a_godot(-hx, fondo, 0.02), Coord.a_godot(hx, fondo, 0.02), sottile, bianco)
-	# rete
+	# rete: mesh fine, spostamenti dalla rete a molle (una texture letta nei vertici)
+	var molle := ReteMolle.new(lato)
+	_molle[lato] = molle
 	var rete := MeshInstance3D.new()
 	rete.name = "Rete"
-	rete.mesh = _mesh_rete(gy, lato)
+	rete.mesh = _mesh_rete(molle)
 	var mat := _materiale_rete()
-	mat.set_shader_parameter("fuori", Vector3(0, 0, -lato))
+	mat.set_shader_parameter("spostamenti", molle.tex)
 	_reti[lato] = mat
 	rete.material_override = mat
 	rete.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -127,43 +133,41 @@ func _tubo(parent: Node3D, a: Vector3, b: Vector3, r: float, mat: Material) -> v
 	parent.add_child(mi)
 
 
-func _mesh_rete(gy: float, lato: float) -> ArrayMesh:
+# i quattro teli della rete a molle (fondo inclinato, tetto, due fianchi), ognuno diviso in quadratini
+func _mesh_rete(molle: RefCounted) -> ArrayMesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var hx := Coord.GW / 2.0 + PALO_R
-	var gh := Coord.GH + PALO_R
-	var y0 := gy + lato * PALO_R
-	var yf := gy + lato * RETE_FONDO
-	var ya := gy + lato * RETE_ALTO
-	# fondo (inclinato), tetto, due fianchi: quattro quadrilateri (punti del gioco: x, y, h)
-	_quad(st, Vector3(-hx, yf, 0.0), Vector3(hx, yf, 0.0), Vector3(hx, ya, gh), Vector3(-hx, ya, gh))
-	_quad(st, Vector3(-hx, y0, gh), Vector3(hx, y0, gh), Vector3(hx, ya, gh), Vector3(-hx, ya, gh))
-	for x in [-hx, hx]:
-		_quad(st, Vector3(x, y0, 0.0), Vector3(x, yf, 0.0), Vector3(x, ya, gh), Vector3(x, y0, gh))
+	for nome: String in ["fondo", "tetto", "fianco_s", "fianco_d"]:
+		_quad(st, molle, nome)
 	return st.commit()
 
 
-# quadrilatero diviso in quadratini (punti del gioco x, y, h), UV in metri / maglia;
-# COLOR.r = libertà del vertice (0 sul bordo, attaccato al telaio o al terreno)
-func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> void:
+# telo diviso in quadratini (punti del gioco x, y, h): UV in metri / maglia, UV2 = posto nella texture degli
+# spostamenti, NORMAL = verso fuori dal telo (dove lo spinge il pallone)
+func _quad(st: SurfaceTool, molle: RefCounted, nome: String) -> void:
+	var t: Dictionary = molle.telo(nome)
+	var a: Vector3 = t.a
+	var b: Vector3 = t.b
+	var c: Vector3 = t.c
+	var d: Vector3 = t.d
 	var lu := maxf(a.distance_to(b), d.distance_to(c))
 	var lv := maxf(a.distance_to(d), b.distance_to(c))
 	var nu := maxi(1, ceili(lu / RETE_CELLA))
 	var nv := maxi(1, ceili(lv / RETE_CELLA))
 	var u_dir: Vector3 = (b - a).normalized()
 	var v_dir: Vector3 = (d - a).normalized()
-	var punto := func(i: int, j: int) -> Vector3:
-		var u := float(i) / nu
-		var v := float(j) / nv
-		return a.lerp(b, u).lerp(d.lerp(c, u), v)
+	var n: Vector3 = t.n
+	var normale := Coord.a_godot(n.x, n.y, n.z)
 	for j in nv:
 		for i in nu:
 			var ids := [[i, j], [i + 1, j], [i + 1, j + 1], [i, j], [i + 1, j + 1], [i, j + 1]]
 			for q: Array in ids:
-				var p: Vector3 = punto.call(q[0], q[1])
-				var bordo := minf(minf(float(q[0]) / nu, 1.0 - float(q[0]) / nu) * lu, minf(float(q[1]) / nv, 1.0 - float(q[1]) / nv) * lv)
-				st.set_color(Color(clampf(bordo / RETE_LIBERA, 0.0, 1.0), 0, 0))
+				var u := float(q[0]) / nu
+				var v := float(q[1]) / nv
+				var p: Vector3 = a.lerp(b, u).lerp(d.lerp(c, u), v)
+				st.set_normal(normale)
 				st.set_uv(Vector2((p - a).dot(u_dir), (p - a).dot(v_dir)) / RETE_MAGLIA)
+				st.set_uv2(molle.uv2(nome, u, v))
 				st.add_vertex(Coord.a_godot(p.x, p.y, p.z))
 
 
@@ -181,9 +185,14 @@ func _materiale_rete() -> ShaderMaterial:
 	return m
 
 
-## materiale della rete della porta a y = lato·50 (lato 1 o −1), per farla gonfiare e cambiarne la trasparenza
+## materiale della rete della porta a y = lato·50 (lato 1 o −1), per cambiarne la trasparenza
 func materiale_rete(lato: float) -> ShaderMaterial:
 	return _reti.get(1.0 if lato > 0.0 else -1.0)
+
+
+## rete a molle della porta a y = lato·50 (scripts/rete_molle.gd): chi disegna la partita la fa avanzare col pallone
+func rete_molle(lato: float) -> RefCounted:
+	return _molle.get(1.0 if lato > 0.0 else -1.0)
 
 
 # ---------------------------------------------------------------- bandierine

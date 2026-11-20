@@ -13,6 +13,10 @@
 #                                      nel gioco l'anteprima la disegna l'interfaccia in 2D)
 #   trick(p[, r])                      parte un giochetto del dribbling per p (solo grafica); ritorna {id, name, dur}
 #   dispose()                          via tutto (la partita la chiude chi l'ha creata); va bene anche da _exit_tree
+#   tifo(tipo, squadra)                reazione del pubblico: "gol", "occasione", "parata", "palo", "fischio"
+#   set_rallenty(k)                    quanto è forte il rallenty (0..1) per la profondità di campo; −1 = la vista lo
+#                                      ricava da sola da dt_game / dt_real (predefinito)
+#   set_qualita(l) / qualita_auto      livello grafico 0..3 (qualita.gd); con qualita_auto scende da solo sotto 58 fps
 #   user_yaw, cam_drag, drawing        scritti da chi gestisce il dito (src/input.js), letti qui; il ritorno dolce
 #                                      di user_yaw a 0 (relaxYaw) lo fa la vista in update_view
 #
@@ -23,31 +27,39 @@ extends Node3D
 
 const Coord := preload("res://scripts/coord.gd")
 const Figura := preload("figura.gd")
+const PALLA_HD := "res://assets/textures/pallone.png"
+const PALLA_N := "res://assets/textures/pallone_n.png"
+const AspettoVista := preload("aspetto.gd") # stesso porting di looks.js di scripts/carriera/aspetto.gd (Aspetto)
+const Schiene := preload("schiene.gd")
+const Giocatore := preload("res://scripts/giocatore.gd")
 const TV := preload("texture_vista.gd")
 const CU := preload("camuser.gd")
 const Giochetti := preload("mosse/giochetti.gd")
+const Effetti := preload("effetti.gd")
+const Qualita := preload("qualita.gd")
 
 const BALL_R := 0.21           # raggio del pallone a schermo (più grande del vero, per leggerlo da lontano)
 const PASS_RECV := 5.0         # linea "pass": compagno entro questa distanza dalla fine = riceve (anello verde)
 const RING_K := 1.9            # anello del controllato: scala, pulsa di ±0,12 a 6 rad/s
 const MARKER_H := 2.75         # segnalino sopra il controllato (m)
 const SHADOW_SIZE := 1.15      # ombra morbida sotto i giocatori (m)
-const NET_K := 170.0           # rete: molla e smorzamento (oscilla ~2 volte al secondo), come src/props.js
-const NET_C := 7.0
-const NET_KICK := 0.14         # spinta del pallone che arriva in fondo alla rete (per m/s)
 const NET_FAR := 0.78          # trasparenza della rete: porta avversaria / propria porta (guardata attraverso)
 const NET_NEAR := 0.22
 const RETE_FONDO := 2.0        # profondità della rete a terra e alla traversa (come scripts/campo.gd)
 const RETE_ALTO := 1.0
 const NET_MAX := 0.45          # il telo si gonfia al massimo così (m); il pallone a schermo non va oltre
 const RISOLUZIONE_3D_LARGO := 780.0   # sul telefono il 3D si disegna largo al massimo così (px), poi FSR
+const GOL_SCHERMO := 5.0       # s di "GOOOL!" sul maxischermo
+const GOL_DOPPIO := 4.0        # due avvisi di gol entro questo tempo sono lo stesso gol
+const SCIA_V := 17.0           # m/s: oltre questa velocità (o su un tiro) il pallone lascia la scia
+const DOF_VICINO := 16.0       # telecamera più vicina di così al pallone (m): primo piano, sfocatura in crescita...
+const DOF_PRIMO := 9.0         # ... piena da qui
+const DOF_OLTRE := 16.0        # nel rallenty è a fuoco fino a questa distanza oltre il pallone (m); nel primo piano 5
+const DOF_FORZA := 0.07        # sfocatura massima (dof_blur_amount)
 
 # divise come nel gioco web (src/career.js kitOf: Rosso e Blu; portieri arancio e verde)
 const KIT_CASA := {"shirt": 0xc8102e, "shorts": 0xffffff, "socks": 0xc8102e, "gk": {"shirt": 0xffa41c, "shorts": 0x222222, "socks": 0xffa41c}}
 const KIT_OSPITI := {"shirt": 0x1746a2, "shorts": 0xffffff, "socks": 0x1746a2, "gk": {"shirt": 0x2ad17a, "shorts": 0x15803d, "socks": 0x15803d}}
-const Asp := preload("res://scripts/carriera/aspetto.gd")
-const PELLI := [Color("#f1c9a5"), Color("#d9a47a"), Color("#a9744f"), Color("#6b4630")]
-const CAPELLI := [Color("#1c1410"), Color("#4a2f1b"), Color("#8a5a2b"), Color("#d9b66a"), Color("#222222")]
 
 ## angolo (rad) della visuale girata col dito: lo scrive chi gestisce il dito, qui torna dolcemente a 0 (relaxYaw)
 var user_yaw := 0.0
@@ -73,15 +85,34 @@ var _shadows: MultiMeshInstance3D
 var _ring: MeshInstance3D
 var _marker: Sprite3D
 var _tex_warn: Texture2D
-var _nets := {}                # lato in Godot (1 / −1) → {d, v, hit, entered, sp}
 var _ctx := {"t": 0.0, "phase": "", "flip": 1.0, "yaw": 0.0, "ball": null, "trick": null}   # riusato per tutti
 var _zoom_t := -1.0            # zoom voluto dal gioco (set_zoom); < 0 = lo calcola la telecamera
+## il livello grafico scende da solo se gli FPS restano sotto 58 (qualita.gd)
+var qualita_auto := true
+## livello grafico in uso: 3 alto, 2 medio, 1 basso, 0 minimo
+var livello_qualita := Qualita.ALTO
+var t_vero := 0.0              # tempo vero dall'inizio (s)
+var _qualita := Qualita.new()
+var _schiene: Node
+var _effetti: Node3D
+var _attr: CameraAttributesPractical
+var _env: Environment
+var _dof_on := true
+var _dof_k := 0.0
+var _rk_auto := 0.0            # rallenty ricavato dai tempi (0..1)
+var _rk_forzato := -1.0        # set_rallenty
+var _ultimo_calcio: Object = null
+var _punti := [0, 0]
+var _gol_t := -INF
+var _schermo_gol := false
 
 @onready var cam: Camera3D = $Telecamera
 @onready var _campo: Node3D = $Campo
 @onready var _giocatori: Node3D = $Giocatori
 @onready var _nastri: Node3D = $Nastri
 @onready var _sole: DirectionalLight3D = $Sole
+@onready var _stadio: Node3D = $Stadio
+@onready var _ambiente: WorldEnvironment = $Ambiente
 
 
 func _ready() -> void:
@@ -91,8 +122,18 @@ func _ready() -> void:
 	_tex_warn = TV.avviso()
 	_crea_pallone()
 	_crea_segni()
-	for lato: float in [1.0, -1.0]:
-		_nets[lato] = {"d": 0.0, "v": 0.0, "hit": false, "entered": false, "sp": 0.0}
+	_schiene = Schiene.new()
+	_schiene.name = "Schiene"
+	add_child(_schiene)
+	_effetti = Effetti.new()
+	add_child(_effetti)
+	_attr = CameraAttributesPractical.new()
+	cam.attributes = _attr
+	_env = _ambiente.environment
+	_imposta_bagliore()
+	if DisplayServer.get_name() == "headless":
+		qualita_auto = false
+	_applica_qualita(livello_qualita)
 
 
 ## nuova partita: 22 giocatori con le divise della loro squadra (team.kit se c'è: shirt, shorts, socks e gk,
@@ -111,11 +152,12 @@ func setup(match_: SimMatch, me_: int) -> void:
 	for i in m.players.size():
 		_figs.append(_figura(m.players[i]))
 		_srcs.append(m.players[i].src)
+	_prepara_schiene()
 	var mm := _shadows.multimesh
 	mm.instance_count = m.players.size()
 	cam.reset(m.ball.x, m.ball.y)
-	for lato: float in _nets:
-		_nets[lato] = {"d": 0.0, "v": 0.0, "hit": false, "entered": false, "sp": 0.0}
+	_ultimo_calcio = m.ball.kick
+	_prepara_stadio()
 	clear_path()
 
 
@@ -124,6 +166,7 @@ func update_view(dt_game: float, dt_real: float) -> void:
 	if m == null:
 		return
 	t += dt_game
+	t_vero += dt_real
 	var s := flip
 	var b: Object = m.ball
 	# giochetti in corso
@@ -139,6 +182,8 @@ func update_view(dt_game: float, dt_real: float) -> void:
 			_figs[i].queue_free()
 			_figs[i] = _figura(p)
 			_srcs[i] = p.src
+			_prepara_schiene()
+			_srcs[i] = p.src
 		_posa(i, p, dt_game)
 		var on: bool = not p.off
 		mm.set_instance_transform(i, Transform3D(Basis.from_scale(Vector3.ONE if on else Vector3.ZERO), Vector3(s * p.x, 0.025, -s * p.y)))
@@ -153,7 +198,9 @@ func update_view(dt_game: float, dt_real: float) -> void:
 		bx += c.fx * o.x - c.fy * o.y * tk.side
 		by += c.fy * o.x + c.fx * o.y * tk.side
 		bh += o.z
-	by = _dentro_la_rete(bx, by, bh)
+	var rete := _dentro_la_rete(bx, by, bh)
+	by = rete.x
+	bh = rete.y
 	_aggiorna_pallone(b, bx, by, bh, dt_game)
 	_aggiorna_segni()
 	# visuale girata dalla persona: resta finché dura il rallenty in attacco con lo stesso portatore e mentre si
@@ -166,6 +213,8 @@ func update_view(dt_game: float, dt_real: float) -> void:
 	_nastri.mostra_corse(m.runs[me] if m.runs != null else [])
 	if dt_game > 0.0:
 		_aggiorna_reti(b, dt_game)
+	_aggiorna_stadio(dt_real)
+	_aggiorna_effetti(b, dt_game, dt_real)
 
 
 ## punto del gioco (x, y, altezza h) → Vector3(x_px, y_px, 1 se davanti alla telecamera / 0 se dietro).
@@ -257,6 +306,69 @@ func dispose() -> void:
 		_nastri.mostra_corse([])
 
 
+## reazione del pubblico a un fatto della partita (solo grafica). tipo: "gol", "occasione" (tiro pericoloso),
+## "parata", "palo", "fischio" (fallo o fuorigioco); squadra = indice nel motore (0 / 1) di chi segna, ha l'occasione,
+## para, prende il palo o subisce il fischio. Il gol la vista lo vede anche da sola (cambio del punteggio): chiamare
+## tifo("gol", ...) in più non raddoppia la festa (folla, maxischermo e coriandoli partono una volta per gol).
+func tifo(tipo: String, squadra: int) -> void:
+	if m == null:
+		return
+	if tipo == "gol":
+		_festa_gol(squadra)
+		return
+	_stadio.tifo(tipo, squadra)
+
+
+# ---------------------------------------------------------------- stadio, pubblico, maxischermo
+func _prepara_stadio() -> void:
+	var nomi := []
+	var colori := []
+	for k in 2:
+		var team: Dictionary = m.teams[k]
+		nomi.append(str(team.get("short", team.get("name", "CASA" if k == 0 else "OSPITI"))))
+		colori.append(_colori_tifo(k))
+	_stadio.squadre(nomi, colori)
+	_punti = [m.score[0], m.score[1]]
+	_gol_t = -INF
+	_schermo_gol = false
+	_stadio.punteggio(_punti[0], _punti[1], false)
+
+
+# maglia e secondo colore dei tifosi di una squadra (fanColors del web: i calzoncini se si distinguono dalla maglia,
+# sennò bianco o nero)
+func _colori_tifo(k: int) -> Array:
+	var team: Dictionary = m.teams[k]
+	var def: Dictionary = KIT_CASA if k == 0 else KIT_OSPITI
+	var kit: Dictionary = team.get("kit", def)
+	var a := _colore(kit.get("shirt", def.shirt))
+	var b := _colore(kit.get("shorts", 0xffffff))
+	if absf(a.r - b.r) + absf(a.g - b.g) + absf(a.b - b.b) <= 0.45:
+		b = Color("#15171c") if a.get_luminance() > 0.55 else Color("#f4f4f4")
+	return [a, b]
+
+
+func _aggiorna_stadio(dt_real: float) -> void:
+	if m.score[0] != _punti[0] or m.score[1] != _punti[1]:
+		var chi := 0 if m.score[0] > _punti[0] else 1
+		_punti = [m.score[0], m.score[1]]
+		_festa_gol(chi)
+	if _schermo_gol and t_vero - _gol_t > GOL_SCHERMO:
+		_schermo_gol = false
+		_stadio.punteggio(_punti[0], _punti[1], false)
+	_stadio.aggiorna(dt_real)
+
+
+# folla, maxischermo e coriandoli per il gol di `squadra`, una volta sola per gol
+func _festa_gol(squadra: int) -> void:
+	if t_vero - _gol_t < GOL_DOPPIO:
+		return
+	_gol_t = t_vero
+	_stadio.tifo("gol", squadra)
+	_schermo_gol = true
+	_stadio.punteggio(m.score[0], m.score[1], true)
+	_effetti.coriandoli(squadra, _colori_tifo(squadra), flip)
+
+
 # ---------------------------------------------------------------- giocatori
 func _figura(p: Object) -> Node3D:
 	var f := Figura.new()
@@ -304,33 +416,66 @@ func _trick_of(p: Object) -> Dictionary:
 	return {"id": k.id, "q": minf(1.0, k.t / k.dur), "side": k.side}
 
 
+# divisa del giocatore (figFor di src/render.js): kit della squadra o del portiere, stile (team.kit.style, sennò dal
+# nome della squadra come kitStyleFromSeed; il portiere ha maniche lunghe, tinta unita e girocollo), numero e cognome
 func _kit_di(p: Object) -> Dictionary:
 	var team: Dictionary = m.teams[p.team]
-	var k: Dictionary = team.get("kit", KIT_CASA if p.team == 0 else KIT_OSPITI)
 	var def: Dictionary = KIT_CASA if p.team == 0 else KIT_OSPITI
+	var squadra: Dictionary = team.get("kit", def)
+	var k: Dictionary = squadra
+	var st := _stile_squadra(p.team)
 	if p.pos == "P":
-		k = k.get("gk", def.gk)
+		k = squadra.get("gk", def.gk)
+		st = st.duplicate()
+		st.sleeves = 1
+		st.pattern = 0
+		st.collar = 0
 	var shirt := _colore(k.get("shirt", 0xffffff))
 	var shorts := _colore(k.get("shorts", 0xffffff))
-	return {"maglia": shirt, "calzoncini": shorts, "calzettoni": _colore(k.get("socks", k.get("shirt", 0xffffff))), "bordino": shorts}
+	var i: int = m.players.find(p)
+	var cel := Schiene.cella(maxi(i, 0))
+	return {"maglia": shirt, "calzoncini": shorts, "calzettoni": _colore(k.get("socks", k.get("shirt", 0xffffff))),
+		"bordino": _secondo_colore(shirt, shorts),
+		"stile": Vector4(st.sleeves, st.collar, st.pattern, st.socks),
+		"numero": Vector4(cel.x, cel.y, 1.0 if i >= 0 else 0.0, st.fit)}
 
 
-# pelle e capelli: dal giocatore (src.look {skin, hair} se c'è), altrimenti fissi per nome
+func _stile_squadra(k: int) -> Dictionary:
+	var team: Dictionary = m.teams[k]
+	var kit: Variant = team.get("kit")
+	if kit is Dictionary and kit.has("style"):
+		return AspettoVista.normalize_kit_style(kit["style"])
+	return AspettoVista.kit_style_from_seed(AspettoVista.hash32([str(team.get("name", "squadra %d" % k))]))
+
+
+# secondo colore della divisa (altH di src/athlete3d.js): i calzoncini, o bianco / quasi nero se sono come la maglia
+static func _secondo_colore(maglia: Color, calzoncini: Color) -> Color:
+	if maglia.is_equal_approx(calzoncini):
+		return Color("#1b1b1b") if maglia.get_luminance() > 0.5 else Color.WHITE
+	return calzoncini
+
+
+# aspetto (src/looks.js): il `look` del giocatore se c'è (completato), sennò dal suo id e nome come lookOf del web
 func _aspetto_di(p: Object) -> Dictionary:
-	var look: Variant = p.src.get("look")
-	var h := hash(str(p.team) + ":" + str(p.name) + ":" + str(p.i))
-	var skin: Color = PELLI[absi(h) % PELLI.size()]
-	var hair: Color = CAPELLI[absi(h / 7) % CAPELLI.size()]
-	if look is Dictionary and look.get("skin") is int:
-		# look della carriera (scripts/carriera/aspetto.gd): indici negli elenchi, colori da lì
-		var col := Asp.colori(look)
-		return {"pelle": col.pelle, "capelli": col.capelli}
-	if look is Dictionary:
-		if look.has("skin"):
-			skin = _colore(look.skin)
-		if look.has("hair"):
-			hair = _colore(look.hair)
-	return {"pelle": skin, "capelli": hair}
+	var src: Dictionary = p.src if p.src is Dictionary else {}
+	var l := AspettoVista.look_of(src if not src.is_empty() else {"id": "%d_%d" % [p.team, p.i], "name": str(p.name)})
+	return {"pelle": AspettoVista.colore(AspettoVista.SKINS, l.skin), "capelli": AspettoVista.colore(AspettoVista.HAIR_COLORS, l.hairColor),
+		"iride": AspettoVista.colore(AspettoVista.EYE_COLORS, l.eyeColor), "scarpe": AspettoVista.colore(AspettoVista.BOOTS, l.boots),
+		"stile2": Vector4(l.hair, l.beard, l.brows, _stile_squadra(p.team).shorts)}
+
+
+# cognomi e numeri di chi è in campo (numero: src.num, sennò il posto in squadra + 1, come figFor del web)
+func _prepara_schiene() -> void:
+	var voci: Array = []
+	for i in m.players.size():
+		var p: Object = m.players[i]
+		var k := _kit_di(p)
+		var st: Vector4 = k.stile
+		var ink := Schiene.inchiostro(k.maglia, k.bordino, int(st.z))
+		var src: Dictionary = p.src if p.src is Dictionary else {}
+		voci.append({"num": int(src.get("num", p.i + 1)), "nome": AspettoVista.back_name(str(src.get("name", p.name))),
+			"fill": ink[0], "line": ink[1]})
+	_schiene.prepara(voci, Giocatore._materiale)
 
 
 static func _colore(v: Variant) -> Color:
@@ -359,11 +504,19 @@ func _crea_pallone() -> void:
 	var sfera := SphereMesh.new()
 	sfera.radius = BALL_R
 	sfera.height = BALL_R * 2.0
-	sfera.radial_segments = 20
-	sfera.rings = 10
+	sfera.radial_segments = 32
+	sfera.rings = 16
 	var mat := StandardMaterial3D.new()
-	mat.albedo_texture = TV.palla()
+	# pallone HD (tools/genera_texture.gd: 32 spicchi con le cuciture in rilievo), sennò quello disegnato al volo
+	if ResourceLoader.exists(PALLA_HD) and ResourceLoader.exists(PALLA_N):
+		mat.albedo_texture = load(PALLA_HD)
+		mat.normal_enabled = true
+		mat.normal_texture = load(PALLA_N)
+		mat.normal_scale = 0.8
+	else:
+		mat.albedo_texture = TV.palla()
 	mat.roughness = 0.45
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	_ball = MeshInstance3D.new()
 	_ball.name = "Pallone"
 	_ball.mesh = sfera
@@ -451,66 +604,138 @@ func _aggiorna_segni() -> void:
 
 
 # ---------------------------------------------------------------- reti
-# pallone in porta oltre il fondo della rete (il motore lo tiene fino a 1,9 m dietro la linea): a schermo si ferma
-# nel telo gonfio, non lo buca
-func _dentro_la_rete(bx: float, by: float, bh: float) -> float:
+# pallone in porta (il motore, dopo il gol, lo tiene fino a 1,9 m dietro la linea e lo lascia volare in alto, come il
+# web): a schermo si ferma nel telo gonfio e sotto il tetto della rete, non lo buca. Ritorna (y, h) da disegnare
+func _dentro_la_rete(bx: float, by: float, bh: float) -> Vector2:
 	var depth := absf(by) - Coord.HL
 	if depth <= 0.0 or absf(bx) > Coord.GW / 2.0 + 0.25 or bh > Coord.GH + 0.8:
-		return by
-	var lim := _fondo_rete(bh + BALL_R) + NET_MAX - BALL_R
-	return signf(by) * (Coord.HL + minf(depth, lim))
+		return Vector2(by, bh)
+	var h := minf(bh, _tetto_rete(minf(depth, RETE_FONDO)))
+	# fin dove il telo è gonfio davanti al pallone adesso (rete a molle), mai oltre NET_MAX
+	var molle: RefCounted = _campo.rete_molle(signf(flip * by))
+	var gonfio := NET_MAX
+	if molle != null:
+		gonfio = clampf(molle.gonfiore_in(Vector3(flip * bx, flip * by, h + BALL_R)) + 0.04, 0.0, NET_MAX)
+	var d := minf(depth, _fondo_rete(h + BALL_R) + gonfio - BALL_R)
+	h = minf(h, _tetto_rete(d))
+	return Vector2(signf(by) * (Coord.HL + d), h)
+
+
+# altezza massima del pallone (da terra al punto più basso) dentro la rete a d m dietro la linea: tetto piano fino a
+# RETE_ALTO, poi il fondo inclinato fino a terra a RETE_FONDO (più il telo che si gonfia)
+static func _tetto_rete(d: float) -> float:
+	var alto := Coord.GH
+	if d > RETE_ALTO:
+		alto = Coord.GH * clampf((RETE_FONDO + NET_MAX - d) / (RETE_FONDO - RETE_ALTO), 0.0, 1.0)
+	return maxf(0.0, alto - BALL_R * 2.0)
 
 
 # profondità del fondo della rete dietro la linea di porta all'altezza h (m)
 static func _fondo_rete(h: float) -> float:
 	return RETE_FONDO + (RETE_ALTO - RETE_FONDO) * clampf(h / Coord.GH, 0.0, 1.0)
 
-# Rete che si gonfia quando il pallone arriva in fondo e poi ondeggia (src/props.js updateGoals, semplificata: un solo
-# spostamento per porta, distribuito dallo shader attorno al punto d'impatto). La propria porta è più trasparente.
+# Reti a molle (scripts/rete_molle.gd, una per porta): il pallone spinge i nodi che tocca, il telo si gonfia attorno
+# a lui e poi ondeggia. Il pallone del motore (anche oltre il telo, dopo il gol) dà quanto spingere; quello a schermo
+# resta dentro (_dentro_la_rete). La propria porta è più trasparente (la si guarda attraverso).
 func _aggiorna_reti(b: Object, dt: float) -> void:
 	var s := flip
-	var wx: float = s * b.x
-	var wz: float = -s * b.y
-	var h: float = b.h + BALL_R
-	for lato: float in _nets:
+	var palla := Vector3(s * b.x, s * b.y, b.h + BALL_R)    # gioco, campo non girato (come scripts/campo.gd)
+	var vel := Vector3(b.vx, b.vy, b.vh).length()
+	for lato: float in [1.0, -1.0]:
 		var mat: ShaderMaterial = _campo.materiale_rete(lato)
-		if mat == null:
+		var molle: RefCounted = _campo.rete_molle(lato)
+		if mat == null or molle == null:
 			continue
-		var g: Dictionary = _nets[lato]
 		mat.set_shader_parameter("opacita", NET_NEAR if lato < 0.0 else NET_FAR)
-		var depth := -wz * lato - Coord.HL      # quanto il pallone è oltre la linea di porta (m)
-		var inside: bool = (m.phase == "goal" or m.phase == "play") and depth > -0.2 and depth < RETE_FONDO + 0.8 \
-			and absf(wx) < Coord.GW / 2.0 + 0.25 and h < Coord.GH + 0.8 and absf(b.y) > Coord.HL - 0.3
-		if inside and not g.entered:
-			g.entered = true
-			g.sp = Vector3(b.vx, b.vy, b.vh).length()
-		var dn := _fondo_rete(h)
-		if inside and depth > RETE_ALTO * 0.9 and not g.hit:
-			g.hit = true
-			g.v += minf(5.0, 1.0 + g.sp * NET_KICK) * 0.5
-		if not inside:
-			g.hit = false
-			g.entered = false
-		var target := clampf(depth + BALL_R - dn, 0.0, NET_MAX) if inside else 0.0
-		var d: float = g.d
-		var v: float = g.v
-		if target > d:
-			d += (target - d) * minf(1.0, dt * 30.0)
-			v = maxf(v, 0.0)
-		else:
-			var steps := maxi(1, ceili(dt * 60.0))
-			var hh := dt / steps
-			for n in steps:
-				v += (NET_K * (target - d) - NET_C * v) * hh
-				d += v * hh
-		if absf(d) < 1e-4 and absf(v) < 1e-3:
-			d = 0.0
-			v = 0.0
-		g.d = d
-		g.v = v
-		if inside:
-			mat.set_shader_parameter("colpo", Vector2(wx, h))
-		mat.set_shader_parameter("gonfia", d)
+		var depth := palla.y * lato - Coord.HL
+		var dentro: bool = (m.phase == "goal" or m.phase == "play") and depth > -0.6 and absf(palla.x) < Coord.GW / 2.0 + 0.3 \
+			and palla.z < Coord.GH + 0.6
+		molle.passo(dt, palla, BALL_R, vel, dentro)
+
+
+# ---------------------------------------------------------------- effetti, profondità di campo, qualità
+## forza del rallenty per la profondità di campo: 0 = niente, 1 = pieno; −1 = la vista lo ricava da sola
+## (dt_game / dt_real: sotto 0,6 inizia, a 0,2 è pieno)
+func set_rallenty(k: float) -> void:
+	_rk_forzato = clampf(k, 0.0, 1.0) if k >= 0.0 else -1.0
+
+
+## livello grafico a mano (0 minimo .. 3 alto, vedi qualita.gd); la discesa automatica riparte da qui
+func set_qualita(l: int) -> void:
+	_qualita.imposta(l)
+	_applica_qualita(_qualita.livello)
+
+
+func _process(delta: float) -> void:
+	if qualita_auto and m != null and _qualita.aggiorna(delta):
+		_applica_qualita(_qualita.livello)
+		print("qualità grafica: %s (FPS %.1f)" % [Qualita.NOMI[livello_qualita], _qualita.ultima_media])
+
+
+func _applica_qualita(l: int) -> void:
+	livello_qualita = l
+	_dof_on = l >= Qualita.ALTO
+	if not _dof_on:
+		_attr.dof_blur_far_enabled = false
+		_attr.dof_blur_near_enabled = false
+		_dof_k = 0.0
+	RenderingServer.directional_soft_shadow_filter_set_quality(RenderingServer.SHADOW_QUALITY_SOFT_LOW if l >= Qualita.ALTO else RenderingServer.SHADOW_QUALITY_SOFT_VERY_LOW)
+	_sole.shadow_blur = 1.6 if l >= Qualita.ALTO else 1.0
+	_env.glow_enabled = l >= Qualita.MEDIO
+	_stadio.set_pubblico(1.0 if l >= Qualita.MEDIO else (0.5 if l == Qualita.BASSO else 0.0))
+	_effetti.set_quantita(1.0 if l >= Qualita.MEDIO else (0.5 if l == Qualita.BASSO else 0.25))
+	_effetti.scia_on = l >= Qualita.BASSO
+	_effetti.sbuffi_on = l >= Qualita.BASSO
+
+
+# bagliore leggero: solo le cose più luminose del bianco (led, lampade, maxischermo, riflessi forti)
+func _imposta_bagliore() -> void:
+	_env.glow_intensity = 0.55
+	_env.glow_strength = 0.9
+	_env.glow_bloom = 0.0
+	_env.glow_hdr_threshold = 1.0
+	_env.glow_hdr_scale = 1.6
+	_env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SCREEN
+
+
+func _aggiorna_effetti(b: Object, dt_game: float, dt_real: float) -> void:
+	if dt_real > 0.0:
+		var r := dt_game / dt_real
+		_rk_auto = lerpf(_rk_auto, clampf((0.6 - r) / 0.4, 0.0, 1.0), minf(1.0, dt_real * 5.0))
+		_effetti.rallenty(r)
+	else:
+		_effetti.rallenty(0.0)
+	# sbuffo d'erba quando parte un calcio da terra
+	if b.kick != null and b.kick != _ultimo_calcio:
+		if b.h < 0.6:
+			_effetti.sbuffo(_ball.global_position)
+	_ultimo_calcio = b.kick
+	var v := Vector3(b.vx, b.vy, b.vh).length()
+	var tiro: bool = b.owner == null and (b.shot != null or v > SCIA_V) and v > 9.0 and m.phase == "play"
+	_effetti.scia(_ball.global_position, tiro, cam.global_position, dt_real)
+	_aggiorna_profondita(dt_real)
+
+
+# profondità di campo: nel rallenty (sfocati solo stadio e campo lontano) e nei primi piani (fuoco sul pallone)
+func _aggiorna_profondita(dt_real: float) -> void:
+	if not _dof_on:
+		return
+	var dist := cam.global_position.distance_to(_ball.global_position)
+	var k_r := _rk_forzato if _rk_forzato >= 0.0 else _rk_auto
+	var k_c := smoothstep(DOF_VICINO, DOF_PRIMO, dist)
+	var k := maxf(k_r, k_c)
+	_dof_k = lerpf(_dof_k, k, minf(1.0, maxf(dt_real, 1.0 / 60.0) * 4.0))
+	var on := _dof_k > 0.02
+	_attr.dof_blur_far_enabled = on
+	_attr.dof_blur_near_enabled = on and k_c > 0.3
+	if not on:
+		return
+	var oltre := lerpf(DOF_OLTRE, 5.0, k_c)
+	_attr.dof_blur_far_distance = dist + oltre
+	_attr.dof_blur_far_transition = oltre * 1.5
+	_attr.dof_blur_near_distance = dist * 0.45
+	_attr.dof_blur_near_transition = dist * 0.3
+	_attr.dof_blur_amount = DOF_FORZA * _dof_k
 
 
 # ---------------------------------------------------------------- risoluzione 3D

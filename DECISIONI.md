@@ -899,3 +899,51 @@ Verificato sul PC (Windows, Godot 4.7.2): 144 test senza schermo verdi (13 nuovi
 pausa in campionato (0-3 registrato) e in amichevole (nulla cambia) con `--prova-uscite`; schermate 390×844 del giro
 senza carriera → menu → partita → fine → dopo partita → menu. **Non verificato**: iPhone (salvataggio in sottofondo
 vero, prestazioni), le schermate vere dei menu (altro lavoro).
+
+## 2026-11-20 — Godot fase 4: grafica
+Grafica della partita nella versione Godot (`godot/`), solo vista: il motore non è cambiato. Nuove chiamate di
+`PartitaVista` (contratto nel README di `godot/`): `tifo(tipo, squadra)`, `set_rallenty(k)`, `set_qualita(l)`, più
+`qualita_auto` e `livello_qualita`.
+- **Pubblico 3D** (`scripts/stadio/pubblico.gd`, `shaders/pubblico.gdshader`): un cartoncino per tifoso in MultiMesh a
+  pezzi da 30 m (così la telecamera scarta quelli fuori schermo), girato verso la telecamera nello shader; figurine
+  disegnate a codice (4 tipi × 2 pose). Curva di casa dietro la porta in basso, settore ospiti al centro dell'altra
+  curva, misti ai lati; colori come `fanColors` del web. Le reazioni (in piedi, braccia su, salti, applauso) sono soglie
+  per tifoso nello shader: la CPU scrive solo 2 vec4 per fotogramma. Sul gol l'altra tifoseria si siede.
+- **Stadio**: cartelloni a led con 16 sponsor inventati che scorrono (porting di `src/stadium-ads.js`, testo disegnato
+  una volta in una SubViewport), maxischermi col risultato e "GOOOL!" (`src/stadium-screen.js`), tettoie a sbalzo con
+  travi e lampade, fari accesi sulle torri. Il bagliore (glow del renderer Mobile, soglia HDR 1) accende solo led,
+  lampade e maxischermo.
+- **Effetti** (`scripts/partita/effetti.gd`): scia del pallone sui tiri (> 17 m/s), sbuffo d'erba sul calcio da terra,
+  900 coriandoli coi colori di chi segna. Le particelle si "scaldano" all'avvio sotto il campo: senza, il primo gol
+  faceva un intoppo di ~150 ms (compilazione degli shader).
+- **Profondità di campo** nel rallenty (fondo sfocato oltre il portatore) e nei primi piani: solo al livello alto, è la
+  voce più cara (sul PC +0,19 ms di GPU a 780 px, il resto della scena 0,33 ms). **Occlusione ambientale (SSAO): il
+  renderer Mobile non ce l'ha**; non messa. Ombre morbide: filtro "soft low" e sfocatura 1,6 al livello alto.
+- **Rete a molle** (`scripts/rete_molle.gd`): 4 teli con una molla per nodo (17×7 il fondo), spostamenti in una
+  texture float letta nei vertici; il pallone tiene gonfio il telo attorno a sé (al massimo 45 cm) e uscito ondeggia;
+  dorme quando è ferma (niente conti). Test in `tests/test_rete.gd`.
+- **Pallone dopo il gol a y ≈ ±51,9 e fino a ~2,6 m**: il motore Godot fa come quello web (`match.js` riga 381 /
+  `match.gd` 526: la velocità verticale non si smorza nella rete), quindi **non è un errore del porting** e il motore
+  non è stato toccato. Corretto nella vista: il pallone a schermo resta sotto il tetto della rete e non va oltre il telo
+  gonfio (`_dentro_la_rete`). Nel web succede lo stesso (lì lo nasconde la rete a pezzi): da decidere se correggerlo
+  anche nel motore, per tutti e due.
+- **Aspetto dei giocatori** come il web (`aspetto.gd` = porting di `src/looks.js`, stessi numeri del JS nei test):
+  pelle, colore e taglio dei capelli, barba, sopracciglia, occhi, scarpe, maniche, colletto, motivo, calzettoni,
+  pantaloncini, maglia larga; cognome e numero sulla schiena da un atlante 8×4 disegnato una volta per partita. Tutto
+  nello shader della divisa (instance uniform: un materiale per tutti). **Limite**: i capelli non sono mesh a parte
+  come nel web: la zona coperta cambia col taglio e i vertici della testa si gonfiano; code e capelli lunghi non pendono.
+  Niente stemma sul petto (il motore non passa lo stemma).
+- **Texture HD** fatte dal progetto (`tools/genera_texture.gd`, CC0): pallone a 32 spicchi 1024×512 con normal map delle
+  cuciture, fili d'erba in normal map che spariscono oltre 26 m, chiazze larghe sull'erba. Il file più grande è 650 KB.
+  Bandierine col vento a raffiche, maglie che ondeggiano correndo (vertex shader).
+- **Livelli grafici automatici** (`qualita.gd`): sotto 58 fps per 3 finestre di 1 s di fila (dopo 4 s) si scende:
+  alto → medio (via profondità di campo, ombre più semplici) → basso (via bagliore, metà pubblico e particelle) →
+  minimo (pubblico dipinto, niente scia e sbuffi). Non si risale. `--qualita=N` e `--senza=voce` in `prova_vista` per
+  provare e misurare.
+- **Misure** (PC con RTX 3070, condiviso con altre sessioni: i numeri ballano di ±15%), `prova_vista --senza-vsync
+  --scala3d=2` (780 px come sull'iPhone): prima della fase GPU 0,25 ms, vista 0,92 ms di CPU; dopo GPU 0,35 ms in
+  partita, 0,27 sulla festa del gol, 0,51 nel rallenty con profondità di campo (0,33 senza); vista 1,0-1,2 ms di CPU.
+  Le singole voci (pubblico, cartelloni, schermi, tetti, fari, bagliore, ombre, effetti, aspetto) valgono ciascuna meno
+  del rumore (< 0,03 ms di GPU). Stima per l'iPhone A12 (GPU ~20 volte più lenta, CPU ~3-4 volte, margine dimezzato):
+  +2 ms di GPU in partita, +4 ms nel rallenty con la profondità di campo, +1 ms di CPU: dentro i 16,6 ms, ma la
+  profondità di campo è la prima a saltare. **Non verificato sull'iPhone.**

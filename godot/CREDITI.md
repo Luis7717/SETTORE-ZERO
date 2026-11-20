@@ -29,7 +29,20 @@ Tutti da Freesound, **CC0 1.0**, ritagliati per il web (dettagli e tempi in `ass
 `icons/icon_1024.png`: l'icona dell'app web (`App/AppIcon60x60@3x.png`, 180×180, disegno originale del progetto)
 ingrandita a 1024×1024 da `tools/genera_icona.gd`. È un po' morbida: un'icona disegnata a 1024 sarà meglio.
 
+## Texture HD (fase 4)
+
+| File | Origine | Licenza |
+|------|---------|---------|
+| textures/pallone.png, textures/pallone_n.png | disegno originale del progetto, generato da `tools/genera_texture.gd` (32 spicchi su un icosaedro troncato, cuciture in rilievo) | CC0 1.0 |
+| textures/erba_n.png | disegno originale del progetto, generato da `tools/genera_texture.gd` (fili d'erba casuali con seme fisso, rumore di Godot) | CC0 1.0 |
+
+Nessuna texture scaricata: tutte si rigenerano con `$G --headless --path godot -s res://tools/genera_texture.gd`.
+
 ## Fatto nel codice (niente file esterni)
+
+Fase 4: pubblico 3D (figurine disegnate a codice in `scripts/stadio/pubblico.gd`), cartelloni a led con 16 sponsor
+inventati (`scripts/stadio/cartelloni.gd`), maxischermi, tettoie, coriandoli, scia, capelli, barbe, numeri e cognomi
+sulle maglie (font predefinito di Godot): tutto disegnato dal codice, niente copiato da altri giochi.
 
 Erba, righe, porte, rete, bandierine, tribune, pubblico dipinto, cartelloni, torri faro, pallone, colori delle divise:
 li genera il codice (`scripts/campo.gd`, `scripts/stadio.gd`, `scripts/prova_campo.gd`, `shaders/`), disegni originali.

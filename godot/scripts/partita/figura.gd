@@ -62,9 +62,12 @@ var _w_idle := 0.0
 var _params := PackedFloat32Array([0.0, 0.0, 0.0, -1.0, -1.0, -1.0])   # ultimi valori scritti (_param)
 var _gcache := {}              # osso → posa globale calcolata in questo fotogramma (vedi _glob)
 var _avviso: Sprite3D
+var _mesh: MeshInstance3D
+var _corsa := 0.0              # ultimo valore di "corsa" dato allo shader (la maglia ondeggia)
 
 
-## kit: Dictionary con maglia, calzoncini, calzettoni, bordino (Color); aspetto: pelle, capelli (Color)
+## kit: maglia, calzoncini, calzettoni, bordino (Color) e se c'è stile, numero (Vector4); aspetto: pelle, capelli
+## (Color) e se ci sono iride, scarpe (Color), stile2 (Vector4): parametri di shaders/divisa.gdshader
 func prepara(kit: Dictionary, aspetto: Dictionary, sfasa: float, tex_avviso: Texture2D) -> void:
 	corpo = Node3D.new()
 	corpo.name = "Corpo"
@@ -82,10 +85,11 @@ func prepara(kit: Dictionary, aspetto: Dictionary, sfasa: float, tex_avviso: Tex
 		_prepara_condivisi(mesh, _scheletro, player)
 	mesh.mesh = Giocatore._mesh_divisa
 	mesh.material_override = Giocatore._materiale
-	for k in ["maglia", "calzoncini", "calzettoni", "bordino"]:
+	for k: String in kit:
 		mesh.set_instance_shader_parameter(k, kit[k])
-	for k in ["pelle", "capelli"]:
+	for k: String in aspetto:
 		mesh.set_instance_shader_parameter(k, aspetto[k])
+	_mesh = mesh
 	_fix.rotation.y = _fix_yaw
 	_fix.scale = Vector3.ONE * _fix_scale
 	_fix.position.y = _fix_y
@@ -125,6 +129,10 @@ func posa(p: Object, dt: float, ctx: Dictionary) -> void:
 	_avviso.visible = p.warn
 	var v := sqrt(p.vx * p.vx + p.vy * p.vy)
 	var run := clampf((v - 0.25) / RUN_FULL, 0.0, 1.0)
+	var corsa := clampf(v / SPRINT_REF, 0.0, 1.0)
+	if absf(corsa - _corsa) > 0.06:
+		_corsa = corsa
+		_mesh.set_instance_shader_parameter(&"corsa", corsa)
 	var bx := 0.0
 	var by := 0.0
 	var bz := 0.0
