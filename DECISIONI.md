@@ -845,3 +845,55 @@ Legge `SimMatch` e non lo cambia; contratto nel README di `godot/`. Ciclo di gio
 - **Verifica** (PC, RTX 3070): 144 test verdi, 0 falliti (anche `test_allenamento` 7 e `test_sfondo_menu` 6). Sfondo
   del menu: ~1500 FPS senza vsync, 120 con vsync; scena principale e menu senza errori senza schermo.
   **Non verificato sull'iPhone.**
+
+## 2026-11-20 — Godot fase 3: carriera
+Carriera, salvataggio e flusso dell'app in Godot (in parallelo: interfaccia dei menu, sfondo e allenamento guidato,
+grafica). Scena principale ora `godot/scenes/app.tscn` con l'autoload `App`; dettagli e API in `godot/README.md`
+("Carriera e flusso dell'app (fase 3)"). Scelte fatte in autonomia:
+1. **Porting 1:1 di `src/career.js`** in `godot/scripts/carriera/carriera.gd` (`class_name Carriera`), stessi nomi di
+   metodi e campi, stato in `c.s` con le stesse chiavi: chi fa i menu scrive leggendo `career.js` e `ui.js`.
+   `looks.js` → `aspetto.gd`, la parte dati di `crest.js` → `stemma_dati.gd` (tracciati SVG come testo: il disegno lo
+   fanno i menu). **A parità di seme la carriera è identica al JS** (`node test/export-carriera.mjs` →
+   `tests/test_carriera.gd`: creazione, calendario, mercato, 20 giornate a caso, tre stagioni con promozioni e titolo).
+2. **Per avere gli stessi numeri** si rifanno tre cose del JS (`scripts/carriera/js.gd`): l'ordinamento di V8
+   (TimSort con inserimento binario: i mescolamenti `sort(() => r() - 0.5)` dipendono da quante volte si chiama r();
+   verificato contro Node 26 da 8 a 63 elementi, sotto 8 V8 usa un altro metodo ma career.js mescola solo liste da
+   10 e 32), `toFixed` esatto in `fmtMoney` (1005 k€ = "1,00 M€", 1125 k€ = "1,13 M€", come il JS) e i numeri interi
+   dopo il JSON (Godot legge tutto come float e `[1.0].has(1)` è falso: al caricamento gli interi tornano int).
+3. **Salvataggio nuovo, non si converte quello del web** (scelta di Luis): `user://salvataggio.json` =
+   `{"versione": 1, "carriera": s}`. Scrittura su `.tmp`, controllo rileggendolo, il file di prima diventa `.bak`, il
+   temporaneo prende il suo posto. Lettura: principale, poi temporaneo, poi copia; un principale rotto va in `.rotto`
+   (non lo si cancella e non diventa la copia). Se non c'è niente di buono **non si crea una carriera da sola**: come
+   nel web il menu propone "Nuova carriera" (serve il nome della squadra). Campi mancanti → predefiniti, calendario
+   rotto → rifatto, formazione sbagliata → rifatta.
+4. **Impostazioni in `s.settings` come il web** (`half`, `diff`, `sound`, `autoGk`) **più `music` e `vibra`**
+   (predefinite true). Il segnaposto non le mostra: le userà il menu Impostazioni.
+5. **`App` autoload + `scenes/app.tscn` principale**: le schermate sono scene in `scenes/menu/<nome>.tscn` che
+   sostituiscono la scena corrente (`App.vai`); quelle che `App` apre da sola sono `principale` (avvio, ritorno) e
+   `dopo_partita` (con `App.ultimo_esito`). Finché mancano si vede `segnaposto.tscn` (elenco in testo).
+6. **Partita dall'app**: `gioco.gd` ha `avvia(opz)` e il segnale `finita(esito)`; se nessuno chiama `avvia` entro il
+   primo fotogramma parte con le squadre di prova. Le vecchie opzioni (`--bot`, `--scena`, `--schermata`, …) senza
+   `--app` fanno partire subito la partita di prova: i comandi delle fasi 1-2 funzionano come prima.
+   `finita` parte al fischio finale (il risultato si registra subito, come il web, anche se poi l'app viene chiusa
+   sulla schermata di fine), e il tasto "Continua" (prima "Nuova partita") emette `continua` per cambiare schermata;
+   con "Esci" `finita` parte subito: in campionato 0-3 a tavolino e `finishMatch` (come il web), in amichevole
+   ritorno al menu senza conseguenze.
+   Amichevole: `App.gioca_amichevole(avversario)` accetta l'id di una squadra, un livello (come il web) o niente.
+7. **Vista**: le divise arrivano col campo `kit` di `myMatchTeam`/`aiMatchTeam` (colori, `style`, `crest`); la vista
+   le usa già per i colori. Il `look` della carriera è fatto di indici (non colori): in `vista.gd` una riga lo
+   traduce con `Aspetto.colori` (prima avrebbe dato pelle e capelli quasi neri). Stile della maglia e stemma sulla
+   maglia restano alla grafica.
+8. **App in sottofondo o chiusa = salva subito.** La partita in corso non si salva (come il web): se l'app viene chiusa
+   a metà partita, la giornata non viene registrata.
+
+9. **Salvataggi scritti a metà**: calendario, classifica, squadre e giocatori controllati campo per campo; una
+   stagione arrivata alla giornata 18 ma non chiusa si chiude al caricamento; `finishMatch` senza partita da giocare
+   non fa niente (nel JS darebbe errore). Restano i limiti: `pow`/`exp` di Godot usano la libreria del sistema
+   (V8 la sua), quindi su iPhone un risultato simulato può in casi rarissimi differire dal web a parità di seme.
+
+Verificato sul PC (Windows, Godot 4.7.2): 144 test senza schermo verdi (13 nuovi: `test_carriera` 4,
+`test_salvataggio` 9); stagione intera senza schermo con le partite vere e il dito finto (`--app --stagione-bot --bot
+--veloce=8 --tempo=20`: 18 partite in 2 min 20 s, fine stagione, salvato, ricaricato dal file identico); "Esci" dalla
+pausa in campionato (0-3 registrato) e in amichevole (nulla cambia) con `--prova-uscite`; schermate 390×844 del giro
+senza carriera → menu → partita → fine → dopo partita → menu. **Non verificato**: iPhone (salvataggio in sottofondo
+vero, prestazioni), le schermate vere dei menu (altro lavoro).

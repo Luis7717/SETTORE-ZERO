@@ -1,0 +1,215 @@
+# Flusso dell'app (autoload `App`): carriera corrente, schermate del menu, partita, fine partita e ritorno.
+# La scena principale (scenes/app.tscn) chiama App.avvio() al primo fotogramma.
+#
+# API per i menu:
+#   App.carriera                      la Carriera corrente (scripts/carriera/carriera.gd); App.carriera.s == null
+#                                     se non c'è ancora una carriera (allora il menu propone di crearne una)
+#   App.vai(schermata, arg = null)    mostra scenes/menu/<schermata>.tscn (se manca: segnaposto.tscn). Se la scena
+#                                     ha `func apri(arg)` la si chiama subito dopo averla messa in scena; `arg` è anche
+#                                     nel meta "arg" del nodo, leggibile già in _ready
+#                                     (get_meta("arg") if has_meta("arg") else null: un meta null non viene scritto)
+#   App.gioca_campionato()            prossima partita di campionato (Carriera.nextMatch)
+#   App.gioca_amichevole(avversario)  amichevole: id di una squadra ("t3"), oppure livello (numero, come il web),
+#                                     oppure null (livello della mia squadra)
+#   App.allenamento()                 partita di allenamento (avversario debole, senza fine)
+#   App.ultimo_esito                  {esito, res, titolo, tipo} dell'ultima partita (anche come arg della schermata)
+#   segnale schermata_cambiata(nome)
+#
+# Dopo la partita (risultato registrato al fischio finale, schermata cambiata col tasto "Continua"):
+# campionato → Carriera.finishMatch e schermata "dopo_partita" (arg = ultimo_esito, con
+# res.season a fine stagione); amichevole finita → "dopo_partita" (res = null); amichevole abbandonata e
+# allenamento → "principale". L'app che va in sottofondo salva subito.
+#
+# Prove da riga di comando (dopo "--"):
+#   le opzioni della partita (--bot, --scena, --schermata, --veloce, --seme, --tempo, --vista-finta, --esci-a-fine,
+#   --partita) senza --app fanno partire subito la partita di prova, come prima della fase 3;
+#   --app forza il flusso dell'app; --salvataggio=user://altro.json usa un altro file;
+#   --stagione-bot, --app-schermate=CARTELLA, --prova-uscite: vedi scripts/app_prove.gd; --esci-dopo=SEC esce dopo SEC secondi.
+extends Node
+
+signal schermata_cambiata(nome: String)
+
+const CarrieraScript := preload("res://scripts/carriera/carriera.gd")
+const ProveApp := preload("res://scripts/app_prove.gd")
+const SCENA_PARTITA := "res://scenes/partita.tscn"
+const DIR_MENU := "res://scenes/menu/"
+const SEGNAPOSTO := "res://scenes/menu/segnaposto.tscn"
+const PRINCIPALE := "principale"
+const DOPO_PARTITA := "dopo_partita"
+const OPZIONI_PARTITA := ["bot", "scena", "schermata", "esci-a-fine", "veloce", "vista-finta", "seme", "tempo", "partita"]
+const ALLENAMENTO_TEMPO := 99999.0  # l'allenamento non finisce da solo (come il web)
+const AVVERSARIO_ALLENAMENTO := {"name": "Allenamento", "short": "ALL", "rating": 40, "seed": 7}
+
+var carriera: CarrieraScript
+var schermata := ""
+var partita: Node = null        # la scena della partita in corso (scripts/partita/gioco.gd)
+var ultimo_esito := {}
+var opzioni := {}               # opzioni da riga di comando
+
+var _avviata := false
+
+
+func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--"):
+			var parti := arg.substr(2).split("=", true, 1)
+			opzioni[parti[0]] = parti[1] if parti.size() > 1 else "1"
+	carriera = CarrieraScript.new()
+	if opzioni.has("salvataggio"):
+		carriera.percorso = opzioni.salvataggio
+	carriera.load()
+
+
+## primo avvio (da scenes/app.tscn): menu principale, oppure subito la partita di prova se ci sono le sue opzioni
+func avvio() -> void:
+	if _avviata:
+		return
+	_avviata = true
+	if opzioni.has("esci-dopo"):
+		get_tree().create_timer(float(opzioni["esci-dopo"])).timeout.connect(func() -> void: get_tree().quit(0))
+	if not opzioni.has("app") and OPZIONI_PARTITA.any(func(k: String) -> bool: return opzioni.has(k)):
+		_metti((load(SCENA_PARTITA) as PackedScene).instantiate()) # partita di prova: parte da sola
+		schermata = "partita"
+		return
+	if opzioni.has("stagione-bot") or opzioni.has("app-schermate") or opzioni.has("prova-uscite"):
+		add_child(ProveApp.new())
+	vai(PRINCIPALE)
+
+
+## mostra una schermata del menu (scenes/menu/<nome>.tscn); se non esiste ancora, il segnaposto
+func vai(nome: String, arg: Variant = null) -> void:
+	var percorso := DIR_MENU + nome + ".tscn"
+	if not ResourceLoader.exists(percorso):
+		percorso = SEGNAPOSTO
+	var n: Node = (load(percorso) as PackedScene).instantiate()
+	if arg != null:
+		n.set_meta("arg", arg)
+	n.set_meta("schermata", nome)
+	_metti(n)
+	partita = null
+	schermata = nome
+	if n.has_method("apri"):
+		n.apri(arg)
+	schermata_cambiata.emit(nome)
+
+
+func gioca_campionato() -> void:
+	if not _ha_carriera():
+		return
+	var nm: Variant = carriera.nextMatch()
+	if nm == null:
+		vai(PRINCIPALE)
+		return
+	var titolo := "Giornata %d · %s" % [nm.day, CarrieraScript.DIV_NAMES[nm.div]]
+	_partita("campionato", carriera.aiMatchTeam(nm.opp), titolo, float(carriera.s.settings.half))
+
+
+## avversario: id di una squadra del campionato, oppure livello (numero), oppure null = livello della mia squadra
+func gioca_amichevole(avversario: Variant = null) -> void:
+	if not _ha_carriera():
+		return
+	var t: Dictionary
+	if avversario is String and carriera.team(avversario) != null:
+		t = carriera.team(avversario)
+	else:
+		var lvl: float = float(avversario) if (avversario is int or avversario is float) else float(carriera.myRating())
+		t = {"name": "Amichevole", "short": "AMI", "kit": _kit_avversario(), "rating": lvl, "seed": randi() % 1000000000}
+	_partita("amichevole", carriera.aiMatchTeam(t), "Amichevole", float(carriera.s.settings.half))
+
+
+func allenamento() -> void:
+	if not _ha_carriera():
+		return
+	var t := AVVERSARIO_ALLENAMENTO.duplicate()
+	t["kit"] = _kit_avversario()
+	_partita("allenamento", carriera.aiMatchTeam(t), "Allenamento guidato", ALLENAMENTO_TEMPO)
+
+
+func _kit_avversario() -> int:
+	return (int(carriera.s.kit) + 4) % CarrieraScript.KITS.size()
+
+
+func _ha_carriera() -> bool:
+	if carriera.s == null:
+		push_warning("App: nessuna carriera, prima crearne una (App.carriera.create)")
+		vai(PRINCIPALE)
+		return false
+	return true
+
+
+func _partita(tipo: String, avversario: Dictionary, titolo: String, durata: float) -> void:
+	if schermata == "partita":
+		return # doppio tocco sul tasto: la partita sta già partendo
+	var s: Dictionary = carriera.s
+	var opz := {"squadra_a": carriera.myMatchTeam(), "squadra_b": avversario, "me": 0, "tipo": tipo,
+		"durata_tempo": durata, "seme": randi() % 1000000000, "titolo": titolo, "autoGk": bool(s.settings.autoGk)}
+	s.tut = int(s.get("tut", 0)) + 1 # partite iniziate (come il web)
+	carriera.save()
+	var scena: Node = (load(SCENA_PARTITA) as PackedScene).instantiate()
+	scena.avvia(opz)
+	scena.finita.connect(_fine_partita.bind(titolo))
+	scena.continua.connect(_continua)
+	_metti(scena)
+	partita = scena
+	schermata = "partita"
+	schermata_cambiata.emit("partita")
+
+
+# fischio finale o "Esci": il risultato si registra subito; la schermata cambia con "Continua" (o subito se si esce)
+func _fine_partita(esito: Dictionary, titolo: String) -> void:
+	var tipo: String = esito.tipo
+	if tipo == "allenamento" and esito.get("completato", false): # allenamento finito (come il web: tutDone)
+		carriera.s.tutDone = true
+		carriera.save()
+	if tipo == "allenamento" or (tipo == "amichevole" and esito.abbandonata):
+		ultimo_esito = {}
+		vai(PRINCIPALE)
+		return
+	var res: Variant = null
+	if tipo == "campionato":
+		var me: int = esito.me
+		var mie: int = esito.gol_a if me == 0 else esito.gol_b
+		var loro: int = esito.gol_b if me == 0 else esito.gol_a
+		res = carriera.finishMatch(mie, loro, _marcatori_per_me(esito.marcatori, me))
+		if (res as Dictionary).is_empty(): # nessuna partita da registrare (calendario finito o rotto)
+			res = null
+	ultimo_esito = {"esito": esito, "res": res, "titolo": titolo + (" · abbandonata" if esito.abbandonata else ""), "tipo": tipo}
+	if esito.abbandonata:
+		_continua()
+
+
+func _continua() -> void:
+	if schermata != "partita":
+		return
+	if ultimo_esito.is_empty():
+		vai(PRINCIPALE)
+	else:
+		vai(DOPO_PARTITA, ultimo_esito)
+
+
+# finishMatch conta i gol della squadra 0: se la persona fosse la squadra 1 si girano
+static func _marcatori_per_me(log: Array, me: int) -> Array:
+	if me == 0:
+		return log
+	return log.map(func(g: Dictionary) -> Dictionary:
+		var c := g.duplicate()
+		c.team = 1 - int(g.team)
+		return c)
+
+
+# sostituisce la scena corrente con `n`
+func _metti(n: Node) -> void:
+	var albero := get_tree()
+	var vecchia := albero.current_scene
+	albero.root.add_child(n)
+	albero.current_scene = n
+	if vecchia != null and vecchia != n:
+		vecchia.queue_free()
+
+
+# l'app va in sottofondo o si chiude: si salva subito
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_CLOSE_REQUEST:
+		if carriera != null and carriera.s != null:
+			carriera.save()

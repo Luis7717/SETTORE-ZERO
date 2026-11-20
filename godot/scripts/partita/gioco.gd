@@ -18,7 +18,19 @@
 #   --esci-dopo=SEC     esce dopo SEC secondi veri
 #   --allenamento       allenamento guidato (tipo "allenamento", scripts/partita/allenamento.gd) invece dell'amichevole;
 #                       con --lezione=N [--prova=K] parte da lì, con --scheda mostra la scheda della lezione N
+#
+# Dall'app (scripts/app.gd): chi crea la scena chiama `avvia(opz)` prima di aggiungerla o entro il primo fotogramma,
+# con opz = {squadra_a, squadra_b, me, tipo: "campionato"|"amichevole"|"allenamento", durata_tempo, seme,
+# titolo (facoltativo), autoGk (facoltativo)}; squadre come Carriera.myMatchTeam()/aiMatchTeam() (kit compreso).
+# Al fischio finale (la schermata di fine resta sopra) o se si esce dalla pausa la scena emette `finita(esito)` con
+# {gol_a, gol_b, marcatori, statistiche, abbandonata, tipo, me}; "Esci" in campionato = sconfitta 0-3 a tavolino.
+# Il tasto "Continua" della schermata di fine emette poi `continua` (chi ha avviato la partita cambia schermata).
+# Così il risultato si registra subito, anche se l'app viene chiusa sulla schermata di fine (come il web).
+# Se nessuno chiama avvia, la partita parte da sola con le squadre di prova (come prima, per le prove).
 extends Node
+
+signal finita(esito: Dictionary)
+signal continua
 
 const SimMatchScript := preload("res://sim/match.gd")
 const C := preload("res://sim/core.gd")
@@ -71,8 +83,7 @@ const RHINT := {
 
 var m: SimMatchScript = null
 var me := 0
-var tipo := "amichevole"      # "amichevole" o "allenamento" (allenamento guidato)
-var stato := "partita"        # "partita" o "fine"
+var stato := "attesa"         # "attesa" (prima di partire), "partita" o "fine"
 var paused := false
 var ts := 1.0                 # velocità del tempo attuale (1 = normale)
 var gesti: Gesti
@@ -83,6 +94,8 @@ var bot: BotDito = null
 var abbandonata := false
 
 var _opzioni := {}
+var _avvio := {}              # opzioni di avvia() (vuoto = partita di prova da sola)
+var _finita_emessa := false
 var _fine_ms := 0
 var _hud_ms := 0
 var _cam_tip_visto := false   # la scritta della visuale si mostra finché non la si gira una volta (web: career.s.camTip)
@@ -93,10 +106,32 @@ var _anteprima_viva := false
 var _inizio_ms := 0
 
 
+## avvio dall'app: da chiamare prima di aggiungere la scena all'albero o entro il primo fotogramma
+func avvia(opz: Dictionary) -> void:
+	if stato != "attesa":
+		push_warning("gioco.avvia: la partita è già partita, opzioni ignorate")
+		return
+	_avvio = opz.duplicate()
+
+
+func avviata_da_app() -> bool:
+	return not _avvio.is_empty()
+
+
+func tipo() -> String:
+	if _opzioni.has("allenamento"): # prova da riga di comando
+		return "allenamento"
+	return String(_avvio.get("tipo", "amichevole"))
+
+
 func _ready() -> void:
 	_leggi_opzioni()
-	if _opzioni.has("allenamento"):
-		tipo = "allenamento"
+	if _avvio.is_empty():
+		await get_tree().process_frame # chi ha creato la scena può ancora chiamare avvia()
+	_parti()
+
+
+func _parti() -> void:
 	_inizio_ms = Time.get_ticks_msec()
 	_crea_partita()
 	_crea_vista()
@@ -111,15 +146,16 @@ func _ready() -> void:
 	hud.dribbling_premuto.connect(_dribbling)
 	hud.riprendi.connect(_riprendi)
 	hud.secondo_tempo.connect(_secondo_tempo)
-	hud.esci.connect(func() -> void: _finisci(true))
+	hud.esci.connect(_esci_dalla_pausa)
 	hud.nuova_partita.connect(_nuova_partita)
 	audio = AudioPartita.new()
 	add_child(audio)
 	audio.folla(FOLLA_BASE)
-	if tipo == "allenamento":
+	if tipo() == "allenamento":
 		_avvia_allenamento()
 	else:
-		hud.big(TITOLO, "", 1800)
+		hud.big(_titolo(), "", 1800)
+	stato = "partita"
 	if _opzioni.has("bot"):
 		var seme_bot := int(_opzioni.get("seme", "1")) + 99
 		bot = BotAllenamento.new(seme_bot) if allenamento != null else BotDito.new(seme_bot)
@@ -129,12 +165,20 @@ func _ready() -> void:
 func _crea_partita() -> void:
 	var seme := int(_opzioni["seme"]) if _opzioni.has("seme") else randi() % 1000000000
 	var tempo := float(_opzioni.get("tempo", str(TEMPO_PREDEFINITO)))
-	var ospiti := Squadre.ospiti()
-	if tipo == "allenamento":
+	var squadre: Array = [Squadre.casa(), Squadre.ospiti()]
+	if avviata_da_app():
+		me = int(_avvio.get("me", 0))
+		squadre = [_avvio.squadra_a, _avvio.squadra_b]
+		seme = int(_avvio.get("seme", seme))
+		if not _opzioni.has("tempo"): # --tempo vince anche dall'app (prove veloci)
+			tempo = float(_avvio.get("durata_tempo", TEMPO_PREDEFINITO))
+	var auto_gk: bool = _avvio.get("autoGk", false)
+	m = SimMatchScript.new({"seed": seme, "halfLen": tempo, "human": [me == 0, me == 1],
+		"autoGk": [auto_gk and me == 0, auto_gk and me == 1], "teams": squadre})
+	if tipo() == "allenamento":
 		tempo = Allenamento.HALF_LEN
-		ospiti = Allenamento.squadra_ospite()
-	m = SimMatchScript.new({"seed": seme, "halfLen": tempo, "human": [true, false], "autoGk": [false, false],
-		"teams": [Squadre.casa(), ospiti]})
+		if not avviata_da_app():
+			squadre[1] = Allenamento.squadra_ospite()
 	gesti = Gesti.new()
 	gesti.out = Gesti.ComandiPartita.new(m, me)
 
@@ -353,6 +397,8 @@ func _fallo(e: Dictionary, adv: bool) -> void:
 
 # ---------------------------------------------------------------- tocchi (un dito solo)
 func _unhandled_input(event: InputEvent) -> void:
+	if gesti == null:
+		return
 	var giocabile := stato == "partita" and not paused
 	var now := Time.get_ticks_msec()
 	if event is InputEventScreenTouch:
@@ -390,7 +436,12 @@ func _mostra_pausa() -> void:
 	gesti.cancel()
 	hud.mostra_dribbling(false)
 	hud.aiuto_visuale("")
-	hud.mostra_pausa("Esci dall'allenamento" if allenamento != null else "Esci dall'amichevole")
+	var esci := "Esci dall'amichevole"
+	if allenamento != null:
+		esci = "Esci dall'allenamento"
+	elif avviata_da_app() and tipo() == "campionato":
+		esci = "Abbandona (sconfitta 0–3)"
+	hud.mostra_pausa(esci)
 
 
 func _riprendi() -> void:
@@ -425,6 +476,10 @@ func _finisci(forfait: bool) -> void:
 	hud.rallenty(false)
 	hud.suggerimento("", false)
 	hud.mostra_fine(dati_fine())
+	if avviata_da_app():
+		_emetti_finita()
+		if bot != null: # il dito finto preme "Continua"
+			get_tree().create_timer(1.5).timeout.connect(_nuova_partita)
 	if _opzioni.has("esci-a-fine"):
 		print(riassunto())
 		if not (_opzioni.has("schermata") and _opzioni.has("alla-fine")):
@@ -443,7 +498,8 @@ func dati_fine() -> Dictionary:
 	var tot: float = maxf(0.001, float(poss[0]) + float(poss[1]))
 	var p0 := int(roundf(float(poss[0]) / tot * 100.0))
 	return {
-		"titolo": TITOLO + (" · abbandonata" if abbandonata else ""),
+		"titolo": _titolo() + (" · abbandonata" if abbandonata else ""),
+		"tasto": "Continua" if avviata_da_app() else "Nuova partita",
 		"sigle": [m.teams[0].short, m.teams[1].short],
 		"colori": [Minimappa.colore(m.teams[0].kit.shirt), Minimappa.colore(m.teams[1].kit.shirt)],
 		"gol": [g0, g1],
@@ -476,7 +532,48 @@ func _esci() -> void:
 
 
 func _nuova_partita() -> void:
+	if avviata_da_app():
+		_emetti_finita()
+		continua.emit()
+		return
 	get_tree().reload_current_scene()
+
+
+func _titolo() -> String:
+	if avviata_da_app():
+		return String(_avvio.get("titolo", {"campionato": "Campionato", "allenamento": "Allenamento"}.get(tipo(), TITOLO)))
+	return TITOLO
+
+
+# "Esci" dalla pausa: dall'app la partita finisce subito (in campionato 0-3 a tavolino, come il web);
+# nella partita di prova si mostra la schermata di fine come prima
+func _esci_dalla_pausa() -> void:
+	if not avviata_da_app():
+		_finisci(true)
+		return
+	abbandonata = true
+	if tipo() == "campionato":
+		m.score[me] = 0
+		m.score[1 - me] = maxi(3, m.score[1 - me])
+		m.goalsLog = m.goalsLog.filter(func(g: Dictionary) -> bool: return g.team != me)
+	stato = "fine"
+	gesti.enabled = false
+	gesti.cancel()
+	audio.folla(0.0)
+	_emetti_finita()
+
+
+## risultato per chi ha avviato la partita (una volta sola)
+func esito() -> Dictionary:
+	return {"gol_a": m.score[0], "gol_b": m.score[1], "marcatori": m.goalsLog.duplicate(),
+		"statistiche": m.stats.duplicate(true), "abbandonata": abbandonata, "tipo": tipo(), "me": me}
+
+
+func _emetti_finita() -> void:
+	if _finita_emessa or m == null:
+		return
+	_finita_emessa = true
+	finita.emit(esito())
 
 
 # ---------------------------------------------------------------- prove da riga di comando

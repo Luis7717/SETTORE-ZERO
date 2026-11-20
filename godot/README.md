@@ -18,12 +18,18 @@ porting di `src/render.js`, `camfit.js`, `camuser.js`, `players3d.js`, `athlete3
 `move-pose.js`, `tricks.js` e `src/moves/*`. Legge lo stato del motore (`SimMatch`) e non lo cambia mai; il ciclo di
 gioco, i gesti e l'interfaccia sono un altro lavoro (`partita.tscn`). Contratto qui sotto.
 
+**Fase 3, carriera, salvataggio e flusso dell'app** (`scripts/carriera/`, `scripts/app.gd`, `scenes/app.tscn`):
+porting di `src/career.js` (identico al JS a parità di seme), salvataggio su file, scena principale che passa da
+menu a partita a fine partita e ritorno. Dettagli sotto, in "Carriera e flusso dell'app (fase 3)". In parallelo:
+interfaccia dei menu, sfondo del menu e allenamento guidato, grafica.
+
 ## Aprire il progetto
 
 1. Scarica Godot 4.7.2-stable (https://godotengine.org/download/archive/4.7.2-stable/), versione normale (non .NET).
 2. Apri Godot → *Importa* → scegli `godot/project.godot`. La prima volta importa modelli e suoni (cartella
    `godot/.godot/`, fuori dal repo).
-3. F5 fa partire la partita (`scenes/partita.tscn`). Col mouse si gioca come col dito. La scena di prova della fase 1
+3. F5 fa partire l'app (`scenes/app.tscn`: menu, poi partita); la sola partita di prova con `scenes/partita.tscn`
+   (F6 sulla scena aperta). Col mouse si gioca come col dito. La scena di prova della fase 1
    (`scenes/prova_campo.tscn`) resta: si apre dall'editor o con `$G --path godot res://scenes/prova_campo.tscn`.
 
 ## Struttura
@@ -44,7 +50,14 @@ gioco, i gesti e l'interfaccia sono un altro lavoro (`partita.tscn`). Contratto 
 | `shaders/divisa.gdshader` | colori della divisa per zone del corpo, come `src/athlete3d.js` |
 | `assets/` | modelli, suoni, icona (licenze in `CREDITI.md`) |
 | `tools/` | strumenti di sviluppo (icona, ispezione dei modelli): non finiscono nell'app |
-| `scenes/partita.tscn` | **partita** (scena principale): `scripts/partita/gioco.gd` |
+| `scenes/app.tscn`, `scripts/app_avvio.gd` | **scena principale**: al primo fotogramma passa la mano all'autoload `App` |
+| `scripts/app.gd` | autoload **`App`**: carriera corrente, schermate del menu, partita, fine partita, salvataggio in sottofondo |
+| `scripts/app_prove.gd` | prove automatiche del flusso: stagione intera col dito finto, giro di schermate |
+| `scripts/carriera/carriera.gd` | **`Carriera`**: porting 1:1 di `src/career.js` (stessi nomi, stato in `c.s`) |
+| `scripts/carriera/aspetto.gd`, `stemma_dati.gd` | `src/looks.js` e la parte dati di `src/crest.js` (forme, motivi, simboli, colori) |
+| `scripts/carriera/salvataggio.gd`, `js.gd` | file `user://salvataggio.json` (scrittura sicura, ripiego); aiuti per rifare il JS esatto (ordinamento di V8, toFixed, …) |
+| `scenes/menu/segnaposto.tscn` | menu provvisorio in testo (finché non ci sono le schermate vere in `scenes/menu/`) |
+| `scenes/partita.tscn` | **partita**: `scripts/partita/gioco.gd` (dall'app con `avvia(opz)`, da sola con le squadre di prova) |
 | `scenes/hud_partita.tscn` | interfaccia della partita: `scripts/partita/hud_partita.gd` |
 | `scripts/partita/gioco.gd` | ciclo della partita (`frame()` di `src/main.js`): gesti → motore col tempo scalato → eventi → vista; pausa, intervallo, fine |
 | `scripts/partita/gesti.gd` | comandi a un dito, porting di `src/input.js` (logica pura, provata senza schermo) |
@@ -91,8 +104,20 @@ $G --path godot -- --senza-vsync --esci-dopo=10            # FPS massimi del PC 
 $G --path godot -- --prova-tocchi --esci-dopo=6            # tocco simulato su un giocatore e sul campo (serve la finestra)
 ```
 
-Queste opzioni sono della scena di prova della fase 1: con la partita come scena principale si aggiunge
-`res://scenes/prova_campo.tscn` dopo `--path godot`. Le schermate di prova vanno in `shots/` (ignorata da git).
+Queste opzioni sono della scena di prova della fase 1: si aggiunge `res://scenes/prova_campo.tscn` dopo `--path godot`.
+Le schermate di prova vanno in `shots/` (ignorata da git).
+
+Scena principale = app (fase 3). Le opzioni della partita (`--bot`, `--scena`, `--schermata`, `--veloce`, `--seme`,
+`--tempo`, `--vista-finta`, `--esci-a-fine`, `--partita`) senza `--app` fanno partire subito la partita di prova come
+prima; con `--app` si passa dal menu:
+
+```sh
+$G --headless --path godot -- --esci-dopo=4                                  # menu senza schermo per 4 s: niente errori
+$G --headless --path godot -- --app --stagione-bot --bot --veloce=8 --tempo=20 --salvataggio=user://prova.json
+#   stagione intera col dito finto (~2 min): 18 partite vere, fine stagione, salva, ricarica e confronta
+$G --path godot -- --app --app-schermate=shots/fase3 --bot --veloce=8 --tempo=15 --salvataggio=user://prova2.json
+#   schermate: senza carriera, menu, partita, fine partita, dopo partita, menu
+```
 
 ## Partita (fase 2)
 
@@ -194,6 +219,65 @@ $G --path godot -- --allenamento --lezione=1 --scheda --schermata=shots/scheda.p
 $G --path godot -- --allenamento --bot --lezione=4 --prova=2 --schermata=shots/recupera.png --dopo=2.2
 node test/export-menu.mjs        # rigenera tests/fixtures/menu.json dal JS
 ```
+
+## Carriera e flusso dell'app (fase 3)
+
+**Carriera** (`scripts/carriera/carriera.gd`, `class_name Carriera`): porting 1:1 di `src/career.js` con gli stessi
+nomi di metodi e campi, così i menu si scrivono leggendo `career.js` e `src/ui.js`. Stato in `c.s` (Dictionary con le
+stesse chiavi del web: `club`, `kit`, `money`, `season`, `day`, `teams`, `divs`, `squad`, `market`, `lineup`,
+`formation`, `fix`, `tab`, `res`, `history`, `last`, `settings`, …). Metodi: `create(name, kit, seme = casuale)`,
+`load()`, `save()`, `reset()`, `newSeason`, `table(d)`, `myRating`, `nextMatch`, `autoLineup`, `fixLineup`, `bench`,
+`swap(a, b)`, `refreshMarket`, `buy(id)`, `sell(id)`, `sellPrice(p)`, `kitStyle`/`setKitStyle`, `crest`/`setCrest`,
+`teamCrest(t)`, `setLook(id, look)`, `addChampion({name, pos, look, num})`, `div`, `team(id)`, `player(id)`,
+`skillOf`, `divOf`, `kitOf`, `dress`, `myMatchTeam`, `aiMatchTeam(t)`, `record`, `simScore`, `finishMatch(my, opp,
+log)`, `endSeason`. Funzioni e costanti statiche: `Carriera.DIV_NAMES`, `KITS`, `POS_NAME`, `FORMATIONS`,
+`overall(p)`, `overallAs(p, pos)`, `value(p)`, `fmtMoney(k)`, `genPlayer(...)`, `randomName(r)`.
+Differenze: `buy`/`sell` ritornano `""` se è andata bene (nel JS `null`); `s.settings` ha anche `music` e `vibra`;
+gli interi restano `int` anche dopo il caricamento. `Aspetto` (`aspetto.gd`) = `src/looks.js` (`lookFromSeed`,
+`normalizeLook`, `lookOf`, `kitStyleFromSeed`, `squadNumbers`, `backName`, elenchi `SKINS`, `HAIR_STYLES`, …, più
+`colori(look)` per la grafica); `StemmaDati` (`stemma_dati.gd`) = dati di `src/crest.js` (`CREST_SHAPES`,
+`CREST_PATTERNS`, `CREST_ICONS` come tracciati SVG, `crestFromSeed`, `normalizeCrest`, `crestColors`).
+
+**Uguale al JS a parità di seme**: `node test/export-carriera.mjs` scrive `tests/fixtures/carriera.json` (pezzi,
+creazione e calendario, mercato, rosa, stemma, campione, 20 giornate con risultati a caso, tre stagioni vinte con
+promozioni e titolo) e `tests/test_carriera.gd` lo confronta passo per passo. Va rilanciato quando cambia la carriera
+JS. Per avere gli stessi numeri: i mescolamenti `sort(() => r() - 0.5)` rifanno l'ordinamento di V8 (`js.gd`), e
+`fmtMoney` rifà `toFixed` esatto (1005 k€ → "1,00 M€" come il JS).
+
+**Salvataggio** (`salvataggio.gd`): `user://salvataggio.json` = `{"versione": 1, "carriera": s}` (nuovo formato,
+quello dell'app web non si legge). Si scrive `salvataggio.json.tmp`, lo si rilegge, il file di prima diventa
+`salvataggio.json.bak` e il temporaneo prende il suo posto. In lettura vince il primo buono tra principale, temporaneo
+e copia; un principale rotto finisce in `salvataggio.json.rotto`; se non c'è niente di buono `load()` ritorna false
+(il menu propone una carriera nuova). I campi mancanti si riempiono coi predefiniti (`completa`), il calendario rotto
+si rifà. `tests/test_salvataggio.gd` prova tutti i casi.
+
+**Flusso** (`scripts/app.gd`, autoload `App`; scena principale `scenes/app.tscn`):
+
+| API | Cosa fa |
+|---|---|
+| `App.carriera` | la `Carriera` corrente (`App.carriera.s == null` = nessuna carriera) |
+| `App.vai(schermata, arg = null)` | mostra `scenes/menu/<schermata>.tscn` (se manca: `segnaposto.tscn`); chiama `apri(arg)` se la scena ce l'ha; `arg` anche nel meta "arg" |
+| `App.gioca_campionato()` | prossima partita di campionato |
+| `App.gioca_amichevole(avversario)` | id di una squadra (`"t3"`), un livello (numero, come il web) o `null` (livello della mia squadra) |
+| `App.allenamento()` | allenamento (avversario debole, tempo senza fine) |
+| `App.ultimo_esito` | `{esito, res, titolo, tipo}` dell'ultima partita |
+| `App.schermata_cambiata(nome)` | segnale |
+
+All'avvio `App` mostra `"principale"`. Dopo la partita (risultato registrato al fischio, schermata cambiata con
+"Continua"): campionato → `finishMatch` e `"dopo_partita"` con
+`arg = App.ultimo_esito` (`res.season` a fine stagione); amichevole → `"dopo_partita"` (`res = null`); amichevole
+abbandonata e allenamento → `"principale"`. App in sottofondo o chiusa = salva subito.
+
+**Partita dall'app** (`gioco.gd`): `avvia(opz)` prima di aggiungere la scena (o entro il primo fotogramma) con
+`{squadra_a, squadra_b, me, tipo: "campionato"|"amichevole"|"allenamento", durata_tempo, seme, titolo, autoGk}`;
+le squadre sono quelle di `myMatchTeam()`/`aiMatchTeam()`, col campo `kit` = `{shirt, shorts, socks, gk, style,
+crest, (gloves)}` che arriva alla vista. Al fischio finale emette `finita(esito)` con
+`{gol_a, gol_b, marcatori (m.goalsLog), statistiche (m.stats), abbandonata, tipo, me}` (il risultato si registra
+subito, anche se l'app viene chiusa sulla schermata di fine), poi il tasto "Continua" emette `continua` e `App`
+cambia schermata. "Esci" dalla pausa: in
+campionato sconfitta 0-3 a tavolino (come il web), in amichevole si torna al menu senza conseguenze. Senza `avvia`
+la partita parte da sola con le squadre di prova (opzioni da riga di comando come prima).
+La vista colora pelle e capelli dal `look` della carriera (indici di `Aspetto`) con `Aspetto.colori`.
 
 ## Build per iPhone (GitHub Actions)
 
