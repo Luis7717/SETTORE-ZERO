@@ -1,4 +1,5 @@
 // Grafica 3D: stadio, giocatori, palla, linea disegnata. Coordinate three: X = x, Y = altezza, Z = -y.
+import { chooseTrick, ballOffset } from './tricks.js';
 import * as THREE from 'three';
 import { W, L, HW, HL, GW, GH, BOX_W, BOX_D, SIX_W, SIX_D, PEN_D, CIRCLE } from './sim.js';
 import { buildStadium } from './stadium.js';
@@ -263,6 +264,15 @@ export class View {
 
   setZoom(z) { this.zoomT = z; }
 
+  // dribbling tentato da p: parte un giochetto, più bello se il dribbling di p è alto (solo grafica)
+  trick(p, r = Math.random()) {
+    const T = chooseTrick(p.st ? p.st.dri : 50, r);
+    this.tricks = this.tricks || new Map();
+    this.tricks.set(p.i, { id: T.id, name: T.name, dur: T.dur, t: 0, side: r * 1000 % 2 < 1 ? 1 : -1 });
+    return T;
+  }
+  trickOf(p) { const k = this.tricks && this.tricks.get(p.i); return k ? { id: k.id, q: Math.min(1, k.t / k.dur), side: k.side } : null; }
+
   update(dt) {
     const m = this.match; if (!m) return;
     const s = this.flip, b = m.ball; this.t += dt;
@@ -274,11 +284,19 @@ export class View {
       if (f.src !== p.src) { this.scene.remove(f.g); this.scene.remove(f.sh); if (f.m3d) this.p3d.dispose(f); f = this.figs[i] = this.figFor(p); } // cambio: entra un altro giocatore
       this.pose(p, f, dt);
     }
-    // palla
-    this.ballM.position.set(s * b.x, b.h + 0.21, -s * b.y);
+    // giochetti del dribbling in corso
+    if (this.tricks) for (const [i, k] of this.tricks) { k.t += dt; if (k.t >= k.dur) this.tricks.delete(i); }
+    // palla (durante un giochetto di chi la porta, spostata per farlo vedere)
+    let bx = b.x, by = b.y, bh = b.h;
+    const tk = b.owner && this.trickOf(b.owner);
+    if (tk) {
+      const o = ballOffset(tk.id, tk.q), c = b.owner, fx = c.fx, fy = c.fy;
+      bx += fx * o.f - fy * o.s * tk.side; by += fy * o.f + fx * o.s * tk.side; bh += o.h;
+    }
+    this.ballM.position.set(s * bx, bh + 0.21, -s * by);
     const sp = Math.hypot(b.vx, b.vy);
     if (sp > 0.2) { this.v3.set(-s * b.vy, 0, -s * b.vx).normalize(); this.ballM.rotateOnWorldAxis(this.v3, -sp * dt / 0.21); }
-    const hs = 0.75 + Math.min(b.h, 8) * 0.12; this.ballSh.position.set(s * b.x, 0.03, -s * b.y); this.ballSh.scale.set(hs, 1, hs);
+    const hs = 0.75 + Math.min(bh, 8) * 0.12; this.ballSh.position.set(s * bx, 0.03, -s * by); this.ballSh.scale.set(hs, 1, hs);
     // anello
     const c = m.ctrl[this.me];
     if (c && !c.off) {
@@ -329,7 +347,7 @@ export class View {
     const wx = s * p.fx, wz = -s * p.fy, yaw = Math.atan2(wx, wz);
     g.position.set(s * p.x, 0, -s * p.y); g.rotation.y = yaw;
     f.sh.position.set(s * p.x, 0.025, -s * p.y);
-    if (f.m3d) { f.warn.visible = !!p.warn; this.p3d.pose(p, f, dt, { t: this.t, phase: this.match.phase, flip: s, yaw, ball: this.match.ball, scale: SCALE }); return; }
+    if (f.m3d) { f.warn.visible = !!p.warn; this.p3d.pose(p, f, dt, { t: this.t, phase: this.match.phase, flip: s, yaw, ball: this.match.ball, scale: SCALE, trick: this.trickOf(p) }); return; }
     const v = Math.hypot(p.vx, p.vy), A = Math.min(1, v / 6.5), ph = p.phase;
     body.rotation.set(0, 0, 0); body.position.set(0, 0, 0);
     let tl = -A * 0.95 * Math.sin(ph), tr = A * 0.95 * Math.sin(ph);

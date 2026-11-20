@@ -402,7 +402,65 @@ class Players3D {
     L.length = 0;
   }
 
-  // ctx: { t, phase, flip, yaw, ball, scale }
+  // giochetto del dribbling (tr = { id, q 0..1, side ±1 }): rotazioni delle ossa sopra il clip
+  trickPose(f, body, tr, S) {
+    const X = 0, Y = 1, Z = 2, q = tr.q, sd = tr.side, PI = Math.PI;
+    const bump = u => Math.sin(PI * Math.min(1, Math.max(0, u)));
+    const R = sd > 0 ? 'Right' : 'Left', Lf = sd > 0 ? 'Left' : 'Right', zs = sd > 0 ? -1 : 1;
+    switch (tr.id) {
+      case 'finta': { // spalla da una parte, via dall'altra
+        const w = Math.sin(2 * PI * q);
+        body.rotation.z = -0.32 * w * sd; this.rot(f, 'Spine', Y, 0.55 * w * sd);
+        this.rot(f, 'LeftUpLeg', X, -0.25 * Math.abs(w)); this.rot(f, 'RightUpLeg', X, -0.25 * Math.abs(w));
+        this.rot(f, 'LeftLeg', X, 0.4 * Math.abs(w)); this.rot(f, 'RightLeg', X, 0.4 * Math.abs(w));
+        this.rot(f, 'LeftArm', Z, 0.6 + 0.3 * w); this.rot(f, 'RightArm', Z, -0.6 + 0.3 * w);
+        break;
+      }
+      case 'doppiopasso': { // due giri della gamba sopra il pallone, prima una poi l'altra
+        const h = q < 0.5 ? 0 : 1, u = q < 0.5 ? q * 2 : q * 2 - 1, leg = h ? Lf : R, z = h ? -zs : zs;
+        this.rot(f, leg + 'UpLeg', X, -0.95 * bump(u)); this.rot(f, leg + 'UpLeg', Z, z * 0.75 * Math.sin(2 * PI * u - 0.6));
+        this.rot(f, leg + 'Leg', X, 0.8 * bump(u));
+        body.rotation.z = -z * 0.22 * bump(u); this.rot(f, 'Spine', Y, z * 0.35 * bump(u));
+        this.rot(f, 'LeftArm', Z, 0.75); this.rot(f, 'RightArm', Z, -0.75);
+        break;
+      }
+      case 'elastico': { // esterno fuori, poi interno dentro
+        const out = q < 0.45 ? bump(q / 0.9) : Math.cos(PI * (q - 0.45) / 0.55 * 1.5) * (1 - (q - 0.45) / 0.55);
+        this.rot(f, R + 'UpLeg', Z, zs * 0.7 * out); this.rot(f, R + 'UpLeg', X, -0.45 * Math.abs(out));
+        this.rot(f, R + 'Leg', X, 0.5 * Math.abs(out));
+        body.rotation.z = zs * 0.18 * out; this.rot(f, 'Spine', Y, -zs * 0.3 * out);
+        this.rot(f, 'LeftArm', Z, 0.8); this.rot(f, 'RightArm', Z, -0.8);
+        break;
+      }
+      case 'veronica': { // giro completo sul pallone
+        const e = q * q * (3 - 2 * q);
+        body.rotation.y = -sd * 2 * PI * e;
+        this.rot(f, R + 'UpLeg', X, -0.5 * bump(q * 2)); this.rot(f, Lf + 'UpLeg', X, -0.5 * bump(q * 2 - 1));
+        this.rot(f, 'LeftArm', Z, 1.0); this.rot(f, 'RightArm', Z, -1.0);
+        this.rot(f, 'Spine', X, 0.15);
+        break;
+      }
+      case 'sombrero': { // punta sotto il pallone, su e oltre, poi saltello per andarlo a prendere
+        const k = bump(q / 0.4);
+        this.rot(f, R + 'UpLeg', X, -1.1 * k); this.rot(f, R + 'Leg', X, 0.3 * k);
+        this.rot(f, 'Spine', X, -0.2 * k);
+        body.position.y = 0.25 * bump((q - 0.55) / 0.45) / S;
+        this.rot(f, 'LeftArm', Z, 0.9); this.rot(f, 'RightArm', Z, -0.9);
+        break;
+      }
+      case 'arcobaleno': { // tallone dietro che alza il pallone sopra la testa
+        const k = bump(q / 0.5);
+        this.rot(f, R + 'Leg', X, 1.7 * k); this.rot(f, R + 'UpLeg', X, 0.35 * k);
+        this.rot(f, Lf + 'Leg', X, 0.4 * k);
+        this.rot(f, 'Spine', X, -0.3 * k);
+        body.position.y = (0.18 * k + 0.2 * bump((q - 0.6) / 0.4)) / S;
+        this.rot(f, 'LeftArm', Z, 1.1 * k + 0.3); this.rot(f, 'RightArm', Z, -1.1 * k - 0.3);
+        break;
+      }
+    }
+  }
+
+  // ctx: { t, phase, flip, yaw, ball, scale, trick }
   pose(p, f, dt, ctx) {
     const body = f.body, A = f.act, X = 0, Z = 2, sv = f.saved;
     for (let i = sv.length - 2; i >= 0; i -= 2) sv[i].quaternion.copy(sv[i + 1]);
@@ -445,6 +503,8 @@ class Players3D {
       const w = 0.2 * Math.sin(ctx.t * 9 + p.i);
       this.rot(f, 'LeftArm', Z, 1.05 + w); this.rot(f, 'RightArm', Z, -1.05 - w);
       this.rot(f, 'LeftForeArm', Z, 0.4); this.rot(f, 'RightForeArm', Z, -0.4);
+    } else if (ctx.trick && st === 'play') {
+      this.trickPose(f, body, ctx.trick, S);
     } else if (header) {
       const q = 1 - p.kickAnim / KICK_T;
       body.position.y = Math.sin(q * Math.PI) * 0.35;

@@ -138,6 +138,7 @@ function events(m) {
       case 'advantage': big('Vantaggio!', '', 1100); break;
       case 'advantage_back': sfx.whistle(); big('Si torna alla punizione', '', 1300); break;
       case 'tackle': case 'block': sfx.kick(9); break;
+      case 'dribble': { const T = view.trick(e.p); if (e.p.team === 0) big(T.name + (e.ok ? '!' : ''), e.ok ? 'g' : '', 1000); break; }
       case 'goal':
         if (e.team === 0) { sfx.goal(); big('GOL!', 'g', 2600, (e.scorer ? e.scorer.name : 'Autogol') + ' · ' + e.minute + '\''); }
         else { sfx.ooh(); big('Gol subito', 'b', 2400, (e.scorer ? e.scorer.name : 'Autogol') + ' · ' + e.minute + '\''); }

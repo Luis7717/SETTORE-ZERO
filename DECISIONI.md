@@ -300,3 +300,12 @@ maglia, maniche, calzettoni…), poi nome e numero sulla schiena e uno stemma in
 - **Scivolata tolta anche all'IA** (richiesta successiva): il pressatore avversario ruba palla solo col contatto.
   Il motore della scivolata resta (prove a schermo e test dei falli). Effetto: i falli venivano quasi solo dalle
   scivolate, quindi ora punizioni, cartellini e rigori per fallo saranno rarissimi. Impronta golden rigenerata.
+
+## 2026-11-20 — Giochetti nel dribbling
+- Solo grafica (`src/tricks.js`, pose in `src/players3d.js` `trickPose`, pallone spostato in `src/render.js`): il motore
+  decide se il dribbling riesce, la grafica sceglie come farlo vedere. Nessun cambio al motore né all'impronta golden.
+- Sei giochetti in ordine di bellezza: finta di corpo, doppio passo, elastico, veronica, sombrero, colpo dell'arcobaleno.
+  Il più bello possibile si sblocca ogni 10 punti di dribbling da 35 in su (85+ = arcobaleno); di solito si fa il più
+  bello che si sa fare (60%), a volte uno o due più semplici. Si usa il dribbling del momento (cala con l'uso).
+- Valgono anche per gli avversari. Per i nostri compare il nome del giochetto in grande.
+- Prova a schermo: `node test/tricks-shot.mjs shots`.
