@@ -724,3 +724,44 @@ di costanti, metodi e campi; dettagli e corrispondenza dei file in `godot/sim/RE
 - **Velocità** (PC di sviluppo): GDScript ~1 800 passi/s (0,56 ms a passo, 99% sotto 1,5 ms, massimo 3,1 ms), Node ~29 000.
   Un passo a fotogramma è ~3% dei 16,7 ms; su iPhone stimati 0,5-1 ms a passo. **Da misurare sul telefono.**
 - `m.dispose()` a fine partita: i riferimenti circolari tra giocatori (`supC`, `beatBy`) Godot non li libera da solo.
+
+## 2026-11-20 — Godot fase 2: gioco
+Partita giocabile in Godot, parte "gioco" (la vista con giocatori, animazioni e telecamere la fa un altro lavoro in
+parallelo). Scena principale ora `godot/scenes/partita.tscn`; dettagli e contratto della vista in `godot/README.md`
+("Partita (fase 2)"). Scelte fatte in autonomia:
+1. **Ciclo uguale al web**: gesti → motore a passi di al massimo 1/60 s col tempo scalato → eventi → vista; rallenty
+   con le costanti attuali di `src/main.js` (duello 0,08, area 0,1, disegno di passaggio 0,04, di strada 0,25, di
+   difesa 0,13, parata 0,1) e passaggio dolce del tempo (14/s). Un tempo dura 150 s come il predefinito del web.
+2. **Gesti = porting di `src/input.js`** in `scripts/partita/gesti.gd`, logica pura: riceve posizioni e millisecondi,
+   così gira nei test senza schermo (`tests/test_gesti.gd`, 20 test) con una vista finta come
+   `test/unit/camuser.test.mjs`. Stessi nomi del JS (`down`, `move_ev`, `up`, `update`, `run_path`, `pick`, `spec`).
+3. **La porta senza `screen_to_goal`**: il contratto della vista non ha il punto della porta sotto il dito (serve per
+   tiro e tuffo). Se la vista ha `screen_to_goal` lo si usa; altrimenti lo si ricava con un'**omografia** da 4 punti
+   della porta passati per `world_to_screen` (un piano visto da una telecamera arriva sullo schermo così, è esatto).
+   Provato con una telecamera prospettica nei test (errore sotto 1 mm). Per questo `world_to_screen(...).z` deve dire
+   "davanti alla telecamera", non "dentro lo schermo".
+4. **Visuale girata col dito**: `camuser.gd` è della vista, quindi la parte del gesto (soglia 12 px, 150°/schermo,
+   ±100°, verso "afferra il campo", angolo e rallenty) sta in `scripts/partita/visuale_dito.gd`; il ritorno a 0 e la
+   porta tenuta a schermo restano alla vista. All'unione i due file si possono fondere.
+5. **Anteprima del calcio in 2D** (puntini del volo, linea del fuorigioco, cerchio su chi riceve) disegnata dall'HUD
+   sopra la vista con `world_to_screen`: il contratto non ha `setPreview`. Se la vista vera la farà in 3D, si toglie.
+6. **Un dito solo**: un secondo dito si ignora; un tocco annullato dal sistema non dà ordini; i tocchi sui tasti
+   dell'HUD (pausa, Dribbling) non arrivano ai gesti; l'app in sottofondo mette in pausa (come `visibilitychange`).
+7. **Squadre di prova** (`scripts/partita/squadre_prova.gd`): Virtus Borgoalto (VIR, rosso, 4-4-2, livello 64) contro
+   Aurora Portosole (AUR, blu, 4-3-3, livello 62), statistiche come `genPlayer` da un seme fisso, nomi inventati;
+   stessa forma dei dati di `career.js` (colori 0xRRGGBB). Il seme della partita è a caso (`--seme=N` per le prove).
+8. **Suoni**: file di `godot/assets/audio/`; il palo non ha un file e si genera un tono come il web. Pubblico che
+   cresce col pallone negli ultimi 25 m prima di una porta (come lo stadio del web) e sale dopo un gol. Senza schermo
+   i suoni sono spenti: col driver audio finto un suono in corso all'uscita resta in memoria e la build su GitHub
+   (che cerca `ERROR:`) fallirebbe.
+9. **Carattere**: quello di Godot ingrossato (`FontVariation`), non un carattere di sistema: stesse misure e stessi
+   simboli su PC e iPhone. Il testo dei suggerimenti va a capo a mano (le Label con a-capo automatico dentro un
+   contenitore sbagliavano l'altezza). Il tasto Dribbling sta sempre sopra il suggerimento.
+10. **Fine partita**: schermata con risultato, esito, marcatori e statistiche, tasto "Nuova partita"; "Esci
+   dall'amichevole" (con conferma) porta lì come partita abbandonata. Niente menu e carriera fino alla fase 3; niente
+   cambi in pausa.
+
+Verificato sul PC: 20 test dei gesti verdi più tutti quelli del motore; partite intere senza schermo col "dito finto"
+(`--bot`) che usa solo i gesti veri, senza errori; schermate 390×844 con la vista finta (partita, rallenty con frecce,
+disegno di un passaggio con anteprima, angolo, pausa, fine partita). **Non verificato**: iPhone (tocchi veri, aree
+sicure vere, suoni, prestazioni) e la vista vera.
