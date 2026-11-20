@@ -585,3 +585,6 @@ corsa andava bene. Non ci sono clip CC0/CC-BY di palleggio o skill per questo sc
   in qualche fotogramma (punta e polpaccio nell'arcobaleno).
 - **Da provare sull'iPhone**: palleggio e giochetti nel menu (fluidità, se il contatto si vede), giochetti in partita
   nel duello (tasto Dribbling, anche col sinistro), durata dei voli di sombrero e arcobaleno in partita.
+
+## 2026-11-20 — Versione Godot: niente conversione del salvataggio
+Luis: "Non mi interessa il salvataggio convertito". L'app Godot ("Tiro a Giro 3D", `it.tiroagiro.godot`) parte con un salvataggio suo, nuovo; non si legge né si copia `tag_save_v1` della versione web. La regola su `tag_save_v1` resta valida solo per la versione web.
