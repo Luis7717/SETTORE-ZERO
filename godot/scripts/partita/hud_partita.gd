@@ -534,7 +534,8 @@ func mostra_intervallo(gol0: int, gol1: int) -> void:
 	_tasto("Secondo tempo", true, func() -> void: secondo_tempo.emit())
 
 
-## schermata di fine partita: d = {titolo, sigle, colori, gol, marcatori: [[squadra, testo]], statistiche: [[nome, a, b]]}
+## schermata di fine partita: d = {titolo, sigle, colori, gol, marcatori: [[squadra, testo]], statistiche: [[nome, a, b]],
+## tasto (facoltativo: testo del tasto in fondo, predefinito "Nuova partita")}
 func mostra_fine(d: Dictionary) -> void:
 	_svuota_overlay()
 	_spazio(_sicura.size.y * 0.03)
@@ -562,7 +563,7 @@ func mostra_fine(d: Dictionary) -> void:
 			griglia.add_child(l)
 	_overlay_box.add_child(griglia)
 	_spazio(10)
-	_tasto("Nuova partita", true, func() -> void: nuova_partita.emit())
+	_tasto(String(d.get("tasto", "Nuova partita")), true, func() -> void: nuova_partita.emit())
 
 
 func _riga_risultato(d: Dictionary) -> HBoxContainer:

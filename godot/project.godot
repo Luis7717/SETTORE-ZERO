@@ -5,7 +5,8 @@
 ; Scelte (spiegate in godot/README.md):
 ; - renderer Mobile (Metal su iPhone), schermo verticale 390×844 punti logici, stretch "canvas_items" + "expand"
 ;   (l'interfaccia segue i punti dell'iPhone, il 3D si allarga su tutto lo schermo, aree sicure gestite dal codice);
-; - compressione texture ETC2/ASTC accesa: senza, l'export iOS si rifiuta di partire.
+; - compressione texture ETC2/ASTC accesa: senza, l'export iOS si rifiuta di partire;
+; - scena principale scenes/app.tscn + autoload App (scripts/app.gd): menu → partita → fine → menu (fase 3).
 
 config_version=5
 
@@ -14,11 +15,15 @@ config_version=5
 config/name="Tiro a Giro 3D"
 config/description="Gioco di calcio a un dito, schermo verticale."
 config/version="0.1.0"
-run/main_scene="res://scenes/partita.tscn"
+run/main_scene="res://scenes/app.tscn"
 config/features=PackedStringArray("4.7", "Mobile")
 config/icon="res://assets/icons/icon_1024.png"
 boot_splash/bg_color=Color(0.0627451, 0.105882, 0.0705882, 1)
 boot_splash/show_image=false
+
+[autoload]
+
+App="*res://scripts/app.gd"
 
 [display]
 

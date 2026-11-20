@@ -45,6 +45,7 @@ const RISOLUZIONE_3D_LARGO := 780.0   # sul telefono il 3D si disegna largo al m
 # divise come nel gioco web (src/career.js kitOf: Rosso e Blu; portieri arancio e verde)
 const KIT_CASA := {"shirt": 0xc8102e, "shorts": 0xffffff, "socks": 0xc8102e, "gk": {"shirt": 0xffa41c, "shorts": 0x222222, "socks": 0xffa41c}}
 const KIT_OSPITI := {"shirt": 0x1746a2, "shorts": 0xffffff, "socks": 0x1746a2, "gk": {"shirt": 0x2ad17a, "shorts": 0x15803d, "socks": 0x15803d}}
+const Asp := preload("res://scripts/carriera/aspetto.gd")
 const PELLI := [Color("#f1c9a5"), Color("#d9a47a"), Color("#a9744f"), Color("#6b4630")]
 const CAPELLI := [Color("#1c1410"), Color("#4a2f1b"), Color("#8a5a2b"), Color("#d9b66a"), Color("#222222")]
 
@@ -320,6 +321,10 @@ func _aspetto_di(p: Object) -> Dictionary:
 	var h := hash(str(p.team) + ":" + str(p.name) + ":" + str(p.i))
 	var skin: Color = PELLI[absi(h) % PELLI.size()]
 	var hair: Color = CAPELLI[absi(h / 7) % CAPELLI.size()]
+	if look is Dictionary and look.get("skin") is int:
+		# look della carriera (scripts/carriera/aspetto.gd): indici negli elenchi, colori da lì
+		var col := Asp.colori(look)
+		return {"pelle": col.pelle, "capelli": col.capelli}
 	if look is Dictionary:
 		if look.has("skin"):
 			skin = _colore(look.skin)
