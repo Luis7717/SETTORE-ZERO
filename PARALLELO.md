@@ -41,3 +41,14 @@ nuovi finché quel blocco non è finito e la build su GitHub non è riuscita. La
 Telecamera: la tengo io. L'unione in `gioco2` la faccio io, un pezzo alla volta, con test e schermate dopo ognuno.
 - Uniti in `gioco2`: 14 campo `ad4cffa`, 13 giocatori `9661147` (Quaternius Universal Base Characters, CC0, `assets/models/athlete.glb` 656 KB, ripiego sul Kenney),
   16 pallone/porte/effetti `9ccc115` (`src/props.js`), 15 stadio `dcb131d` (`stadium*.js`). Conflitti solo negli import e nella telecamera di `render.js`, risolti a mano.
+
+## 17-20 — Rifinitura del corpo a parti, sulle proporzioni di `PROPORZIONI.md` (2026-11-20) · tutti Opus
+Il terminale si è chiuso a metà (un'altra sessione ha chiuso processi per nome). Recupero del 2026-11-20:
+| # | Parte | Worktree / ramo | Stato | File |
+|---|---|---|---|---|
+| 17 | Busto, spalle, braccia, mani | `TAG-wt-busto` / `wt-busto` | unito (`bc6e6ff`) | `src/body/busto.js`, `test/unit/busto.test.mjs`, `test/busto-shot.mjs` |
+| 18 | Bacino, gambe, piedi | `TAG-wt-gambe` / `wt-gambe` | lavoro non salvato ma finito e verde: salvato (`781d30f`) e unito; test aggiornato per confrontare col modello con busto e testa | `src/body/gambe.js`, `test/unit/gambe.test.mjs`, `test/legs-shot.mjs` |
+| 19 | Testa, viso, collo | `TAG-wt-testa` / `wt-testa` | come sopra (`68e50ed`), unito (`f50795a`) | `src/body/testa.js`, `test/unit/head.test.mjs`, `test/head-measure.mjs` |
+| 20a | Braccia nascoste dietro il busto da fermo (difetto del 17) | `TAG-wt-braccia` / `wt-braccia` | in corso | `src/body/busto.js` |
+| 20b | Macchia color pelle sui pantaloncini (difetto del 18) | `TAG-wt-macchia` / `wt-macchia` | in corso | `src/body/gambe.js` |
+Massimo 2 subagenti insieme (richiesta di Luis del 2026-11-20).
