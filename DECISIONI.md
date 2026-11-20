@@ -802,16 +802,18 @@ Legge `SimMatch` e non lo cambia; contratto nel README di `godot/`. Ciclo di gio
   (fotogramma 2,8-3 ms; vista 1,5 ms di CPU, di cui ~0,6 ms le 22 AnimationTree; motore 0,2 ms).
   **Non verificato sull'iPhone.**
 
-## 2026-11-20 — Fuga col tasto Scatto (richiesta di Luis)
-- Luis: "quando sei davanti all'avversario ... il tempo rallenta comunque, come se fosse per il passaggio, però compare un tasto
-  che è lo scatto e lui scatta per staccarsi. E poi prosegue dritto." Il duello si apriva solo per distanza anche con
-  l'avversario quasi di lato (cono di 70°) e restava aperto finché non finiva alle spalle.
-- Scelta: duello solo con l'avversario davanti entro 60°, chiuso appena passa di lato (`DUEL_FRONT` 0,5, `DUEL_BEHIND` 0,2);
-  con l'avversario di lato o alle spalle entro 4 m (`FLEE_R`) c'è la **fuga** (`src/sim/duel.js` `updateFlee`, `userSprint`):
-  rallenty all'8% e tasto Scatto. Nella fuga non si passa e non si dribbla; si può ancora disegnare la strada.
-- Scatto (`burst`): +15% di velocità per 1,2 s, partenza immediata, l'avversario corre a metà velocità e non contrasta per
-  0,6 s; poi il portatore prosegue dritto per 14 m (`BURST_RUN`). La fuga non si apre nell'area di tiro (lì si tira).
-- L'IA usa ancora il cono di 70° per i suoi dribbling (`AI_FRONT`): equilibrio invariato (`npm run balance -- 60 60 20`:
-  V4 N6 P10 contro V5 N6 P9 di prima, stessi tiri e possesso). Impronte golden aggiornate di proposito.
-- Prove: `test/unit/flee.test.mjs`, `node test/flee-shot.mjs shots` (Puppeteer 390×844).
-- La versione Godot va allineata (motore GDScript identico bit per bit + tasto Scatto nell'HUD).
+## 2026-11-20 — Tasto Scatto al posto del Dribbling (richiesta di Luis)
+- Luis: "quando sei davanti all'avversario ... il tempo rallenta comunque, come se fosse per il passaggio, però compare un
+  tasto che è lo scatto e lui scatta per staccarsi. E poi prosegue dritto." e poi "se è davanti non appare il tasto
+  dribbling, appare il tasto scatto". Un primo tentativo (`dfe6bd8`: "fuga" con l'avversario di lato o alle spalle) era
+  un malinteso ed è stato tolto.
+- Scelta: il duello resta com'era (avversario davanti entro 7 m, rallenty all'8%, passaggio disegnato), ma il tasto è
+  **Scatto** (`userSprint` → `dribble(p, o, true)` in `src/sim/duel.js`). Riuscita con `sprintChance` = come il
+  dribbling ma con la **velocità** del portatore contro la difesa (stessi limiti 15-85%). Se riesce: difensore
+  sbilanciato e "saltato" come col dribbling, portatore che gira di fianco a lui a 2 m dalla parte opposta e prosegue dritto
+  fino a 14 m (`BURST_RUN`), +15% di velocità per 1,2 s (`BURST_T`, `BURST_SPD`). Se fallisce: come il dribbling fallito.
+  Niente giochetto a schermo: scritta "Scatto!" o "Fermato!". L'IA dribbla ancora coi giochetti (equilibrio invariato,
+  impronte golden invariate: il bot non tocca il tasto).
+- La lezione dell'allenamento "Dribbling" diventa "Scatto". Prove: `test/unit/sprint.test.mjs`, `test/unit/dribble-beat.test.mjs`,
+  `node test/sprint-shot.mjs shots` (Puppeteer 390×844).
+- Da fare: allineare la versione Godot (motore GDScript identico bit per bit + tasto Scatto).
