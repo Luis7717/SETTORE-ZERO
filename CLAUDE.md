@@ -69,14 +69,14 @@
   passa a qualunque compagno **solo disegnando** fino al compagno (il tocco sul compagno non passa più, 2026-11-20);
   oppure tasto **Dribbling** in basso.
 - **Area di tiro** (ultimi 20 m prima della porta avversaria, col pallone): tempo al 22%; linea in porta = tiro,
-  linea fino a un compagno (entro 5 m) = passaggio, altrove = strada da correre. Anche sulle rimesse il passaggio si disegna.
+  ogni altra linea = passaggio (fino a un compagno entro 5 m, o nello spazio): nei rallenty niente corsa disegnata (2026-11-21). Anche sulle rimesse il passaggio si disegna.
 - **Visuale girata col dito** (duello e area di tiro, pallone nostro): trascinare di lato partendo lontano dal portatore
   gira la telecamera intorno a lui (si afferra il campo: 150° per schermo, al massimo ±100°, `src/camuser.js`); niente
   più rotazione automatica. Il tocco breve sul campo o su un compagno lì non fa niente. Resta finché dura il rallenty
   con lo stesso portatore, poi torna dritta da sola.
 - **Scatto** (fuga, Luis 2026-11-21): si divide il campo in linee parallele alle linee di porta. Avversario a meno di
   4 m **alla pari o dietro** il portatore (non più avanti di 0,5 m verso la porta avversaria, `LEVEL_TOL`) = niente duello:
-  il tempo rallenta (8%), si può **passare** disegnando fino a un compagno (altrove = corsa) e il tasto in basso è **Scatto**; toccandolo il portatore si stacca (+15% di velocità per 1,2 s,
+  il tempo rallenta (8%), si può **passare** disegnando (ogni linea è un passaggio, niente corsa) e il tasto in basso è **Scatto**; toccandolo il portatore si stacca (+15% di velocità per 1,2 s,
   l'avversario resta indietro e non contrasta per 0,6 s) e prosegue dritto per 14 m. Riesce sempre. Avversario **davanti**
   per linee = duello col **Dribbling** o il passaggio disegnato. L'IA dribbla come prima.
 - La finta è stata tolta (2026-11-20).

@@ -812,7 +812,9 @@ Legge `SimMatch` e non lo cambia; contratto nel README di `godot/`. Ciclo di gio
   l'avversario davanti per linee (oltre al cono di 70° di prima) e si chiude ("lontano") quando arriva alla pari: allora
   si apre la fuga. Fuga = avversario alla pari o dietro entro `FLEE_R` = 4 m, rallenty 8%, tasto Scatto (`userSprint` →
   `burst`: riesce sempre, +15% per 1,2 s, avversario "saltato" per 0,6 s, dritto 14 m nel verso di corsa). Nella fuga si passa
-  (Luis: "deve rimanere la parte del passaggio"): linea fino a un compagno = passaggio, altrove = corsa, come nell'area di tiro. Il tasto del duello torna **Dribbling**.
+  (Luis: "deve rimanere la parte del passaggio"): linea fino a un compagno = passaggio. Poi Luis: "Durante i momenti di rallenty togli questa opzione" (la corsa
+  disegnata): in duello, fuga e area di tiro ogni linea è un passaggio (fino al compagno o nello spazio) o un tiro se
+  finisce in porta. `runPath()` in `src/input.js` usa `passFor`. Il tasto del duello torna **Dribbling**.
 - Allenamento: torna la lezione "Dribbling" e se ne aggiunge una "Scatto" (avversario alle spalle). Prove:
   `test/unit/flee.test.mjs` (11 casi, anche squadra 1 e portatore che corre di lato), `node test/flee-shot.mjs shots`.
 - Equilibrio (`npm run balance -- 60 60 20`): prima V5 N6 P9, gol 0,4-0,7, tiri 6,3-4,3; dopo V4 N7 P9, gol 0,4-0,8,

@@ -83,15 +83,13 @@ export class Input {
     for (const p of m.players) if (p.team === this.team && !p.off && p !== m.ctrl[this.team]) { const d = Math.hypot(p.x - x, p.y - y); if (d < bd) { bd = d; best = p; } }
     return best;
   }
-  // la linea è una strada da correre? No se finisce in porta, se si è in duello o rimessa (ogni linea è un passaggio),
-  // e nell'area di tiro se finisce su un compagno (altrimenti si corre lì)
+  // la linea è una strada da correre? No se finisce in porta, in rimessa e in ogni rallenty (duello, fuga, area di tiro):
+  // lì ogni linea è un passaggio (Luis 2026-11-21: durante il rallenty niente corsa disegnata)
   runPath() {
     const m = this.match, e = this.pts[this.pts.length - 1];
     if (!e || e.goal) return false;
-    if (m.phase === 'restart' || (m.duelFor && m.duelFor(this.team))) return false;
-    // area di tiro e fuga (avversario alla pari o dietro): linea fino a un compagno = passaggio, altrove = corsa
-    if ((m.inZone && m.inZone(this.team)) || (m.fleeFor && m.fleeFor(this.team))) return !this.mateAt(e.x, e.y);
-    return true;
+    if (m.phase === 'restart') return false;
+    return !(m.passFor ? m.passFor(this.team) : (m.duelFor && m.duelFor(this.team)));
   }
 
   // punto del campo (o della porta) sotto il dito
