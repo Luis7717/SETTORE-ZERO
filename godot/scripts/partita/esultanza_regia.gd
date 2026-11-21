@@ -113,6 +113,8 @@ func aggiorna(dt: float, m: Object) -> void:
 		_w = move_toward(_w, 1.0, dt / ENTRA)
 		if t >= tt and not _finita_emessa:
 			_emetti_finita()
+			if not attiva or _p == null or not is_instance_valid(_fig):
+				return # chi ascolta "finita" (dopo_esultanza → ferma) ha già chiuso tutto
 	var po := E.posa(id, t)
 	var yaw_fig := atan2(_flip * _p.fx, -_flip * _p.fy)
 	var giro := wrapf(_verso - yaw_fig, -PI, PI) * smoothstep(0.0, GIRO_T, t)

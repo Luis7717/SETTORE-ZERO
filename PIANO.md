@@ -4,14 +4,14 @@ Le novità vanno nella **versione Godot** (quella che Luis gioca). La versione w
 Il motore resta in due copie identiche (`src/sim` JS = riferimento con i test in Node, `godot/sim` = porting):
 ogni cambio al motore si fa in tutte e due, con le fixture rigenerate.
 
-## Fase A — correzioni dalla prova sull'iPhone (in corso)
+## Fase A — correzioni dalla prova sull'iPhone (fatta)
 - Righe bianche del campo che non si vedono; più tagli d'erba (strisce, quadrotti, cerchi concentrici, erba semplice...).
 - Pallone invisibile (tutorial e partite); portiere che non si tuffa.
 - Dribbling che parte vicino al difensore, verso il lato libero, col giochetto adatto al lato.
 - Chi batte un calcio da fermo (rimessa, angolo, punizione, rinvio...) non può ritoccare il pallone per primo.
 - Bordo scuro del rallenty più leggero (fatto).
 
-## Fase B — carriera
+## Fase B — carriera (fatta)
 - **6. Il campione cresce giocando**: le statistiche del giocatore principale salgono con quello che fa in partita
   (dribbling riusciti → dribbling, gol e tiri → tiro, passaggi → passaggio, contrasti → difesa...).
 - **7. Obiettivi della dirigenza**: a inizio stagione salvezza / metà classifica / promozione (o titolo), con soldi per il
@@ -19,7 +19,7 @@ ogni cambio al motore si fa in tutte e due, con le fixture rigenerate.
 - **8. Rivalità e derby**: una squadra del campionato è la rivale; pubblico più rumoroso, cori diversi, premio in più.
 - **9. Stanchezza e infortuni tra le partite**: chi gioca sempre si stanca e ogni tanto si fa male; servono Rosa e cambi.
 
-## Fase C — presentazione
+## Fase C — presentazione (fatta il 2026-11-21, da provare sull'iPhone)
 - **1. Replay del gol**: 4-5 s di replay da un'altra visuale, al rallentatore, con la linea del tiro; si salta con un tocco.
 - **11. Cronaca scritta**: frasi brevi in alto dopo le azioni importanti, generate dagli eventi del motore.
 - **12. Esultanze**: solo per il **giocatore principale**; si sceglie nell'editor del personaggio (anche nell'editor
