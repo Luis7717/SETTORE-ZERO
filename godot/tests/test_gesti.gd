@@ -6,6 +6,7 @@ extends "test_base.gd"
 
 const Gesti := preload("res://scripts/partita/gesti.gd")
 const VD := preload("res://scripts/partita/visuale_dito.gd")
+const TelecameraPartita := preload("res://scripts/partita/telecamera_partita.gd")
 
 const W := 390.0
 const SCHERMO_H := 844.0
@@ -384,6 +385,48 @@ func test_tuffo_dal_portiere_al_rilascio() -> bool:
 		return done()
 	near(reg.calls[0][1], 3.0 - gk.x, 0.05, "verso il punto della porta")
 	near(reg.calls[0][2], 1.5, 0.05, "all'altezza indicata")
+	return done()
+
+
+# il motore riceve il tuffo davvero (ComandiPartita → m.userDive) e la visuale della parata resta durante il tuffo
+func test_tuffo_arriva_al_motore_e_la_visuale_resta() -> bool:
+	prepara()
+	var gk := m.gk(0)
+	H.wake(gk, 1.0, -C.HL + 1.0)
+	var b := m.ball
+	b.owner = null
+	b.x = 0.0
+	b.y = -30.0
+	b.vy = -20.0
+	b.shot = R.Shot.new()
+	b.shot.team = 1
+	check(TelecameraPartita.parata_in_vista(m, 0), "si può parare: visuale della parata")
+	var meta := sch(-3.0, -C.HL, 1.5) # nella vista finta 6 px per metro: linea più lunga di TUFFO_MIN_PX
+	g.down(sch(gk.x, gk.y, 1.0), 1000)
+	for p in linea(sch(gk.x, gk.y, 1.0), meta, 10).slice(1):
+		g.move_ev(p)
+	g.update(1150)
+	eq(g.mode, "dive", "il dito resta nel gesto del tuffo")
+	g.up(meta, 1200)
+	eq(reg.nomi(), ["dive"], "ordine di tuffo al rilascio")
+	eq(gk.state, "dive", "il motore fa tuffare il portiere")
+	near(gk.dive.tx, -3.0, 0.05, "verso il punto della porta")
+	check(not m.diveWin(0), "tuffo partito: diveWin finisce (come il web)")
+	check(TelecameraPartita.parata_in_vista(m, 0), "durante il tuffo col tiro in volo la visuale resta sulla parata")
+	b.owner = gk
+	check(not TelecameraPartita.parata_in_vista(m, 0), "palla presa: la visuale torna normale")
+	m.autoGk[0] = true
+	b.owner = null
+	check(not TelecameraPartita.parata_in_vista(m, 0), "portiere automatico: niente visuale della parata")
+	return done()
+
+
+# il pallone della partita ha un materiale semplice (sull'iPhone quello con la normal map non si vedeva)
+func test_materiale_del_pallone_senza_normal_map() -> bool:
+	var mat: StandardMaterial3D = PartitaVista.materiale_pallone()
+	check(not mat.normal_enabled and mat.normal_texture == null, "niente normal map")
+	check(mat.albedo_texture != null, "texture del pallone")
+	eq(mat.transparency, BaseMaterial3D.TRANSPARENCY_DISABLED, "pallone opaco")
 	return done()
 
 

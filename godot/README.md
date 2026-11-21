@@ -156,6 +156,10 @@ $G --headless --path godot -- --app --stagione-bot --bot --veloce=8 --tempo=20 -
 #   stagione intera col dito finto (~2 min): 18 partite vere, fine stagione, salva, ricarica e confronta
 $G --path godot -- --app --app-schermate=shots/fase3 --bot --veloce=8 --tempo=15 --salvataggio=user://prova2.json
 #   schermate: senza carriera, menu, partita, fine partita, dopo partita, menu
+$G --headless --path godot -s res://tests/prova_partita.gd
+#   partita vera senza schermo: pallone dopo il setup di ogni lezione dell'allenamento, tuffo col tocco vero
+#   (InputEventScreenTouch/Drag) che arriva al motore, visuale della parata che resta, figura che si tuffa;
+#   con la finestra e `-- --foto=CARTELLA` salva anche le schermate. Esce con 1 se un controllo fallisce
 ```
 
 ## Partita (fase 2)
