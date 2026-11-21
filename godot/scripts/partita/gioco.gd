@@ -333,7 +333,9 @@ func _passi_motore(dt: float) -> void:
 	var target := velocita_voluta()
 	var flee: bool = not m.duelFor(me) and m.fleeFor(me)
 	# toccato Dribbling il tasto sparisce: la prenotazione è partita, il dribbling scatta vicino al difensore
-	hud.mostra_dribbling(((m.duelFor(me) and not m.dribBooked(me)) or flee) and not gesti.drawing, flee)
+	# nella lezione del passaggio il tasto non c'è (Luis 2026-11-21): lì si impara solo a disegnare il passaggio
+	var tasto_ok := allenamento == null or allenamento.finished or String(allenamento.lesson().get("id", "")) != "passaggio"
+	hud.mostra_dribbling(tasto_ok and ((m.duelFor(me) and not m.dribBooked(me)) or flee) and not gesti.drawing, flee)
 	ts += (target - ts) * minf(1.0, dt * TEMPO_K)
 	var sdt := dt * ts * _velocita
 	var n := maxi(1, ceili(sdt / PASSO_MAX))
