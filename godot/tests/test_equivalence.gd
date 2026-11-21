@@ -146,7 +146,7 @@ func _trace(idx: int) -> bool:
 			st.fi += 1
 		st.n = n + 1
 	var opt := {"seed": int(sc.seed), "mode": sc.mode, "my": float(sc.my), "op": float(sc.op), "halfLen": float(sc.halfLen),
-		"fA": sc.get("fA", "4-4-2"), "fB": sc.get("fB", "4-4-2"), "tired": sc.get("tired", [])}
+		"fA": sc.get("fA", "4-4-2"), "fB": sc.get("fB", "4-4-2"), "tired": sc.get("tired", []), "meteo": sc.get("meteo", "")}
 	var res := H.playMatch(opt, onStep)
 	var m: SimMatchScript = res.m
 	var firstEv := -1
@@ -206,6 +206,46 @@ func test_traccia_6() -> bool:
 # giocatori che partono stanchi (energia iniziale energy0, carriera: stanchezza tra le partite)
 func test_traccia_7_energia_iniziale() -> bool:
 	return _trace(7)
+
+
+# meteo: pioggia (palla più veloce, contrasti più lunghi) con l'umano simulato, neve (palla più lenta) IA contro IA
+func test_traccia_8_pioggia() -> bool:
+	return _trace(8)
+
+
+func test_traccia_9_neve() -> bool:
+	return _trace(9)
+
+
+# meteo: senza campo o sereno/nuvoloso/sconosciuto il motore non cambia; pioggia e neve come weatherFx del JS;
+# la scivolata sotto la pioggia dura di più (le partite col bot non scivolano mai: userSlide a mano)
+func test_meteo_moltiplicatori() -> bool:
+	var base := SimMatchScript.weatherFx(null)
+	eq(base.roll, 5.0, "attrito asciutto")
+	for w: Variant in ["sereno", "nuvoloso", "grandine", 3]:
+		eq(SimMatchScript.weatherFx(w), base, "niente effetto: %s" % str(w))
+	var r := SimMatchScript.weatherFx("pioggia")
+	near(r.roll, 3.75, 1e-12, "attrito pioggia")
+	eq(r.slide, 1.3, "scivolata pioggia")
+	eq(r.stun, 1.25, "contrasto pioggia")
+	near(SimMatchScript.weatherFx("neve").roll, 6.75, 1e-12, "attrito neve")
+	var durate := []
+	for w: String in ["", "pioggia"]:
+		var m := H.newMatch(3, 9999.0, [true, false], H.mkTeam("A", 60, 22), H.mkTeam("B", 60, 44), w)
+		eq(m.meteo, w, "meteo della partita")
+		var p: R.Player = m.players[4]
+		m.phase = "play"
+		m.restart = null
+		m.ball.owner = m.players[20]
+		m.ctrl[0] = p
+		check(m.userSlide(0, 0.0, 1.0), "scivolata partita")
+		var n := 0
+		while p.state == "slide" and n < 120:
+			m.step(1.0 / 60.0)
+			n += 1
+		durate.append(n)
+	check(durate[1] > durate[0], "scivolata più lunga sotto la pioggia: %s" % str(durate))
+	return done()
 
 
 # senza il campo energy0 si parte a 1 come prima; col campo si parte da lì (tra 0,2 e 1)

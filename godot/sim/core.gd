@@ -134,7 +134,8 @@ static func effStats(src: Dictionary, slotPos: String) -> R.Stats:
 	return s
 
 
-static func ballPhys(s: R.Ball, dt: float) -> void:
+## roll = attrito del rotolamento (m/s²): la partita passa il suo (meteo, SimMatch.roll); senza, ROLL come sempre
+static func ballPhys(s: R.Ball, dt: float, roll: float = ROLL) -> void:
 	if s.ct > 0.0:
 		s.vx += s.cax * dt
 		s.vy += s.cay * dt
@@ -155,7 +156,7 @@ static func ballPhys(s: R.Ball, dt: float) -> void:
 	else:
 		var v: float = hyp(s.vx, s.vy)
 		if v > 0.0:
-			var nv: float = maxf(0.0, v - ROLL * dt)
+			var nv: float = maxf(0.0, v - roll * dt)
 			s.vx *= nv / v
 			s.vy *= nv / v
 

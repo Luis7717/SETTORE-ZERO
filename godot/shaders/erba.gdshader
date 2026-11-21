@@ -16,6 +16,11 @@ uniform sampler2D ciuffi_tex : filter_linear_mipmap_anisotropic, repeat_enable; 
 uniform float forza_grana = 0.55;  // era 0,3: Luis "deve sembrare ci sia un pochino di erba"
 uniform sampler2D dettaglio_n : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;   // fili d'erba (normal map)
 uniform float forza_dettaglio = 0.55;
+uniform float bagnato = 0.0;       // pioggia (scripts/partita/meteo.gd): erba più scura e lucida; 0 = asciutta
+uniform float neve = 0.0;          // neve: chiazze bianche (0 = niente, 1 = quasi tutto bianco)
+const vec3 BIANCO_NEVE = vec3(0.80, 0.83, 0.88);
+const float BAGNATO_SCURO = 0.34;  // quanto si scurisce l'erba bagnata
+const float NEVE_VELO = 0.25;      // neve: parte bianca anche fuori dalle chiazze
 const float DETTAGLIO_M = 0.9;     // m coperti da una ripetizione dei fili
 const float DETTAGLIO_FINE = 40.0; // m dalla telecamera: oltre, niente fili (non si vedono e sfarfallerebbero)
 const float CIUFFI_M = 3.5;        // m di una ripetizione della grana fine (ciuffi d'erba)
@@ -127,7 +132,16 @@ void fragment() {
 	float vicino = 1.0 - smoothstep(DETTAGLIO_FINE * 0.35, DETTAGLIO_FINE, dist);
 	NORMAL_MAP = mix(vec3(0.5, 0.5, 1.0), texture(dettaglio_n, pos_mondo / DETTAGLIO_M).rgb, vicino);
 	NORMAL_MAP_DEPTH = forza_dettaglio;
+	// neve: un velo bianco leggero più chiazze larghe e morbide (le righe bianche, mesh a parte, restano sopra)
+	if (neve > 0.0) {
+		float n = texture(grana, pos_mondo / 23.0 + vec2(0.13, 0.61)).r * 0.7 + texture(grana, pos_mondo / 6.0 + vec2(0.47, 0.29)).r * 0.3;
+		float k = NEVE_VELO + (1.0 - NEVE_VELO) * smoothstep(0.42, 0.78, n);
+		c = mix(c, BIANCO_NEVE * (0.95 + 0.1 * fitti), k * neve);
+	}
+	// bagnato: più scuro, con pozze ancora più scure e lucide
+	float pozza = smoothstep(0.55, 0.85, texture(grana, pos_mondo / 31.0 + vec2(0.83, 0.07)).r) * bagnato;
+	c *= (1.0 - BAGNATO_SCURO * bagnato) * (1.0 - 0.08 * pozza);
 	ALBEDO = c;
-	ROUGHNESS = 1.0;
-	SPECULAR = 0.06;  // era 0,25: il riflesso del cielo azzurro spegneva il giallo-verde
+	ROUGHNESS = mix(1.0, 0.32, bagnato) - 0.2 * pozza;
+	SPECULAR = mix(0.06, 0.45, bagnato);  // all'asciutto 0,06: il riflesso del cielo azzurro spegneva il giallo-verde
 }

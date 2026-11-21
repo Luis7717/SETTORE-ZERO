@@ -74,7 +74,7 @@ export class AIMethods {
     const consider = (m, tx, ty, through) => {
       const d = hyp(tx - ox, ty - oy);
       if (d < 4 || d > 44) return;
-      const vp = Math.min(17 + p.st.pas * 0.13, Math.sqrt(25 + 2 * ROLL * d)) * 0.8;
+      const vp = Math.min(17 + p.st.pas * 0.13, Math.sqrt(25 + 2 * this.rollKick * d)) * 0.8;
       let safe = this.lane(ox, oy, tx, ty, T, vp), type = 'ground';
       const open = this.nearOpp(tx, ty, T);
       if (through) {
@@ -233,7 +233,7 @@ export class AIMethods {
     const s = { x: b.x, y: b.y, h: b.h, vx: b.vx, vy: b.vy, vh: b.vh, cax: b.cax, cay: b.cay, ct: b.ct };
     for (let k = 0; k < N; k++) {
       px.push(clamp(s.x, -HW, HW)); py.push(clamp(s.y, -HL, HL)); ph.push(s.h);
-      for (let j = 0; j < 4; j++) ballPhys(s, 0.025);
+      for (let j = 0; j < 4; j++) ballPhys(s, 0.025, this.roll);
     }
     for (let T = 0; T < 2; T++) {
       const dir = T ? -1 : 1;
