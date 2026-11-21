@@ -48,7 +48,9 @@ interfaccia dei menu, sfondo del menu e allenamento guidato, grafica.
 | `scripts/telecamera.gd` | telecamera verticale come `src/render.js` |
 | `scripts/hud.gd` | contatore FPS / memoria / disegni / risoluzione 3D, dentro l'area sicura |
 | `scripts/prova_campo.gd` | movimenti finti, pallone, tocchi, opzioni per le prove da riga di comando |
-| `shaders/erba.gdshader` | disegno del taglio dell'erba calcolato per pixel (8 tagli, bordi ammorbiditi), grana, fili d'erba |
+| `shaders/erba.gdshader` | prato: chiama la parte comune e passa colore e rilievo a Godot |
+| `shaders/erba_comune.gdshaderinc` | parte comune dell'erba: taglio calcolato per pixel (9 tagli, bordi ammorbiditi), grana, fili con micro-ombre, meteo |
+| `shaders/erba_ciuffi.gdshader` | ciuffi in rilievo (4 strati) davanti alla telecamera bassa; sopra le righe i fili sono bianchi |
 | `shaders/righe.gdshader` | righe: si allargano da lontano per restare larghe almeno 1,5 pixel |
 | `shaders/divisa.gdshader` | colori della divisa per zone del corpo, come `src/athlete3d.js` |
 | `scripts/partita/capelli.gd`, `barbe.gd`, `shaders/capelli.gdshader` | capelli e barbe come mesh a parte sull'osso della testa (vedi "Capelli e barbe") |
@@ -95,7 +97,7 @@ interfaccia dei menu, sfondo del menu e allenamento guidato, grafica.
 | `scripts/partita/effetti.gd` | scia del pallone, sbuffi d'erba, coriandoli |
 | `scripts/partita/qualita.gd` | livelli grafici automatici (logica pura, `tests/test_qualita.gd`) |
 | `scripts/partita/schiene.gd` | atlante di cognomi e numeri sulle schiene |
-| `tools/genera_texture.gd` | genera `assets/textures/` (pallone HD e normal map, fili d'erba) |
+| `tools/genera_texture.gd` | genera `assets/textures/` (pallone HD e normal map, fili d'erba `erba_fili.png`; `-- solo-erba` rifà solo quella) |
 | `scenes/prova_vista.tscn` | prova: computer contro computer disegnato dalla vista, scene per le schermate e misure |
 | `scenes/menu/sfondo_menu.tscn` | sfondo 3D del menu: campione che palleggia, fa giochetti e tira (`scripts/menu/sfondo_menu.gd`, `routine_menu.gd`) |
 | `scripts/partita/allenamento.gd` | allenamento guidato (logica pura); `allenamento_hud.gd` riquadro e schede; `bot_allenamento.gd` dito finto |
@@ -140,6 +142,29 @@ Le schermate di prova vanno in `shots/` (ignorata da git).
   in campionato il taglio viene dal seme della squadra di casa (`App._partita(..., stadio_seme)` →
   `avvia({stadio_seme})`), in amichevole e allenamento dal seme della partita (`gioco.gd taglio_campo`). Il menu usa
   il classico. Solo grafica: il motore non lo vede.
+
+### Erba con spessore (2026-11-21, "il campo sembra ancora piatto")
+
+- **Fili e micro-ombre**: `assets/textures/erba_fili.png` (512², `tools/genera_texture.gd`): R, G = normale dei fili,
+  B = altezza (0 = buco scuro tra i fili, 1 = punta), con media esatta 0,5. Lo shader moltiplica il colore per
+  `1 + forza_fili·2·(B − 0,5)`: da vicino si vedono i fili e la terra scura in mezzo, da lontano la mipmap fa la media
+  e il colore del manto resta quello tarato. Tre scale: 0,55 m (fili, fino a 14 m), 1,45 m girata (sempre), 4,1 m
+  (oltre 3 m: i "fili" diventano ciuffi, è la grana che si vede dalla telecamera della partita). Dall'alto si vede di
+  più tra i fili, di sbieco meno.
+- **Fili piegati dal taglio**: la normale pende di `piega_fili` lungo l'asse del taglio, in versi opposti nelle fasce
+  alterne (col sole di lato una fascia prende più luce); il chiaro/scuro che cambia con la direzione di vista
+  (`LUCIDO`) ora segue l'asse vero del taglio (verticali lungo X, diagonali in diagonale).
+- **Ciuffi in rilievo** (`erba_ciuffi.gdshader`, nodo `CiuffiErba` di `campo.gd`): 4 strati piatti (0,7-2,9 cm) in un
+  quadrato di 20 m davanti alla telecamera, accesi solo se la telecamera è sotto 4,5 m (replay, esultanza, primi
+  piani) e a qualità alta; sfumano entro 9 m. Ogni strato tiene i punti dove i fili (scala 2,2 m) sono più alti
+  della sua quota: di sbieco i fili si staccano dal prato e coprono un po' scarpe e pallone. Sopra le righe i fili
+  sono bianchi (campo.gd passa allo shader i pezzi di riga vicini, `righe_per_ciuffi`, `righe_vicine`, al massimo 8):
+  il bordo della riga è sfrangiato ma la riga non si buca. `--senza-ciuffi` li spegne (confronti).
+- **Meteo**: sul bagnato il rilievo fine si spiana (`BAGNATO_PIATTO`), sennò brillavano punti sparsi; all'asciutto la
+  texture delle pozze non si legge. Le texture che da una certa distanza non servono non si leggono (rami su `dist`
+  con `textureGrad`).
+- **Costo** (GPU RTX 3070, 1320×1000 = pixel del 3D sull'iPhone): partita 0,43 → 0,46 ms (+6%), vista vicina senza
+  ciuffi 0,34 → 0,37 ms, con i ciuffi 0,54 ms (+60%, solo con telecamera bassa).
 
 ```sh
 $G --path godot -- --seme=3 --campo=quadrotti --schermata=shots/campo_quadrotti.png --dopo=3

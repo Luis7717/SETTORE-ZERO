@@ -1329,3 +1329,28 @@ Dettagli in `godot/README.md`, "Capelli e barbe".
 - **Da provare sull'iPhone**: FPS in partita con 22 giocatori; se da vicino (editor, esultanza) le barbe hanno un
   bordo troppo netto; se i capelli lunghi entrano nelle spalle nelle esultanze; tempo di avvio della partita
   (prima costruzione delle mesh, ~10 ms l'una sul PC).
+
+## 2026-11-21 — Godot: erba con spessore ("il campo sembra ancora piatto")
+- **Micro-ombre tra i fili** invece della sola normal map: nuova texture `erba_fili.png` (normale + altezza dei fili
+  con media esatta 0,5, sostituisce `erba_n.png`). Il colore si moltiplica per un fattore che ha media 1: da vicino
+  si vedono fili e buchi scuri, da lontano la mipmap fa la media e **i colori tarati dei manti non cambiano**. Tre
+  scale; quella grossa (4,1 m) dà la grana che si vede dalla telecamera della partita (prima era tutto liscio).
+- **Fili piegati dal taglio**: normale che pende in versi opposti nelle fasce alterne (`piega_fili` 0,06) e `LUCIDO`
+  sull'asse vero del taglio (prima per le strisce verticali usava l'asse sbagliato).
+- **Ciuffi in rilievo** (shell texturing, 4 strati, un solo disegno) solo con la telecamera sotto 4,5 m e a qualità
+  alta; sopra le righe i fili sono bianchi (pezzi di riga passati allo shader, con test), così le righe hanno il bordo
+  sfrangiato ma non si bucano (la prima prova le bucava di verde). Parte comune dell'erba in `erba_comune.gdshaderinc`.
+- **Bagnato**: il rilievo fine faceva brillare punti sparsi sotto la pioggia: sul bagnato si spiana (`BAGNATO_PIATTO`).
+- **Colori misurati** (sRGB medio di fasce, schermate 480×1040, strisce/vivo, prima → dopo): fascia chiara
+  162 → 164 di verde, scura 137-138 → 134-136 (−1..−3%, nella prima misura con `piega_fili` 0,10; poi abbassato a
+  0,06 per avvicinarsi). Milano: chiara 181-182 → 183, scura 134-137 → 131-136.
+- **Costo GPU** (RTX 3070, 1320×1000 come i pixel del 3D sull'iPhone, prima → dopo): partita 0,43 → 0,46 ms (+6%,
+  dopo aver tolto le letture inutili: pozze all'asciutto, fili fini lontano, ciuffi oltre 34 m); vicina senza ciuffi
+  0,34 → 0,37; con i ciuffi 0,54 (+60%); esultanza senza ciuffi 0,39 → 0,42-0,47. Sull'iPhone (A12 molto più lento)
+  la partita normale dovrebbe costare circa il 5-8% in più; i ciuffi nelle visuali basse sono la voce cara: per
+  questo solo a qualità alta (al primo calo sotto 58 FPS la vista li spegne).
+- **Non rifatto**: su richiesta di Luis a metà lavoro niente più finestre del gioco: le ultime modifiche
+  (`piega_fili` 0,06, ciuffi solo a qualità alta, letture saltate con `textureGrad`, bagnato spianato) non hanno
+  schermate nuove.
+- **Da provare sull'iPhone**: se il campo sembra erba (partita, duello, replay ed esultanza da vicino), FPS nelle
+  visuali basse coi ciuffi, sfarfallio dei fili muovendo la telecamera, pioggia.

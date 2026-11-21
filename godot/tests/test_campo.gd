@@ -5,6 +5,7 @@ extends "test_base.gd"
 const Righe := preload("res://scripts/righe_campo.gd")
 const Tagli := preload("res://scripts/tagli_campo.gd")
 const Gioco := preload("res://scripts/partita/gioco.gd")
+const Campo := preload("res://scripts/campo.gd")
 
 
 func _conta(tipo: String) -> int:
@@ -126,4 +127,53 @@ func test_manti_tutti_validi_e_fissi_per_squadra() -> bool:
 
 func test_taglio_diagonali() -> bool:
 	eq(Tagli.indice("diagonali"), 8, "taglio diagonali")
+	return done()
+
+
+# distanza da un pezzo di riga come la calcola shaders/erba_ciuffi.gdshader (dist_righe), per provare il formato
+func _dist_shader(r: Dictionary, p: Vector2) -> float:
+	var a: Vector4 = r.a
+	var b: Vector4 = r.b
+	if b.w < 0.5:
+		var pa := Vector2(a.x, a.y)
+		var ab := Vector2(a.z, a.w) - pa
+		var t := clampf((p - pa).dot(ab) / maxf(ab.dot(ab), 1e-6), 0.0, 1.0)
+		return p.distance_to(pa + ab * t)
+	if b.w < 1.5:
+		var v := p - Vector2(a.x, a.y)
+		return absf(v.length() - a.z) if v.dot(Vector2(b.x, b.y)) >= a.w * v.length() else 1e3
+	return maxf(p.distance_to(Vector2(a.x, a.y)) - a.z + Righe.LARGHEZZA / 2.0, 0.0)
+
+
+func _sulla_riga(p: Vector2) -> bool:
+	for r: Dictionary in Campo.righe_per_ciuffi():
+		if _dist_shader(r, p) < Righe.LARGHEZZA / 2.0:
+			return true
+	return false
+
+
+func test_righe_dei_ciuffi_in_rilievo() -> bool:
+	var r := Campo.righe_per_ciuffi()
+	eq(r.size(), Righe.pezzi().size(), "un pezzo per ogni riga")
+	check(_sulla_riga(Vector2(10.0, 0.0)), "metà campo")
+	check(_sulla_riga(Vector2(C.CIRCLE, 0.0)), "cerchio di centrocampo")
+	check(_sulla_riga(Vector2(0.0, C.HL - C.PEN_D)), "dischetto")
+	check(_sulla_riga(Vector2(0.0, C.HL - C.PEN_D - C.CIRCLE)), "lunetta, fuori dall'area")
+	check(not _sulla_riga(Vector2(0.0, C.HL - C.PEN_D + C.CIRCLE)), "la lunetta non continua dentro l'area")
+	check(_sulla_riga(Vector2(C.HW, C.HL) + Vector2(-1.0, -1.0).normalized()), "arco d'angolo")
+	check(not _sulla_riga(Vector2(C.HW, C.HL) + Vector2(1.0, 1.0).normalized()), "l'arco d'angolo non esce dal campo")
+	check(not _sulla_riga(Vector2(5.0, 5.0)), "erba senza righe")
+	return done()
+
+
+func test_righe_vicine_ai_ciuffi() -> bool:
+	var r := Campo.righe_per_ciuffi()
+	var vuoto := Campo.righe_vicine(r, Vector2(0.0, 22.0), 10.0, 8)
+	eq(vuoto.size(), 0, "tra cerchio e lunetta nessuna riga")
+	var meta := Campo.righe_vicine(r, Vector2(10.0, 0.0), 20.0, 8)
+	eq(meta.size(), 3, "metà campo, cerchio e punto del centro")
+	for i in meta:
+		var p: Dictionary = r[i]
+		check(p.box.intersects(Rect2(Vector2(0.0, -10.0), Vector2(20.0, 20.0)), true), "solo pezzi nel quadrato")
+	eq(Campo.righe_vicine(r, Vector2(0.0, C.HL - 8.0), 44.0, 8).size(), 8, "al massimo quanti ne regge lo shader")
 	return done()

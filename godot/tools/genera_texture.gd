@@ -2,21 +2,23 @@
 #   assets/textures/pallone.png    1024×512  pallone a 32 spicchi (12 pentagoni neri, 20 esagoni bianchi) con le cuciture,
 #                                  proiezione equirettangolare (come le UV di SphereMesh)
 #   assets/textures/pallone_n.png  1024×512  rilievo delle cuciture (normal map)
-#   assets/textures/erba_n.png     512×512   fili d'erba visti da vicino (normal map ripetibile senza giunte)
-# Uso: $G --headless --path godot -s res://tools/genera_texture.gd   (qualche secondo; i file si importano dopo con --import)
+#   assets/textures/erba_fili.png  512×512   fili d'erba visti da vicino: normale (R, G) e altezza (B, media 0,5), ripetibile
+# Uso: $G --headless --path godot -s res://tools/genera_texture.gd [-- solo-erba]   (qualche secondo; poi --import)
 extends SceneTree
 
 const CARTELLA := "res://assets/textures/"
 const PALLA_W := 1024
 const PALLA_H := 512
 const ERBA := 512
+const FILI := 15000              # fili d'erba nella texture (coprono circa due terzi, il resto sono buchi scuri)
 const PESO_PENTAGONO := 0.075   # rad: i pentagoni sono più piccoli degli esagoni (diagramma pesato)
 const CUCITURA := 0.012         # rad: mezza larghezza di una cucitura
 
 
 func _init() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(CARTELLA))
-	_pallone()
+	if not OS.get_cmdline_user_args().has("solo-erba"):   # -- solo-erba: rifà solo erba_fili.png
+		_pallone()
 	_erba()
 	print("texture generate in ", CARTELLA)
 	quit()
@@ -93,7 +95,10 @@ func _pallone() -> void:
 
 
 # ---------------------------------------------------------------- erba
-# rilievo: tanti fili corti in tutte le direzioni (visti dall'alto) sopra una grana fine, ripetibile
+# fili d'erba visti dall'alto, fitti, in tutte le direzioni, sopra il fondo scuro (terra e erba secca), ripetibile.
+# Un file solo, letto una volta sola dallo shader: R, G = normale (z la ricostruisce Godot), B = altezza dei fili
+# (0 = buco scuro tra i fili, 1 = punta al sole) con media esatta 0,5: lo shader scurisce i buchi e schiarisce le
+# punte di (B − 0,5), così da lontano (mipmap = media) il colore del manto resta quello tarato.
 func _erba() -> void:
 	var alt := PackedFloat32Array()
 	alt.resize(ERBA * ERBA)
@@ -105,21 +110,48 @@ func _erba() -> void:
 	noise.fractal_octaves = 2
 	var grana := noise.get_seamless_image(ERBA, ERBA)
 	for i in alt.size():
-		alt[i] = grana.get_pixel(i % ERBA, i / ERBA).r * 0.35
-	for n in 9000:
+		alt[i] = grana.get_pixel(i % ERBA, i / ERBA).r * 0.22   # fondo: terra e fili secchi, scuro
+	for n in FILI:
 		var p := Vector2(rng.randf() * ERBA, rng.randf() * ERBA)
 		var ang := rng.randf() * TAU
-		var dir := Vector2(cos(ang), sin(ang) * 0.6).normalized()   # un po' più lunghi nel verso del taglio
-		var lungo := rng.randf_range(5.0, 12.0)
-		var alto := rng.randf_range(0.5, 1.0)
+		var dir := Vector2(cos(ang), sin(ang))
+		var lato := Vector2(-dir.y, dir.x) * 0.7
+		var lungo := rng.randf_range(6.0, 15.0)
+		var alto := rng.randf_range(0.55, 1.0)
 		for s in int(lungo * 2.0):
-			var q := p + dir * (s * 0.5)
 			var k := float(s) / (lungo * 2.0)
-			var xi := posmod(int(q.x), ERBA)
-			var yi := posmod(int(q.y), ERBA)
-			var idx := yi * ERBA + xi
-			alt[idx] = maxf(alt[idx], 0.35 + alto * (1.0 - k) * 0.65)
-	_normali(alt, ERBA, ERBA, 2.2, true).save_png(CARTELLA + "erba_n.png")
+			# filo piegato: sale dalla radice, è più alto a metà e si abbassa verso la punta; più stretto in punta
+			var h := alto * (0.4 + 0.6 * sin(PI * (0.15 + 0.75 * k)))
+			var q := p + dir * (s * 0.5)
+			for w: float in ([0.0, 1.0] if k < 0.7 else [0.0]):
+				var r := q + lato * w
+				var idx := posmod(int(r.y), ERBA) * ERBA + posmod(int(r.x), ERBA)
+				alt[idx] = maxf(alt[idx], 0.3 + 0.7 * h)
+	# altezza con media esatta 0,5 (contrasto: ±2 scarti tipo coprono 0..1)
+	var media := 0.0
+	for v in alt:
+		media += v
+	media /= alt.size()
+	var varianza := 0.0
+	for v in alt:
+		varianza += (v - media) * (v - media)
+	var scarto := sqrt(varianza / alt.size())
+	var b := PackedFloat32Array()
+	b.resize(alt.size())
+	var media_b := 0.0
+	for i in alt.size():
+		b[i] = clampf(0.5 + (alt[i] - media) / (scarto * 4.0), 0.0, 1.0)
+		media_b += b[i]
+	media_b /= b.size()
+	var img := Image.create(ERBA, ERBA, false, Image.FORMAT_RGB8)
+	for y in ERBA:
+		for x in ERBA:
+			var dx := (alt[y * ERBA + posmod(x + 1, ERBA)] - alt[y * ERBA + posmod(x - 1, ERBA)]) * 2.2
+			var dy := (alt[posmod(y + 1, ERBA) * ERBA + x] - alt[posmod(y - 1, ERBA) * ERBA + x]) * 2.2
+			var nn := Vector3(-dx, dy, 1.0).normalized()
+			img.set_pixel(x, y, Color(nn.x * 0.5 + 0.5, nn.y * 0.5 + 0.5, clampf(b[y * ERBA + x] + 0.5 - media_b, 0.0, 1.0)))
+	img.generate_mipmaps()
+	img.save_png(CARTELLA + "erba_fili.png")
 
 
 # normal map (verde verso l'alto, come vuole Godot) dal rilievo; giro = i bordi si toccano (texture ripetibile)
