@@ -3,21 +3,19 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://c0xocjsdx38uc"
-path.s3tc="res://.godot/imported/capelli_tinta.png-7eea7eb0123f2d999b43de9f88f18001.s3tc.ctex"
-path.etc2="res://.godot/imported/capelli_tinta.png-7eea7eb0123f2d999b43de9f88f18001.etc2.ctex"
+path="res://.godot/imported/capelli_tinta.png-7eea7eb0123f2d999b43de9f88f18001.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc", "etc2_astc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/textures/capelli_tinta.png"
-dest_files=["res://.godot/imported/capelli_tinta.png-7eea7eb0123f2d999b43de9f88f18001.s3tc.ctex", "res://.godot/imported/capelli_tinta.png-7eea7eb0123f2d999b43de9f88f18001.etc2.ctex"]
+dest_files=["res://.godot/imported/capelli_tinta.png-7eea7eb0123f2d999b43de9f88f18001.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

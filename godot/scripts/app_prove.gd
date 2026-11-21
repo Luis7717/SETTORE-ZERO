@@ -6,7 +6,7 @@
 #                             campione "Bot Campione"). Stampa anche derby, crescita del campione, infortuni e
 #                             obiettivo della dirigenza.
 #   --app-schermate=CARTELLA  schermate 390×844 del giro menu → impostazioni → editor (taglio afro e chignon,
-#                             esultanza del campione) →
+#                             quattro volti con barba e occhi diversi, esultanza del campione) →
 #                             partita → fine partita → dopo partita → statistiche (numeri, mappa dei tiri,
 #                             pagella) → menu → classifica → rosa (con un infortunato
 #                             e un giocatore stanco) → fine stagione (con l'obiettivo della dirigenza)
@@ -18,6 +18,9 @@ extends Node
 const CarrieraScript := preload("res://scripts/carriera/carriera.gd")
 const JS := preload("res://scripts/carriera/js.gd")
 const ATTESA_MENU := 0.6
+# volti fotografati nella scheda Viso dell'editor (--app-schermate): valori nell'ordine di CAMPI_VOLTO
+const CAMPI_VOLTO := ["hair", "beard", "eyes", "eyeColor", "skin", "hairColor", "brows"]
+const VOLTI_EDITOR := [[9, 6, 3, 0, 6, 0, 4], [12, 0, 1, 4, 0, 5, 1], [2, 5, 2, 3, 3, 2, 0], [11, 2, 5, 1, 1, 7, 5]]
 const ATTESA_PARTITA := 3.0
 
 var _app: Node
@@ -260,6 +263,17 @@ func _giro_impostazioni_editor(dir: String) -> void:
 		ed.mostra(false)
 		await _attendi(1.2)
 		await _scatto(dir, prova[2])
+	# scheda Viso con combinazioni diverse di taglio, barba, occhi (forma e colore) e pelle
+	for k in VOLTI_EDITOR.size():
+		var v: Array = VOLTI_EDITOR[k]
+		_app.vai("editor", {"flow": "look", "id": p.id, "tab": "face"})
+		var ed2: Node = get_tree().current_scene
+		ed2.d.look = ed2.d.look.duplicate()
+		for i in v.size():
+			ed2.d.look[CAMPI_VOLTO[i]] = v[i]
+		ed2.mostra(false)
+		await _attendi(1.2)
+		await _scatto(dir, "editor_volto_%d" % (k + 1))
 	# scheda Esultanza del campione: il modellino la fa (a metà, a 1,8 s)
 	var ch: Variant = _app.carriera.campione()
 	if ch is Dictionary:

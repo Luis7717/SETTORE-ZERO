@@ -80,7 +80,9 @@ const vec2 LASH = vec2(0.0024, 0.75);          // linea delle ciglia: larghezza 
 // maschere del viso (tools/make-godot-tex.mjs): zona FACE_CROP del web, celle 4 × 2
 const vec4 FACE_CROP = vec4(200.0, 150.0, 240.0, 260.0);
 const vec2 MASCHERE = vec2(960.0, 520.0);
-const float AA_MM = 0.35;         // occhi: bordo morbido delle palpebre (mm)
+const float AA_MM = 0.35;
+const float PALPEBRA_MAX = 0.9;   // occhi: apertura massima sopra e sotto (frazioni della semialtezza della finestra)
+const float IRIDE_K = 1.3;        // occhi: iride più grande del web (la finestra misurata qui è più piccola)         // occhi: bordo morbido delle palpebre (mm)
 
 // tagli (HAIR di src/hair3d.js): attaccatura, 5 nodi [|az|, el] per taglio (per rasato e cresta: la nuca rasata)
 const vec2 LINEE[85] = vec2[85](
@@ -366,6 +368,9 @@ vec3 occhio(vec3 p) {
 	int fi = clamp(int(occhi_forma + 0.5), 0, 5);
 	vec4 fa = OCCHI_A[fi];
 	vec4 fb = OCCHI_B[fi];
+	// l'apertura del modello in Godot è più alta della finestra misurata (la testa non ha le correzioni del web):
+	// palpebre sempre dentro la finestra, così come nel web si vedono le palpebre e poco bianco
+	fb.xy = min(fb.xy, vec2(PALPEBRA_MAX));
 	vec2 fc = OCCHI_C[fi];
 	float W = occhio_finestra.z;
 	float H = occhio_finestra.w;
@@ -388,7 +393,7 @@ vec3 occhio(vec3 p) {
 	float dL = y - giu;
 	float aperto = clamp(min(dU, dL) / AA_MM + 0.5, 0.0, 1.0);
 	if (aperto > 0.0) {
-		float rI = fc.x * H;
+		float rI = fc.x * H * IRIDE_K;
 		vec3 e = mix(vec3(0.949, 0.929, 0.902), vec3(0.8, 0.745, 0.714), clamp(pow(x / (W * 1.05), 2.0) + pow(y / (H * 1.6), 2.0), 0.0, 1.0));
 		float d = length(vec2(x, y));
 		if (d < rI + 0.3) {

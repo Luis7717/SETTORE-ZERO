@@ -1354,3 +1354,23 @@ Dettagli in `godot/README.md`, "Capelli e barbe".
   schermate nuove.
 - **Da provare sull'iPhone**: se il campo sembra erba (partita, duello, replay ed esultanza da vicino), FPS nelle
   visuali basse coi ciuffi, sfarfallio dei fili muovendo la telecamera, pioggia.
+
+## Capelli, barbe, occhi e mento come il web (Godot) — 2026-11-21
+
+- **Capelli**: porting di `src/hair3d.js` (stesse forme e 17 id), non più la griglia fatta da noi. Texture dei
+  capelli disegnata dalle funzioni del web con Puppeteer (`tools/make-godot-tex.mjs`) come pesi di colore, così una
+  sola texture va per tutti i colori. Senza compressione VRAM: con la compressione in cima si vedevano quadretti.
+- **Barbe**: tolto il guscio di triangoli (`barbe.gd`). Ipotesi sul perché sull'iPhone non si vedevano: il guscio
+  sottile spariva coi livelli di dettaglio di Godot. Adesso sono dipinte nello stesso shader della pelle, come nel web,
+  con le maschere del web (`viso_maschere.png`): non possono più sparire.
+- **Occhi**: la forma non arrivava allo shader (`Aspetto.parametri_figura` non la passava) e l'iride stava al centro
+  del riquadro, quasi sotto le palpebre. Ora forme di `EYE_FORMS` dentro la parte visibile del bulbo misurata sul
+  modello. La testa del modello Godot non ha le correzioni della testa del web: la finestra è più piccola, quindi
+  palpebre al massimo 0,9 e iride ×1,3 (scelta a occhio dalle foto, da confermare sull'iPhone).
+- **Mento color maglia**: la parte sotto il mento finiva nel ramo del busto (si sceglieva per altezza). Ora testa e
+  collo si riconoscono dall'osso dominante; lo scollo resta dov'era.
+- **Riga scura all'attaccatura**: il bordo dei capelli rientra verso la testa e prendeva poca luce. Normale del
+  bordo girata verso fuori (`BORDO_FUORI`) e risvolto col colore del bordo.
+- **FPS** (`prova_vista --senza-vsync --scala3d=2 --qualita=3 --esci-dopo=12`, PC carico): prima GPU 0,401 ms,
+  601 FPS, 47 disegni; dopo GPU 0,400 ms, 632 FPS, 49 disegni. Vicino (`--vicino=5`): prima 0,536 ms, dopo 0,519 ms.
+- **Da provare sull'iPhone**: barbe e forme degli occhi nell'editor e in partita, grandezza dell'iride, attaccatura.

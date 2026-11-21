@@ -56,6 +56,7 @@ const SHELL_COLS := 40
 const SHELL_ROWS := 9
 const SKIRT_IN := -0.06          # il risvolto del bordo entra sotto la base (in R)
 const TUCK := 0.07               # il bordo rientra verso la testa: niente visiera
+const BORDO_FUORI := 0.75        # quanto la normale del bordo si gira verso fuori (niente riga buia all'attaccatura)
 const TEX_SHELL := Vector2(0.01, 0.77)
 const TEX_TOP := 0.02
 const TEX_EDGE := 0.86
@@ -316,6 +317,10 @@ static func _mesh(taglio: int, pc: Pezzi) -> ArrayMesh:
 		var q: Vector3 = pc.nrm[i]
 		var t: Vector2 = pc.uv[i]
 		v[i] = mondo(p)
+		# bordo della calotta e risvolto (rientrano verso la testa): normale girata verso fuori, se no il bordo
+		# viene buio e sulla fronte si vede una riga scura
+		if t.x < TEX_EXTRA.x - 0.03 and t.y > TEX_EDGE - 0.01:
+			q = q.lerp(p.normalized(), BORDO_FUORI).normalized()
 		nr[i] = (testa.right * q.x + testa.up * q.y + testa.fwd * q.z).normalized()
 		uv2[i] = t
 		uv[i] = Vector2(cx * cw + (TINTA_PAD + t.x * TINTA_W) * TINTA_SCALA, cy * ch + (TINTA_PAD + t.y * TINTA_H) * TINTA_SCALA) / atl

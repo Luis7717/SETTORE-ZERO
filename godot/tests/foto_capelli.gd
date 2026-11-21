@@ -5,6 +5,8 @@
 # Uso (finestra vera, non --headless):
 #   $G --path godot -s res://tests/foto_capelli.gd [-- --cartella=shots/capelli --giro=0 --tagli=10,11 --barbe=5,6]
 # (--tagli / --barbe: solo quei tipi, foto grandi in un foglio dettaglio.png, niente fogli normali)
+# --volti: solo volti.png (righe = combinazioni di taglio, barba, occhi e colori come nell'editor; di fronte molto
+# vicino, tre quarti, di lato)
 # Scrive CARTELLA/*.png (cartella relativa a quella che contiene godot/).
 extends SceneTree
 
@@ -20,6 +22,9 @@ const DIST := 0.85          # m dalla testa (già scalata), inquadratura stretta
 const VISTE_CAPELLI := [[0.0, 0.08], [0.75, 0.12], [1.5708, 0.05], [3.1416, 0.12]]
 const VISTE_BARBE := [[0.0, 0.0], [0.65, 0.0], [1.5708, -0.02], [0.35, -0.3]]
 # coppie [pelle, colore dei capelli] (indici in Aspetto.SKINS / HAIR_COLORS), una per riga
+# combinazioni per --volti: [taglio, barba, forma occhi, colore occhi, pelle, colore capelli, sopracciglia]
+const VOLTI := [[9, 6, 3, 0, 6, 0, 4], [12, 0, 1, 4, 0, 5, 1], [2, 5, 2, 3, 3, 2, 0], [11, 2, 5, 1, 1, 7, 5], [7, 1, 0, 6, 4, 1, 2], [5, 4, 4, 5, 2, 9, 3]]
+const VISTE_VOLTI := [[0.0, 0.03], [0.6, 0.03], [1.5708, 0.0]]
 const COLORI := [[1, 0], [6, 0], [0, 5], [3, 2], [7, 1], [2, 7], [4, 9], [5, 3], [0, 6], [2, 8], [6, 10]]
 
 
@@ -47,6 +52,7 @@ var _fermo := Fermo.new()
 var _ctx := {"t": 0.0, "phase": "menu", "flip": 1.0, "yaw": 0.0, "ball": null, "trick": null}
 var _giro := 0
 var _dettaglio: Array = []   # [taglio, barba] da fotografare grandi
+var _volti := false
 
 
 func _initialize() -> void:
@@ -57,6 +63,7 @@ func _initialize() -> void:
 			opz[p[0]] = p[1] if p.size() > 1 else "1"
 	var cartella: String = opz.get("cartella", "shots/capelli")
 	_giro = int(opz.get("giro", "0"))
+	_volti = opz.has("volti")
 	if opz.has("tagli") or opz.has("barbe"):
 		TILE = Vector2i(480, 480)
 		for x in String(opz.get("tagli", "")).split(",", false):
@@ -104,7 +111,11 @@ func _initialize() -> void:
 
 func _aspetto(hair: int, beard: int, riga: int) -> void:
 	var c: Array = COLORI[(riga + _giro) % COLORI.size()]
-	var asp := Asp.parametri_figura({"skin": c[0], "hairColor": c[1], "hair": hair, "beard": beard, "brows": 0})
+	var look := {"skin": c[0], "hairColor": c[1], "hair": hair, "beard": beard, "brows": 0}
+	if hair < 0:   # riga di VOLTI
+		var v: Array = VOLTI[beard]
+		look = {"hair": v[0], "beard": v[1], "eyes": v[2], "eyeColor": v[3], "skin": v[4], "hairColor": v[5], "brows": v[6]}
+	var asp := Asp.parametri_figura(look)
 	if _fig.has_method("metti_aspetto"):
 		_fig.metti_aspetto(asp)
 	else:
@@ -152,6 +163,15 @@ func _foglio(righe: Array, viste: Array, nome: String, dist: float) -> void:
 func _lavora(cartella: String) -> void:
 	var base := ProjectSettings.globalize_path("res://").path_join("..").path_join(cartella).simplify_path()
 	DirAccess.make_dir_recursive_absolute(base)
+	if _volti:
+		TILE = Vector2i(360, 360)
+		_vp.size = TILE
+		var righe: Array = []
+		for k in VOLTI.size():
+			righe.append([-1, k])
+		await _foglio(righe, VISTE_VOLTI, base.path_join("volti.png"), DIST * 0.55)
+		quit(0)
+		return
 	if not _dettaglio.is_empty():
 		await _foglio(_dettaglio, VISTE_CAPELLI, base.path_join("dettaglio.png"), DIST * 0.85)
 		quit(0)

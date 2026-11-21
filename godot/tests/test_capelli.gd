@@ -1,15 +1,16 @@
-# Capelli e barbe come mesh a parte (scripts/partita/capelli.gd, barbe.gd): una mesh per ogni taglio e barba degli
-# elenchi di Aspetto (stessi id dei salvataggi), pochi triangoli, appoggiata fuori dalla pelle, cambiata dalla figura
-# quando cambia l'aspetto.
+# Capelli come mesh a parte (scripts/partita/capelli.gd, porting di src/hair3d.js), barbe, sopracciglia e occhi
+# dipinti dallo shader della divisa: un tipo per ogni id di Aspetto (stessi id dei salvataggi), pochi triangoli,
+# capelli fuori dalla pelle, mesh condivise, e la figura che cambia davvero quando cambia l'aspetto.
 extends "test_base.gd"
 
 const Figura := preload("res://scripts/partita/figura.gd")
 const TV := preload("res://scripts/partita/texture_vista.gd")
 const Capelli := preload("res://scripts/partita/capelli.gd")
-const Barbe := preload("res://scripts/partita/barbe.gd")
+const Viso := preload("res://scripts/partita/viso.gd")
+const Giocatore := preload("res://scripts/giocatore.gd")
 const Asp := preload("res://scripts/carriera/aspetto.gd")
 const KIT := {"maglia": Color.RED, "calzoncini": Color.WHITE, "calzettoni": Color.RED, "bordino": Color.WHITE}
-const MAX_TRIANGOLI := 2800     # capelli + barba di un giocatore (vicino; da lontano i livelli di dettaglio ne tolgono)
+const MAX_TRIANGOLI := 1800     # capelli di un giocatore
 
 
 func nuova(look: Dictionary = {}) -> Node3D:
@@ -22,79 +23,137 @@ func triangoli(m: ArrayMesh) -> int:
 	return 0 if m == null else (m.surface_get_arrays(0)[Mesh.ARRAY_INDEX] as PackedInt32Array).size() / 3
 
 
-func test_un_tipo_per_ogni_taglio_e_barba_degli_elenchi() -> bool:
+func test_un_tipo_per_ogni_taglio_degli_elenchi() -> bool:
 	var f := nuova()
 	eq(Capelli.N_TAGLI, Asp.HAIR_STYLES.size(), "tagli: stessi id dell'elenco di Aspetto")
-	eq(Barbe.SPESSORE.size(), Asp.BEARDS.size(), "barbe: stessi id dell'elenco di Aspetto")
-	eq(Capelli.LINEA.size(), Capelli.N_TAGLI, "attaccatura per ogni taglio")
+	eq(Capelli.HAIR.size(), Capelli.N_TAGLI, "dati per ogni taglio")
+	eq(Asp.BEARDS.size(), 7, "barbe: 7 come nel web (maschere 1..6 in viso_maschere.png)")
 	f.free()
 	return done()
 
 
-func test_calvo_e_rasato_senza_barba_non_hanno_mesh_gli_altri_si() -> bool:
+func test_calvo_e_rasato_senza_mesh_gli_altri_con_pochi_triangoli() -> bool:
 	var f := nuova()
 	for h in Capelli.N_TAGLI:
-		for b in Asp.BEARDS.size():
-			var m := Capelli.mesh_per(h, b)
-			var vuota := h <= 1 and b <= 1
-			check((m == null) == vuota, "taglio %d barba %d: mesh %s" % [h, b, "assente" if m == null else "presente"])
-			check(triangoli(m) <= MAX_TRIANGOLI, "taglio %d barba %d: %d triangoli" % [h, b, triangoli(m)])
+		var m := Capelli.mesh_per(h)
+		check((m == null) == (h <= 1), "taglio %d: mesh %s" % [h, "assente" if m == null else "presente"])
+		check(triangoli(m) <= MAX_TRIANGOLI, "taglio %d: %d triangoli" % [h, triangoli(m)])
 	f.free()
 	return done()
 
 
 func test_la_mesh_si_costruisce_una_volta_e_si_condivide() -> bool:
 	var f := nuova()
-	check(Capelli.mesh_per(9, 6) == Capelli.mesh_per(9, 6), "stessa coppia, stessa mesh")
-	check(Capelli.mesh_per(9, 6) != Capelli.mesh_per(9, 5), "barba diversa, mesh diversa")
-	check(Capelli.mesh_per(99, -3) == Capelli.mesh_per(16, 0), "valori fuori elenco: riportati dentro")
+	check(Capelli.mesh_per(9) == Capelli.mesh_per(9), "stesso taglio, stessa mesh")
+	check(Capelli.mesh_per(9) != Capelli.mesh_per(10), "taglio diverso, mesh diversa")
+	check(Capelli.mesh_per(99) == Capelli.mesh_per(16), "valori fuori elenco: riportati dentro")
+	var g := nuova({"hair": 9})
+	check((f.get("_capelli") as MeshInstance3D).material_override == (g.get("_capelli") as MeshInstance3D).material_override, "un materiale per tutti")
 	f.free()
+	g.free()
 	return done()
 
 
 func test_i_capelli_stanno_fuori_dalla_pelle() -> bool:
 	var f := nuova()
 	for h in range(2, Capelli.N_TAGLI):
-		var m := Capelli.mesh_per(h, 0)
-		var v: PackedVector3Array = m.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+		var pc := Capelli.pezzi(h)
 		var dentro := 0
-		for p in v:
-			var ae := Capelli.az_el(p)
-			if ae.y > -60.0 and p.distance_to(Capelli._c) < Capelli.raggio(ae.x, ae.y, false) - 0.002:
+		var n := 0
+		for i in pc.pos.size():
+			var uv: Vector2 = pc.uv[i]
+			# la calotta lontano dal bordo (il bordo e il risvolto entrano apposta sotto la base)
+			if uv.x > 0.8 or uv.y > 0.6:
+				continue
+			n += 1
+			var p: Vector3 = pc.pos[i]
+			if p.length() < Capelli.base(p) / 1.015 - 0.01:
 				dentro += 1
-		check(dentro <= v.size() / 50, "taglio %d: %d vertici su %d sotto la pelle" % [h, dentro, v.size()])
+		check(n > 0 and dentro <= n / 50, "taglio %d: %d vertici su %d sotto la testa" % [h, dentro, n])
 	f.free()
 	return done()
 
 
-func test_le_barbe_stanno_sul_viso_sotto_gli_occhi() -> bool:
+func test_misure_del_viso_sensate() -> bool:
 	var f := nuova()
-	var occhi: Vector3 = Capelli._c + Vector3(0, 0, 0.075)
-	for b in range(2, 7):
-		var a: Dictionary = Barbe.parte(b)
-		check(not a.is_empty(), "barba %d: c'è" % b)
-		var alto := -INF
-		var avanti := INF
-		for p: Vector3 in a.v:
-			alto = maxf(alto, p.y)
-			avanti = minf(avanti, p.z)
-		check(alto < occhi.y + 0.02, "barba %d: non sale sopra gli occhi (%.3f)" % [b, alto - occhi.y])
-		check(avanti > Capelli._c.z - 0.06, "barba %d: non va dietro le orecchie (%.3f)" % [b, avanti])
-	check(Barbe.parte(1).is_empty(), "l'ombra è solo dipinta")
+	var d := Viso.dati
+	var occhio: Vector4 = d.occhio
+	check(d.mento < occhio.y - 0.08 and d.mento > occhio.y - 0.16, "mento sotto gli occhi (%.3f)" % [occhio.y - d.mento])
+	var fin: Vector4 = d.occhio_finestra
+	check(fin.z > 6.0 and fin.z < 25.0 and fin.w >= 2.0 and fin.w < 10.0, "finestra dell'occhio in mm: %s" % fin)
+	check(Capelli.testa.R > 0.06 and Capelli.testa.R < 0.14, "raggio della testa %.3f" % Capelli.testa.R)
 	f.free()
 	return done()
 
 
-func test_la_figura_cambia_capelli_quando_cambia_aspetto() -> bool:
-	var f := nuova({"hair": 2, "beard": 0})
+func test_testa_e_collo_dalle_ossa_niente_maglia_sotto_il_mento() -> bool:
+	var f := nuova()
+	var a := Giocatore._mesh_divisa.surface_get_arrays(0)
+	var c0: PackedFloat32Array = a[Mesh.ARRAY_CUSTOM0]
+	var c1: PackedFloat32Array = a[Mesh.ARRAY_CUSTOM1]
+	var v: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
+	var mento: float = Viso.dati.mento
+	var testa := 0
+	var sotto := 0
+	var buoni := 0
+	for i in v.size():
+		if c0[i * 4 + 3] > 0.5:
+			testa += 1
+		# sotto il mento, davanti, vicino alla linea di mezzo: testa o collo (pelle), mai busto
+		if absf(v[i].x) < 0.02 and v[i].y < mento and v[i].y > mento - 0.03 and v[i].z > 0.0:
+			sotto += 1
+			if c0[i * 4 + 3] > 0.5 or c1[i * 4 + 3] > 0.5:
+				buoni += 1
+	check(testa > 100, "vertici della testa: %d" % testa)
+	check(sotto > 0 and buoni == sotto, "sotto il mento %d vertici, testa o collo %d" % [sotto, buoni])
+	f.free()
+	return done()
+
+
+func test_la_figura_cambia_capelli_barba_e_occhi_quando_cambia_aspetto() -> bool:
+	var f := nuova({"hair": 2, "beard": 0, "eyes": 0, "eyeColor": 0})
 	var cap: MeshInstance3D = f.get("_capelli")
-	check(cap.mesh == Capelli.mesh_per(2, 0), "taglio corto all'inizio")
-	f.metti_aspetto(Asp.parametri_figura({"hair": 9, "beard": 6, "hairColor": 5}))
-	check(cap.mesh == Capelli.mesh_per(9, 6), "afro con barba piena")
+	var corpo: MeshInstance3D = f.get("_mesh")
+	check(cap.mesh == Capelli.mesh_per(2), "taglio corto all'inizio")
+	f.metti_aspetto(Asp.parametri_figura({"hair": 9, "beard": 6, "hairColor": 5, "eyes": 3, "eyeColor": 4}))
+	check(cap.mesh == Capelli.mesh_per(9), "afro")
 	eq(cap.get_instance_shader_parameter(&"colore"), Color(Asp.HAIR_COLORS[5][1]), "colore dei capelli per istanza")
-	f.metti_aspetto(Asp.parametri_figura({"hair": 0, "beard": 0}))
-	check(not cap.visible, "calvo senza barba: niente mesh")
+	var s2: Vector4 = corpo.get_instance_shader_parameter(&"stile2")
+	eq(int(s2.y), 6, "barba piena nello shader della divisa")
+	eq(int(s2.x), 9, "taglio nello shader (cute)")
+	eq(corpo.get_instance_shader_parameter(&"occhi_forma"), 3.0, "forma degli occhi nello shader")
+	eq(corpo.get_instance_shader_parameter(&"iride"), Color(Asp.EYE_COLORS[4][1]), "colore degli occhi nello shader")
+	f.metti_aspetto(Asp.parametri_figura({"hair": 0, "beard": 2, "eyes": 5}))
+	check(not cap.visible, "calvo: niente mesh")
+	eq(int((corpo.get_instance_shader_parameter(&"stile2") as Vector4).y), 2, "pizzetto anche da calvo")
+	eq(corpo.get_instance_shader_parameter(&"occhi_forma"), 5.0, "occhi assonnati")
 	f.metti_aspetto({"pelle": Color.TAN, "capelli": Color.BLACK})
 	check(not cap.visible, "senza stile2 resta il taglio di prima")
+	f.free()
+	return done()
+
+
+func test_shader_della_divisa_ha_maschere_e_misure() -> bool:
+	var f := nuova()
+	var mat: ShaderMaterial = Giocatore._materiale
+	check(mat.get_shader_parameter("viso_maschere") is Texture2D, "maschere di barbe, sopracciglia e labbra")
+	var tex: Texture2D = mat.get_shader_parameter("viso_maschere")
+	eq(Vector2i(tex.get_width(), tex.get_height()), Vector2i(960, 520), "maschere: 4 × 2 celle della zona viso del web")
+	eq(mat.get_shader_parameter("occhio_finestra"), Viso.dati.occhio_finestra, "finestra degli occhi nello shader")
+	eq(mat.get_shader_parameter("cap_c"), Capelli.testa.c, "riferimento dei capelli nello shader (cute)")
+	# la barba k sta nella cella k − 1 (canale rosso): ogni barba ha la sua maschera, diversa dalle altre
+	var img := tex.get_image()
+	if img.is_compressed():
+		img.decompress()
+	var somme: Array = []
+	for k in 6:
+		var s := 0.0
+		for y in range(0, 260, 4):
+			for x in range(0, 240, 4):
+				s += img.get_pixel((k % 4) * 240 + x, (k / 4) * 260 + y).r
+		somme.append(s)
+		check(s > 1.0, "barba %d: maschera non vuota" % (k + 1))
+	for k in range(1, 6):
+		check(absf(somme[k] - somme[k - 1]) > 0.5, "barba %d diversa dalla %d" % [k + 1, k])
 	f.free()
 	return done()
