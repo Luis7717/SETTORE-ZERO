@@ -1060,3 +1060,37 @@ Clip vere del "Free mocap pack 05: Soccer" di Anderson Rohr nella versione Godot
   nello stesso fotogramma (es. `vai` e subito `mostra`). Ora salta i nodi già liberati.
 - Prove: `--app-schermate` passa anche da Impostazioni (con il controllo audio spento/acceso sul bus) ed editor
   dell'aspetto con taglio afro (Capelli, da vicino) e chignon (Scarpe, corpo intero).
+
+## 2026-11-21 — Godot: pallone nell'allenamento e tuffo del portiere
+Luis (IPA Godot sull'iPhone, tocco vero): "nel tutorial non c'è il pallone", poi "manca anche durante le partite";
+"sembra che non si riesca a parare ... il portiere sembra che non si tuffi".
+- **Pallone: sul PC si vede sempre** (Vulkan Forward Mobile, OpenGL compatibilità, D3D12, `.pck` esportato col preset
+  Windows, finestra a scala 2×, allenamento da riga di comando e dal giro dell'app). Quindi il difetto è del telefono
+  (Metal) e non della logica: in allenamento il nodo `Pallone` c'è, è acceso, sta dove dice il motore ed è
+  nell'inquadratura dopo il setup di ogni lezione (provato). Nel codice il pallone della partita era l'**unico oggetto
+  con StandardMaterial3D + normal map** (`pallone_n.png`) e filtro anisotropico; il pallone dello sfondo del menu e
+  tutto il resto no. **Scelta**: `PartitaVista.materiale_pallone()` = solo la texture HD (`pallone.png`), niente normal
+  map né anisotropico (come il materiale semplice del web, MeshPhong con la sola mappa); in più, se il giro del pallone
+  diventasse non finito si azzera (un pallone con basi NaN sparirebbe). **Non è una causa provata**: senza un iPhone
+  qui non si può vedere Metal. Resta da chiedere a Luis se nello sfondo del menu (campione che palleggia) il pallone si
+  vede: se sì, la causa era il materiale; se manca anche lì, è altro (e la prossima prova è un pallone di colore pieno
+  senza texture). `pallone_n.png` resta negli asset (lo genera `tools/genera_texture.gd`), non usato.
+- **Pallone coperto dal portatore** (visto sul PC, uguale nel web `test/duel-shot.mjs`): con la telecamera alta dietro
+  chi porta palla, il pallone 0,6 m davanti ai piedi resta dietro il corpo. Non cambiato (è come il web).
+- **Tuffo: la logica funziona anche col tocco vero.** Prova con `InputEventScreenTouch`/`ScreenDrag` passati da
+  `Input` in pixel della finestra (anche a scala 2×), telecamera dietro la porta: `gesti.gd` apre il modo "dive",
+  il punto in porta sotto il dito è giusto, al rilascio `m.userDive` fa partire il tuffo verso quel punto. Uguale al web
+  (`src/input.js`, `src/sim/match.js`): il motore non è stato toccato.
+- **Perché sembrava che non si tuffasse**: appena alzato il dito `diveWin` finisce (il portiere non è più in "play"),
+  quindi il rallenty finiva e la **telecamera lasciava subito la visuale dietro la porta** (come nel web); il tuffo
+  partiva mentre la visuale volava via, e senza pallone visibile sull'iPhone non si capiva niente. **Scelta**: la
+  visuale della parata resta finché il nostro portiere è in tuffo col tiro ancora in volo
+  (`TelecameraPartita.parata_in_vista`); il tempo torna normale come prima (il risultato non cambia: il motore è lo
+  stesso). Il tuffo si vede (figura col corpo di lato, schermata `8_tuffo`). Con il portiere automatico (impostazione
+  `autoGk`) niente visuale della parata, come prima.
+- **Resta come nel web**: il tuffo parte quando si alza il dito; se lo si alza subito, con il pallone ancora lontano,
+  il portiere arriva a terra prima del pallone ("troppo presto"). Se Luis lo trova troppo difficile, una scelta
+  possibile è tenere il rallenty anche durante il tuffo o far partire il tuffo più tardi: da decidere con lui.
+- Prove: `tests/test_gesti.gd` +2 (tuffo che arriva davvero al motore e visuale che resta; materiale del pallone),
+  `tests/prova_partita.gd` nuova (partita vera senza schermo: pallone dopo ogni lezione, tuffo col tocco vero,
+  figura che si tuffa; `-- --foto=CARTELLA` con la finestra salva le schermate).

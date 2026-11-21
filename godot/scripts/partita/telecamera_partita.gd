@@ -192,9 +192,22 @@ func _corner_step(m: Object, dir: float, rdt: float, pk: float, user_yaw: float)
 	return _corn_k if _corner_p != null else 0.0
 
 
+## la visuale della parata resta: mentre si può parare (diveWin, come il web) e poi finché il nostro portiere è in
+## tuffo col tiro ancora in volo (2026-11-21: prima, alzato il dito, la telecamera se ne andava subito e il tuffo non
+## si vedeva, "sembra che non si tuffi")
+static func parata_in_vista(m: Object, me: int) -> bool:
+	if m.autoGk[me]:
+		return false
+	if m.diveWin(me):
+		return true
+	var b: Object = m.ball
+	var g: Object = m.gk(me)
+	return m.phase == "play" and g.state == "dive" and b.shot != null and b.shot.team != me and b.owner == null
+
+
 # parata: dietro la propria porta, porta intera + portiere + pallone sempre a schermo
 func _save_step(m: Object, me: int, dir: float, rdt: float, pk: float) -> float:
-	var on: bool = m.diveWin(me) and not m.autoGk[me]
+	var on: bool = parata_in_vista(m, me)
 	_gk_k += ((1.0 if on else 0.0) - _gk_k) * minf(1.0, rdt * 6.0)
 	if _gk_k < 1e-3 and not on:
 		_gk_k = 0.0

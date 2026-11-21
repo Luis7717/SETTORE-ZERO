@@ -28,7 +28,6 @@ extends Node3D
 const Coord := preload("res://scripts/coord.gd")
 const Figura := preload("figura.gd")
 const PALLA_HD := "res://assets/textures/pallone.png"
-const PALLA_N := "res://assets/textures/pallone_n.png"
 const Asp := preload("res://scripts/carriera/aspetto.gd") # porting di src/looks.js (classe Aspetto)
 const Schiene := preload("schiene.gd")
 const Giocatore := preload("res://scripts/giocatore.gd")
@@ -524,17 +523,7 @@ func _crea_pallone() -> void:
 	sfera.height = BALL_R * 2.0
 	sfera.radial_segments = 32
 	sfera.rings = 16
-	var mat := StandardMaterial3D.new()
-	# pallone HD (tools/genera_texture.gd: 32 spicchi con le cuciture in rilievo), sennò quello disegnato al volo
-	if ResourceLoader.exists(PALLA_HD) and ResourceLoader.exists(PALLA_N):
-		mat.albedo_texture = load(PALLA_HD)
-		mat.normal_enabled = true
-		mat.normal_texture = load(PALLA_N)
-		mat.normal_scale = 0.8
-	else:
-		mat.albedo_texture = TV.palla()
-	mat.roughness = 0.45
-	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	var mat := materiale_pallone()
 	_ball = MeshInstance3D.new()
 	_ball.name = "Pallone"
 	_ball.mesh = sfera
@@ -552,6 +541,17 @@ func _crea_pallone() -> void:
 	add_child(_ball_sh)
 
 
+## materiale del pallone: solo la texture HD (tools/genera_texture.gd), sennò quella disegnata al volo. Niente normal
+## map né filtro anisotropico (2026-11-21): sull'iPhone il pallone non si vedeva, ed era l'unico oggetto della
+## partita con quel materiale; ora è fatto come il pallone dello sfondo del menu (texture e basta).
+static func materiale_pallone() -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = load(PALLA_HD) if ResourceLoader.exists(PALLA_HD) else TV.palla()
+	mat.roughness = 0.45
+	mat.metallic_specular = 0.55
+	return mat
+
+
 func _aggiorna_pallone(b: Object, bx: float, by: float, bh: float, dt: float) -> void:
 	var s := flip
 	_ball.position = Vector3(s * bx, bh + BALL_R, -s * by)
@@ -559,6 +559,8 @@ func _aggiorna_pallone(b: Object, bx: float, by: float, bh: float, dt: float) ->
 	if sp > 0.2 and dt > 0.0:   # rotola nel verso giusto (asse = su × velocità)
 		_ball.rotate(Vector3(-s * b.vy, 0.0, -s * b.vx).normalized(), sp * dt / BALL_R)
 		_ball.basis = _ball.basis.orthonormalized()
+		if not _ball.basis.is_finite(): # mai un pallone sparito per un giro fatto di NaN
+			_ball.basis = Basis()
 	# ombra: più larga e più chiara quando il pallone è alto
 	var hk := minf(bh, 8.0)
 	var hs := 0.8 + hk * 0.13
