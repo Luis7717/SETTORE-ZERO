@@ -37,6 +37,8 @@ ogni cambio al motore si fa in tutte e due, con le fixture rigenerate.
   motore e si vede come cronaca scritta. Più la mia squadra è forte rispetto all'avversaria, più azioni sono offensive;
   più l'avversaria è forte, più sono difensive; **mai meno di 3 azioni offensive**, anche con la squadra più scarsa, e
   devono essere occasioni vere (posizioni da cui si può segnare). Il resto sono azioni difensive e offensive miste.
+  Ogni **azione offensiva parte da centrocampo** (o poco oltre) col pallone alla mia squadra verso la porta avversaria;
+  ogni **azione difensiva** è lo stesso al contrario: parte da centrocampo con l'avversario che attacca verso la mia porta.
 - **13. Allenamento libero**: tiri, punizioni, rigori con punteggio.
 
 ## Tenute da parte (da provare più avanti)
