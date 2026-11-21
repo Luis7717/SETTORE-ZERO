@@ -117,14 +117,15 @@ static func lookOf(p: Variant) -> Dictionary:
 
 
 ## parametri di shaders/divisa.gdshader per un look (vista della partita e anteprima dell'editor):
-## pelle, capelli, iride, scarpe (Color) e stile2 = (taglio, barba, sopracciglia, calzoncini dello stile della divisa)
+## pelle, capelli, iride, scarpe (Color), stile2 = (taglio, barba, sopracciglia, calzoncini dello stile della divisa)
+## e occhi_forma (forma degli occhi, EYE_SHAPES)
 static func parametri_figura(look: Variant, stile_divisa: Variant = null) -> Dictionary:
 	var l := normalizeLook(look)
 	var st := normalizeKitStyle(stile_divisa)
 	return {
 		"pelle": Color(SKINS[l.skin][1]), "capelli": Color(HAIR_COLORS[l.hairColor][1]),
 		"iride": Color(EYE_COLORS[l.eyeColor][1]), "scarpe": Color(BOOTS[l.boots][1]),
-		"stile2": Vector4(l.hair, l.beard, l.brows, st.shorts),
+		"stile2": Vector4(l.hair, l.beard, l.brows, st.shorts), "occhi_forma": float(l.eyes),
 	}
 
 

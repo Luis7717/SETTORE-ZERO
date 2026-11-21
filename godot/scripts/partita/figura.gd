@@ -16,7 +16,7 @@ const Giochetti := preload("mosse/giochetti.gd")
 const Corpo := preload("mosse/corpo.gd")
 const IK := preload("mosse/ik.gd")
 const FiguraMocap := preload("figura_mocap.gd")   # animazioni mocap (esultanze, parate, calci, rimessa, difesa)
-const Capelli := preload("capelli.gd")            # capelli e barba: mesh a parte sull'osso della testa
+const Capelli := preload("capelli.gd")            # capelli: mesh a parte sull'osso della testa (barba dipinta)
 
 const MODEL_H := 1.84          # altezza del modello prima della scala del gioco (come src/athlete3d.js)
 const RUN_FULL := 1.6          # m/s: sopra questa velocità il clip di corsa è a peso pieno
@@ -65,7 +65,7 @@ var _params := PackedFloat32Array([0.0, 0.0, 0.0, -1.0, -1.0, -1.0])   # ultimi 
 var _gcache := {}              # osso → posa globale calcolata in questo fotogramma (vedi _glob)
 var _avviso: Sprite3D
 var _mesh: MeshInstance3D
-var _capelli: MeshInstance3D   # capelli + barba (Capelli.mesh_per), sotto l'osso della testa
+var _capelli: MeshInstance3D   # capelli (Capelli.mesh_per), sotto l'osso della testa
 var _stile2 := Vector4(2, 0, 0, 0)   # taglio, barba, sopracciglia, calzoncini (come stile2 di divisa.gdshader)
 var _corsa := 0.0              # ultimo valore di "corsa" dato allo shader (la maglia ondeggia)
 ## clip mocap di questa figura (figura_mocap.gd); null solo prima di prepara()
@@ -128,14 +128,15 @@ func prepara(kit: Dictionary, aspetto: Dictionary, sfasa: float, tex_avviso: Tex
 	add_child(_avviso)
 
 
-## pelle, capelli (Color) e, se ci sono, iride, scarpe, stile2 (Aspetto.parametri_figura): colori dello shader della
-## divisa e mesh di capelli e barba del taglio. Si può richiamare per cambiare aspetto (anteprima dell'editor)
+## pelle, capelli (Color) e, se ci sono, iride, scarpe, stile2, occhi_forma (Aspetto.parametri_figura): parametri
+## dello shader della divisa (barba, sopracciglia, occhi, cute dipinti) e mesh dei capelli del taglio. Si può
+## richiamare per cambiare aspetto (anteprima dell'editor: il modellino cambia subito)
 func metti_aspetto(aspetto: Dictionary) -> void:
 	for k: String in aspetto:
 		_mesh.set_instance_shader_parameter(k, aspetto[k])
 	if aspetto.has("stile2"):
 		_stile2 = aspetto.stile2
-	var m := Capelli.mesh_per(int(_stile2.x + 0.5), int(_stile2.y + 0.5))
+	var m := Capelli.mesh_per(int(_stile2.x + 0.5))
 	if _capelli.mesh != m:
 		_capelli.mesh = m
 	_capelli.visible = m != null

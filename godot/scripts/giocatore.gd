@@ -7,6 +7,8 @@ const Coord := preload("res://scripts/coord.gd")
 const MODELLO := preload("res://assets/models/athlete.glb")
 const SHADER_DIVISA := preload("res://shaders/divisa.gdshader")
 const Capelli := preload("res://scripts/partita/capelli.gd")
+const Viso := preload("res://scripts/partita/viso.gd")
+const MASCHERE_VISO := preload("res://assets/textures/viso_maschere.png")
 
 const RUN_REF := 4.2       # m/s: velocità a cui il clip di corsa gira a velocità 1 (come src/athlete3d.js)
 const SPRINT_REF := 8.0    # m/s: idem per lo scatto
@@ -22,6 +24,8 @@ static var _mesh_divisa: ArrayMesh
 static var _materiale: ShaderMaterial
 static var _albero: AnimationNodeBlendTree
 static var _yaw_modello := 0.0
+## peso dell'osso della testa per vertice della mesh del corpo (riferimento dei capelli, misure del viso)
+static var _peso_testa := PackedFloat32Array()
 
 var _modello: Node3D
 var _mesh: MeshInstance3D
@@ -48,7 +52,7 @@ func prepara(kit: Dictionary, aspetto: Dictionary, sfasa: float) -> void:
 		_mesh.set_instance_shader_parameter(k, aspetto[k])
 	# capelli corti di base (taglio 2, come stile2 predefinito dello shader), mesh a parte sull'osso della testa
 	var cap := Capelli.attacca(scheletro, _mesh.skin)
-	cap.mesh = Capelli.mesh_per(2, 0)
+	cap.mesh = Capelli.mesh_per(2)
 	cap.set_instance_shader_parameter(&"colore", aspetto["capelli"])
 	cap.set_instance_shader_parameter(&"pelle", aspetto["pelle"])
 	_modello.scale = Vector3.ONE * Coord.SCALE
@@ -90,7 +94,7 @@ func _scala_tempo(v: float) -> float:
 
 # ---------------------------------------------------------------- risorse condivise
 static func _prepara_condivisi(mi: MeshInstance3D, scheletro: Skeleton3D, player: AnimationPlayer) -> void:
-	_mesh_divisa = _mesh_con_riposo(mi.mesh as ArrayMesh)
+	_mesh_divisa = _mesh_con_riposo(mi.mesh as ArrayMesh, _nomi_ossa(mi.skin, scheletro))
 	_materiale = ShaderMaterial.new()
 	_materiale.shader = SHADER_DIVISA
 	var osso := func(nome: String) -> Vector3:
@@ -111,7 +115,13 @@ static func _prepara_condivisi(mi: MeshInstance3D, scheletro: Skeleton3D, player
 	var punta: Vector3 = osso.call("ball_r") - osso.call("foot_r")
 	_yaw_modello = -atan2(-punta.x, -punta.z)
 	_materiale.set_shader_parameter("davanti", Vector2(punta.x, punta.z).normalized())
-	Capelli.prepara(_mesh_divisa, _materiale.get_shader_parameter("occhi"), Vector2(punta.x, punta.z).normalized())
+	# capelli e viso come il web: riferimento della testa, cute, barba, sopracciglia, labbra, occhi
+	var arr := _mesh_divisa.surface_get_arrays(0)
+	var t := Capelli.prepara(arr, _peso_testa)
+	Capelli.applica(_materiale)
+	Viso.misura(arr, _peso_testa, t.c, t.occhio_l, t.occhio_r)
+	Viso.applica(_materiale)
+	_materiale.set_shader_parameter("viso_maschere", MASCHERE_VISO)
 	for nome in CLIP_IN_LOOP:
 		if player.has_animation(nome):
 			player.get_animation(nome).loop_mode = Animation.LOOP_LINEAR
@@ -132,21 +142,67 @@ static func _centro_occhio(mesh: ArrayMesh) -> Vector3:
 	return somma / n if n > 0 else Vector3(0.034, 1.698, 0.07)
 
 
-# copia della mesh con la posizione di riposo di ogni vertice in CUSTOM0 (per lo shader della divisa)
-static func _mesh_con_riposo(src: ArrayMesh) -> ArrayMesh:
+# nome dell'osso per ogni indice di legame della pelle (gli indici delle ossa nella mesh sono quelli della pelle)
+static func _nomi_ossa(pelle: Skin, scheletro: Skeleton3D) -> PackedStringArray:
+	var out := PackedStringArray()
+	if pelle == null:
+		for i in scheletro.get_bone_count():
+			out.append(scheletro.get_bone_name(i))
+		return out
+	for i in pelle.get_bind_count():
+		var n := String(pelle.get_bind_name(i))
+		if n.is_empty() and pelle.get_bind_bone(i) >= 0:
+			n = scheletro.get_bone_name(pelle.get_bind_bone(i))
+		out.append(n)
+	return out
+
+
+# copia della mesh con, per ogni vertice, la posizione di riposo in CUSTOM0.xyz e la normale di riposo in CUSTOM1.xyz
+# (per lo shader della divisa); CUSTOM0.w = 1 se l'osso che lo muove di più è la testa, CUSTOM1.w = 1 se è il collo
+# (come le classi dei texel del web). Riempie anche _peso_testa.
+static func _mesh_con_riposo(src: ArrayMesh, ossa: PackedStringArray) -> ArrayMesh:
 	var out := ArrayMesh.new()
 	for s in src.get_surface_count():
 		var arrays := src.surface_get_arrays(s)
 		var vertici: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var normali: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+		var bi: PackedInt32Array = arrays[Mesh.ARRAY_BONES] if arrays[Mesh.ARRAY_BONES] != null else PackedInt32Array()
+		var bw: PackedFloat32Array = arrays[Mesh.ARRAY_WEIGHTS] if arrays[Mesh.ARRAY_WEIGHTS] != null else PackedFloat32Array()
+		var per := bi.size() / maxi(1, vertici.size())
 		var riposo := PackedFloat32Array()
 		riposo.resize(vertici.size() * 4)
+		var nr := PackedFloat32Array()
+		nr.resize(vertici.size() * 4)
+		var pt := PackedFloat32Array()
+		pt.resize(vertici.size())
 		for i in vertici.size():
+			var testa := 0.0
+			var migliore := ""
+			var mp := -1.0
+			for k in per:
+				var j := bi[i * per + k]
+				var w := bw[i * per + k]
+				var nome := ossa[j] if j >= 0 and j < ossa.size() else ""
+				if w > mp:
+					mp = w
+					migliore = nome
+				if nome == "Head":
+					testa += w
+			pt[i] = testa
 			riposo[i * 4] = vertici[i].x
 			riposo[i * 4 + 1] = vertici[i].y
 			riposo[i * 4 + 2] = vertici[i].z
-			riposo[i * 4 + 3] = 1.0
+			riposo[i * 4 + 3] = 1.0 if migliore == "Head" else 0.0
+			var n := normali[i] if i < normali.size() else Vector3.UP
+			nr[i * 4] = n.x
+			nr[i * 4 + 1] = n.y
+			nr[i * 4 + 2] = n.z
+			nr[i * 4 + 3] = 1.0 if migliore == "neck_01" else 0.0
+		if s == 0:
+			_peso_testa = pt
 		arrays[Mesh.ARRAY_CUSTOM0] = riposo
-		var flags := Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT
+		arrays[Mesh.ARRAY_CUSTOM1] = nr
+		var flags := (Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT) | (Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM1_SHIFT)
 		if src.surface_get_format(s) & Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS:
 			flags |= Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS
 		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, [], {}, flags)
