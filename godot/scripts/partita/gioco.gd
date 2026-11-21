@@ -16,6 +16,7 @@
 #   --scena=area|duello|fuga|angolo|pausa   mette la partita in una situazione da fotografare
 #   --schermata=PERCORSO.png [--dopo=SEC] [--alla-fine]   schermata dopo SEC secondi veri, o alla fine partita
 #   --esci-dopo=SEC     esce dopo SEC secondi veri
+#   --scena=gol [--esultanza=ID]   gol del n. 10 di casa; con --esultanza è il campione e fa quell'esultanza
 #   --campo=NOME        taglio dell'erba (strisce, strette, verticali, quadrotti, cerchi, uniforme, rombi, raggi, diagonali)
 #   --manto=NOME        colore dell'erba (vivo, milano, naturale, sintetico, sintetico_chiaro, estivo)
 #   --allenamento       allenamento guidato (tipo "allenamento", scripts/partita/allenamento.gd) invece dell'amichevole;
@@ -36,6 +37,9 @@ extends Node
 
 signal finita(esito: Dictionary)
 signal continua
+## dopo ogni gol, quando l'esultanza è finita: subito se non esulta il campione, alla fine (o al tocco che la salta)
+## se esulta. Il replay del gol si aggancia qui (ordine: esultanza → replay → calcio d'inizio)
+signal esultanza_finita
 
 const SimMatchScript := preload("res://sim/match.gd")
 const C := preload("res://sim/core.gd")
@@ -54,6 +58,7 @@ const AllenamentoHud := preload("res://scripts/partita/allenamento_hud.gd")
 const BotAllenamento := preload("res://scripts/partita/bot_allenamento.gd")
 const Tagli := preload("res://scripts/tagli_campo.gd")
 const ContaGiocatori := preload("res://scripts/partita/conta_giocatori.gd")
+const EsultanzaRegia := preload("res://scripts/partita/esultanza_regia.gd")
 const SCENA_VISTA := "res://scenes/vista_partita.tscn"
 
 # velocità del tempo (rallenty), come src/main.js
@@ -102,6 +107,7 @@ var audio: AudioPartita
 var bot: BotDito = null
 var abbandonata := false
 var conta: ContaGiocatori = null  # conteggi per giocatore (carriera: crescita del campione)
+var esultanza: EsultanzaRegia = null  # esultanza del campione dopo un suo gol (esultanza_regia.gd)
 
 var _opzioni := {}
 var _avvio := {}              # opzioni di avvia() (vuoto = partita di prova da sola)
@@ -174,6 +180,9 @@ func _parti() -> void:
 	hud.nuova_partita.connect(_nuova_partita)
 	audio = AudioPartita.new()
 	add_child(audio)
+	esultanza = EsultanzaRegia.new()
+	add_child(esultanza)
+	esultanza.finita.connect(_dopo_esultanza)
 	audio.folla(FOLLA_BASE)
 	var derby := _segna_derby()
 	if tipo() == "allenamento":
@@ -267,7 +276,9 @@ func _process(delta: float) -> void:
 	_anteprima_viva = gesti.drawing
 	vista.drawing = gesti.drawing
 	var dt_reale := 0.0 if paused else dt
+	esultanza.aggiorna(dt_reale, m)
 	vista.update_view(0.0 if paused else dt * maxf(ts, 0.25), dt_reale)
+	esultanza.camera(vista)
 
 
 ## velocità del tempo voluta adesso (rallenty)
@@ -412,6 +423,14 @@ func _gol(e: Dictionary) -> void:
 	else:
 		audio.ooh()
 		hud.big("Gol subito", "b", 2400, piccolo)
+	# gol del campione: parte la sua esultanza (alla fine chiama _dopo_esultanza); negli altri casi si va avanti subito
+	if allenamento != null or not esultanza.avvia(e, m, me, vista):
+		_dopo_esultanza()
+
+
+## fine dell'esultanza del campione (o gol di un altro): qui si aggancia il replay del gol
+func _dopo_esultanza() -> void:
+	esultanza_finita.emit()
 
 
 func _ripartenza(e: Dictionary) -> void:
@@ -449,6 +468,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	var now := Time.get_ticks_msec()
 	if event is InputEventScreenTouch:
 		var e := event as InputEventScreenTouch
+		if e.pressed and esultanza != null and esultanza.attiva and not hud.tocca_hud(e.position):
+			esultanza.salta() # un tocco salta l'esultanza del campione
+			return
 		if e.pressed:
 			if giocabile and gesti.dito < 0 and not hud.tocca_hud(e.position):
 				gesti.down(e.position, now, e.index)
@@ -700,6 +722,15 @@ func _prepara_scena(nome: String) -> void:
 				_disegno_di_prova(m.team(me)[10])
 		"angolo":
 			m.setRestart("corner", me, C.HW, C.HL)
+		"gol": # il n. 10 segna (con --esultanza=ID è il campione): esultanza, telecamera, tocco per saltare
+			_metti_in_gioco()
+			var marcatore: R.Player = m.team(me)[9]
+			if _opzioni.has("esultanza"):
+				marcatore.src["champ"] = true # (nello stesso dizionario: la vista non rifà la figura)
+				marcatore.src["esultanza"] = _opzioni["esultanza"]
+			_sposta(marcatore, 3.0, 36.0 if me == 0 else -36.0)
+			m.ball.last = marcatore
+			m.goal(me)
 		"pausa":
 			await get_tree().create_timer(0.8).timeout
 			_mostra_pausa()

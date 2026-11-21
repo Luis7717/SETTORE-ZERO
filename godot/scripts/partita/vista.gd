@@ -379,6 +379,12 @@ func _festa_gol(squadra: int) -> void:
 
 
 # ---------------------------------------------------------------- giocatori
+## figura (Figura) del giocatore p del motore, o null (esultanza del campione: esultanza_regia.gd)
+func figura_di(p: Object) -> Node3D:
+	var i: int = m.players.find(p) if m != null else -1
+	return _figs[i] if i >= 0 and i < _figs.size() and is_instance_valid(_figs[i]) else null
+
+
 func _figura(p: Object) -> Node3D:
 	var f := Figura.new()
 	f.name = "G%d_%d" % [p.team, p.i]

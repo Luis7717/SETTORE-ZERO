@@ -67,6 +67,10 @@ var _mesh: MeshInstance3D
 var _corsa := 0.0              # ultimo valore di "corsa" dato allo shader (la maglia ondeggia)
 ## clip mocap di questa figura (figura_mocap.gd); null solo prima di prepara()
 var mocap: FiguraMocap
+## esultanza del campione in corso: null, oppure {fr, corsa, vel, corpo, braccia} di mosse/esultanza.gd posa() più
+## w (peso 0..1, entrata e uscita). La mette chi la guida (esultanza_regia.gd in partita, l'anteprima nell'editor)
+## prima di posa(): finché c'è, comanda lei (niente clip mocap né pose del motore)
+var esultanza: Variant = null
 
 
 ## kit: maglia, calzoncini, calzettoni, bordino (Color) e se c'è stile, numero (Vector4); aspetto: pelle, capelli
@@ -131,6 +135,9 @@ static func sprint_mix(v: float, sprinting: bool) -> float:
 func posa(p: Object, dt: float, ctx: Dictionary) -> void:
 	_rimetti()
 	_avviso.visible = p.warn
+	if esultanza != null:
+		_posa_esultanza(esultanza, dt, ctx)
+		return
 	var mc := mocap.aggiorna(p, dt, ctx)   # [mocap] peso della clip mocap (0 = nessuna)
 	var v := sqrt(p.vx * p.vx + p.vy * p.vy)
 	var run := clampf((v - 0.25) / RUN_FULL, 0.0, 1.0)
@@ -320,22 +327,43 @@ func _giochetto(tr: Dictionary) -> void:
 
 
 ## mette lo scheletro nella posa fr di una Mossa (src/move-pose.js applyMove): bacino, busto, collo e testa con la
-## rotazione voluta rispetto alla posa di legame, braccia e gambe con la IK, piede orientato. w = peso (0..1)
-func applica_mossa(fr: Dictionary, w: float) -> void:
-	if w <= 0.0:
-		return
-	_set_pos("pelvis", fr.pelvis.p, w)
-	for n: String in TRUNK:
-		_set_quat(n, (fr.rot[n] as Quaternion) * _rest_q[n], w)
-	for s: String in ["l", "r"]:
-		_set_quat("clavicle_" + s, (fr.rot.spine_03 as Quaternion) * _rest_q["clavicle_" + s], w)
-		var a: Variant = fr.arms.get(s)
-		if a != null:
-			_arto(_limbs["arm_" + s], a.hand, a.pole, null, w)
-	for s: String in ["l", "r"]:
-		var l: Variant = fr.legs.get(s)
-		if l != null:
-			_arto(_limbs["leg_" + s], l.ankle, l.pole, l.fq, w)
+## rotazione voluta rispetto alla posa di legame, braccia e gambe con la IK, piede orientato. w = peso (0..1);
+## w_corpo (se >= 0) = peso diverso per bacino, busto e gambe (esultanze: correndo le gambe le fa il clip di corsa);
+## w_braccia e w_busto (se >= 0) = pesi diversi per le braccia e per il busto (bacino girato, schiena, collo, testa)
+func applica_mossa(fr: Dictionary, w: float, w_corpo: float = -1.0, w_braccia: float = -1.0, w_busto: float = -1.0) -> void:
+	var wc := w if w_corpo < 0.0 else w_corpo
+	var wb := w if w_braccia < 0.0 else w_braccia
+	var wt := wc if w_busto < 0.0 else w_busto
+	if wc > 0.0:
+		_set_pos("pelvis", fr.pelvis.p, wc)
+	if wt > 0.0:
+		for n: String in TRUNK:
+			_set_quat(n, (fr.rot[n] as Quaternion) * _rest_q[n], wt)
+	if wb > 0.0:
+		for s: String in ["l", "r"]:
+			_set_quat("clavicle_" + s, (fr.rot.spine_03 as Quaternion) * _rest_q["clavicle_" + s], wb)
+			var a: Variant = fr.arms.get(s)
+			if a != null:
+				_arto(_limbs["arm_" + s], a.hand, a.pole, null, wb)
+	if wc > 0.0:
+		for s: String in ["l", "r"]:
+			var l: Variant = fr.legs.get(s)
+			if l != null:
+				_arto(_limbs["leg_" + s], l.ankle, l.pole, l.fq, wc)
+
+
+# esultanza del campione (mosse/esultanza.gd): clip di fermo o di corsa sotto, corpo intero spostato e girato,
+# posa calcolata sopra (le gambe solo fuori dalla corsa)
+func _posa_esultanza(e: Dictionary, dt: float, ctx: Dictionary) -> void:
+	mocap.spegni(ctx.get("m"))
+	var w: float = e.get("w", 1.0)
+	var corsa: float = e.corsa
+	_mescola(1.0 - corsa, corsa, 0.0, e.vel, false, false)
+	_w_idle = 0.0
+	_anim.advance(dt)
+	_gcache.clear()
+	corpo.transform = Transform3D.IDENTITY.interpolate_with(e.corpo, w) if w < 1.0 else e.corpo
+	applica_mossa(e.fr, w, w * (1.0 - corsa), w * float(e.braccia), w * float(e.get("busto", 1.0 - corsa)))
 
 
 # due ossa verso il bersaglio: radice, metà e fine

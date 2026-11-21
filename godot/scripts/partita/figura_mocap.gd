@@ -409,6 +409,21 @@ func _ferma() -> void:
 	_bersaglio = 0.0
 
 
+## la figura fa altro (esultanza del campione, esultanza_regia.gd): niente clip, peso subito a zero; il gol in corso
+## conta come già visto, così finita l'esultanza non parte anche la clip mocap
+func spegni(m: Object) -> void:
+	if m != null:
+		_gol_visto = m.goalsLog.size()
+	_mano = 0.0
+	if _albero == null or (clip == "" and peso <= 0.0):
+		return
+	_ferma()
+	clip = ""
+	peso = 0.0
+	yaw = 0.0
+	_scrivi(0, P_PESO, 0.0)
+
+
 func _imposta_ts(ts: float) -> void:
 	_ts = ts
 	_scrivi(1, P_TS, ts)
