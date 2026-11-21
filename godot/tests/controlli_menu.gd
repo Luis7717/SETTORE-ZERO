@@ -10,7 +10,8 @@ const JS := preload("res://scripts/carriera/js.gd")
 const FIXTURE := "res://tests/fixtures/carriera_menu.json"
 const SALVA := "user://test_menu_schermate.json"
 const SCHERMATE := ["principale", "nuova_carriera", "hub", "rosa", "mercato", "classifica", "calendario", "amichevole",
-	"uno_contro_uno", "impostazioni", "come_si_gioca", "editor", "dopo_partita", "fine_stagione"]
+	"uno_contro_uno", "impostazioni", "come_si_gioca", "editor", "dopo_partita", "fine_stagione", "statistiche"]
+const ProvaMenu := preload("res://tests/prova_menu.gd")
 
 var _andate: Array = []
 var _app_carriera: Variant = null
@@ -67,6 +68,8 @@ func test_ogni_schermata_si_costruisce() -> bool:
 			a = {"esito": {"gol_a": 2, "gol_b": 1, "marcatori": [{"team": 0, "name": "L. Mancini", "minute": 23}], "me": 0,
 				"statistiche": {"shots": [5, 3], "onT": [3, 1], "poss": [60.0, 40.0], "corners": [2, 1], "fouls": [1, 2]},
 				"abbandonata": false, "tipo": "amichevole"}, "res": null, "titolo": "Amichevole", "tipo": "amichevole"}
+		elif nome == "statistiche":
+			a = ProvaMenu.statistiche_prova(MenuSchermata.carriera_prova.s)
 		elif nome == "fine_stagione":
 			a = {"pos": 1, "prize": 300, "bonus": 100, "outcome": "up", "div": 2, "newDiv": 1}
 		var n := _apri(nome, a)
@@ -167,4 +170,43 @@ func test_dopo_partita_continua_porta_alla_fine_stagione() -> bool:
 		ultimo.pressed.emit()
 	eq(_andate.back()[0] if not _andate.is_empty() else "", "fine_stagione", "a fine stagione si va al riepilogo")
 	_finisci(n)
+	return done()
+
+
+func test_dopo_partita_apre_le_statistiche_e_torna_indietro() -> bool:
+	_inizia(_carriera())
+	var tab: Dictionary = ProvaMenu.statistiche_prova(MenuSchermata.carriera_prova.s).tabellino
+	var a := {"esito": {"gol_a": 2, "gol_b": 1, "marcatori": [], "statistiche": {"shots": [6, 3]}, "me": 0, "tabellino": tab},
+		"res": null, "titolo": "Amichevole", "tipo": "amichevole"}
+	var n := _apri("dopo_partita", a)
+	var bottoni: Array = n.corpo.find_children("*", "Button", true, false)
+	var stats: Button = null
+	for b: Button in bottoni:
+		if b.text == "STATISTICHE E PAGELLE":
+			stats = b
+	check(stats != null, "c'è il tasto delle statistiche")
+	eq((bottoni.back() as Button).text if not bottoni.is_empty() else "", "CONTINUA", "Continua resta l'ultimo")
+	if stats != null:
+		stats.pressed.emit()
+	var andata: Array = _andate.back() if not _andate.is_empty() else ["", null]
+	eq(andata[0], "statistiche", "si apre la schermata delle statistiche")
+	_finisci(n)
+	if andata[0] != "statistiche":
+		return done()
+	_inizia(_carriera())
+	var s := _apri("statistiche", andata[1])
+	var pagella := s.corpo.find_children("*", "RichTextLabel", true, false).filter(func(l: RichTextLabel) -> bool:
+		return l.text.contains("MIGLIORE IN CAMPO"))
+	eq(pagella.size(), 1, "un solo migliore in campo")
+	s.torna_indietro()
+	eq(_andate.back()[0], "dopo_partita", "‹ torna al dopo partita")
+	check(_andate.back()[1] == a, "con lo stesso esito")
+	_finisci(s)
+	var senza := a.duplicate(true)
+	senza.esito.erase("tabellino")
+	_inizia(_carriera())
+	var n2 := _apri("dopo_partita", senza)
+	check(n2.corpo.find_children("*", "Button", true, false).all(func(b: Button) -> bool: return b.text != "STATISTICHE E PAGELLE"),
+		"senza tabellino (vecchio esito) niente tasto")
+	_finisci(n2)
 	return done()

@@ -41,6 +41,8 @@ const TUTTE := [
 	["22_editor_aspetto", "editor", {"flow": "look", "id": "rosa:0"}, ""],
 	["23_editor_divisa", "editor", {"flow": "kit"}, ""],
 	["24_uno_contro_uno", "uno_contro_uno", null, ""],
+	["25_statistiche", "statistiche", "STATISTICHE", ""],
+	["26_statistiche_pagella", "statistiche", "STATISTICHE", "trascina:195,760,195,90,500;aspetta:0.6"],
 ]
 
 var carriera: Object = null
@@ -136,6 +138,8 @@ func apri(nome: String, a: Variant) -> void:
 func _risolvi(a: Variant) -> Variant:
 	if a is String and a == "PROVA":
 		return risultato_prova()
+	if a is String and a == "STATISTICHE":
+		return statistiche_prova(carriera.s if carriera != null else {})
 	if a is Dictionary:
 		var out := {}
 		for k: String in a:
@@ -174,6 +178,35 @@ func risultato_prova() -> Dictionary:
 	}
 	var res: Variant = ultimo_risultato if carriera != null else null
 	return {"m": m, "res": res, "title": "Terza Divisione · Giornata %d" % int(s.get("day", 3))}
+
+
+## statistiche di prova (arg della schermata "statistiche"): la fine partita di prova più un tabellino inventato
+## con gli undici titolari della carriera (o nomi finti senza carriera); il campione è il numero 9 in campo
+static func statistiche_prova(s: Dictionary) -> Dictionary:
+	var pos := ["P", "D", "D", "D", "D", "C", "C", "C", "C", "A", "A"]
+	var conti := [{"parate": 3, "subiti": 1}, {"contrasti": 2, "subiti": 1}, {"contrasti": 4, "subiti": 1, "perse": 1},
+		{"subiti": 1, "perse": 3}, {"intercetti": 2, "subiti": 1}, {"passaggi": 14, "perse": 2}, {"assist": 1, "passaggi": 9},
+		{"dribbling": 2, "perse": 4}, {"passaggi": 6}, {"gol": 2, "dribbling": 3, "tiri": 4}, {"tiri": 2, "perse": 1}]
+	var squad := {}
+	for p: Dictionary in s.get("squad", []):
+		squad[p.id] = p
+	var lineup: Array = s.get("lineup", [])
+	var gioc: Array = []
+	for i in 11:
+		var p: Dictionary = squad.get(lineup[i], {}) if i < lineup.size() else {}
+		gioc.append({"id": p.get("id", "p%d" % i), "name": p.get("name", "Giocatore %d" % (i + 1)), "pos": pos[i],
+			"champ": i == 9, "num": i + 1, "conti": conti[i]})
+	var tiri := [{"team": 0, "x": 4.0, "y": 38.0, "esito": "gol"}, {"team": 0, "x": -8.0, "y": 31.0, "esito": "parato"},
+		{"team": 0, "x": 12.0, "y": 27.0, "esito": "fuori"}, {"team": 0, "x": -2.0, "y": 44.0, "esito": "gol"},
+		{"team": 0, "x": 18.0, "y": 36.0, "esito": "respinto"}, {"team": 0, "x": 0.5, "y": 22.0, "esito": "fuori"},
+		{"team": 1, "x": 3.0, "y": -40.0, "esito": "gol"}, {"team": 1, "x": -14.0, "y": -30.0, "esito": "parato"},
+		{"team": 1, "x": 9.0, "y": -25.0, "esito": "fuori"}]
+	var mio := {"short": "ATL", "kit": {"crest": {"shape": 2, "pattern": 3, "icon": 6, "c1": 0xf2c200, "c2": 0x1b1b1b}}}
+	var loro := {"short": "VAL", "kit": {"crest": {"shape": 0, "pattern": 1, "icon": 2, "c1": 0x0b7a3e, "c2": 0xffffff}}}
+	var m := {"score": [2, 1], "teams": [mio, loro], "goalsLog": [],
+		"stats": {"shots": [6, 3], "onT": [3, 2], "poss": [61.0, 39.0], "corners": [4, 2], "fouls": [3, 6], "saves": [1, 1]}}
+	var tab := {"me": 0, "passaggi": [[212, 251], [131, 170]], "km": [52.4, 49.8], "tiri": tiri, "giocatori": gioc}
+	return {"m": m, "tabellino": tab, "title": "Terza Divisione · Giornata 4", "dopo": "PROVA"}
 
 
 func aspetta(sec: float) -> void:

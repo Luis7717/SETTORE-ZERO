@@ -7,9 +7,13 @@
 #           con le novità di Carriera.dopoPartita: derby (premio), crescita del campione, infortuni, cambi
 #   title = riga in alto ("Terza Divisione · Giornata 4", "Amichevole", ...)
 # "Continua" porta alla fine della stagione se è finita, altrimenti alla casa della carriera.
+# "Statistiche e pagelle" (se l'esito ha il tabellino della partita) apre la schermata "statistiche" con
+# arg = {m, tabellino, title, dopo}: dopo = questo stesso arg, per tornare qui col tasto ‹.
 extends MenuSchermata
 
 const Crescita := preload("res://scripts/carriera/crescita.gd")
+
+var _tabellino: Variant = null   # esito.tabellino (conta_giocatori.gd): c'è il tasto delle statistiche
 
 
 func prepara() -> void:
@@ -18,7 +22,9 @@ func prepara() -> void:
 
 func costruisci() -> void:
 	var r: Dictionary = arg if arg is Dictionary else {}
+	_tabellino = null
 	if r.has("esito"):
+		_tabellino = r.esito.get("tabellino")
 		r = da_esito(r)
 	var m: Variant = r.get("m")
 	if m == null:
@@ -62,11 +68,11 @@ func costruisci() -> void:
 	if ps <= 0.0:
 		ps = 1.0
 	var righe := U.vbox(0)
-	righe.add_child(_stat("Tiri", stats.get("shots", [0, 0])))
-	righe.add_child(_stat("In porta", stats.get("onT", [0, 0])))
-	righe.add_child(_stat("Possesso", ["%d%%" % D._round_js(float(poss[0]) / ps * 100.0), "%d%%" % D._round_js(float(poss[1]) / ps * 100.0)]))
-	righe.add_child(_stat("Angoli", stats.get("corners", [0, 0])))
-	righe.add_child(_stat("Falli", stats.get("fouls", [0, 0])))
+	righe.add_child(riga_stat("Tiri", stats.get("shots", [0, 0])))
+	righe.add_child(riga_stat("In porta", stats.get("onT", [0, 0])))
+	righe.add_child(riga_stat("Possesso", ["%d%%" % D._round_js(float(poss[0]) / ps * 100.0), "%d%%" % D._round_js(float(poss[1]) / ps * 100.0)]))
+	righe.add_child(riga_stat("Angoli", stats.get("corners", [0, 0])))
+	righe.add_child(riga_stat("Falli", stats.get("fouls", [0, 0])))
 	corpo.add_child(righe)
 
 	var res: Variant = r.get("res")
@@ -76,6 +82,9 @@ func costruisci() -> void:
 			corpo.add_child(nov)
 		corpo.add_child(_soldi(res))
 	var stagione: Variant = res.get("season") if res is Dictionary else null
+	if _tabellino is Dictionary and not (_tabellino as Dictionary).is_empty():
+		var dati := {"m": m, "tabellino": _tabellino, "title": r.get("title", ""), "dopo": arg}
+		corpo.add_child(U.bottone("STATISTICHE E PAGELLE", "BtnFantasma", func() -> void: vai("statistiche", dati)))
 	corpo.add_child(U.bottone("CONTINUA", "BtnGrande", func() -> void:
 		if stagione is Dictionary:
 			vai("fine_stagione", stagione)
@@ -141,8 +150,9 @@ func _squadra(t: Variant, destra: bool) -> Control:
 	return h
 
 
-# riga di statistica: valori ai lati, nome al centro, barra divisa sotto (giallo noi, blu loro)
-func _stat(nome: String, v: Array) -> Control:
+# riga di statistica: valori ai lati, nome al centro, barra divisa sotto (giallo noi, blu loro); la usa anche la
+# schermata delle statistiche. `quote` = numeri per la barra se i valori sono scritte ("78%", "54,2")
+static func riga_stat(nome: String, v: Array, quote: Array = []) -> Control:
 	var box := U.vbox(4)
 	var h := U.hbox(10)
 	var a := U.testo(str(v[0]), 16, T.TXT, T.PESO_NERO)
@@ -155,8 +165,8 @@ func _stat(nome: String, v: Array) -> Control:
 	b.custom_minimum_size.x = 56
 	h.add_child(b)
 	box.add_child(h)
-	var fa := str(v[0]).to_float()
-	var fb := str(v[1]).to_float()
+	var fa := float(quote[0]) if quote.size() == 2 else str(v[0]).to_float()
+	var fb := float(quote[1]) if quote.size() == 2 else str(v[1]).to_float()
 	var qa := fa if fa > 0.0 else (0.01 if fb > 0.0 else 1.0)
 	var qb := fb if fb > 0.0 else (0.01 if fa > 0.0 else 1.0)
 	var barra := Control.new()

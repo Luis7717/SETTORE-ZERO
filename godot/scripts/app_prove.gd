@@ -6,7 +6,8 @@
 #                             campione "Bot Campione"). Stampa anche derby, crescita del campione, infortuni e
 #                             obiettivo della dirigenza.
 #   --app-schermate=CARTELLA  schermate 390×844 del giro menu → impostazioni → editor (taglio afro e chignon) →
-#                             partita → fine partita → dopo partita → menu → classifica → rosa (con un infortunato
+#                             partita → fine partita → dopo partita → statistiche (numeri, mappa dei tiri,
+#                             pagella) → menu → classifica → rosa (con un infortunato
 #                             e un giocatore stanco) → fine stagione (con l'obiettivo della dirigenza)
 #                             (da usare con --app --bot --veloce=K --tempo=SEC, finestra vera, non --headless)
 #   --prova-uscite            "Esci" dalla pausa: in campionato sconfitta 0-3 registrata, in amichevole niente
@@ -154,11 +155,39 @@ func _giro_schermate() -> void:
 		await get_tree().process_frame
 	await _attendi(ATTESA_MENU)
 	await _scatto(dir, "dopo")
+	await _giro_statistiche(dir)
 	_app.vai(_app.PRINCIPALE)
 	await _attendi(ATTESA_MENU)
 	await _scatto(dir, "menu_dopo")
 	await _giro_fase_b(dir)
 	get_tree().quit(0)
+
+
+# statistiche della partita appena giocata: tasto "Statistiche e pagelle" del dopo partita, poi la pagella più
+# in basso (scorrimento) e ritorno al dopo partita col tasto ‹
+func _giro_statistiche(dir: String) -> void:
+	var dopo: Node = get_tree().current_scene
+	var tasto: Button = null
+	for b: Button in dopo.find_children("*", "Button", true, false):
+		if b.text == "STATISTICHE E PAGELLE":
+			tasto = b
+	if not _controlla(tasto != null, "dopo partita: c'è il tasto delle statistiche"):
+		return
+	tasto.pressed.emit()
+	await _attendi(ATTESA_MENU)
+	var st: Node = get_tree().current_scene
+	_controlla(_app.schermata == "statistiche", "statistiche aperte")
+	await _scatto(dir, "statistiche")
+	if "scorri" in st and st.scorri != null:
+		st.scorri.scroll_vertical = 640
+		await _attendi(0.3)
+		await _scatto(dir, "statistiche_mappa")
+		st.scorri.scroll_vertical = 100000
+		await _attendi(0.3)
+		await _scatto(dir, "statistiche_pagella")
+	st.torna_indietro()
+	await _attendi(ATTESA_MENU)
+	_controlla(_app.schermata == _app.DOPO_PARTITA, "‹ dalle statistiche: di nuovo il dopo partita")
 
 
 # schermate della fase B: obiettivo e rivale in classifica, infortunato e stanco nella Rosa, fine stagione col

@@ -1201,3 +1201,26 @@ Punti 6-9 del piano, solo nella versione Godot (dettagli in `godot/README.md`, "
 - **Salvataggio**: stessa versione 1; chiavi nuove riempite al caricamento (`novita()`), salvataggi vecchi senza
   di esse si caricano (test).
 
+## Statistiche a fine partita (Godot, fase C punto 14) — 2026-11-21
+
+- **Dove**: schermata nuova `statistiche`, dal dopo partita col tasto "Statistiche e pagelle" (sopra "Continua",
+  che resta l'ultimo). Vale per campionato e amichevole; l'allenamento non ha dopo partita, quindi niente
+  statistiche (non aveva senso aggiungere una schermata in più a un allenamento senza fine).
+- **Raccolta nel contatore che c'era già** (`conta_giocatori.gd`) invece di un secondo lettore di eventi: in
+  `gioco.gd` cambia una riga (`tabellino` nell'esito). `per_giocatore()` resta identico per la crescita.
+- **Posizione del tiro** = posizione di chi tira nel fotogramma del calcio. **Esito** = il primo fatto che segue:
+  gol della sua squadra → gol; parata, o pallone preso dal portiere avversario → parato; respinta, spazzata o
+  pallone preso da un altro → respinto; fuori, intervallo o ripresa del gioco → fuori. Il numero di tiri della
+  mappa può differire di poco da "Tiri" del motore (il motore conta anche i passaggi che finiscono verso la porta).
+- **Palla persa** = contrasto subito o passaggio preso da un avversario (un dribbling sbagliato finisce in un
+  contrasto, quindi conta lì). **Gol subiti** = solo per chi era in campo in quel momento (gli espulsi no, chi
+  entra dopo no).
+- **Formula dei voti** (`voti.gd`): 6 di base; vittoria +0,5, sconfitta −0,5; gol +1, assist +0,6; dribbling +0,2
+  (max +1), contrasti +0,25 (max +1,25), intercetti +0,15 (max +0,75), passaggi riusciti +0,03 (max +0,6), parate
+  +0,4 (max +2); gol subiti −0,5 portiere, −0,3 difensore, −0,1 centrocampista; porta inviolata +0,5 portiere,
+  +0,3 difensore; palle perse −0,1 (max −1,5); poi fra 4 e 10, al mezzo punto. Migliore in campo = più punti prima
+  dell'arrotondamento (a pari punti il primo in elenco). Con i tetti un difensore che non sbaglia niente non supera
+  quasi mai 8: i voti alti restano per chi segna o para tanto. **Da provare**: se i voti sembrano tutti uguali
+  (6-6,5) nelle partite vere, alzare i pesi di contrasti e passaggi.
+- **Colori**: squadra 0 gialla, squadra 1 blu, come le barre del dopo partita (non "mia/loro"); la mappa si gira
+  perché la persona attacchi sempre verso l'alto.

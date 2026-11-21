@@ -360,6 +360,32 @@ le novità passano da due funzioni nuove che chiama `App`:
 - Prove: `tests/test_carriera_b.gd`; `--stagione-bot` stampa anche derby, crescita, infortuni e obiettivo;
   `--app-schermate` aggiunge hub, classifica, rosa (con un infortunato) e fine stagione.
 
+## Statistiche a fine partita (fase C, punto 14, solo Godot)
+
+Dal "dopo partita" (campionato e amichevole) il tasto **Statistiche e pagelle** apre la schermata `statistiche`
+(`scenes/menu/statistiche.tscn`, `scripts/menu/statistiche.gd`); ‹ o "Torna al risultato" riportano al dopo partita
+con lo stesso esito. L'allenamento non ha dopo partita (torna al menu) e quindi niente statistiche. Il motore non
+cambia: tutto si raccoglie lato grafica dagli eventi.
+
+- **Raccolta**: `partita/conta_giocatori.gd` (lo stesso oggetto dei conteggi della crescita) con `tabellino()`,
+  che `gioco.gd` mette nell'esito (`esito.tabellino`, una riga): passaggi tentati e riusciti e km per squadra,
+  mappa dei tiri `[{team, x, y, kind, esito, nome}]` (posizione di chi tira, coordinate del motore; esito `gol`,
+  `parato`, `respinto` o `fuori`), giocatori della persona scesi in campo (anche i cambi) con `conti` = i conteggi
+  di sempre più `perse` (contrasto subito o passaggio preso dall'avversario) e `subiti` (gol subiti mentre era in
+  campo, non dopo un'espulsione). `per_giocatore()` per la crescita resta com'era (stesse chiavi).
+- **Numeri**: possesso, tiri, tiri in porta, falli, angoli e parate da `m.stats`; passaggi riusciti (%) e km dal
+  tabellino. Squadra 0 a sinistra in giallo, squadra 1 a destra in blu, come nel dopo partita (`riga_stat`).
+- **Mappa dei tiri** (`partita/mappa_tiri.gd`, conti puri): campo intero verticale, la persona attacca verso
+  l'alto; pallino pieno = gol, cerchio vuoto = parato, respinto o fuori.
+- **Pagella** (`partita/voti.gd`, logica pura): voto da 4 a 10 a mezzi punti; 6 di base, vittoria +0,5 / sconfitta
+  −0,5, gol +1, assist +0,6, dribbling +0,2 (max +1), contrasti +0,25 (max +1,25), intercetti +0,15 (max +0,75),
+  passaggi riusciti +0,03 (max +0,6), parate +0,4 (max +2), gol subiti −0,5 portiere / −0,3 difensore / −0,1
+  centrocampista, porta inviolata +0,5 portiere / +0,3 difensore, palle perse −0,1 (max −1,5). Migliore in campo
+  (più punti prima dell'arrotondamento) con bordo giallo e scritta; il campione col nome in giallo e "★ Campione".
+- Prove: `tests/test_voti.gd` (voti, mappa, tabellino da eventi scritti a mano e da una partita vera del motore),
+  `tests/controlli_menu.gd` (tasto, pagella con un solo migliore, ritorno), schermate 25-26 di `prova_menu.gd` e
+  `--app-schermate` (statistiche, mappa, pagella della partita appena giocata).
+
 ## Menu (fase 3)
 
 Schermate del web (`src/ui.js`, `ui-squad.js`, `editor.js`) rifatte in Godot, una scena per schermata in

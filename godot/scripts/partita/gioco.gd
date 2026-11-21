@@ -27,8 +27,8 @@
 # manto dell'erba; senza, vengono dal seme della partita), derby (facoltativo: partita contro la rivale, pubblico più
 # rumoroso)}; `--campo=<nome>`/`--manto=<nome>` li forzano per le prove; squadre come Carriera.squadraPartita()/aiMatchTeam() (kit compreso).
 # Al fischio finale (la schermata di fine resta sopra) o se si esce dalla pausa la scena emette `finita(esito)` con
-# {gol_a, gol_b, marcatori, statistiche, abbandonata, tipo, me, derby, conteggi}; conteggi = per giocatore della
-# persona (scripts/partita/conta_giocatori.gd); "Esci" in campionato = sconfitta 0-3 a tavolino.
+# {gol_a, gol_b, marcatori, statistiche, abbandonata, tipo, me, derby, conteggi, tabellino}; conteggi = per giocatore della
+# persona (scripts/partita/conta_giocatori.gd), tabellino = dati della schermata delle statistiche (stesso file); "Esci" in campionato = sconfitta 0-3 a tavolino.
 # Il tasto "Continua" della schermata di fine emette poi `continua` (chi ha avviato la partita cambia schermata).
 # Così il risultato si registra subito, anche se l'app viene chiusa sulla schermata di fine (come il web).
 # Se nessuno chiama avvia, la partita parte da sola con le squadre di prova (come prima, per le prove).
@@ -618,7 +618,8 @@ func _esci_dalla_pausa() -> void:
 func esito() -> Dictionary:
 	return {"gol_a": m.score[0], "gol_b": m.score[1], "marcatori": m.goalsLog.duplicate(),
 		"statistiche": m.stats.duplicate(true), "abbandonata": abbandonata, "tipo": tipo(), "me": me,
-		"derby": bool(_avvio.get("derby", false)), "conteggi": conta.per_giocatore() if conta != null else {}}
+		"derby": bool(_avvio.get("derby", false)), "conteggi": conta.per_giocatore() if conta != null else {},
+		"tabellino": conta.tabellino() if conta != null else {}}
 
 
 # derby (opzione di avvia): pubblico più rumoroso, più cori e tifosi più in piedi. Ritorna true se è un derby
