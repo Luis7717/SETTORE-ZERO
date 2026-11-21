@@ -139,13 +139,12 @@ func metti(kit: Dictionary, aspetto: Dictionary) -> void:
 		_fig.scale = Vector3.ONE * Coord.SCALE
 		_vp.add_child(_fig)
 		_fig.prepara(kit, aspetto, 0.0, TV.avviso())
-		_mesh = _fig.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D
+		_mesh = _fig.get("_mesh") as MeshInstance3D
 		return
 	# stesso modello: si cambiano solo i colori (un materiale per tutti, colori per istanza)
 	for k: String in kit:
 		_mesh.set_instance_shader_parameter(k, kit[k])
-	for k: String in aspetto:
-		_mesh.set_instance_shader_parameter(k, aspetto[k])
+	_fig.metti_aspetto(aspetto)   # colori e mesh di capelli e barba
 
 
 ## esultanza da mostrare ("" = nessuna, il giocatore torna fermo); un id nuovo riparte da capo

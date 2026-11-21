@@ -6,6 +6,7 @@ extends Node3D
 const Coord := preload("res://scripts/coord.gd")
 const MODELLO := preload("res://assets/models/athlete.glb")
 const SHADER_DIVISA := preload("res://shaders/divisa.gdshader")
+const Capelli := preload("res://scripts/partita/capelli.gd")
 
 const RUN_REF := 4.2       # m/s: velocità a cui il clip di corsa gira a velocità 1 (come src/athlete3d.js)
 const SPRINT_REF := 8.0    # m/s: idem per lo scatto
@@ -45,6 +46,11 @@ func prepara(kit: Dictionary, aspetto: Dictionary, sfasa: float) -> void:
 		_mesh.set_instance_shader_parameter(k, kit[k])
 	for k in ["pelle", "capelli"]:
 		_mesh.set_instance_shader_parameter(k, aspetto[k])
+	# capelli corti di base (taglio 2, come stile2 predefinito dello shader), mesh a parte sull'osso della testa
+	var cap := Capelli.attacca(scheletro, _mesh.skin)
+	cap.mesh = Capelli.mesh_per(2, 0)
+	cap.set_instance_shader_parameter(&"colore", aspetto["capelli"])
+	cap.set_instance_shader_parameter(&"pelle", aspetto["pelle"])
 	_modello.scale = Vector3.ONE * Coord.SCALE
 	_modello.rotation.y = _yaw_modello
 
@@ -105,6 +111,7 @@ static func _prepara_condivisi(mi: MeshInstance3D, scheletro: Skeleton3D, player
 	var punta: Vector3 = osso.call("ball_r") - osso.call("foot_r")
 	_yaw_modello = -atan2(-punta.x, -punta.z)
 	_materiale.set_shader_parameter("davanti", Vector2(punta.x, punta.z).normalized())
+	Capelli.prepara(_mesh_divisa, _materiale.get_shader_parameter("occhi"), Vector2(punta.x, punta.z).normalized())
 	for nome in CLIP_IN_LOOP:
 		if player.has_animation(nome):
 			player.get_animation(nome).loop_mode = Animation.LOOP_LINEAR

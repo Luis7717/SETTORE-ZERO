@@ -10,9 +10,9 @@
 //   numero = cella (x, y) del cognome e numero nell'atlante "schiene" (scripts/partita/schiene.gd), z = 1 se c'è,
 //            w = maglia larga (1) o aderente (0)
 //   corsa  = 0..1 quanto corre (la maglia ondeggia)
-// I capelli non sono mesh a parte (il web ne costruisce una per taglio): la zona coperta cambia col taglio e i vertici
-// della testa si gonfiano lungo la normale (spessore del taglio, ricci, punte, cresta, chignon). Code e capelli
-// lunghi che pendono non si possono fare così: restano più corti che nel web.
+// Capelli e barbe veri sono mesh a parte (scripts/partita/capelli.gd, barbe.gd, shaders/capelli.gdshader, dal
+// 2026-11-21): qui si dipinge solo sotto di loro (radici scure, così il bordo dei capelli sfuma sulla pelle), la
+// testa rasata (Rasato, lati della Cresta) e la barba "Ombra", con un po' di grana. La testa non si gonfia più.
 shader_type spatial;
 render_mode diffuse_lambert, specular_schlick_ggx;   // lambert: più leggero di burley sul telefono
 
@@ -53,25 +53,26 @@ const vec2 CELLA = vec2(0.125, 0.25); // atlante delle schiene: 8 × 4 celle
 const float SCHIENA = 0.4;        // m di schiena coperti da una cella (come il canvas 256 px del web)
 const float ALZA_BOCCA = -0.058;  // bocca rispetto agli occhi (m)
 
-// tagli: attaccatura (gradi di elevazione sopra il centro della testa) davanti, ai lati e dietro; spessore (m)
+// tagli: attaccatura sul cranio (gradi di elevazione sopra il centro della testa) davanti, ai lati e dietro (come
+// LINEA in scripts/partita/capelli.gd); w = 1 se il taglio è rasato (solo dipinto, niente mesh)
 const vec4 TAGLI[17] = vec4[17](
 	vec4(95.0, 95.0, 95.0, 0.0),      // 0 calvo
-	vec4(42.0, 6.0, -38.0, 0.002),    // 1 rasato
-	vec4(38.0, 8.0, -34.0, 0.011),    // 2 corti
-	vec4(40.0, 10.0, -32.0, 0.014),   // 3 spazzola
-	vec4(36.0, 8.0, -34.0, 0.012),    // 4 ciuffo
-	vec4(36.0, 6.0, -36.0, 0.012),    // 5 riga di lato
-	vec4(42.0, 6.0, -38.0, 0.002),    // 6 cresta (lati rasati)
-	vec4(38.0, 8.0, -34.0, 0.014),    // 7 a punte
-	vec4(34.0, 4.0, -38.0, 0.024),    // 8 ricci
-	vec4(30.0, -2.0, -42.0, 0.048),   // 9 afro
-	vec4(30.0, -26.0, -58.0, 0.02),   // 10 caschetto
-	vec4(32.0, -38.0, -75.0, 0.022),  // 11 lunghi
-	vec4(36.0, 6.0, -30.0, 0.009),    // 12 coda
-	vec4(36.0, 6.0, -30.0, 0.009),    // 13 chignon
-	vec4(34.0, -6.0, -45.0, 0.015),   // 14 treccine
-	vec4(14.0, 2.0, -40.0, 0.015),    // 15 frangia
-	vec4(40.0, 10.0, -34.0, 0.011)    // 16 indietro
+	vec4(42.0, 6.0, -38.0, 1.0),      // 1 rasato
+	vec4(38.0, 8.0, -34.0, 0.0),      // 2 corti
+	vec4(40.0, 10.0, -32.0, 0.0),     // 3 spazzola
+	vec4(36.0, 8.0, -34.0, 0.0),      // 4 ciuffo
+	vec4(36.0, 6.0, -36.0, 0.0),      // 5 riga di lato
+	vec4(42.0, 6.0, -38.0, 1.0),      // 6 cresta (lati rasati; la cresta è una mesh)
+	vec4(38.0, 8.0, -34.0, 0.0),      // 7 a punte
+	vec4(34.0, 4.0, -38.0, 0.0),      // 8 ricci
+	vec4(30.0, -2.0, -42.0, 0.0),     // 9 afro
+	vec4(32.0, 2.0, -32.0, 0.0),      // 10 caschetto
+	vec4(32.0, 2.0, -32.0, 0.0),      // 11 lunghi
+	vec4(36.0, 6.0, -30.0, 0.0),      // 12 coda
+	vec4(36.0, 6.0, -30.0, 0.0),      // 13 chignon
+	vec4(34.0, -2.0, -40.0, 0.0),     // 14 treccine
+	vec4(14.0, 4.0, -38.0, 0.0),      // 15 frangia
+	vec4(40.0, 10.0, -34.0, 0.0)      // 16 indietro
 );
 const float SOPRACCIGLIA[6] = float[6](0.008, 0.005, 0.011, 0.008, 0.008, 0.01);
 
@@ -91,53 +92,20 @@ float attaccatura(vec4 t, float az) {
 	return az < 95.0 ? mix(t.x, t.y, smoothstep(25.0, 95.0, az)) : mix(t.y, t.z, smoothstep(100.0, 170.0, az));
 }
 
-// spessore dei capelli (m) nel punto p del taglio `taglio`; copertura (0..1) in cop
-float capelli_spessore(int taglio, vec3 p, out float cop) {
+// copertura dei capelli (0..1) nel punto p del taglio `taglio`: bordo morbido di pochi gradi
+float capelli_copertura(int taglio, vec3 p) {
 	vec3 h = testa_dir(p);
-	float el = h.x;
-	float az = h.y;
-	vec4 t = TAGLI[taglio];
-	float linea = attaccatura(t, az);
-	cop = smoothstep(linea - 1.5, linea + 1.5, el);
-	float s = t.w * smoothstep(linea, linea + 10.0, el);
-	float lat = abs(p.x);
-	if (taglio == 3) {
-		s *= 1.0 + 0.7 * smoothstep(50.0, 80.0, el);
-	} else if (taglio == 4) {
-		s += 0.02 * smoothstep(60.0, 15.0, az) * smoothstep(30.0, 60.0, el);
-	} else if (taglio == 6) {
-		float k = smoothstep(0.03, 0.012, lat) * smoothstep(10.0, 30.0, el);
-		s = max(s, 0.035 * k);
-		cop = max(cop, k);
-	} else if (taglio == 7) {
-		s *= 0.55 + 0.9 * max(0.0, sin(radians(az) * 9.0) * sin(radians(el) * 7.0));
-	} else if (taglio == 8 || taglio == 9) {
-		s *= 0.8 + 0.35 * sin(radians(az) * 14.0 + radians(el) * 17.0) * sin(radians(el) * 23.0 - radians(az) * 8.0);
-	} else if (taglio == 12) {
-		s += 0.05 * exp(-(pow((180.0 - az) / 20.0, 2.0) + pow((el + 5.0) / 18.0, 2.0)));
-	} else if (taglio == 13) {
-		s += 0.06 * exp(-(pow((180.0 - az) / 22.0, 2.0) + pow((el - 40.0) / 18.0, 2.0)));
-	} else if (taglio == 14) {
-		s *= 0.5 + 0.9 * pow(abs(sin(radians(az) * 6.0)), 0.6);
-	} else if (taglio == 16) {
-		s += 0.012 * smoothstep(100.0, 170.0, az);
-	}
-	// orecchie: colorate ma non gonfiate (spunterebbero di lato)
-	if (az > 70.0 && az < 120.0 && el < 20.0 && el > -45.0) {
-		s *= 0.15;
-	}
-	return s;
+	float linea = attaccatura(TAGLI[taglio], h.y);
+	return smoothstep(linea - 2.5, linea + 1.5, h.x);
+}
+
+float grana(vec3 p) {
+	return fract(sin(dot(floor(p * 1400.0), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
 }
 
 void vertex() {
 	riposo = CUSTOM0.xyz;
 	vec3 p = riposo;
-	int taglio = clamp(int(stile2.x + 0.5), 0, 16);
-	if (p.y > collo_y - 0.02 && abs(p.x) < 0.16 && taglio > 0) {
-		float cop;
-		float s = capelli_spessore(taglio, p, cop);
-		VERTEX += NORMAL * s * cop;
-	}
 	float maglia_bassa = anca_y + 0.035;
 	float ax = abs(p.x);
 	if (p.y > maglia_bassa - 0.03 && p.y < collo_y && ax < spalla_x + 0.06) {
@@ -204,7 +172,7 @@ float barba(int b, vec3 p, float zf) {
 	float guance = smoothstep(-0.012, -0.03, y) * smoothstep(0.03, 0.05, ax) * smoothstep(-0.1, -0.07, fr);
 	float pizzetto = (ax < 0.024 && bocca < -0.007 && fr > -0.03) ? 1.0 : 0.0;
 	float baffi = (ax < 0.03 - bocca * 0.6 && bocca > 0.005 && bocca < 0.016 && fr > -0.02) ? 1.0 : 0.0;
-	if (b == 1) return 0.32 * max(mascella, guance * 0.6);
+	if (b == 1) return (0.2 + 0.22 * grana(p)) * max(mascella, guance * 0.6);   // ombra: grana di peli corti
 	if (b == 2) return 0.9 * pizzetto;
 	if (b == 3) return 0.9 * baffi;
 	if (b == 4) return 0.9 * max(pizzetto, baffi);
@@ -256,20 +224,15 @@ void fragment() {
 		if (abs(bocca) < 0.006 && ax < 0.019 && zf > dot(occhi.xz, davanti) - 0.02) {
 			c = mix(c, vec3(0.62, 0.3, 0.28), 0.22);
 		}
-		c = mix(c, capelli.rgb, barba(int(stile2.y + 0.5), p, zf));
+		// barba: l'ombra (1) è solo dipinta; sotto le barbe vere (mesh) un velo più leggero che fa da radice
+		int tipo_barba = int(stile2.y + 0.5);
+		c = mix(c, capelli.rgb, barba(tipo_barba, p, zf) * (tipo_barba > 1 ? 0.45 : 1.0));
 		c = mix(c, capelli.rgb * 0.9, sopracciglia(clamp(int(stile2.z + 0.5), 0, 5), p, zf));
 		if (taglio > 0) {
-			float cop;
-			float s = capelli_spessore(taglio, p, cop);
-			// rasati: cute con la tinta a metà; gli altri: tinta piena, un filo più chiara dove il taglio è spesso
-			float a = TAGLI[taglio].w < 0.005 ? 0.62 : 1.0;
-			if (taglio == 6 && s > 0.01) {
-				a = 1.0;
-			}
-			vec3 tinta = capelli.rgb * (0.85 + 6.0 * min(s, 0.03));
-			if (taglio == 5 && abs(p.x - 0.03) < 0.003 && zf > 0.0) {
-				tinta *= 0.6;   // riga
-			}
+			// rasati: cute con la tinta a metà e grana; gli altri: radici scure sotto la mesh dei capelli
+			float cop = capelli_copertura(taglio, p);
+			float a = TAGLI[taglio].w > 0.5 ? 0.5 + 0.2 * grana(p) : 0.85;
+			vec3 tinta = TAGLI[taglio].w > 0.5 ? capelli.rgb : capelli.rgb * 0.7;
 			c = mix(c, tinta, cop * a);
 			ruvido = mix(ruvido, 0.85, cop);
 		}

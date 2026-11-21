@@ -1307,3 +1307,25 @@ Dettagli in `godot/README.md`, "Meteo e ora del giorno".
 - **Da provare sull'iPhone**: FPS con la pioggia (900 particelle) e di notte; se la notte sembra troppo chiara o
   troppo scura (`ORA_NOTTE.energia`, `NOTTE_AMBIENTE`); se le pozze sul bagnato piacciono; quanto si sente la palla
   più veloce sotto la pioggia.
+
+
+## 2026-11-21 — Godot: capelli e barbe rifatti (Luis: "fatte malissimo")
+Dettagli in `godot/README.md`, "Capelli e barbe".
+- **Cosa non andava** (foto in `shots/capelli/prima/`): i capelli erano la testa stessa gonfiata lungo le normali
+  dallo shader della divisa. La testa ha pochi vertici, quindi ricci, afro, punte e treccine venivano a gradini e a
+  spigoli ("a punte"); tutti i tagli erano una calotta a tinta unita con l'attaccatura netta; caschetto e lunghi
+  erano dipinti sul collo; coda e chignon erano bozzi. Le barbe erano macchie dipinte piatte: il pizzetto un
+  rettangolo, la barba piena copriva anche naso e collo.
+- **Scelta: mesh procedurali, niente modelli scaricati** (nessun CC0 adatto a questo modello e ai 17 tagli). Calotta
+  appoggiata su una mappa dei raggi della testa vera (segue il cranio), barba fatta coi triangoli del viso.
+  Stessi 17 tagli e 7 barbe, stessi id: i salvataggi non cambiano.
+- **Prestazioni**: una mesh per coppia taglio + barba condivisa, un materiale solo, un disegno in più per
+  giocatore, niente ombre proiettate dai capelli, niente trasparenza (pixel scartati), livelli di dettaglio.
+  `prova_vista --senza-vsync --scala3d=2 --esci-dopo=12`: GPU 0,372 → 0,375 ms, disegno CPU 0,141 → 0,142-0,156 ms
+  (rumore); `--esci-dopo=4` 95-97 FPS come la cartella di confronto senza modifiche (97-99), PC carico di altre sessioni.
+- **Scelte**: "Rasato" resta dipinto (con grana); la cresta è una pinna, i lati rasati dipinti; "A punte" sono
+  ciuffi a cono smussati voluti (le punte sono il taglio), mentre ricci e afro hanno volumi tondi e il riccio è nel
+  rilievo dello shader. I lunghi arrivano a metà collo (più giù entrerebbero nella schiena quando gira la testa).
+- **Da provare sull'iPhone**: FPS in partita con 22 giocatori; se da vicino (editor, esultanza) le barbe hanno un
+  bordo troppo netto; se i capelli lunghi entrano nelle spalle nelle esultanze; tempo di avvio della partita
+  (prima costruzione delle mesh, ~10 ms l'una sul PC).
