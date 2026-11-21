@@ -121,7 +121,7 @@ const HINTS = {
   loose: 'Palla libera: disegna una linea da un tuo giocatore per andarci',
   dive: 'PARA! Tira una linea dal portiere al punto della porta',
   duel: 'Disegna fino a un compagno per passare · oppure tocca Dribbling',
-  flee: 'Avversario addosso: tocca Scatto per staccarlo',
+  flee: 'Disegna fino a un compagno per passare · oppure tocca Scatto',
   zone: 'Area di tiro: linea in porta = tiro · fino a un compagno = passaggio',
 };
 const RHINT = { kickoff: 'Calcio d\'inizio: disegna il passaggio', throw: 'Rimessa: disegna il passaggio', corner: 'Calcio d\'angolo: disegna il cross', goalkick: 'Rinvio: disegna il passaggio', freekick: 'Punizione: disegna il passaggio o il tiro', penalty: 'RIGORE: disegna il tiro in porta', gk: 'Rilancio del portiere: disegna il passaggio' };

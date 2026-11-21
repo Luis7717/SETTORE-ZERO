@@ -80,7 +80,7 @@ export const LESSONS = [
   {
     title: 'Scatto',
     short: 'Hai un avversario alle spalle: tocca Scatto.',
-    text: "Se un avversario ti arriva <b>alla pari o alle spalle</b> il tempo rallenta e in basso compare <b>Scatto</b>: toccalo e il tuo giocatore si stacca e prosegue dritto. Con l'avversario davanti, invece, si dribbla o si passa.",
+    text: "Se un avversario ti arriva <b>alla pari o alle spalle</b> il tempo rallenta e in basso compare <b>Scatto</b>: toccalo e il tuo giocatore si stacca e prosegue dritto. Puoi anche <b>passare</b> disegnando fino a un compagno. Con l'avversario davanti, invece, si dribbla o si passa.",
     needs: 'userSprint',
     setup(m, T, k) {
       const c = T.carrier(m, 7, [0, -12, 12][k], [-8, -2, -14][k]); T.clearOpp(m);

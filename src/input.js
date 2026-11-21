@@ -89,7 +89,8 @@ export class Input {
     const m = this.match, e = this.pts[this.pts.length - 1];
     if (!e || e.goal) return false;
     if (m.phase === 'restart' || (m.duelFor && m.duelFor(this.team))) return false;
-    if (m.inZone && m.inZone(this.team)) return !this.mateAt(e.x, e.y);
+    // area di tiro e fuga (avversario alla pari o dietro): linea fino a un compagno = passaggio, altrove = corsa
+    if ((m.inZone && m.inZone(this.team)) || (m.fleeFor && m.fleeFor(this.team))) return !this.mateAt(e.x, e.y);
     return true;
   }
 

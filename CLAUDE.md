@@ -76,7 +76,7 @@
   con lo stesso portatore, poi torna dritta da sola.
 - **Scatto** (fuga, Luis 2026-11-21): si divide il campo in linee parallele alle linee di porta. Avversario a meno di
   4 m **alla pari o dietro** il portatore (non più avanti di 0,5 m verso la porta avversaria, `LEVEL_TOL`) = niente duello:
-  il tempo rallenta (8%) e il tasto in basso è **Scatto**; toccandolo il portatore si stacca (+15% di velocità per 1,2 s,
+  il tempo rallenta (8%), si può **passare** disegnando fino a un compagno (altrove = corsa) e il tasto in basso è **Scatto**; toccandolo il portatore si stacca (+15% di velocità per 1,2 s,
   l'avversario resta indietro e non contrasta per 0,6 s) e prosegue dritto per 14 m. Riesce sempre. Avversario **davanti**
   per linee = duello col **Dribbling** o il passaggio disegnato. L'IA dribbla come prima.
 - La finta è stata tolta (2026-11-20).

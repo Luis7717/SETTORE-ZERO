@@ -26,7 +26,7 @@ test('fuga: si apre con un avversario alle spalle o alla pari entro FLEE_R, non 
     assert.ok(st && st.p === p && st.o === o, `avversario in ${ox},${oy}`);
     assert.equal(m.fleeFor(0), true);
     assert.equal(m.duelFor(0), false, 'niente duello');
-    assert.equal(m.passFor(0), false, 'nella fuga non si passa');
+    assert.equal(m.passFor(0), true, 'nella fuga si può passare (Luis 2026-11-21)');
   }
 });
 
@@ -125,4 +125,18 @@ test('squadra 1 (attacca verso -y): "dietro" vale al contrario', () => {
   // Assert
   assert.equal(m.fleeFor(1), true);
   assert.equal(m.duelFor(1), false);
+});
+
+test('fuga: si può passare a un compagno (Luis 2026-11-21) e la fuga si chiude col passaggio', () => {
+  // Arrange: avversario alle spalle, compagno libero di lato
+  const { m, p } = setup(11);
+  const mate = m.players[7]; wake(mate, -12, 6);
+  run(m, 1 / 60, hold(m, p));
+  assert.equal(m.fleeFor(0), true);
+  // Act
+  const ok = m.userKick(0, { type: 'ground', tx: mate.x, ty: mate.y });
+  const ev = run(m, 1 / 30, () => {});
+  // Assert
+  assert.equal(ok, true);
+  assert.equal(ev.find(e => e.type === 'flee_end')?.reason, 'passaggio');
 });

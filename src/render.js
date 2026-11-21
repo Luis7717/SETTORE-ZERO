@@ -327,8 +327,8 @@ export class View {
   // rallenty in attacco (duello, area di tiro, disegno col pallone): visuale larga che tiene a schermo i compagni
   // davanti e di fianco al portatore; restituisce quanto pesa (0..1, entra ed esce col tempo vero)
   wideStep(m, mine, duel, rdt, pk) {
-    const c = m.ball.owner, zone = !duel && !!(m.inZone && m.inZone(this.me));
-    const on = !!(mine && c && m.phase === 'play' && (duel || zone || this.drawing));
+    const c = m.ball.owner, zone = !duel && !!(m.inZone && m.inZone(this.me)), flee = !!(m.fleeFor && m.fleeFor(this.me));
+    const on = !!(mine && c && m.phase === 'play' && (duel || zone || flee || this.drawing));
     this.wideK = (this.wideK || 0) + ((on ? 1 : 0) - (this.wideK || 0)) * Math.min(1, rdt * WIDE_IN);
     if (this.wideK < 1e-3 && !on) { this.wideK = 0; this.wideP = null; return 0; }
     if (on) {

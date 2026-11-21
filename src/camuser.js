@@ -19,13 +19,13 @@ export function cornerCamOn(m) {
   return !!(m && m.phase === 'restart' && m.restart && m.restart.type === 'corner');
 }
 
-/** visuale che si può girare: calcio d'angolo, oppure rallenty (fase di gioco, pallone a un giocatore di T, duello o area di tiro) */
+/** visuale che si può girare: calcio d'angolo, oppure rallenty (fase di gioco, pallone a un giocatore di T, duello, fuga o area di tiro) */
 export function userCamOn(m, T) {
   if (cornerCamOn(m)) return true;
   if (!m || m.phase !== 'play') return false;
   const c = m.ball && m.ball.owner;
   if (!c || c.team !== T) return false;
-  return !!((m.duelFor && m.duelFor(T)) || (m.inZone && m.inZone(T)));
+  return !!((m.duelFor && m.duelFor(T)) || (m.fleeFor && m.fleeFor(T)) || (m.inZone && m.inZone(T)));
 }
 
 /**

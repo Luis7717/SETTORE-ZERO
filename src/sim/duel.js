@@ -31,7 +31,7 @@ export const ZONE_DIST = 20;   // negli ultimi metri prima della porta avversari
 export const WEAR_TES = 0.02, WEAR_TES_MIN = 0.85; // ogni colpo di testa vinto: -2% di colpi di testa, fino all'85%
 // Davanti o dietro "per linee" (Luis 2026-11-21): si divide il campo in linee parallele alle linee di porta. L'avversario
 // è davanti solo se sta su una linea più avanti (verso la porta avversaria) di almeno LEVEL_TOL; altrimenti è alla pari o
-// dietro. Davanti = duello (Dribbling o passaggio disegnato); alla pari o dietro = fuga (solo il tasto Scatto).
+// dietro. Davanti = duello (Dribbling o passaggio disegnato); alla pari o dietro = fuga (Scatto o passaggio disegnato).
 export const LEVEL_TOL = 0.5;  // "alla pari": fino a tanto più avanti del portatore conta ancora come stessa linea (m)
 export const FLEE_R = 4;       // avversario alla pari o dietro più vicino di così al portatore apre la fuga (m)
 const FLEE_END_R = 7;          // la fuga si chiude se l'avversario si allontana oltre (m)
@@ -50,8 +50,8 @@ export class DuelMethods {
     if (!c || c.team !== T || !this.human[T] || this.ctrl[T] !== c || this.phase !== 'play' || c.state !== 'play') return false;
     return (T === 0 ? HL - c.y : c.y + HL) <= ZONE_DIST;
   }
-  // si può passare (duello col difensore o area di tiro)
-  passFor(T) { return this.duelFor(T) || this.inZone(T); }
+  // si può passare (duello col difensore, fuga o area di tiro)
+  passFor(T) { return this.duelFor(T) || this.fleeFor(T) || this.inZone(T); }
   // il difensore del duello non può ancora rubare palla
   duelGuard(o) { const d = this.duel; return !!(d && d.o === o && d.t < DUEL_GUARD); }
   // o è stato saltato col dribbling da c e non si è ancora ripreso: non può contrastarlo né riaprirgli il duello
@@ -123,7 +123,7 @@ export class DuelMethods {
       f.t += dt;
       let why = null;
       if (this.phase !== 'play') why = 'gioco fermo';
-      else if (b.owner !== f.p) why = 'palla persa';
+      else if (b.owner !== f.p) why = !b.owner && b.kick && b.kick.kicker === f.p ? 'passaggio' : 'palla persa';
       else if (this.duel) why = 'duello';
       else if (f.o.off || f.o.stun > 0 || hyp(f.o.x - f.p.x, f.o.y - f.p.y) > FLEE_END_R || this.aheadLine(f.p, f.o)) why = 'lontano';
       else if (f.t >= FLEE_MAX) why = 'tempo';
