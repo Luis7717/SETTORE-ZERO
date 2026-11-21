@@ -79,6 +79,11 @@ vec2 disegno(vec2 p, vec2 dp) {
 		float b = onda((p.x - p.y) * k + 0.5, fw);
 		return vec2(incrocia(a, b), 1.0);
 	}
+	if (taglio == 8) {
+		float k = 0.70710678 / (STRISCIA * 1.6);
+		float s = (p.x + p.y) * k;
+		return vec2(onda(s, (dp.x + dp.y) * k), fract(s));
+	}
 	// 0 strisce larghe (e il fuori del cerchio a spicchi)
 	float s = (HL - p.y) / STRISCIA;
 	vec2 v = vec2(onda(s, dp.y / STRISCIA), fract(s));

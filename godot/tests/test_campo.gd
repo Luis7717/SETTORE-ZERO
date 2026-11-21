@@ -107,3 +107,23 @@ func test_taglio_della_squadra_di_casa() -> bool:
 	eq(Gioco.taglio_campo({"stadio_seme": 777}, 2), Gioco.taglio_campo({"stadio_seme": 777}, 99), "non dipende dalla partita")
 	eq(Gioco.taglio_campo({}, 4242), Tagli.da_seme(4242), "amichevole: dal seme della partita")
 	return done()
+
+
+func test_manti_tutti_validi_e_fissi_per_squadra() -> bool:
+	var visti := {}
+	for seme in range(200):
+		var m := Tagli.manto_da_seme(seme)
+		check(m >= 0 and m < Tagli.MANTI.size(), "manto valido")
+		visti[m] = true
+	eq(visti.size(), Tagli.MANTI.size(), "tutti i manti escono")
+	eq(Tagli.manto_da_seme(777), Tagli.manto_da_seme(777), "stesso seme, stesso manto")
+	eq(Tagli.indice_manto("milano"), 1, "nome")
+	var c := Tagli.colori_manto(1)
+	check(c[0].g > c[1].g, "fascia chiara più chiara della scura")
+	eq(Gioco.manto_campo({"stadio_seme": 5}, 1), Tagli.manto_da_seme(5), "stadio di casa")
+	return done()
+
+
+func test_taglio_diagonali() -> bool:
+	eq(Tagli.indice("diagonali"), 8, "taglio diagonali")
+	return done()

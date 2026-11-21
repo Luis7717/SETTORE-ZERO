@@ -30,13 +30,17 @@ var _molle := {}                # lato (1 / −1) → rete a molle (scripts/rete
 var _mat_erba: ShaderMaterial
 var _taglio := Tagli.CLASSICO
 var _taglio_forzato := -1       # da --campo=<nome>: vince su set_taglio
+var _manto := Tagli.MANTO_CLASSICO
+var _manto_forzato := -1        # da --manto=<nome>: vince su set_manto
 
 
 func _ready() -> void:
 	_taglio_forzato = Tagli.da_riga_comando()
+	_manto_forzato = Tagli.manto_da_riga_comando()
 	_costruisci_erba()
 	_costruisci_righe()
 	set_taglio(_taglio)
+	set_manto(_manto)
 	for lato in [1.0, -1.0]:
 		_costruisci_porta(lato)
 	for sx in [1.0, -1.0]:
@@ -96,6 +100,22 @@ func set_taglio(i: int) -> void:
 	_taglio = clampi(i, 0, Tagli.NOMI.size() - 1)
 	if _mat_erba != null:
 		_mat_erba.set_shader_parameter("taglio", taglio())
+
+
+## manto dell'erba (indice di Tagli.MANTI: colore e tipo d'erba); con --manto=<nome> resta quello della riga di comando
+func set_manto(i: int) -> void:
+	_manto = clampi(i, 0, Tagli.MANTI.size() - 1)
+	if _mat_erba == null:
+		return
+	var c := Tagli.colori_manto(manto())
+	_mat_erba.set_shader_parameter("chiara", c[0])
+	_mat_erba.set_shader_parameter("scura", c[1])
+	_mat_erba.set_shader_parameter("chiara_bordo", c[2])
+	_mat_erba.set_shader_parameter("scura_bordo", c[3])
+
+
+func manto() -> int:
+	return _manto_forzato if _manto_forzato >= 0 else _manto
 
 
 ## taglio in uso

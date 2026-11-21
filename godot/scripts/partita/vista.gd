@@ -686,6 +686,11 @@ func set_taglio(i: int) -> void:
 	_campo.set_taglio(i)
 
 
+## manto dell'erba dello stadio (indice di scripts/tagli_campo.gd MANTI; solo grafica)
+func set_manto(i: int) -> void:
+	_campo.set_manto(i)
+
+
 ## livello grafico a mano (0 minimo .. 3 alto, vedi qualita.gd); la discesa automatica riparte da qui
 func set_qualita(l: int) -> void:
 	_qualita.imposta(l)

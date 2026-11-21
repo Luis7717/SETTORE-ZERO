@@ -16,7 +16,8 @@
 #   --scena=area|duello|fuga|angolo|pausa   mette la partita in una situazione da fotografare
 #   --schermata=PERCORSO.png [--dopo=SEC] [--alla-fine]   schermata dopo SEC secondi veri, o alla fine partita
 #   --esci-dopo=SEC     esce dopo SEC secondi veri
-#   --campo=NOME        taglio dell'erba (strisce, strette, verticali, quadrotti, cerchi, uniforme, rombi, raggi)
+#   --campo=NOME        taglio dell'erba (strisce, strette, verticali, quadrotti, cerchi, uniforme, rombi, raggi, diagonali)
+#   --manto=NOME        colore dell'erba (vivo, milano, naturale, sintetico, sintetico_chiaro, estivo)
 #   --allenamento       allenamento guidato (tipo "allenamento", scripts/partita/allenamento.gd) invece dell'amichevole;
 #                       con --lezione=N [--prova=K] parte da lì, con --scheda mostra la scheda della lezione N
 #
@@ -128,6 +129,11 @@ static func taglio_campo(opz: Dictionary, seme_partita: int) -> int:
 	return Tagli.da_seme(seme_partita)
 
 
+## manto dell'erba (colore, tipo d'erba): come il taglio, dallo stadio di casa o dal seme della partita
+static func manto_campo(opz: Dictionary, seme_partita: int) -> int:
+	return Tagli.manto_da_seme(int(opz.stadio_seme) if opz.has("stadio_seme") else seme_partita)
+
+
 func avviata_da_app() -> bool:
 	return not _avvio.is_empty()
 
@@ -207,6 +213,8 @@ func _crea_vista() -> void:
 	vista.setup(m, me)
 	if vista.has_method("set_taglio"):
 		vista.set_taglio(taglio_campo(_avvio, _seme_partita))
+	if vista.has_method("set_manto"):
+		vista.set_manto(manto_campo(_avvio, _seme_partita))
 	gesti.vista = vista
 	gesti.set_match(m, me)
 	gesti.enabled = true
