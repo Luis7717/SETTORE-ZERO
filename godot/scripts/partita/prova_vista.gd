@@ -212,7 +212,7 @@ func _spegni(voce: String) -> void:
 		"aspetto":
 			for f: Node3D in vista._figs:
 				var mi: MeshInstance3D = f.get("_mesh")
-				mi.set_instance_shader_parameter(&"stile2", Vector4(2, 0, 0, 0))
+				f.call("metti_aspetto", {"stile2": Vector4(2, 0, 0, 0)})   # taglio corto, niente barba
 				mi.set_instance_shader_parameter(&"numero", Vector4.ZERO)
 				mi.set_instance_shader_parameter(&"stile", Vector4.ZERO)
 		_:

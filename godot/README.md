@@ -51,6 +51,7 @@ interfaccia dei menu, sfondo del menu e allenamento guidato, grafica.
 | `shaders/erba.gdshader` | disegno del taglio dell'erba calcolato per pixel (8 tagli, bordi ammorbiditi), grana, fili d'erba |
 | `shaders/righe.gdshader` | righe: si allargano da lontano per restare larghe almeno 1,5 pixel |
 | `shaders/divisa.gdshader` | colori della divisa per zone del corpo, come `src/athlete3d.js` |
+| `scripts/partita/capelli.gd`, `barbe.gd`, `shaders/capelli.gdshader` | capelli e barbe come mesh a parte sull'osso della testa (vedi "Capelli e barbe") |
 | `assets/` | modelli, suoni, icona (licenze in `CREDITI.md`) |
 | `tools/` | strumenti di sviluppo (icona, ispezione dei modelli): non finiscono nell'app |
 | `scenes/app.tscn`, `scripts/app_avvio.gd` | **scena principale**: al primo fotogramma passa la mano all'autoload `App` |
@@ -325,6 +326,28 @@ cambia schermata. "Esci" dalla pausa: in
 campionato sconfitta 0-3 a tavolino (come il web), in amichevole si torna al menu senza conseguenze. Senza `avvia`
 la partita parte da sola con le squadre di prova (opzioni da riga di comando come prima).
 La vista colora pelle e capelli dal `look` della carriera (indici di `Aspetto`) con `Aspetto.colori`.
+
+### Capelli e barbe (2026-11-21)
+
+Tagli e barbe sono **mesh a parte** (prima erano la testa gonfiata dallo shader della divisa: a gradini, "a punte").
+- `scripts/partita/capelli.gd`: dal centro della testa (lo stesso di `divisa.gdshader`) misura una volta, per ogni
+  direzione, dove esce la pelle del modello (mappa dei raggi, ~70 ms sul PC alla prima figura). Ogni taglio è una
+  griglia azimut × elevazione appoggiata su quella pelle ammorbidita più lo spessore del taglio (`LINEA` = attaccatura,
+  `SPESSORE`, `RAMPA`, `BORDO_K`, `FINE`/`CADE` per caschetto e lunghi che cadono in verticale, afro = ellissoide);
+  pezzi a parte per cresta (pinna), a punte (coni smussati), coda (tubo con elastico), chignon (palla).
+- `scripts/partita/barbe.gd`: guscio coi triangoli veri del viso spostati lungo la normale; la forma è un campo con
+  segno in metri (pizzetto, baffi, corta, piena). L'"Ombra" resta dipinta.
+- Una mesh per coppia taglio + barba, costruita alla prima richiesta (~10 ms sul PC) e condivisa; livelli di
+  dettaglio generati da Godot (`ImporterMesh.generate_lods`). 1000-1500 triangoli i capelli, 300-1250 la barba.
+- `Figura.metti_aspetto(aspetto)` mette colori e mesh (la chiama `prepara`, e l'anteprima dell'editor quando cambia
+  il look); la mesh sta sotto un `BoneAttachment3D` sull'osso `Head` con la trasformazione di legame della pelle.
+- `shaders/capelli.gdshader`, un materiale per tutti (colore capelli e pelle per istanza), niente trasparenza:
+  l'attaccatura e il bordo della barba li taglia per pixel (pixel scartati con rumore = bordo di peli), striature
+  lungo le ciocche, riflesso allungato (`ANISOTROPY`), radici scure, ricci e treccine col rilievo calcolato, due facce.
+- `divisa.gdshader` dipinge ancora sotto i capelli (radici scure), i rasati (Rasato, lati della Cresta) e l'Ombra.
+- Foto di controllo: `$G --path godot -s res://tests/foto_capelli.gd [-- --cartella=shots/capelli --giro=N]`
+  (tutti i tagli e le barbe di fronte, tre quarti, lato, dietro; `--tagli=10,11 --barbe=5` = foto grandi). Test:
+  `tests/test_capelli.gd`.
 
 ## Carriera, fase B (solo Godot)
 
