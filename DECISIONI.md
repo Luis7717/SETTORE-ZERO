@@ -1060,3 +1060,26 @@ Clip vere del "Free mocap pack 05: Soccer" di Anderson Rohr nella versione Godot
   nello stesso fotogramma (es. `vai` e subito `mostra`). Ora salta i nodi già liberati.
 - Prove: `--app-schermate` passa anche da Impostazioni (con il controllo audio spento/acceso sul bus) ed editor
   dell'aspetto con taglio afro (Capelli, da vicino) e chignon (Scarpe, corpo intero).
+
+## 2026-11-21 — Godot: righe del campo e tagli dell'erba
+- **Righe mancanti sull'iPhone**: erano calcolate per pixel nello shader dell'erba (distanza dalla riga più vicina +
+  `fwidth`, con la riga che da lontano si schiariva invece di restare larga un pixel). Sul PC (Vulkan, anche col
+  renderer Mobile e il 3D a metà risoluzione) si vedono: il difetto **non si riproduce qui**. Causa più probabile: tutto
+  dipendeva dai calcoli per pixel della GPU del telefono (derivate e precisione ridotta su Metal con coordinate fino a
+  60 m; da lontano la riga copriva il 10-20% di un pixel e veniva sbiadita quasi a niente). Invece di inseguire il
+  difetto alla cieca le righe ora sono **geometria vera** (`scripts/righe_campo.gd`, una mesh di ~1500 vertici 1,2 cm
+  sopra l'erba, larghe 12 cm come il regolamento, misure di `sim/core.gd`): sono triangoli bianchi, non dipendono più
+  da quei calcoli. Lo shader `righe.gdshader` fa i conti nei vertici (precisione piena) e allarga la riga solo quando
+  a schermo sarebbe più sottile di 1,5 pixel, anche vista di traverso: da lontano resta visibile senza sfarfallare.
+  Illuminata come l'erba, così le ombre dei giocatori ci passano sopra; normale forzata verso l'alto nel fragment
+  (con `cull_disabled` archi e dischetti, girati al contrario, venivano neri).
+- **Tagli dell'erba**: 8 (`strisce`, `strette`, `verticali`, `quadrotti`, `cerchi`, `uniforme`, `rombi`, `raggi` =
+  strisce + cerchio a spicchi), tutti nello stesso shader dell'erba scelti con un intero (`taglio`): niente texture,
+  bordi ammorbiditi con `fwidth` (da lontano le fasce si fondono invece di sfarfallare). Lo shader dell'erba ora è anche
+  più leggero (niente più distanza dalle righe per ogni pixel).
+- **Scelta del taglio**: ogni squadra ha il suo stadio, taglio fisso da `Tagli.da_seme(seme della squadra)`. In
+  campionato conta la squadra di casa (in casa il seme del mio club `s.seed`, fuori quello dell'avversario, passato
+  come `stadio_seme` in `avvia`); amichevole e allenamento: dal seme della partita (quindi a caso). Il menu resta col
+  classico. `--campo=<nome>` sulla riga di comando vince su tutto (prove). Nessun campo nuovo nel salvataggio.
+- **Da provare sull'iPhone**: che le righe si vedano (vicino e lontano) e i tagli; se le righe sembrassero troppo
+  spesse da lontano, abbassare `min_px` in `shaders/righe.gdshader`.

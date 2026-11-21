@@ -40,13 +40,16 @@ interfaccia dei menu, sfondo del menu e allenamento guidato, grafica.
 | `export_presets.cfg` | preset **iOS** (usato dalla build su GitHub) e **Windows Desktop** (solo per provare l'export sul PC) |
 | `scenes/prova_campo.tscn` | scena di prova: cielo e luce, telecamera, campo, stadio, squadre, contatore |
 | `scripts/coord.gd` | misure del campo e passaggio coordinate gioco ↔ Godot |
-| `scripts/campo.gd` | erba, porte con rete, bandierine |
+| `scripts/campo.gd` | erba (col taglio dello stadio, `set_taglio`), righe, porte con rete, bandierine |
+| `scripts/righe_campo.gd` | righe bianche del campo come mesh (misure di `sim/core.gd`), `tests/test_campo.gd` |
+| `scripts/tagli_campo.gd` | tagli dell'erba (nomi, taglio fisso per seme, `--campo=<nome>`) |
 | `scripts/stadio.gd` | cartelloni, tribune col pubblico dipinto, tetti, torri faro |
 | `scripts/giocatore.gd` | un giocatore: modello, divisa, animazioni fermo/corsa/scatto |
 | `scripts/telecamera.gd` | telecamera verticale come `src/render.js` |
 | `scripts/hud.gd` | contatore FPS / memoria / disegni / risoluzione 3D, dentro l'area sicura |
 | `scripts/prova_campo.gd` | movimenti finti, pallone, tocchi, opzioni per le prove da riga di comando |
-| `shaders/erba.gdshader` | strisce e righe calcolate per pixel (nitide a ogni distanza, niente texture grande) |
+| `shaders/erba.gdshader` | disegno del taglio dell'erba calcolato per pixel (8 tagli, bordi ammorbiditi), grana, fili d'erba |
+| `shaders/righe.gdshader` | righe: si allargano da lontano per restare larghe almeno 1,5 pixel |
 | `shaders/divisa.gdshader` | colori della divisa per zone del corpo, come `src/athlete3d.js` |
 | `assets/` | modelli, suoni, icona (licenze in `CREDITI.md`) |
 | `tools/` | strumenti di sviluppo (icona, ispezione dei modelli): non finiscono nell'app |
@@ -119,7 +122,29 @@ $G --path godot -- --prova-tocchi --esci-dopo=6            # tocco simulato su u
 ```
 
 Queste opzioni sono della scena di prova della fase 1: si aggiunge `res://scenes/prova_campo.tscn` dopo `--path godot`.
+`--campo=<nome>` (taglio dell'erba, vedi sotto) vale in ogni scena che ha il campo: partita, prova del campo, menu.
 Le schermate di prova vanno in `shots/` (ignorata da git).
+
+### Campo: righe e tagli dell'erba (2026-11-21)
+
+- **Righe** = una mesh piatta 1,2 cm sopra l'erba (`righe_campo.gd`, ~1500 vertici, un materiale): linee laterali e di
+  fondo, metà campo, cerchio e punto del centro, aree di rigore e di porta, dischetti, lunette, archi d'angolo, larghe
+  12 cm, misure di `sim/core.gd`. Lo shader (`righe.gdshader`) sposta i vertici di lato e allarga la riga quando da
+  lontano sarebbe più sottile di 1,5 pixel (anche di traverso): non sparisce e non sfarfalla. È illuminata come l'erba
+  (le ombre dei giocatori ci passano sopra). Prima le righe erano calcolate per pixel nello shader dell'erba e
+  sull'iPhone non si vedevano.
+- **Tagli** (`tagli_campo.gd`, uniform `taglio` dello shader dell'erba): `strisce` (classico, 18 di traverso),
+  `strette` (30), `verticali` (lungo il campo), `quadrotti`, `cerchi` (concentrici dal centro), `uniforme`, `rombi`
+  (diagonali incrociate), `raggi` (strisce + cerchio di centrocampo a spicchi). Ogni squadra ha il suo stadio:
+  in campionato il taglio viene dal seme della squadra di casa (`App._partita(..., stadio_seme)` →
+  `avvia({stadio_seme})`), in amichevole e allenamento dal seme della partita (`gioco.gd taglio_campo`). Il menu usa
+  il classico. Solo grafica: il motore non lo vede.
+
+```sh
+$G --path godot -- --seme=3 --campo=quadrotti --schermata=shots/campo_quadrotti.png --dopo=3
+$G --path godot res://scenes/prova_campo.tscn -- --vista=alta --scala-3d=0.5 --campo=cerchi --schermata=...   # da lontano, 3D a metà
+$G --path godot --rendering-driver vulkan --rendering-method mobile -- ...                                  # renderer Mobile come sul telefono
+```
 
 Scena principale = app (fase 3). Le opzioni della partita (`--bot`, `--scena`, `--schermata`, `--veloce`, `--seme`,
 `--tempo`, `--vista-finta`, `--esci-a-fine`, `--partita`) senza `--app` fanno partire subito la partita di prova come

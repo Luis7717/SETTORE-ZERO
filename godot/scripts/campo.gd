@@ -1,12 +1,17 @@
-# Campo da gioco: erba a strisce con le righe (calcolate per pixel da shaders/erba.gdshader), terreno intorno,
-# porte con rete, bandierine. Misure e coordinate da scripts/coord.gd (le stesse del gioco web, src/pitch.js).
+# Campo da gioco: erba col suo taglio (shaders/erba.gdshader, tagli in scripts/tagli_campo.gd), righe bianche come
+# mesh (scripts/righe_campo.gd + shaders/righe.gdshader), terreno intorno, porte con rete, bandierine.
+# Misure e coordinate da scripts/coord.gd (le stesse del gioco web, src/pitch.js).
+#   set_taglio(i)    taglio dell'erba (indice di Tagli.NOMI); `--campo=<nome>` sulla riga di comando vince sempre
 extends Node3D
 
 const Coord := preload("res://scripts/coord.gd")
 const SHADER_ERBA := preload("res://shaders/erba.gdshader")
+const SHADER_RIGHE := preload("res://shaders/righe.gdshader")
 const SHADER_RETE := preload("res://shaders/rete.gdshader")
 const SHADER_BANDIERINA := preload("res://shaders/bandierina.gdshader")
 const ReteMolle := preload("res://scripts/rete_molle.gd")
+const Tagli := preload("res://scripts/tagli_campo.gd")
+const RigheCampo := preload("res://scripts/righe_campo.gd")
 
 const MX := 10.0               # margine d'erba oltre le linee laterali (m)
 const MY := 12.0               # margine d'erba oltre le linee di porta (m)
@@ -22,10 +27,16 @@ const RETE_CELLA := 0.3         # lato dei quadratini in cui è divisa la rete, 
 
 var _reti := {}                 # lato (1 / −1) → ShaderMaterial della rete
 var _molle := {}                # lato (1 / −1) → rete a molle (scripts/rete_molle.gd)
+var _mat_erba: ShaderMaterial
+var _taglio := Tagli.CLASSICO
+var _taglio_forzato := -1       # da --campo=<nome>: vince su set_taglio
 
 
 func _ready() -> void:
+	_taglio_forzato = Tagli.da_riga_comando()
 	_costruisci_erba()
+	_costruisci_righe()
+	set_taglio(_taglio)
 	for lato in [1.0, -1.0]:
 		_costruisci_porta(lato)
 	for sx in [1.0, -1.0]:
@@ -33,10 +44,11 @@ func _ready() -> void:
 			_costruisci_bandierina(sx, sy)
 
 
-# ---------------------------------------------------------------- erba e righe
+# ---------------------------------------------------------------- erba, taglio e righe
 func _costruisci_erba() -> void:
 	var mat := ShaderMaterial.new()
 	mat.shader = SHADER_ERBA
+	_mat_erba = mat
 	mat.set_shader_parameter("grana", _texture_grana())
 	if ResourceLoader.exists(ERBA_N):   # fili d'erba da vicino (tools/genera_texture.gd)
 		mat.set_shader_parameter("dettaglio_n", load(ERBA_N))
@@ -62,6 +74,32 @@ func _costruisci_erba() -> void:
 	fuori.position.y = -0.02
 	fuori.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(fuori)
+
+
+# righe bianche: una mesh sola (poche migliaia di vertici), un materiale solo
+func _costruisci_righe() -> void:
+	var righe := MeshInstance3D.new()
+	righe.name = "Righe"
+	righe.mesh = RigheCampo.mesh()
+	var mat := ShaderMaterial.new()
+	mat.shader = SHADER_RIGHE
+	righe.material_override = mat
+	righe.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# lo shader allarga le righe lontane: la scatola per il taglio fuori schermo deve tenerne conto
+	righe.extra_cull_margin = 1.0
+	add_child(righe)
+
+
+## taglio dell'erba (indice di Tagli.NOMI); con --campo=<nome> resta quello della riga di comando
+func set_taglio(i: int) -> void:
+	_taglio = clampi(i, 0, Tagli.NOMI.size() - 1)
+	if _mat_erba != null:
+		_mat_erba.set_shader_parameter("taglio", taglio())
+
+
+## taglio in uso
+func taglio() -> int:
+	return _taglio_forzato if _taglio_forzato >= 0 else _taglio
 
 
 func _texture_grana() -> Texture2D:

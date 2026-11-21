@@ -16,7 +16,8 @@
 #   tifo(tipo, squadra)                reazione del pubblico: "gol", "occasione", "parata", "palo", "fischio"
 #   set_rallenty(k)                    quanto è forte il rallenty (0..1) per la profondità di campo; −1 = la vista lo
 #                                      ricava da sola da dt_game / dt_real (predefinito)
-#   set_qualita(l) / qualita_auto      livello grafico 0..3 (qualita.gd); con qualita_auto scende da solo sotto 58 fps
+#   set_taglio(i)                      taglio dell'erba dello stadio (scripts/tagli_campo.gd)
+#   set_qualita(l) / qualita_auto     livello grafico 0..3 (qualita.gd); con qualita_auto scende da solo sotto 58 fps
 #   user_yaw, cam_drag, drawing        scritti da chi gestisce il dito (src/input.js), letti qui; il ritorno dolce
 #                                      di user_yaw a 0 (relaxYaw) lo fa la vista in update_view
 #
@@ -676,6 +677,11 @@ func _aggiorna_reti(b: Object, dt: float) -> void:
 ## (dt_game / dt_real: sotto 0,6 inizia, a 0,2 è pieno)
 func set_rallenty(k: float) -> void:
 	_rk_forzato = clampf(k, 0.0, 1.0) if k >= 0.0 else -1.0
+
+
+## taglio dell'erba dello stadio (indice di scripts/tagli_campo.gd NOMI; solo grafica)
+func set_taglio(i: int) -> void:
+	_campo.set_taglio(i)
 
 
 ## livello grafico a mano (0 minimo .. 3 alto, vedi qualita.gd); la discesa automatica riparte da qui
