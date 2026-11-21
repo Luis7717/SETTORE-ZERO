@@ -16,12 +16,14 @@
 #   --scena=area|duello|fuga|angolo|pausa   mette la partita in una situazione da fotografare
 #   --schermata=PERCORSO.png [--dopo=SEC] [--alla-fine]   schermata dopo SEC secondi veri, o alla fine partita
 #   --esci-dopo=SEC     esce dopo SEC secondi veri
+#   --campo=NOME        taglio dell'erba (strisce, strette, verticali, quadrotti, cerchi, uniforme, rombi, raggi)
 #   --allenamento       allenamento guidato (tipo "allenamento", scripts/partita/allenamento.gd) invece dell'amichevole;
 #                       con --lezione=N [--prova=K] parte da lì, con --scheda mostra la scheda della lezione N
 #
 # Dall'app (scripts/app.gd): chi crea la scena chiama `avvia(opz)` prima di aggiungerla o entro il primo fotogramma,
 # con opz = {squadra_a, squadra_b, me, tipo: "campionato"|"amichevole"|"allenamento", durata_tempo, seme,
-# titolo (facoltativo), autoGk (facoltativo)}; squadre come Carriera.myMatchTeam()/aiMatchTeam() (kit compreso).
+# titolo (facoltativo), autoGk (facoltativo), stadio_seme (facoltativo: seme della squadra di casa, sceglie il taglio
+# dell'erba; senza, il taglio viene dal seme della partita)}; `--campo=<nome>` lo forza per le prove; squadre come Carriera.myMatchTeam()/aiMatchTeam() (kit compreso).
 # Al fischio finale (la schermata di fine resta sopra) o se si esce dalla pausa la scena emette `finita(esito)` con
 # {gol_a, gol_b, marcatori, statistiche, abbandonata, tipo, me}; "Esci" in campionato = sconfitta 0-3 a tavolino.
 # Il tasto "Continua" della schermata di fine emette poi `continua` (chi ha avviato la partita cambia schermata).
@@ -47,6 +49,7 @@ const HudFase1 := preload("res://scripts/hud.gd")
 const Allenamento := preload("res://scripts/partita/allenamento.gd")
 const AllenamentoHud := preload("res://scripts/partita/allenamento_hud.gd")
 const BotAllenamento := preload("res://scripts/partita/bot_allenamento.gd")
+const Tagli := preload("res://scripts/tagli_campo.gd")
 const SCENA_VISTA := "res://scenes/vista_partita.tscn"
 
 # velocità del tempo (rallenty), come src/main.js
@@ -106,6 +109,7 @@ var _dt_fisso := 0.0
 var _fotogrammi := 0
 var _anteprima_viva := false
 var _inizio_ms := 0
+var _seme_partita := 0
 
 
 ## avvio dall'app: da chiamare prima di aggiungere la scena all'albero o entro il primo fotogramma
@@ -114,6 +118,14 @@ func avvia(opz: Dictionary) -> void:
 		push_warning("gioco.avvia: la partita è già partita, opzioni ignorate")
 		return
 	_avvio = opz.duplicate()
+
+
+## taglio dell'erba (scripts/tagli_campo.gd) per le opzioni di avvia(): lo stadio della squadra di casa
+## (opz.stadio_seme, lo mette l'app in campionato), altrimenti a caso col seme della partita
+static func taglio_campo(opz: Dictionary, seme_partita: int) -> int:
+	if opz.has("stadio_seme"):
+		return Tagli.da_seme(int(opz.stadio_seme))
+	return Tagli.da_seme(seme_partita)
 
 
 func avviata_da_app() -> bool:
@@ -174,6 +186,7 @@ func _crea_partita() -> void:
 		seme = int(_avvio.get("seme", seme))
 		if not _opzioni.has("tempo"): # --tempo vince anche dall'app (prove veloci)
 			tempo = float(_avvio.get("durata_tempo", TEMPO_PREDEFINITO))
+	_seme_partita = seme
 	var auto_gk: bool = _avvio.get("autoGk", false)
 	m = SimMatchScript.new({"seed": seme, "halfLen": tempo, "human": [me == 0, me == 1],
 		"autoGk": [auto_gk and me == 0, auto_gk and me == 1], "teams": squadre})
@@ -192,6 +205,8 @@ func _crea_vista() -> void:
 		vista = VistaFinta.new()
 	add_child(vista)
 	vista.setup(m, me)
+	if vista.has_method("set_taglio"):
+		vista.set_taglio(taglio_campo(_avvio, _seme_partita))
 	gesti.vista = vista
 	gesti.set_match(m, me)
 	gesti.enabled = true

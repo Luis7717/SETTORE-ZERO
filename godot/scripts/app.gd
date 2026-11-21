@@ -126,7 +126,9 @@ func gioca_campionato() -> void:
 		vai(PRINCIPALE)
 		return
 	var titolo := "Giornata %d · %s" % [nm.day, CarrieraScript.DIV_NAMES[nm.div]]
-	_partita("campionato", carriera.aiMatchTeam(nm.opp), titolo, float(carriera.s.settings.half))
+	# stadio (taglio dell'erba) della squadra di casa: in casa il mio, fuori quello dell'avversario
+	var stadio: Variant = carriera.s.get("seed") if nm.home else nm.opp.get("seed")
+	_partita("campionato", carriera.aiMatchTeam(nm.opp), titolo, float(carriera.s.settings.half), stadio)
 
 
 ## avversario: id di una squadra del campionato, oppure livello (numero), oppure null = livello della mia squadra
@@ -162,12 +164,15 @@ func _ha_carriera() -> bool:
 	return true
 
 
-func _partita(tipo: String, avversario: Dictionary, titolo: String, durata: float) -> void:
+# stadio_seme: seme della squadra di casa (taglio dell'erba); null = a caso col seme della partita
+func _partita(tipo: String, avversario: Dictionary, titolo: String, durata: float, stadio_seme: Variant = null) -> void:
 	if schermata == "partita":
 		return # doppio tocco sul tasto: la partita sta già partendo
 	var s: Dictionary = carriera.s
 	var opz := {"squadra_a": carriera.myMatchTeam(), "squadra_b": avversario, "me": 0, "tipo": tipo,
 		"durata_tempo": durata, "seme": randi() % 1000000000, "titolo": titolo, "autoGk": bool(s.settings.autoGk)}
+	if stadio_seme is int or stadio_seme is float:
+		opz["stadio_seme"] = int(stadio_seme)
 	s.tut = int(s.get("tut", 0)) + 1 # partite iniziate (come il web)
 	carriera.save()
 	var scena: Node = (load(SCENA_PARTITA) as PackedScene).instantiate()
