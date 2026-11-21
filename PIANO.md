@@ -33,7 +33,7 @@ ogni cambio al motore si fa in tutte e due, con le fixture rigenerate.
   Vale per i compagni guidati dalla CPU e per le squadre avversarie (ognuna col suo stile).
 
 ## Fase E — modi di gioco nuovi
-- **5. Momenti chiave** (modalità da provare): invece di tutta la partita si giocano **15 azioni**; il resto lo simula il
+- **5. Momenti chiave** (modalità da provare): invece di tutta la partita si giocano **circa 10 azioni** (Luis: "circa 10 in totale non 15"); il resto lo simula il
   motore e si vede come cronaca scritta. Più la mia squadra è forte rispetto all'avversaria, più azioni sono offensive;
   più l'avversaria è forte, più sono difensive; **mai meno di 3 azioni offensive**, anche con la squadra più scarsa, e
   devono essere occasioni vere (posizioni da cui si può segnare). Il resto sono azioni difensive e offensive miste.
