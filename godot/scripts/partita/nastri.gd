@@ -150,13 +150,13 @@ static func _vert(im: ImmediateMesh, v: Vector3, u: float) -> void:
 
 
 ## linea disegnata dal dito. kind: "run" (strada da correre), "pass", "shot" (gialla col mirino, end_h = altezza
-## del punto in porta), "replay" (gialla come il tiro ma senza mirino: nel replay del gol il mirino finiva sul portiere), "def" (linea di difesa). recv = Vector2 del compagno che riceve (anello verde) o null.
+## del punto in porta), "def" (linea di difesa). recv = Vector2 del compagno che riceve (anello verde) o null.
 func mostra_linea(points: PackedVector2Array, kind: String, end_h: float, recv: Variant) -> void:
 	var n := mini(points.size(), PATH_MAX)
 	if n < 2:
 		nascondi_linea()
 		return
-	var shot := kind == "shot" or kind == "replay"
+	var shot := kind == "shot"
 	var pts: Array = []
 	for i in n:
 		var h := LIFT
@@ -169,8 +169,8 @@ func mostra_linea(points: PackedVector2Array, kind: String, end_h: float, recv: 
 	_path_mesh.surface_end()
 	_path_mat.albedo_color = Color(SHOT_COLOR, 0.95) if shot else Color(1, 1, 1, 0.95)
 	_path_mi.visible = true
-	_target.visible = kind == "shot"
-	if _target.visible:
+	_target.visible = shot
+	if shot:
 		var e := points[n - 1]
 		_target.position = _g(e.x, e.y, end_h)
 	_recv.visible = recv != null

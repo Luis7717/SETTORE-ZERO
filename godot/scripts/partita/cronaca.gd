@@ -12,12 +12,12 @@ extends RefCounted
 
 const Coord := preload("res://scripts/coord.gd")
 
-const PAUSA := 6.0             # s veri tra una frase qualunque e una frase "piccola"
+const PAUSA := 4.0             # s veri tra una frase qualunque e una frase "piccola"
 const PAUSA_FORTE := 2.0       # s veri tra una frase e una importante (il gol non aspetta)
 const TIRO_RICORDO := 3.0      # s: un tiro si ricorda per dire com'è finito (parata, palo, fuori, respinta)
 const ZONA_TIRO := 20.0        # m dalla porta: un colpo di testa o al volo da qui è un tiro
 # probabilità di dire qualcosa per le cose piccole (passata la pausa)
-const PROB := {"dribbling": 0.7, "contrasto": 0.35, "angolo": 0.6, "fallo": 0.6}
+const PROB := {"dribbling": 0.9, "contrasto": 0.55, "angolo": 0.85, "fallo": 0.8}
 const IMPORTANZA := {"gol": 3, "autogol": 3, "parata": 2, "palo": 2, "fuori": 2, "occasione": 2, "rigore": 2,
 	"rosso": 2, "giallo": 2, "dribbling": 1, "contrasto": 1, "angolo": 1, "fallo": 1}
 

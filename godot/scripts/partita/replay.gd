@@ -1,6 +1,6 @@
 # Replay del gol (solo grafica, fase C). Il motore non cambia: si registrano gli ultimi secondi in un buffer
 # circolare (replay_buffer.gd) e dopo il gol si rigiocano sulla vista, ripresi da un'altra visuale (bassa da dietro
-# la porta o bassa di lato), al rallentatore, con la linea del tiro che cresce dietro al pallone. Un tocco lo salta.
+# la porta o bassa di lato), al rallentatore, senza linee disegnate (Luis 2026-11-21). Un tocco lo salta.
 #
 # Sequenza dopo un gol (gioco.gd):
 #   1. gol(m)            evento "goal": stato "attesa"; la festa del motore (fase "goal", 3,2 s) va avanti
@@ -169,7 +169,6 @@ func fotogramma(m: Object, vista: Node, dt: float) -> void:
 	_t = minf(_t1, _t + dt_gioco)
 	buffer.applica(m, _t)
 	_muovi_telecamera(m, vista, dt)
-	_linea_tiro(vista)
 	vista.update_view(dt_gioco, dt) # col replay acceso la vista non muove la telecamera
 	buffer.ripristina(m)
 	if _t >= _t1:
@@ -235,24 +234,6 @@ func _muovi_telecamera(m: Object, vista: Node, dt: float) -> void:
 # (x, altezza, y) del gioco → posizione nel mondo di Godot (con la vista girata se si gioca con la squadra 1)
 static func _mondo(v: Vector3, flip: float) -> Vector3:
 	return Vector3(flip * v.x, v.y, -flip * v.z)
-
-
-# linea del tiro: dal punto del calcio fino a dove è arrivato il pallone adesso (cresce con lui)
-func _linea_tiro(vista: Node) -> void:
-	if is_nan(_t_tiro) or _t < _t_tiro:
-		return
-	var punti := buffer.traiettoria(_t_tiro, minf(_t, _t_gol))
-	punti.append(buffer.pallone_a(minf(_t, _t_gol)))
-	if punti.size() < 2:
-		return
-	var terra := PackedVector2Array()
-	for p: Vector3 in punti:
-		terra.append(Vector2(p.x, p.y))
-	var ultimo: Vector3 = punti[punti.size() - 1]
-	if vista.has_method("show_path"):
-		vista.show_path(terra, "replay", ultimo.z) # gialla senza mirino (Luis: non sul portiere)
-	if vista.has_method("show_preview"):
-		vista.show_preview(punti, NAN)
 
 
 # scritta "REPLAY" in alto e "Tocca per saltare" in basso (sopra la vista, sotto i menu dell'HUD)

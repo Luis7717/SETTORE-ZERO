@@ -6,11 +6,11 @@ extends Control
 const MARGINE := 12.0
 const SOTTO := 96.0            # punti sotto il bordo alto dell'area sicura (punteggio e scritta della visuale sopra)
 const MAPPA := 78.0 + 10.0 + 8.0  # larghezza della minimappa a destra, col suo margine e uno spazio
-const DURATA := 3.6            # s di una frase
-const DURATA_GOL := 5.0
+const DURATA := 5.0            # s di una frase (Luis non la vedeva: più a lungo e più grande)
+const DURATA_GOL := 6.0
 const DISSOLVENZA := 0.25
 const GIALLO := Color("#ffe14a")
-const FONDO := Color(0.039, 0.063, 0.125, 0.78)
+const FONDO := Color(0.039, 0.063, 0.125, 0.9)
 const Hud := preload("hud_partita.gd")
 
 var _l: Label
@@ -28,7 +28,7 @@ func _ready() -> void:
 	f.base_font = ThemeDB.fallback_font
 	f.variation_embolden = 0.5
 	_l.add_theme_font_override("font", f)
-	_l.add_theme_font_size_override("font_size", 14)
+	_l.add_theme_font_size_override("font_size", 17)
 	var s := StyleBoxFlat.new()
 	s.bg_color = FONDO
 	s.set_corner_radius_all(10)
