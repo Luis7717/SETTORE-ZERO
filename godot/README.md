@@ -130,7 +130,7 @@ $G --headless --path godot -- --esci-dopo=4                                  # m
 $G --headless --path godot -- --app --stagione-bot --bot --veloce=8 --tempo=20 --salvataggio=user://prova.json
 #   stagione intera col dito finto (~2 min): 18 partite vere, fine stagione, salva, ricarica e confronta
 $G --path godot -- --app --app-schermate=shots/fase3 --bot --veloce=8 --tempo=15 --salvataggio=user://prova2.json
-#   schermate: senza carriera, menu, partita, fine partita, dopo partita, menu
+#   schermate: senza carriera, menu, partita, fine partita, dopo partita, menu, hub, classifica, rosa, fine stagione
 ```
 
 ## Partita (fase 2)
@@ -295,6 +295,40 @@ cambia schermata. "Esci" dalla pausa: in
 campionato sconfitta 0-3 a tavolino (come il web), in amichevole si torna al menu senza conseguenze. Senza `avvia`
 la partita parte da sola con le squadre di prova (opzioni da riga di comando come prima).
 La vista colora pelle e capelli dal `look` della carriera (indici di `Aspetto`) con `Aspetto.colori`.
+
+## Carriera, fase B (solo Godot)
+
+Novità che il web non ha. Le funzioni portate da `career.js` (`finishMatch`, `endSeason`, `myMatchTeam`, …) restano
+identiche al web (`tests/test_carriera.gd` le confronta ancora col JS, togliendo le chiavi nuove `CHIAVI_GODOT`);
+le novità passano da due funzioni nuove che chiama `App`:
+
+- `Carriera.squadraPartita()` al posto di `myMatchTeam()`: niente infortunati (la CPU mette il miglior sostituto
+  sano, `schieraSani()`), e chi è giù di forma parte stanco (copie dei giocatori col campo `energy0`).
+- `Carriera.dopoPartita(res, esito)` dopo `finishMatch`: premio del derby, crescita del campione, forma e
+  infortuni, a fine stagione giudizio della dirigenza e obiettivo nuovo. Aggiunge a `res`: `derby`, `crescita`
+  `{nome, righe}`, `infortuni`, `cambi`, `obiettivo` (anche in `res.season`).
+
+| Cosa | File | Stato nel salvataggio |
+|---|---|---|
+| Campione che cresce giocando (`champ: true`) | `carriera/crescita.gd`, conteggi da `partita/conta_giocatori.gd` | `progressi` {id: {stat: decimali}} |
+| Obiettivo della dirigenza | `carriera/dirigenza.gd` | `obiettivo` {stagione, div, tipo, posto} |
+| Rivale e derby | `carriera/dirigenza.gd`; `audio_partita.gd` e `stadio/pubblico.gd` (`derby = true`) | `rivale` (id) |
+| Forma e infortuni | `carriera/forma.gd` | `forma` {id: 0..100}, `infortuni` {id: giornate}, `semeB` |
+
+- **Conteggi della partita**: `gioco.gd` chiama `conta.leggi(m)` a ogni fotogramma prima di consumare gli eventi;
+  l'esito ha `conteggi` = {id: {gol, assist, tiri, in_porta, passaggi, intercetti, contrasti, dribbling, scatti,
+  testa, parate, km}} per i giocatori della persona, e `derby`. Il motore non cambia.
+- **Derby**: `avvia({... "derby": true})` → scritta "DERBY!" all'inizio, pubblico più forte (×1,3), cori ogni 9-15 s
+  invece di 28-45 s, più tifosi in piedi e un coro sugli spalti ogni 11 s.
+- **Energia iniziale** (unico cambio al motore, in tutte e due le copie): campo facoltativo `energy0` del giocatore
+  sorgente (0,2..1); senza il campo si parte a 1 come sempre. Prove: `test/unit/start-energy.test.mjs`,
+  `tests/fixtures/trace_7.json` (`test_traccia_7_energia_iniziale`, bit per bit col JS).
+- Menu: obiettivo nell'hub (verde se oggi è raggiunto) e in classifica (linea gialla tratteggiata, "RIV" sulla
+  rivale), pillola DERBY sulla prossima partita, crescita/derby/infortuni nella schermata dopo partita, giudizio
+  della dirigenza a fine stagione, croce rossa e barretta della forma sulle carte della Rosa (un infortunato non
+  entra con uno scambio).
+- Prove: `tests/test_carriera_b.gd`; `--stagione-bot` stampa anche derby, crescita, infortuni e obiettivo;
+  `--app-schermate` aggiunge hub, classifica, rosa (con un infortunato) e fine stagione.
 
 ## Menu (fase 3)
 

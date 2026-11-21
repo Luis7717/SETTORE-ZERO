@@ -5,6 +5,7 @@
 class_name SimMatch
 extends "ai.gd"
 
+const ENERGY_MIN := 0.2 # energia più bassa possibile (come il calo in partita, motion.gd)
 const PREVIEW_SEC := 2.4 # durata massima dell'anteprima della traiettoria (s)
 const SHOT_V0 := 22.0 # velocità base del tiro (m/s), più la bravura del tiratore
 const GK_REACT := 0.42 # tempo di reazione base del portiere del computer (s), meno la sua bravura
@@ -23,6 +24,18 @@ const RUN_MAX_LEN := 14.0 # lunghezza massima di una linea di difesa, misurata d
 const SPRINT_DIST := 6.0 # dito più lontano di così dal giocatore controllato (m) = scatto
 const CORNER_ATT := [[-3.0, 7.0], [3.0, 8.5], [0.0, 11.5], [-6.0, 10.0], [6.0, 12.5], [-2.0, 19.0], [9.0, 22.0], [-10.0, 46.0], [8.0, 50.0], [0.0, 44.0]]
 const CORNER_DEF := [[-2.6, 5.5], [2.6, 5.5], [0.0, 8.0], [-5.0, 8.5], [5.0, 9.5], [0.0, 13.0], [-3.0, 3.0], [-7.0, 20.0], [8.0, 21.0], [0.0, 38.0]]
+
+
+## Energia a inizio partita (o all'ingresso dalla panchina): il campo facoltativo `energy0` del giocatore sorgente
+## (carriera: chi arriva stanco dalle partite prima), tra ENERGY_MIN e 1; senza il campo 1, come sempre.
+## Come startEnergy di src/sim/match.js.
+static func startEnergy(src: Variant) -> float:
+	if not src is Dictionary:
+		return 1.0
+	var e: Variant = (src as Dictionary).get("energy0")
+	if (typeof(e) != TYPE_FLOAT and typeof(e) != TYPE_INT) or is_nan(float(e)) or is_inf(float(e)):
+		return 1.0
+	return minf(1.0, maxf(ENERGY_MIN, float(e)))
 
 
 # Taglia una linea che parte da (x0, y0) e passa per pts alla lunghezza max (m): l'ultimo punto cade esattamente a max.
@@ -95,6 +108,7 @@ func mk(tm: int, i: int, src: Dictionary, slot: Array) -> R.Player:
 	p.bx = slot[1]
 	p.by = slot[2]
 	p.st = C.effStats(src, slot[0])
+	p.energy = startEnergy(src)
 	p.fy = -1.0 if tm else 1.0
 	p.phase = rnd() * 6.0
 	p.soT = rnd()
@@ -1002,7 +1016,7 @@ func substitute(tm: int, idx: int, src: Dictionary) -> bool:
 	p.src = src
 	p.name = String(src.get("name", ""))
 	p.st = C.effStats(src, p.pos)
-	p.energy = 1.0
+	p.energy = startEnergy(src)
 	p.wear = {"dri": 1.0, "tes": 1.0}
 	p.dribCd = 0.0
 	p.yellow = 0

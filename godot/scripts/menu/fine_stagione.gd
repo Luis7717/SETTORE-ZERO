@@ -1,8 +1,10 @@
 # Fine stagione (season() di src/ui.js). arg = risultato di Carriera.endSeason: {pos, prize, bonus, outcome
-# ("up" | "down" | "champ" | "stay"), div, newDiv}. Coppa (tranne in retrocessione), titolo, premio, nuova divisione.
+# ("up" | "down" | "champ" | "stay"), div, newDiv, obiettivo?}. Coppa (tranne in retrocessione), titolo, premio,
+# obiettivo della dirigenza (Carriera.dopoPartita: premio o penalità), nuova divisione e obiettivo nuovo.
 extends MenuSchermata
 
 const I := preload("res://scripts/menu/icone.gd")
+const Dirigenza := preload("res://scripts/carriera/dirigenza.gd")
 
 
 func prepara() -> void:
@@ -30,5 +32,14 @@ func costruisci() -> void:
 			"La prossima stagione giochi in <b>%s</b>. I giocatori hanno un anno in più: controlla la rosa e il mercato." % div_nuova]:
 		var p := U.bb("[center]%s[/center]" % U.html_a_bbcode(t), 16.5, Color("#d7e1f3"))
 		corpo.add_child(p)
+	var ob: Variant = r.get("obiettivo")
+	if ob is Dictionary:
+		var soldi := int(ob.get("soldi", 0))
+		var col := "#4aeb9f" if ob.get("riuscito", false) else "#ff7079"
+		var cifra := ("+" if soldi >= 0 else "−") + D.fmt_money(absf(soldi))
+		corpo.add_child(U.bb("[center]%s [color=%s][b]%s[/b][/color][/center]" % [U.esc(str(ob.get("messaggio", ""))), col, cifra], 15, Color("#d7e1f3")))
+	var nuovo := Dirigenza.testo(carriera().obiettivo()) if not stato().is_empty() else ""
+	if nuovo != "":
+		corpo.add_child(U.bb("[center]Obiettivo della nuova stagione: [b]%s[/b][/center]" % U.esc(nuovo), 14, T.DIM))
 	corpo.add_child(U.spazio(4))
 	corpo.add_child(U.bottone("AVANTI", "BtnGrande", func() -> void: vai("hub")))

@@ -21,9 +21,11 @@
 #
 # Dall'app (scripts/app.gd): chi crea la scena chiama `avvia(opz)` prima di aggiungerla o entro il primo fotogramma,
 # con opz = {squadra_a, squadra_b, me, tipo: "campionato"|"amichevole"|"allenamento", durata_tempo, seme,
-# titolo (facoltativo), autoGk (facoltativo)}; squadre come Carriera.myMatchTeam()/aiMatchTeam() (kit compreso).
+# titolo (facoltativo), autoGk (facoltativo), derby (facoltativo: partita contro la rivale, pubblico più rumoroso)};
+# squadre come Carriera.squadraPartita()/aiMatchTeam() (kit compreso).
 # Al fischio finale (la schermata di fine resta sopra) o se si esce dalla pausa la scena emette `finita(esito)` con
-# {gol_a, gol_b, marcatori, statistiche, abbandonata, tipo, me}; "Esci" in campionato = sconfitta 0-3 a tavolino.
+# {gol_a, gol_b, marcatori, statistiche, abbandonata, tipo, me, derby, conteggi}; conteggi = per giocatore della
+# persona (scripts/partita/conta_giocatori.gd); "Esci" in campionato = sconfitta 0-3 a tavolino.
 # Il tasto "Continua" della schermata di fine emette poi `continua` (chi ha avviato la partita cambia schermata).
 # Così il risultato si registra subito, anche se l'app viene chiusa sulla schermata di fine (come il web).
 # Se nessuno chiama avvia, la partita parte da sola con le squadre di prova (come prima, per le prove).
@@ -47,6 +49,7 @@ const HudFase1 := preload("res://scripts/hud.gd")
 const Allenamento := preload("res://scripts/partita/allenamento.gd")
 const AllenamentoHud := preload("res://scripts/partita/allenamento_hud.gd")
 const BotAllenamento := preload("res://scripts/partita/bot_allenamento.gd")
+const ContaGiocatori := preload("res://scripts/partita/conta_giocatori.gd")
 const SCENA_VISTA := "res://scenes/vista_partita.tscn"
 
 # velocità del tempo (rallenty), come src/main.js
@@ -94,6 +97,7 @@ var hud: HudPartita
 var audio: AudioPartita
 var bot: BotDito = null
 var abbandonata := false
+var conta: ContaGiocatori = null  # conteggi per giocatore (carriera: crescita del campione)
 
 var _opzioni := {}
 var _avvio := {}              # opzioni di avvia() (vuoto = partita di prova da sola)
@@ -153,8 +157,11 @@ func _parti() -> void:
 	audio = AudioPartita.new()
 	add_child(audio)
 	audio.folla(FOLLA_BASE)
+	var derby := _segna_derby()
 	if tipo() == "allenamento":
 		_avvia_allenamento()
+	elif derby:
+		hud.big("DERBY!", "g", 2400, _titolo())
 	else:
 		hud.big(_titolo(), "", 1800)
 	stato = "partita"
@@ -183,6 +190,7 @@ func _crea_partita() -> void:
 			squadre[1] = Allenamento.squadra_ospite()
 	gesti = Gesti.new()
 	gesti.out = Gesti.ComandiPartita.new(m, me)
+	conta = ContaGiocatori.new(me)
 
 
 func _crea_vista() -> void:
@@ -303,6 +311,7 @@ func _aggiorna_hud() -> void:
 
 # ---------------------------------------------------------------- eventi del motore (events() di src/main.js)
 func _eventi() -> void:
+	conta.leggi(m)
 	var adv := false
 	for e: Dictionary in m.events:
 		if e.type == "advantage":
@@ -581,7 +590,19 @@ func _esci_dalla_pausa() -> void:
 ## risultato per chi ha avviato la partita (una volta sola)
 func esito() -> Dictionary:
 	return {"gol_a": m.score[0], "gol_b": m.score[1], "marcatori": m.goalsLog.duplicate(),
-		"statistiche": m.stats.duplicate(true), "abbandonata": abbandonata, "tipo": tipo(), "me": me}
+		"statistiche": m.stats.duplicate(true), "abbandonata": abbandonata, "tipo": tipo(), "me": me,
+		"derby": bool(_avvio.get("derby", false)), "conteggi": conta.per_giocatore() if conta != null else {}}
+
+
+# derby (opzione di avvia): pubblico più rumoroso, più cori e tifosi più in piedi. Ritorna true se è un derby
+func _segna_derby() -> bool:
+	if not _avvio.get("derby", false):
+		return false
+	audio.derby = true
+	var pubblico: Node = vista.find_child("Pubblico", true, false) if vista is Node else null
+	if pubblico != null and "derby" in pubblico:
+		pubblico.derby = true
+	return true
 
 
 func _emetti_finita() -> void:

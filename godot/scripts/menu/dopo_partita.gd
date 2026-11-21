@@ -3,10 +3,13 @@
 # accetta anche il formato del web {m, res, title} (prove):
 #   m     = la partita (SimMatch o Dictionary): score, goalsLog [{team, name, minute}], stats {shots, onT, poss,
 #           corners, fouls}, teams [{short, kit: {crest: {shape, pattern, icon, c1, c2}}}]
-#   res   = risultato di Carriera.finishMatch (incasso, stipendi, migliorati, altri risultati, season) o null
+#   res   = risultato di Carriera.finishMatch (incasso, stipendi, migliorati, altri risultati, season) o null,
+#           con le novità di Carriera.dopoPartita: derby (premio), crescita del campione, infortuni, cambi
 #   title = riga in alto ("Terza Divisione · Giornata 4", "Amichevole", ...)
 # "Continua" porta alla fine della stagione se è finita, altrimenti alla casa della carriera.
 extends MenuSchermata
+
+const Crescita := preload("res://scripts/carriera/crescita.gd")
 
 
 func prepara() -> void:
@@ -68,6 +71,9 @@ func costruisci() -> void:
 
 	var res: Variant = r.get("res")
 	if res is Dictionary:
+		var nov := _novita(res)
+		if nov != null:
+			corpo.add_child(nov)
 		corpo.add_child(_soldi(res))
 	var stagione: Variant = res.get("season") if res is Dictionary else null
 	corpo.add_child(U.bottone("CONTINUA", "BtnGrande", func() -> void:
@@ -178,6 +184,8 @@ func _soldi(res: Dictionary) -> Control:
 	carta.add_child(v)
 	v.add_child(_voce("Incasso partita", "+" + D.fmt_money(float(res.get("income", 0))), T.GOOD, false))
 	v.add_child(_voce("Stipendi", "−" + D.fmt_money(float(res.get("wages", 0))), T.BAD, true))
+	if int(res.get("derby", 0)) > 0:
+		v.add_child(_voce("Premio del derby", "+" + D.fmt_money(float(res.derby)), T.GOOD, true))
 	v.add_child(_voce("Cassa", D.fmt_money(float(s.get("money", 0))), T.TXT, true))
 	var grown: Array = res.get("grown", [])
 	if not grown.is_empty():
@@ -204,3 +212,33 @@ func _voce(nome: String, val: String, col: Color, riga_sopra: bool) -> Control:
 	h.add_child(U.testo(val, 16, col, T.PESO_NERO))
 	box.add_child(h)
 	return box
+
+
+## crescita del campione ("Tiro +1"), derby, infortuni e cambi della CPU (Carriera.dopoPartita); null se niente
+func _novita(res: Dictionary) -> Control:
+	var righe: Array = []
+	var cr: Variant = res.get("crescita")
+	if cr is Dictionary:
+		var su: Array = []
+		for r: Dictionary in cr.get("righe", []):
+			if int(r.su) > 0:
+				su.append("[color=#4aeb9f][b]%s[/b][/color]" % U.esc(Crescita.testo(r)))
+			elif float(r.parte) >= 0.05:
+				su.append(U.esc(Crescita.testo(r)))
+		if not su.is_empty():
+			righe.append("[b]%s cresce:[/b] %s" % [U.esc(str(cr.nome)), " · ".join(su)])
+	if res.has("derby"):
+		righe.append("[color=#ffd93d][b]Derby vinto![/b][/color] Premio in più dalla società." if int(res.derby) > 0 else "Derby perso o pareggiato: niente premio in più.")
+	for inf: Dictionary in res.get("infortuni", []):
+		var g := int(inf.giornate)
+		righe.append("[color=#ff7079][b]Infortunio:[/b][/color] %s si è fatto male: fuori %d %s." % [U.esc(str(inf.name)), g, "giornata" if g == 1 else "giornate"])
+	for c: Dictionary in res.get("cambi", []):
+		righe.append("In formazione %s al posto di %s." % [U.esc(str(c.dentro)), U.esc(str(c.fuori))])
+	if righe.is_empty():
+		return null
+	var carta := U.pannello("Carta")
+	var v := U.vbox(8)
+	carta.add_child(v)
+	for t: String in righe:
+		v.add_child(U.bb(t, 13.5, Color("#d7e1f3")))
+	return carta

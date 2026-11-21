@@ -2,9 +2,12 @@
 #   --stagione-bot            gioca col dito finto tutte le partite di campionato fino alla fine della stagione
 #                             (da usare con --app --bot --veloce=K --tempo=SEC), poi salva, ricarica il file e
 #                             controlla che la carriera ricaricata sia identica; stampa il riassunto ed esce
-#                             (codice 0 se tutto bene, 1 se no). Senza carriera ne crea una (seme fisso 4242).
+#                             (codice 0 se tutto bene, 1 se no). Senza carriera ne crea una (seme fisso 4242, col
+#                             campione "Bot Campione"). Stampa anche derby, crescita del campione, infortuni e
+#                             obiettivo della dirigenza.
 #   --app-schermate=CARTELLA  schermate 390×844 del giro menu → impostazioni → editor (taglio afro e chignon) →
-#                             partita → fine partita → dopo partita → menu
+#                             partita → fine partita → dopo partita → menu → classifica → rosa (con un infortunato
+#                             e un giocatore stanco) → fine stagione (con l'obiettivo della dirigenza)
 #                             (da usare con --app --bot --veloce=K --tempo=SEC, finestra vera, non --headless)
 #   --prova-uscite            "Esci" dalla pausa: in campionato sconfitta 0-3 registrata, in amichevole niente
 #                             cambia e si torna al menu; stampa i controlli ed esce (codice 0 se tutti veri)
@@ -38,7 +41,8 @@ func _nuova_carriera_se_manca() -> bool:
 	if _app.carriera.s != null:
 		return false
 	_app.carriera.create("FC Prova Bot", 1, 4242)
-	print("prove: carriera nuova (seme 4242)")
+	_app.carriera.addChampion({"name": "Bot Campione", "pos": "A", "look": {}, "num": 10})
+	print("prove: carriera nuova (seme 4242), obiettivo %s, rivale %s" % [_app.carriera.obiettivo().get("tipo", "?"), _app.carriera.s.get("rivale", "?")])
 	return true
 
 
@@ -54,11 +58,30 @@ func _stagione(nome: String) -> void:
 		print("giornata %d: %d-%d (%s) · soldi %s · %d s" % [c.s.day if c.s.day > 0 else 18, e.gol_a, e.gol_b,
 			"abbandonata" if e.abbandonata else "%d tiri" % int(e.statistiche.shots[0]), CarrieraScript.fmtMoney(c.s.money),
 			(Time.get_ticks_msec() - _t0) / 1000])
+		_novita_giornata(u.res)
 		if u.res.has("season"):
 			_fine_stagione(u.res.season)
 			return
 	await get_tree().create_timer(0.2).timeout
 	_app.gioca_campionato()
+
+
+# derby, crescita del campione, infortuni e cambi della giornata (Carriera.dopoPartita)
+func _novita_giornata(res: Dictionary) -> void:
+	var parti: Array = []
+	if res.has("derby"):
+		parti.append("DERBY (premio %s)" % CarrieraScript.fmtMoney(res.derby))
+	var cr: Variant = res.get("crescita")
+	if cr is Dictionary:
+		parti.append("campione: " + ", ".join(cr.righe.map(func(r: Dictionary) -> String: return CarrieraScript.Crescita.testo(r))))
+	for x: Dictionary in res.get("infortuni", []):
+		parti.append("infortunio %s (%d)" % [x.name, x.giornate])
+	for x: Dictionary in res.get("cambi", []):
+		parti.append("cambio %s per %s" % [x.dentro, x.fuori])
+	if res.has("obiettivo"):
+		parti.append("obiettivo %s: %s %s" % [res.obiettivo.tipo, "raggiunto" if res.obiettivo.riuscito else "mancato", CarrieraScript.fmtMoney(res.obiettivo.soldi)])
+	if not parti.is_empty():
+		print("   " + " · ".join(parti))
 
 
 func _fine_stagione(st: Dictionary) -> void:
@@ -134,7 +157,44 @@ func _giro_schermate() -> void:
 	_app.vai(_app.PRINCIPALE)
 	await _attendi(ATTESA_MENU)
 	await _scatto(dir, "menu_dopo")
+	await _giro_fase_b(dir)
 	get_tree().quit(0)
+
+
+# schermate della fase B: obiettivo e rivale in classifica, infortunato e stanco nella Rosa, fine stagione col
+# giudizio della dirigenza (dati finti: lo stato della carriera torna com'era)
+func _giro_fase_b(dir: String) -> void:
+	var c: CarrieraScript = _app.carriera
+	var rivale: Variant = c.s.rivale
+	var nm: Variant = c.nextMatch()
+	if nm != null:
+		c.s.rivale = nm.opp.id # prossima partita = derby, per vedere la scritta
+	_app.vai("hub")
+	await _attendi(ATTESA_MENU)
+	await _scatto(dir, "hub")
+	c.s.rivale = rivale
+	_app.vai("classifica")
+	await _attendi(ATTESA_MENU)
+	await _scatto(dir, "classifica")
+	var inf: Dictionary = c.s.infortuni.duplicate()
+	var forma: Dictionary = c.s.forma.duplicate()
+	var lineup: Array = c.s.lineup.duplicate()
+	c.s.infortuni[str(c.s.lineup[9])] = 2
+	c.s.forma[str(c.s.lineup[5])] = 45
+	_app.vai("rosa")
+	await _attendi(ATTESA_MENU)
+	await _scatto(dir, "rosa")
+	_app.vai("rosa", {"sel": c.s.lineup[9]})
+	await _attendi(ATTESA_MENU)
+	await _scatto(dir, "rosa_infortunato")
+	c.s.infortuni = inf
+	c.s.forma = forma
+	c.s.lineup = lineup
+	var ob := c.obiettivo()
+	_app.vai("fine_stagione", {"pos": 2, "prize": 756, "bonus": 210, "outcome": "up", "div": 2, "newDiv": 1,
+		"obiettivo": CarrieraScript.Dirigenza.valuta(ob, 2, 70, 500)})
+	await _attendi(ATTESA_MENU)
+	await _scatto(dir, "fine_stagione")
 
 
 # Impostazioni (con controllo dell'audio spento / acceso) e editor dell'aspetto con un taglio vistoso, da vicino

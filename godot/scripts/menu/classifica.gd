@@ -1,7 +1,10 @@
 # Classifica (table() di src/ui.js): una scheda per divisione, righe con posto, stemma, nome, G V N P DR PT;
 # la mia squadra in giallo, a sinistra verde chi sale (o vince il titolo) e rosso chi scende; legenda sotto.
+# Nella mia divisione: linea gialla tratteggiata sotto il posto dell'obiettivo della dirigenza e la rivale
+# segnata con "RIV" rosso.
 extends MenuSchermata
 
+const Dirigenza := preload("res://scripts/carriera/dirigenza.gd")
 const COLONNE := ["G", "V", "N", "P", "DR", "PT"]
 const LARGHEZZA_NUM := 20.0
 
@@ -28,15 +31,23 @@ func costruisci() -> void:
 	var tab := U.vbox(5)
 	tab.add_child(_riga_titoli())
 	var righe: Array = c.table(d)
+	var ob: Dictionary = c.obiettivo() if d == c.div() else {}
+	var posto_ob := int(ob.get("posto", 0))
 	for i in righe.size():
 		tab.add_child(_riga(righe[i], i, d))
+		if i + 1 == posto_ob and i < righe.size() - 1:
+			tab.add_child(_linea_obiettivo())
 	corpo.add_child(tab)
 
 	var leg := U.hbox(14)
 	leg.add_child(_voce(T.GOOD, "Promozione" if d > 0 else "Titolo"))
 	if d < 2:
 		leg.add_child(_voce(T.BAD, "Retrocessione"))
+	if posto_ob > 0:
+		leg.add_child(_voce(T.GOLD, "Obiettivo"))
 	corpo.add_child(leg)
+	if posto_ob > 0:
+		corpo.add_child(U.paragrafo("Obiettivo della dirigenza: %s." % Dirigenza.testo(ob), 13.5))
 	var nota := ("Le prime due salgono di divisione. " if d > 0 else "La prima vince il titolo. ") + ("Le ultime due retrocedono." if d < 2 else "")
 	corpo.add_child(U.paragrafo(nota, 13.5))
 
@@ -79,6 +90,11 @@ func _riga(r: Dictionary, i: int, d: int) -> Control:
 	var k := D.kit(tm.get("kit", 0))
 	nome.add_child(MenuStemma.nuovo(c.teamCrest(tm), int(k[1]), int(k[2]), Vector2(22, 26)))
 	nome.add_child(U.corto(str(tm.name), 14, testo_col, T.PESO_NERO if me else T.PESO_MEDIO))
+	if c.isDerby(tm):
+		var riv := U.pannello_stile(T.stile(Color("#ff4d5e"), 5, Color(0, 0, 0, 0), 0, Vector4(4, 1, 4, 1)))
+		riv.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		riv.add_child(U.testo("RIV", 9.5, Color.WHITE, T.PESO_NERO))
+		nome.add_child(riv)
 	h.add_child(nome)
 	var dr: int = int(r.gf) - int(r.ga)
 	var vals := [r.p, r.w, r.d, r.l, ("+%d" % dr) if dr > 0 else str(dr), r.pts]
@@ -104,3 +120,12 @@ func _voce(col: Color, t: String) -> Control:
 	h.add_child(q)
 	h.add_child(U.testo(t, 12.5, T.DIM, T.PESO_MEDIO))
 	return h
+
+
+# linea gialla tratteggiata tra il posto dell'obiettivo e quello dopo
+func _linea_obiettivo() -> Control:
+	var l := Control.new()
+	l.custom_minimum_size.y = 4
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	l.draw.connect(func() -> void: l.draw_dashed_line(Vector2(4, 2), Vector2(l.size.x - 4, 2), T.GOLD, 2.0, 7.0))
+	return l

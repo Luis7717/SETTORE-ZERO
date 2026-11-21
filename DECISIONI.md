@@ -1060,3 +1060,47 @@ Clip vere del "Free mocap pack 05: Soccer" di Anderson Rohr nella versione Godot
   nello stesso fotogramma (es. `vai` e subito `mostra`). Ora salta i nodi già liberati.
 - Prove: `--app-schermate` passa anche da Impostazioni (con il controllo audio spento/acceso sul bus) ed editor
   dell'aspetto con taglio afro (Capelli, da vicino) e chignon (Scarpe, corpo intero).
+
+## 2026-11-21 — Godot fase B: carriera
+Punti 6-9 del piano, solo nella versione Godot (dettagli in `godot/README.md`, "Carriera, fase B").
+- **Dove**: la carriera Godot resta il porting di `career.js` (confrontato col JS dai test); le novità stanno in tre
+  file nuovi (`crescita.gd`, `dirigenza.gd`, `forma.gd`), in chiavi nuove dello stato (`CHIAVI_GODOT`) e in due
+  funzioni chiamate da `App`: `squadraPartita()` prima della partita, `dopoPartita(res, esito)` dopo `finishMatch`.
+  Così `finishMatch`/`endSeason` restano uguali al web (in fondo a `endSeason` c'è solo `novita()`, che sceglie
+  obiettivo e rivale nuovi senza numeri casuali e senza toccare le chiavi del web). I numeri casuali delle novità (infortuni) vengono da un seme
+  loro (`semeB` + stagione + giornata), non da `s.seed`: la carriera "come il web" non cambia.
+  `carriera.gd` supera le 800 righe (1090): è il porting 1:1 di `career.js` più la sezione fase B; tenuto insieme
+  apposta perché le funzioni nuove usano lo stato e i metodi del porting.
+- **6. Campione** (`champ: true`, quello dell'editor iniziale): conteggi per giocatore presi dagli eventi del
+  motore nella scena della partita (`conta_giocatori.gd`, il motore non cambia). Progresso per ogni volta: gol 0,25
+  e tiro in porta 0,08 e tiro 0,03 → Tiro; dribbling riuscito 0,1 → Dribbling; Scatto 0,08 → Velocità (+0,03
+  Dribbling); passaggio riuscito 0,025 e assist 0,15 → Passaggio; contrasto 0,08 e intercetto 0,06 → Difesa;
+  contrasto aereo vinto 0,08 → Colpo di testa (+0,04 Fisico); parata 0,08 → Parate; km corsi 0,04 Velocità e 0,06
+  Fisico. Al massimo +0,5 per statistica a partita, poi per l'età (fino a 23 anni ×1, 27 ×0,85, 30 ×0,55, 33 ×0,25,
+  oltre ×0,1; il calo dei vecchi resta quello di fine stagione del porting). Il progresso si accumula e a 1 la
+  statistica sale di 1 (massimo 99). Solo in campionato. Dopo partita: "Tiro +1" in verde, "Dribbling +0,3" in
+  chiaro. Con la stagione del bot (40 s a tempo, quasi niente tiri) il campione ha fatto +1 Velocità in 18 partite:
+  giocando davvero dovrebbe salire di più (gol e dribbling pesano molto): resta da provare sull'iPhone.
+- **7. Obiettivo**: dal posto della mia forza tra le 10 della divisione. Prima Divisione: 1° = titolo, 2°-5° =
+  metà classifica (primi 5), altrimenti salvezza (non negli ultimi 2). Seconda e Terza: 1°-2° = promozione (primi 2),
+  3°-6° = metà classifica, altrimenti salvezza. Fine stagione: raggiunto = premio ×6 / ×5 / ×3 / ×2 l'incasso della
+  divisione (300/140/70 k€), mancato = −1,5 × l'incasso, senza mai portare la cassa sotto zero. Messaggio nella
+  schermata di fine stagione, obiettivo nell'hub e linea in classifica.
+- **8. Rivale**: la squadra della mia divisione con la forza più vicina (a pari distanza la più forte), scelta alla
+  creazione (o al primo caricamento di un salvataggio vecchio) e tenuta finché resta nella mia divisione; dopo una
+  promozione o retrocessione se ne sceglie una nuova. Derby: titolo "Derby · Giornata …", scritta "DERBY!", premio
+  +0,5 × l'incasso della divisione se si vince; pubblico ×1,3 e cori più spessi (cori nuovi anche nelle partite
+  normali, rari: il pubblico sale per 3,5 s ogni 28-45 s).
+- **9. Forma**: chi gioca perde 14 − 0,05 × fisico (fisico 60 → −11), tutti recuperano 6 a giornata, chi non gioca
+  altri 14; a inizio stagione tutti a 100 e guariti. Sotto 80 si parte stanchi: energia iniziale da 1 (forma 80) a 0,6
+  (forma 0). Infortunio: per chi ha giocato 0,8% a partita in piena forma, fino a +4,5% sotto forma 70; durata 1-2
+  giornate (70%), 3-4 (25%), 5-8 (5%). Nella stagione del bot (11 titolari sempre uguali): 4 infortuni.
+  Gli infortunati non giocano: `schieraSani()` (anche in `autoLineup`/`fixLineup`, quindi "Migliori 11") mette il
+  miglior sostituto sano; uno scambio che lo farebbe entrare è rifiutato (Rosa: avviso).
+- **Motore**: energia iniziale facoltativa `energy0` del giocatore sorgente (`startEnergy`), in `src/sim/match.js` e
+  `godot/sim/match.gd`, anche per chi entra dalla panchina. Senza il campo niente cambia: tracce 0-6 e golden
+  identiche (`node test/export-trace.mjs` le riscrive uguali); traccia nuova `trace_7.json` con quattro giocatori
+  stanchi, uguale al JS bit per bit.
+- **Salvataggio**: stessa versione 1; chiavi nuove riempite al caricamento (`novita()`), salvataggi vecchi senza
+  di esse si caricano (test).
+

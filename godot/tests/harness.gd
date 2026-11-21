@@ -95,13 +95,17 @@ class Bot:
 
 
 # Gioca una partita intera a passi di 1/60 s (playMatch in harness.mjs).
-# opt: seed, my, op, mode ('bot' = umano simulato contro IA, 'ai' = IA contro IA), halfLen, fA, fB, maxSteps.
+# opt: seed, my, op, mode ('bot' = umano simulato contro IA, 'ai' = IA contro IA), halfLen, fA, fB, maxSteps,
+# tired ([[squadra, indice, energia iniziale], ...], facoltativo).
 # onStep(m) viene chiamato a ogni passo prima che gli eventi vengano svuotati. Ritorna {m, steps}.
 static func playMatch(opt: Dictionary, onStep: Callable = Callable()) -> Dictionary:
 	var sd: int = opt.get("seed", 1)
 	var mode: String = opt.get("mode", "bot")
-	var m := newMatch(sd, opt.get("halfLen", 150.0), [true, false] if mode == "bot" else [false, false],
-		mkTeam("A", opt.get("my", 60.0), sd * 7 + 1, opt.get("fA", "4-4-2")), mkTeam("B", opt.get("op", 60.0), sd * 13 + 5, opt.get("fB", "4-4-2")))
+	var ta := mkTeam("A", opt.get("my", 60.0), sd * 7 + 1, opt.get("fA", "4-4-2"))
+	var tb := mkTeam("B", opt.get("op", 60.0), sd * 13 + 5, opt.get("fB", "4-4-2"))
+	for t: Array in opt.get("tired", []): # [squadra, indice, energia iniziale]: giocatori che partono stanchi
+		([ta, tb][int(t[0])].players[int(t[1])] as Dictionary)["energy0"] = float(t[2])
+	var m := newMatch(sd, opt.get("halfLen", 150.0), [true, false] if mode == "bot" else [false, false], ta, tb)
 	var bot: Bot = Bot.new(sd + 9) if mode == "bot" else null
 	var maxSteps: int = opt.get("maxSteps", 60 * 60 * 30)
 	var steps := 0

@@ -3,6 +3,7 @@
 # 11 titolari ai posti della formazione e la panchina che scorre di lato.
 # Tocchi (MenuRosa.pick_card): uno sceglie, un secondo giocatore scambiabile apre il confronto, toccarlo ancora
 # (o "Scambia") li scambia; i badge verdi/rossi dicono quanto cambia la squadra con lo scambio.
+# Forma e infortuni (solo Godot): carte con croce rossa e barretta della forma; un infortunato non entra in campo.
 extends MenuSchermata
 
 const Rosa := preload("res://scripts/menu/rosa_logica.gd")
@@ -122,6 +123,7 @@ func _carta(p: Dictionary, slot_pos: String, sp: Variant, F: Array) -> MenuCarta
 	var carta := Carta.new()
 	carta.imposta(p, slot_pos, MenuFaccia.svg_tondo(D.look_of(p), _colori[0], _colori[1], MenuFaccia.fondo_di(_k1)), _delta(p, sp, F))
 	carta.segna(sel == p.id, tgt == p.id, just is Array and (just as Array).has(p.id))
+	carta.fisico(carriera().forma_di(p.id), carriera().infortunio(p.id))
 	carta.toccata.connect(_tocca)
 	return carta
 
@@ -206,6 +208,10 @@ func _tocca(id: Variant) -> void:
 	var c := carriera()
 	var s := stato()
 	var nuovo := Rosa.pick_card({"sel": sel, "tgt": tgt}, s.lineup, id, func(x: Variant) -> bool: return c.player(x) != null)
+	if nuovo.swap != null and c.entraInfortunato(nuovo.swap[0], nuovo.swap[1]):
+		var chi: Variant = nuovo.swap[1] if s.lineup.has(nuovo.swap[0]) else nuovo.swap[0]
+		toast("%s è infortunato: non può giocare (ancora %d)" % [c.player(chi).name, c.infortunio(chi)])
+		nuovo = {"sel": null, "tgt": null, "just": null, "swap": null}
 	if nuovo.swap != null:
 		c.swap(nuovo.swap[0], nuovo.swap[1])
 	sel = nuovo.sel
@@ -301,6 +307,10 @@ func _pannello_giocatore(p: Dictionary, F: Array) -> Control:
 	nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	nm.add_child(U.corto(str(p.name), 16, T.TXT, T.PESO_NERO))
 	var info := D.pos_name(p.pos)
+	if c.infortunio(p.id) > 0:
+		info += " · INFORTUNATO (%d)" % c.infortunio(p.id)
+	elif c.forma_di(p.id) < 100:
+		info += " · forma %d" % c.forma_di(p.id)
 	if at.where != D.pos_name(p.pos):
 		info += " · in campo %s" % at.where
 	info += " · %d anni · %s" % [int(p.age), D.fmt_money(D.value(p))]
