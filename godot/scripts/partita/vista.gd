@@ -735,6 +735,8 @@ func _applica_qualita(l: int) -> void:
 	_effetti.set_quantita(1.0 if l >= Qualita.MEDIO else (0.5 if l == Qualita.BASSO else 0.25))
 	_effetti.scia_on = l >= Qualita.BASSO
 	_effetti.sbuffi_on = l >= Qualita.BASSO
+	if _campo.has_method("set_ciuffi_3d"):
+		_campo.set_ciuffi_3d(l >= Qualita.ALTO)   # ciuffi in rilievo (i più cari: via al primo calo)
 
 
 # bagliore leggero: solo le cose più luminose del bianco (led, lampade, maxischermo, riflessi forti)

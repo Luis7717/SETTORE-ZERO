@@ -46,7 +46,7 @@ ingrandita a 1024×1024 da `tools/genera_icona.gd`. È un po' morbida: un'icona 
 | File | Origine | Licenza |
 |------|---------|---------|
 | textures/pallone.png, textures/pallone_n.png | disegno originale del progetto, generato da `tools/genera_texture.gd` (32 spicchi su un icosaedro troncato, cuciture in rilievo) | CC0 1.0 |
-| textures/erba_n.png | disegno originale del progetto, generato da `tools/genera_texture.gd` (fili d'erba casuali con seme fisso, rumore di Godot) | CC0 1.0 |
+| textures/erba_fili.png | disegno originale del progetto, generato da `tools/genera_texture.gd` (fili d'erba casuali con seme fisso, rumore di Godot: normale e altezza) | CC0 1.0 |
 
 Nessuna texture scaricata: tutte si rigenerano con `$G --headless --path godot -s res://tools/genera_texture.gd`.
 
