@@ -141,6 +141,8 @@ class Ball:
 	var prev: Player = null
 	var kick: Kick = null
 	var shot: Shot = null
+	var dbl: Player = null # ha battuto il calcio da fermo e non può ritoccare il pallone finché non lo tocca un altro
+	var dblT: float = 0.0  # ... tempo di pallone libero da allora (sicurezza DBL_FREE)
 
 	# copia della sola parte fisica (per le previsioni del volo: { x, y, h, vx, vy, vh, cax, cay, ct } in JS)
 	func physCopy() -> Ball:
@@ -185,6 +187,8 @@ class Duel:
 	var p: Player = null
 	var o: Player = null
 	var t: float = 0.0
+	var side: float = 0.0 # dribbling prenotato: 0 = no, ±1 = lato scelto (+1 = sinistra del portatore)
+	var bt: float = 0.0   # ... tempo di partita dal tocco del tasto
 
 
 class Restart:

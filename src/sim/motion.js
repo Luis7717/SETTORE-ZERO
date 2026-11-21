@@ -163,7 +163,7 @@ export class MotionMethods {
     const b = this.ball, dp = hyp(p.x - b.x, p.y - b.y);
     let o = null, dO = 0.95;
     for (const q of this.players) {
-      if (q.team === p.team || q.off || q.state !== 'play' || q.stun > 0 || (b.noP === q && b.noT > 0) || q.pos === 'P') continue;
+      if (q.team === p.team || q.off || q.state !== 'play' || q.stun > 0 || (b.noP === q && b.noT > 0) || this.dblBan(q) || q.pos === 'P') continue;
       const d = hyp(q.x - b.x, q.y - b.y);
       if (d < dO && (this.airPlay(q) || b.h < 1.7)) { dO = d; o = q; }
     }
@@ -187,7 +187,7 @@ export class MotionMethods {
           b.prev = b.last; b.last = p; b.kick = null; b.noP = c; b.noT = 0.5; this.predT = 0;
           this.ev('tackle', { p, on: c, slide: true });
         } else if (dc < 0.6) { p.hit = true; this.foul(p, c); return; }
-      } else if (!b.owner && db < 0.95 && b.h < 0.7 && !(b.noP === p && b.noT > 0)) {
+      } else if (!b.owner && db < 0.95 && b.h < 0.7 && !(b.noP === p && b.noT > 0) && !this.dblBan(p)) {
         p.hit = true; b.vx = p.sdx * 9; b.vy = p.sdy * 9; b.vh = 1.5; b.ct = 0;
         if (b.last !== p) { b.prev = b.last; b.last = p; } b.kick = null; b.shot = null; b.noP = p; b.noT = 0.3; this.predT = 0;
         this.ev('tackle', { p, slide: true });
@@ -204,7 +204,7 @@ export class MotionMethods {
     const bt = Math.abs(d.hx - d.x0) > 0.75 ? d.hx - d.dirx * 0.75 : d.x0;
     p.x += clamp(bt - p.x, -vs * dt, vs * dt);
     p.t += dt;
-    if (this.phase === 'play' && !b.owner && !(b.noP === p && b.noT > 0) && Math.abs(b.y - p.y) < 0.9 + Math.abs(b.vy) * dt) {
+    if (this.phase === 'play' && !b.owner && !(b.noP === p && b.noT > 0) && !this.dblBan(p) && Math.abs(b.y - p.y) < 0.9 + Math.abs(b.vy) * dt) {
       const prog = clamp(p.t / 0.4, 0, 1);
       const [dd] = segInfo(b.x, b.h, d.x0, 1.0 - prog * 0.3, d.hx, d.hh);
       if (dd < 0.72 + p.st.por * 0.002) this.save(p, Math.abs(b.x - d.x0) < 1.3);
@@ -310,7 +310,7 @@ export class MotionMethods {
     if (b.kick) b.kick.age += dt;
     let best = null, bd = 9, bestAir = null;
     for (const p of this.players) {
-      if (p.off || p.state !== 'play' || p.stun > 0 || (b.noP === p && b.noT > 0)) continue;
+      if (p.off || p.state !== 'play' || p.stun > 0 || (b.noP === p && b.noT > 0) || this.dblBan(p)) continue;
       const gk = p.pos === 'P' && this.inOwnBox(p);
       const d = hyp(p.x - b.x, p.y - b.y);
       // palla appena calciata che si allontana: non si può toccare

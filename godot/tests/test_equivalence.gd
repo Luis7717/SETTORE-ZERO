@@ -259,3 +259,105 @@ func test_scatto_come_js() -> bool:
 		m.dispose()
 	note("%d scene di fuga (%d con lo Scatto) identiche al JS per %d passi" % [ref.scenes.size(), scatti, nSteps])
 	return done()
+
+
+# Dribbling prenotato (userDribble → dribBookStep → dribble col lato scelto): le partite col bot non lo usano, quindi ha
+# scene sue (fixtures/dribble.json: difensore lontano, vicino, di lato, vicino alla linea laterale, un altro avversario,
+# squadra 1): stesso esito del tocco, stessi eventi col lato e stessa impronta dello stato a ogni passo
+func test_dribbling_prenotato_come_js() -> bool:
+	var ref: Variant = readJson("dribble.json")
+	if not check(ref != null, "manca fixtures/dribble.json"):
+		return done()
+	var nSteps: int = int(C.round_(float(ref.sec) * 60.0))
+	for r: Dictionary in ref.scenes:
+		var sc: Dictionary = r.scene
+		var tag := "scena %d" % int(sc.seed)
+		var tm := int(sc.team)
+		var dir := -1.0 if tm == 1 else 1.0
+		var m := H.scene(int(sc.seed), [false, true] if tm == 1 else [true, false])
+		var p: R.Player = m.players[tm * 11 + 9]
+		var o: R.Player = m.players[(1 - tm) * 11 + 3]
+		H.wake(p, float(sc.px), 0.0)
+		p.fx = 0
+		p.fy = dir
+		p.st.dri = float(sc.get("dri", 80))
+		H.give(m, p)
+		m.updateCtrl(tm)
+		H.wake(o, float(sc.px) + float(sc.ox), float(sc.d) * dir)
+		o.fx = 0
+		o.fy = -dir
+		o.vy = -float(sc.ovy) * dir
+		o.st.dif = float(sc.get("dif", 50))
+		if sc.has("extra"):
+			H.wake(m.players[(1 - tm) * 11 + 5], float(sc.px) + float(sc.extra[0]), float(sc.extra[1]) * dir)
+		m.userMove(tm, p.x, p.y, true)
+		m.step(DT)
+		m.events.clear()
+		eq(m.duelFor(tm), r.duel, tag + ": duello")
+		eq(m.userDribble(tm), r.tapped, tag + ": tasto")
+		eq(m.dribBooked(tm), r.booked, tag + ": prenotato")
+		eq(str(m.events.map(func(x: Dictionary) -> Array: return [x.type, int(x.get("side", 0))])),
+			str((r.tapEvents as Array).map(func(a: Array) -> Array: return [a[0], int(a[1])])), tag + ": eventi del tocco")
+		m.events.clear()
+		var hashes: String = r.hashes
+		var firstDiff := -1
+		var evs: Array = []
+		for n in nSteps:
+			m.step(DT)
+			if firstDiff < 0 and "%08x" % stepHash(m) != hashes.substr(n * 8, 8):
+				firstDiff = n
+			for x: Dictionary in m.events:
+				var xp: Variant = x.get("p")
+				evs.append([n, x.type, (xp.team * 11 + xp.i) if xp != null else -1, int(x.get("side", 0))])
+			m.events.clear()
+		eq(firstDiff, -1, tag + ": stato diverso dal JS dal passo")
+		eq(str(evs), str((r.events as Array).map(func(a: Array) -> Array: return [int(a[0]), a[1], int(a[2]), int(a[3])])), tag + ": eventi")
+		m.dispose()
+	note("%d scene di dribbling prenotato identiche al JS per %d passi" % [ref.scenes.size(), nSteps])
+	return done()
+
+
+# Niente doppio tocco sui calci da fermo (b.dbl, dblBan): fixtures/restart.json, calci battuti corti col battitore che
+# insegue il pallone (anche oltre DBL_FREE) o a campo pieno con l'IA: stessa impronta dello stato e stessi eventi
+func test_calci_da_fermo_come_js() -> bool:
+	var ref: Variant = readJson("restart.json")
+	if not check(ref != null, "manca fixtures/restart.json"):
+		return done()
+	var nSteps: int = int(C.round_(float(ref.sec) * 60.0))
+	for r: Dictionary in ref.scenes:
+		var sc: Dictionary = r.scene
+		var tag := "scena %d (%s)" % [int(sc.seed), sc.type]
+		var solo: bool = sc.solo
+		var m := H.scene(int(sc.seed), [true, false] if solo else [false, false])
+		m.setRestart(sc.type, int(sc.team), float(sc.x), float(sc.y))
+		var p: R.Player = m.restart.taker
+		var b := m.ball
+		if solo:
+			for k in m.players.size():
+				if m.players[k] != p:
+					H.park(m.players[k], k)
+		m.restart.t = 1.0
+		m.kick(p, {"type": "ground", "tx": b.x + float(sc.dx), "ty": b.y + float(sc.dy)})
+		eq(p.team * 11 + p.i, int(r.taker), tag + ": battitore")
+		eq(b.dbl == p, r.dbl, tag + ": battitore segnato")
+		m.events.clear()
+		var hashes: String = r.hashes
+		var firstDiff := -1
+		var evs: Array = []
+		for n in nSteps:
+			if solo:
+				m.ctrl[0] = p
+				m.switchCd[0] = 9.0
+				m.userMove(0, b.x, b.y, true)
+			m.step(DT)
+			if firstDiff < 0 and "%08x" % stepHash(m) != hashes.substr(n * 8, 8):
+				firstDiff = n
+			for x: Dictionary in m.events:
+				var xp: Variant = x.get("p")
+				evs.append([n, x.type, x.get("kind", ""), (xp.team * 11 + xp.i) if xp != null else -1])
+			m.events.clear()
+		eq(firstDiff, -1, tag + ": stato diverso dal JS dal passo")
+		eq(str(evs), str((r.events as Array).map(func(a: Array) -> Array: return [int(a[0]), a[1], a[2], int(a[3])])), tag + ": eventi")
+		m.dispose()
+	note("%d scene di calci da fermo identiche al JS per %d passi" % [ref.scenes.size(), nSteps])
+	return done()

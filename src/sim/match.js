@@ -14,6 +14,8 @@ const WALL_DIST = 9.15; // distanza della barriera dal pallone (m)
 const WALL_GAP = 0.75; // spazio tra i giocatori in barriera (m)
 const ADV_FREE = 3; // vantaggio solo se nessun altro avversario è più vicino di così al portatore (m)
 const ADV_MIN_Y = -5; // ... e solo da qui in avanti (m nel verso d'attacco, 0 = metà campo)
+// Calci da fermo (Luis 2026-11-21): chi batte non può toccare il pallone una seconda volta finché non l'ha toccato un altro.
+const DBL_FREE = 6;      // sicurezza: dopo tanto tempo di pallone libero senza che nessun altro lo tocchi, il battitore può riprenderlo (s)
 const SPEED_TIRED = 0.86; // a energia 0 la velocità massima scende a questa frazione (l'energia cala più piano con più fisico = resistenza)
 const PATH_STEP = 1.2;   // distanza minima tra due punti della strada disegnata (m)
 const PATH_REACH = 1.3;  // punto raggiunto quando il portatore è più vicino di così (m)
@@ -55,7 +57,7 @@ export class Match {
       if (tm.skill === undefined) tm.skill = 0.5;
       for (let i = 0; i < 11; i++) this.players.push(this.mk(t, i, tm.players[i], F[i]));
     }
-    this.ball = { x: 0, y: 0, h: 0, vx: 0, vy: 0, vh: 0, cax: 0, cay: 0, ct: 0, owner: null, noP: null, noT: 0, last: null, prev: null, kick: null, shot: null };
+    this.ball = { x: 0, y: 0, h: 0, vx: 0, vy: 0, vh: 0, cax: 0, cay: 0, ct: 0, owner: null, noP: null, noT: 0, last: null, prev: null, kick: null, shot: null, dbl: null, dblT: 0 };
     this.score = [0, 0]; this.half = 1; this.t = 0; this.time = 0; this.phase = 'play'; this.events = [];
     this.stats = { shots: [0, 0], onT: [0, 0], poss: [0, 0], fouls: [0, 0], corners: [0, 0], saves: [0, 0], headers: [0, 0], volleys: [0, 0] };
     this.ctrl = [null, null]; this.move = [null, null]; this.switchCd = [0, 0]; this.runs = [[], []];
@@ -90,6 +92,8 @@ export class Match {
   // velocità massima: cresce con `vel` e cala con la stanchezza (p.energy 1 → 0,2 durante la partita, più piano con più `fis`)
   vmax(p) { return (5.0 + p.st.vel * 0.036) * (SPEED_TIRED + (1 - SPEED_TIRED) * p.energy); }
   ev(type, d) { this.events.push(Object.assign({ type }, d)); }
+  // p ha battuto il calcio da fermo e nessun altro ha ancora toccato il pallone: non può toccarlo (niente doppio tocco)
+  dblBan(p) { const b = this.ball; return b.dbl === p && b.last === p; }
 
   nearOpp(x, y, team) {
     let m = 99;
@@ -157,7 +161,7 @@ export class Match {
 
   setRestart(type, team, x, y, taker) {
     const b = this.ball, dir = team ? -1 : 1, own = -dir * HL, opp = 1 - team;
-    b.owner = null; b.vx = b.vy = b.vh = 0; b.h = 0; b.kick = null; b.shot = null; b.ct = 0; b.noT = 0;
+    b.owner = null; b.vx = b.vy = b.vh = 0; b.h = 0; b.kick = null; b.shot = null; b.ct = 0; b.noT = 0; b.dbl = null; b.dblT = 0;
     this.endDuel('gioco fermo'); this.endFlee('gioco fermo');
     this.phase = 'restart'; this.move = [null, null]; this.runs = [[], []]; this.lastPass = null; this.advantage = null;
     this.resetStates();
@@ -325,6 +329,8 @@ export class Match {
     b.noP = p; b.noT = 0.35;
     if (b.last !== p) { b.prev = b.last; b.last = p; }
     let exempt = false;
+    // calcio da fermo (il portiere che rilancia dalle mani no): il battitore non può ritoccare il pallone (dblBan)
+    b.dbl = this.phase === 'restart' && this.restart.type !== 'gk' ? p : null; b.dblT = 0;
     if (this.phase === 'restart') { exempt = ['throw', 'goalkick', 'corner'].includes(this.restart.type); this.phase = 'play'; this.restart = null; }
     const off = [];
     if (!exempt) {
@@ -376,6 +382,8 @@ export class Match {
       if (this.phase === 'play' && (Math.abs(b.x) > HW || Math.abs(b.y) > HL)) this.out(b.x, b.y, 0);
       return;
     }
+    // un altro ha toccato il pallone dopo il calcio da fermo: il battitore torna libero (anche dopo DBL_FREE s, per sicurezza)
+    if (b.dbl && (b.last !== b.dbl || (this.phase === 'play' && (b.dblT += dt) >= DBL_FREE))) b.dbl = null;
     const px = b.x, py = b.y, ph = b.h;
     ballPhys(b, dt);
     if (this.phase !== 'play') {
@@ -606,16 +614,20 @@ export class Match {
     if (!p || p.team !== T || p.off || p.pos === 'P' || (b.owner && b.owner.team === T) || this.phase !== 'play') return false;
     this.ctrl[T] = p; this.switchCd[T] = 2; this.move[T] = null; return true;
   }
-  // dribbling nel duello aperto per la squadra T (tasto in basso). Ritorna true se il tentativo è partito;
-  // l'esito arriva con l'evento 'dribble' { p, o, ok }.
+  // dribbling nel duello aperto per la squadra T (tasto in basso). Ritorna true se il dribbling è stato prenotato:
+  // il portatore corre verso il difensore dal lato scelto (evento 'dribble_book' { p, o, side }) e il dribbling vero
+  // parte quando gli arriva vicino (duel.js → dribBookStep); l'esito arriva con l'evento 'dribble' { p, o, ok, side }.
+  // Se intanto il duello finisce (palla persa, difensore lontano, passaggio) la prenotazione si annulla con lui.
   userDribble(T) {
     const d = this.duel;
-    if (!d || d.team !== T || this.phase !== 'play') return false;
+    if (!d || d.team !== T || this.phase !== 'play' || d.side) return false;
     const p = d.p;
     // niente attesa tra due tentativi (p.dribCd vale per l'IA): fra due duelli passa già DUEL_CD, e nel rallenty
     // l'attesa durava molti secondi veri col tasto in vista che non faceva nulla
     if (this.ball.owner !== p || p.stun > 0 || p.state !== 'play') return false;
-    this.dribble(p, d.o);
+    d.side = this.dribSide(p, d.o); d.bt = 0;
+    this.ev('dribble_book', { p, o: d.o, side: d.side });
+    this.dribBookStep(d, 0); // già vicino: parte subito
     return true;
   }
   // Scatto nella fuga aperta per la squadra T (avversario alla pari o dietro, tasto in basso). Ritorna true se è partito.

@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { Match, DUEL_R } from '../../src/sim.js';
 import { DRIB_BEAT_SPD } from '../../src/sim/duel.js';
 import { Tutorial, REPS } from '../../src/tutorial.js';
-import { scene, wake, give, run } from '../lib/scene.mjs';
+import { scene, wake, give, run, tapDribble } from '../lib/scene.mjs';
 import { mkTeam } from '../lib/harness.mjs';
 
 const DT = 1 / 60;
@@ -25,8 +25,7 @@ function dribbledAt(d) {
     const st = duelScene(500 + s, d);
     run(st.m, DT);
     if (!st.m.duelFor(0)) continue;
-    assert.equal(st.m.userDribble(0), true);
-    const e = st.m.events.find(x => x.type === 'dribble'); st.m.events.length = 0;
+    const e = tapDribble(st.m).find(x => x.type === 'dribble');
     if (e && e.ok) return st;
   }
   assert.fail('nessun dribbling riuscito in 30 prove');
@@ -85,9 +84,9 @@ const newTut = (seed) => {
   t.go();
   return { m, t };
 };
-// un fotogramma vero (1/60 s) col rallenty del duello come in main.js (G.ts verso 0,08)
+// un fotogramma vero (1/60 s) col rallenty del duello come in main.js (G.ts verso 0,08; tempo normale col dribbling prenotato)
 function frame(m, t, g) {
-  const target = m.duelFor(0) ? 0.08 : 1;
+  const target = m.duelFor(0) && !m.dribBooked(0) ? 0.08 : 1;
   g.ts += (target - g.ts) * Math.min(1, DT * 14);
   const sdt = DT * g.ts;
   t.before(); m.step(sdt); t.after(sdt); m.events.length = 0;

@@ -225,11 +225,13 @@ export class View {
 
   setZoom(z) { this.zoomT = z; }
 
-  // dribbling tentato da p: parte un giochetto, più bello se il dribbling di p è alto (solo grafica)
-  trick(p, r = Math.random()) {
+  // dribbling tentato da p: parte un giochetto, più bello se il dribbling di p è alto (solo grafica).
+  // side = lato scelto dal motore (evento 'dribble': +1 = sinistra del portatore, -1 = destra): il giochetto porta il
+  // pallone da quel lato (+1 col destro, -1 col sinistro, specchiato) e il portatore poi passa di lì; senza, a caso
+  trick(p, r = Math.random(), side = 0) {
     const T = chooseTrick(p.st ? p.st.dri : 50, r);
     this.tricks = this.tricks || new Map();
-    this.tricks.set(p.i, { id: T.id, name: T.name, dur: T.dur, t: 0, side: r * 1000 % 2 < 1 ? 1 : -1 });
+    this.tricks.set(p.i, { id: T.id, name: T.name, dur: T.dur, t: 0, side: side === 1 || side === -1 ? side : (r * 1000 % 2 < 1 ? 1 : -1) });
     return T;
   }
   trickOf(p) { const k = this.tricks && this.tricks.get(p.i); return k ? { id: k.id, q: Math.min(1, k.t / k.dur), side: k.side } : null; }

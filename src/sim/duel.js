@@ -21,6 +21,8 @@ export const DRIB_BEAT_SPD = 0.5; // ... corre a questa frazione della velocità
 const DRIB_PROTECT = 0.35;     // ... e il portatore non può essere contrastato da nessuno per questo tempo (s)
 const DRIB_PAST = 3;           // il portatore punta a questa distanza oltre il difensore (m)
 const DRIB_SIDE = 2.5;         // ... spostato di lato di tanto (m)
+const DRIB_WIDE = 1.5;         // ... ma di più se serve per passare accanto al difensore ad almeno tanto di lato (m; da vicino
+                               // la linea dritta verso il punto oltre gli passava addosso)
 const DRIB_STEAL_R = 2;        // dribbling fallito: entro questa distanza il difensore può prendere il pallone (m)
 const DRIB_STEAL = 0.6;        // ... e lo prende con questa probabilità (altrimenti lo devia)
 const DRIB_CD = 1.2;           // tempo tra due tentativi di dribbling dello stesso giocatore (s)
@@ -41,9 +43,21 @@ export const BURST_T = 1.2;    // Scatto: per questo tempo il portatore corre pi
 export const BURST_SPD = 1.15; // ... di questo fattore (sopra lo scatto normale)
 const BURST_SHAKE = 0.6;       // ... e l'avversario resta indietro: corre piano e non lo contrasta per questo tempo (s)
 export const BURST_RUN = 14;   // ... poi il portatore prosegue dritto fino a questa distanza (m)
+// Dribbling prenotato (Luis 2026-11-21: "il dribbling lo deve fare vicino all'avversario"): il tasto non decide subito,
+// il portatore corre verso il difensore puntando il lato scelto e il dribbling vero scatta solo quando gli arriva vicino.
+export const DRIB_NEAR = 2;    // il dribbling prenotato scatta quando il portatore arriva a questa distanza dal difensore (m)
+export const DRIB_BOOK_MAX = 1.2; // ... o comunque dopo questo tempo di partita dal tocco, anche se non si è avvicinato (s)
+const DRIB_AIM = 1.2;          // ... intanto corre verso il difensore puntando un punto spostato di tanto dal lato scelto (m)
+const SIDE_LEAN = 1.5;         // scelta del lato: peso dello sbilanciamento del difensore rispetto alla linea di corsa (per m)
+const SIDE_LEAN_T = 0.3;       // ... in cui conta anche dove sta andando il difensore (velocità di lato per questo tempo, s)
+const SIDE_FREE = 0.25;        // ... peso dello spazio libero da altri avversari oltre il difensore (per m)
+const SIDE_FREE_MAX = 8;       // ... spazio contato fino a tanto (m)
+const SIDE_EDGE = 8;           // ... entro tanto dalla linea laterale si va sempre verso il centro (m)
 
 export class DuelMethods {
   duelFor(T) { return !!(this.duel && this.duel.team === T); }
+  // la squadra T ha toccato Dribbling e il portatore sta andando verso il difensore (il tasto non serve più)
+  dribBooked(T) { return !!(this.duel && this.duel.team === T && this.duel.side); }
   // area di tiro: il portatore controllato della squadra umana T è negli ultimi ZONE_DIST m prima della porta avversaria
   inZone(T) {
     const c = this.ball.owner;
@@ -85,8 +99,9 @@ export class DuelMethods {
       if (this.phase !== 'play') why = 'gioco fermo';
       else if (b.owner !== d.p) why = !b.owner && b.kick && b.kick.kicker === d.p ? 'passaggio' : 'palla persa';
       else if (d.o.off || hyp(d.o.x - d.p.x, d.o.y - d.p.y) > DUEL_END_R || this.frontDot(d.p, d.o) < DUEL_BEHIND || !this.aheadLine(d.p, d.o)) why = 'lontano';
-      else if (d.t >= DUEL_MAX) why = 'tempo';
-      if (why) this.endDuel(why);
+      else if (d.t >= DUEL_MAX && !d.side) why = 'tempo'; // col dribbling prenotato decide DRIB_BOOK_MAX
+      if (why) this.endDuel(why); // anche la prenotazione del dribbling finisce qui (palla persa, difensore lontano, ...)
+      else if (d.side) this.dribBookStep(d, dt);
       return;
     }
     if (this.phase !== 'play') return;
@@ -95,7 +110,8 @@ export class DuelMethods {
     if (this.duelCd[c.team] > 0 && this.duelCdP[c.team] === c) return;
     const o = this.frontOpp(c, DUEL_R, true);
     if (!o) return;
-    this.duel = { team: c.team, p: c, o, t: 0 };
+    // side: 0 = niente dribbling prenotato, ±1 = prenotato da quel lato (bt = tempo dal tocco)
+    this.duel = { team: c.team, p: c, o, t: 0, side: 0, bt: 0 };
     this.ev('duel_start', { p: c, o });
   }
   endDuel(reason) {
@@ -156,19 +172,49 @@ export class DuelMethods {
     this.ev('burst', { p, o });
   }
 
+  // Lato del dribbling di p su o: +1 = alla sinistra di p (guardando il difensore), -1 = alla destra. Dalla parte opposta
+  // allo sbilanciamento del difensore rispetto alla linea di corsa, verso lo spazio libero da altri avversari, e verso il
+  // centro se si è vicini alla linea laterale. Niente numeri casuali: a parità vince la sinistra.
+  dribSide(p, o) {
+    const [rx, ry] = this.runDir(p), dx = o.x - p.x, dy = o.y - p.y, d = hyp(dx, dy) || 1, ux = dx / d, uy = dy / d;
+    // > 0: il difensore sta (o si sposta) a sinistra della linea di corsa del portatore
+    const lean = (dx * -ry + dy * rx) + (o.vx * -ry + o.vy * rx) * SIDE_LEAN_T;
+    let best = 1, bs = -1e9;
+    for (const s of [1, -1]) {
+      const nx = -uy * s, ny = ux * s, qx = o.x + ux * DRIB_PAST + nx * DRIB_SIDE, qy = o.y + uy * DRIB_PAST + ny * DRIB_SIDE;
+      let free = SIDE_FREE_MAX;
+      for (const q of this.players) if (q.team !== p.team && q !== o && !q.off) free = Math.min(free, hyp(q.x - qx, q.y - qy));
+      let sc = -s * lean * SIDE_LEAN + free * SIDE_FREE;
+      if (Math.abs(p.x) > HW - SIDE_EDGE && nx * p.x > 0) sc -= 100; // verso la linea laterale vicina: mai
+      if (sc > bs) { bs = sc; best = s; }
+    }
+    return best;
+  }
+  // dribbling prenotato dal tasto (d = duello con d.side scelto): il portatore corre verso il difensore puntando il lato
+  // scelto; arrivato a DRIB_NEAR (o passato DRIB_BOOK_MAX) parte il dribbling vero. Chiamato a ogni passo da updateDuel.
+  dribBookStep(d, dt) {
+    const p = d.p, o = d.o, T = d.team;
+    d.bt += dt;
+    const dx = o.x - p.x, dy = o.y - p.y, dist = hyp(dx, dy);
+    if (dist <= DRIB_NEAR || d.bt >= DRIB_BOOK_MAX) { this.dribble(p, o, d.side); return; }
+    const ux = dx / (dist || 1), uy = dy / (dist || 1);
+    const x = clamp(o.x - uy * d.side * DRIB_AIM, -HW + 0.5, HW - 0.5), y = clamp(o.y + ux * d.side * DRIB_AIM, -HL + 0.5, HL - 0.5);
+    if (this.human[T] && this.ctrl[T] === p) this.move[T] = { x, y, ttl: 0.3, held: false, sprint: true };
+  }
+
   dribbleChance(p, o) { return clamp(DRIB_BASE + DRIB_SKILL * (p.st.dri - o.st.dif) / 100, DRIB_MIN, DRIB_MAX); }
 
   // Tentativo di dribbling del portatore p contro o (stessa regola per umano e IA). Ritorna true se riesce.
-  dribble(p, o) {
+  // side: lato già scelto (dribbling prenotato dal tasto), altrimenti lo sceglie dribSide.
+  dribble(p, o, side = 0) {
     const b = this.ball, T = p.team;
     const ok = this.rnd() < this.dribbleChance(p, o);
     p.dribCd = DRIB_CD;
     const dx = o.x - p.x, dy = o.y - p.y, d = hyp(dx, dy) || 1, ux = dx / d, uy = dy / d;
     if (ok) {
-      // di lato verso il centro se si è vicini alla linea laterale, altrimenti a caso
-      const side = Math.abs(p.x) > HW - 8 ? -Math.sign(p.x) * Math.sign(uy || 1) : (this.rnd() < 0.5 ? -1 : 1);
-      const nx = -uy * side, ny = ux * side;
-      const tx = clamp(p.x + ux * (d + DRIB_PAST) + nx * DRIB_SIDE, -HW + 1, HW - 1), ty = clamp(p.y + uy * (d + DRIB_PAST) + ny * DRIB_SIDE, -HL + 1, HL - 1);
+      if (!side) side = this.dribSide(p, o);
+      const nx = -uy * side, ny = ux * side, lat = Math.max(DRIB_SIDE, DRIB_WIDE * (d + DRIB_PAST) / d);
+      const tx = clamp(p.x + ux * (d + DRIB_PAST) + nx * lat, -HW + 1, HW - 1), ty = clamp(p.y + uy * (d + DRIB_PAST) + ny * lat, -HL + 1, HL - 1);
       const wx = tx - p.x, wy = ty - p.y, wn = hyp(wx, wy) || 1, sp = this.vmax(p) * 1.05;
       p.vx = wx / wn * sp; p.vy = wy / wn * sp; p.fx = wx / wn; p.fy = wy / wn;
       p.dx = p.tx = tx; p.dy = p.ty = ty; p.aiT = Math.max(p.aiT, 0.35);
@@ -195,7 +241,8 @@ export class DuelMethods {
         b.kick = null; b.shot = null; b.noP = p; b.noT = 0.4; this.lastPass = null; this.predT = 0;
       }
     }
-    this.ev('dribble', { p, o, ok });
+    // side va anche alla grafica: il giochetto va da quel lato (+1 = sinistra del portatore)
+    this.ev('dribble', { p, o, ok, side: side || this.dribSide(p, o) });
     if (this.duel && this.duel.p === p) this.endDuel(ok ? 'dribbling' : 'palla persa');
     return ok;
   }

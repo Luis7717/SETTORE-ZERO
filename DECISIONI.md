@@ -1060,3 +1060,44 @@ Clip vere del "Free mocap pack 05: Soccer" di Anderson Rohr nella versione Godot
   nello stesso fotogramma (es. `vai` e subito `mostra`). Ora salta i nodi già liberati.
 - Prove: `--app-schermate` passa anche da Impostazioni (con il controllo audio spento/acceso sul bus) ed editor
   dell'aspetto con taglio afro (Capelli, da vicino) e chignon (Scarpe, corpo intero).
+
+## 2026-11-21 — Dribbling vicino al difensore e niente doppio tocco sui calci da fermo
+Richieste di Luis provando la versione Godot sull'iPhone: "il dribbling lo deve fare vicino all'avversario e in base
+alla posizione sceglie un dribbling e va in quella direzione" e "nella rimessa laterale può farsela da solo"
+(poi: "controlla anche gli angoli").
+- **Dribbling prenotato** (`src/sim/duel.js` → `dribBookStep`, `godot/sim/duel.gd`): il tasto non decide più subito.
+  `userDribble` sceglie il lato (`duel.side`, evento `dribble_book`), il portatore corre verso un punto 1,2 m a lato del
+  difensore (`DRIB_AIM`) e il dribbling vero parte a 2 m (`DRIB_NEAR`) o comunque 1,2 s di partita dopo il tocco
+  (`DRIB_BOOK_MAX`, se il difensore arretra). La prenotazione vive dentro il duello: se il duello finisce (palla persa,
+  passaggio, difensore lontano/alla pari) si annulla con lui; mentre è prenotato il duello non chiude per "tempo".
+  Scelte mie: tempo normale durante la corsa verso il difensore (col rallenty all'8% 0,7 s di corsa sarebbero stati
+  9 s veri) e tasto nascosto (`dribBooked`); niente evento di annullamento (basta `duel_end`).
+- **Lato** (`dribSide`, senza numeri casuali): punteggio per lato = sbilanciamento del difensore rispetto alla linea di
+  corsa (posizione + 0,3 s di velocità di lato, 1,5 per m) + spazio libero da altri avversari nel punto oltre il
+  difensore (0,25 per m, fino a 8 m); entro 8 m dalla linea laterale mai verso fuori. Vale anche per l'IA: prima l'IA
+  sceglieva a caso, e vicino alla linea laterale il vecchio codice (`-sign(x)·sign(uy)`) mandava in realtà **verso
+  fuori** nonostante il commento dicesse "verso il centro". Il momento del dribbling dell'IA (3,2 m) non cambia.
+- **Passa accanto senza attraversare**: da 2 m la linea dritta verso il punto 3 m oltre e 2,5 m di lato passava a 1 m
+  dal difensore; ora lo spostamento di lato è almeno quanto serve per passargli a 1,5 m (`DRIB_WIDE`). Test: distanza
+  minima > 0,9 m e portatore sempre dal lato scelto (`test/unit/dribble-book.test.mjs`).
+- **Grafica**: l'evento `dribble` porta `side` (+1 = sinistra del portatore) e il giochetto usa quel lato (web
+  `view.trick(p, r, side)`, Godot `vista.trick(p, r, side)`): +1 col destro, −1 specchiato col sinistro. Non ho fatto
+  giochetti diversi "a rientrare": il lato specchia quelli che ci sono.
+- **Niente doppio tocco** (`b.dbl` in `kick()` per rimessa, angolo, punizione, rinvio, calcio d'inizio, rigore; non per
+  il rilancio del portiere dalle mani `gk`): `dblBan(p)` esclude il battitore da contatti, contrasto aereo, tuffo,
+  scivolata e da chi va sul pallone (`computeChasers`). Si libera quando `b.last` cambia (qualunque tocco di un altro:
+  controllo, deviazione, respinta, parata; il palo no). **Com'era prima**, misurato col codice di partenza
+  (battitore che calcia a 3 m e insegue il pallone): rimessa, angolo, punizione, rinvio e calcio d'inizio = lo
+  riprendeva da solo dopo 1,1-1,3 s (bastava che finissero i 0,35 s di `noT`); rigore sul palo = lo ribatteva dopo
+  0,13 s. Ora nessuno dei sei.
+- **Pallone fermo vicino al battitore e nessun altro**: la CPU manda sempre un altro (il battitore non è mai "chi va sul
+  pallone") e nella squadra umana il controllo passa a quel compagno. Per sicurezza, se in 6 s di gioco nessun altro lo
+  tocca il battitore torna libero (`DBL_FREE`): in partita non si vede, serve solo a non bloccare mai il gioco.
+- **Equilibrio** (`npm run balance -- 60 60 20`, prima = codice di partenza copiato a parte): prima V4 N7 P9, gol
+  0,4-0,8, tiri 6,0-4,5, possesso 49%; dopo V3 N9 P8, gol 0,3-0,7, tiri 5,5-4,3, possesso 48%. Con 80 partite: prima
+  V18 N26 P36, gol 0,5-0,8, tiri 6,8-5,0, 49%; dopo V19 N29 P32, gol 0,5-0,7, tiri 6,9-4,7, 48%. Nessun cambio
+  sensibile. Impronte delle partite (`golden`) rigenerate perché il comportamento è cambiato di proposito.
+- **Godot**: porting riga per riga; `node test/export-trace.mjs` scrive anche `dribble.json` (12 scene di dribbling
+  prenotato) e `restart.json` (10 scene di calci da fermo), identiche al JS bit per bit come le 7 partite.
+- Da provare a Luis sull'iPhone: che la corsa verso il difensore a tempo normale non sembri troppo veloce dopo il
+  rallenty, e che il giochetto "vada dalla parte giusta".

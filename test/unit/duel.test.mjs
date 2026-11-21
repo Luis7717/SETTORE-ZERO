@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Match, HL, effStats, headingOf, rng32, DUEL_R, DUEL_GUARD, DUEL_MAX, ZONE_DIST } from '../../src/sim.js';
 import { genPlayer } from '../../src/career.js';
-import { scene, wake, give, run } from '../lib/scene.mjs';
+import { scene, wake, give, run, tapDribble } from '../lib/scene.mjs';
 import { mkTeam } from '../lib/harness.mjs';
 
 // portatore umano (squadra 0) fermo a centrocampo che guarda verso +y, difensore della squadra 1 davanti a `dist` m
@@ -25,7 +25,7 @@ test('duello: si apre con un avversario davanti entro DUEL_R (7 m), solo per la 
   assert.equal(m.duelFor(0), true);
   assert.equal(m.duelFor(1), false);
   assert.equal(m.hint(0), 'attack', 'si può ancora disegnare il passaggio');
-  assert.deepEqual(Object.keys(m.duel).sort(), ['o', 'p', 't', 'team']);
+  assert.deepEqual(Object.keys(m.duel).sort(), ['bt', 'o', 'p', 'side', 't', 'team']);
 });
 
 test('duello: non si apre con l\'avversario alle spalle o lontano', () => {
@@ -86,8 +86,8 @@ test('dribbling: riuscito = portatore oltre il difensore, difensore sbilanciato,
     const { m, p, o } = setup(20 + s, { dist: 2.5, dri: 85, dif: 40 });
     run(m, 1 / 60, hold(m, p));
     // Act
-    assert.equal(m.userDribble(0), true);
-    const ev = m.events.slice(); m.events.length = 0;
+    const ev = tapDribble(m);
+    assert.ok(ev.some(e => e.type === 'dribble_book'), 'tasto Dribbling: dribbling prenotato');
     const d = ev.find(e => e.type === 'dribble');
     if (!d.ok) continue;
     run(m, 0.6);
@@ -107,8 +107,8 @@ test('dribbling: la riuscita cresce col dribbling e cala con la difesa; se falli
     let ok = 0, lost = 0;
     for (let s = 0; s < 120; s++) {
       const { m, p } = setup(200 + s, { dist: 1.5, dri, dif });
-      run(m, 1 / 60, hold(m, p)); m.userDribble(0);
-      const d = m.events.find(e => e.type === 'dribble');
+      run(m, 1 / 60, hold(m, p));
+      const d = tapDribble(m).find(e => e.type === 'dribble');
       if (d.ok) ok++; else if (m.ball.owner !== p) lost++;
     }
     return { ok: ok / 120, lost: lost / (120 - ok || 1) };
@@ -155,8 +155,8 @@ test('calo per uso: il dribbling riuscito lo applica, la partita nuova riparte d
   let p = null;
   for (let s = 0; s < 20 && !p; s++) {
     const st = setup(40 + s, { dist: 2.5, dri: 85, dif: 40 });
-    run(st.m, 1 / 60, hold(st.m, st.p)); st.m.userDribble(0);
-    if (st.m.events.find(e => e.type === 'dribble').ok) p = st.p;
+    run(st.m, 1 / 60, hold(st.m, st.p));
+    if (tapDribble(st.m).find(e => e.type === 'dribble').ok) p = st.p;
   }
   // Assert
   assert.ok(p && Math.abs(p.wear.dri - 0.97) < 1e-9 && Math.abs(p.st.dri - 85 * 0.97) < 1e-9);

@@ -67,7 +67,12 @@
 - Col pallone, fuori dal duello: disegna dal giocatore = **strada da correre** (con tanta strada davanti scatta); linea che finisce in porta = tiro.
 - **Duello** (portatore a 7 m da un difensore davanti, anche "per linee": vedi Scatto): visuale bassa, tempo all'8%. Si
   passa a qualunque compagno **solo disegnando** fino al compagno (il tocco sul compagno non passa più, 2026-11-20);
-  oppure tasto **Dribbling** in basso.
+  oppure tasto **Dribbling** in basso. Il tasto **prenota** il dribbling (2026-11-21): sparisce, il tempo torna normale e
+  il portatore corre verso il difensore puntando il lato scelto; il dribbling vero (esito, giochetto) parte solo a 2 m
+  dal difensore (`DRIB_NEAR`, al massimo 1,2 s dopo il tocco, `DRIB_BOOK_MAX`). Lato: opposto allo sbilanciamento del
+  difensore, verso lo spazio libero, sempre verso il centro entro 8 m dalla linea laterale (`dribSide`); il giochetto va
+  da quel lato (`e.side`) e il portatore gli passa accanto senza attraversarlo. Se il duello finisce prima (palla persa,
+  passaggio, difensore lontano) la prenotazione si annulla. L'IA dribbla subito, a 3,2 m, come prima.
 - **Area di tiro** (ultimi 20 m prima della porta avversaria, col pallone): tempo al 22%; linea in porta = tiro,
   ogni altra linea = passaggio (fino a un compagno entro 5 m, o nello spazio): nei rallenty niente corsa disegnata (2026-11-21). Anche sulle rimesse il passaggio si disegna.
 - **Visuale girata col dito** (duello e area di tiro, pallone nostro): trascinare di lato partendo lontano dal portatore
@@ -81,6 +86,11 @@
   per linee = duello col **Dribbling** o il passaggio disegnato. L'IA dribbla come prima.
 - La finta è stata tolta (2026-11-20).
 - Calcio d'angolo: telecamera alle spalle del battitore; dito vicino al battitore = cross, lontano = trascinando si gira la visuale.
+- **Niente doppio tocco** sui calci da fermo (2026-11-21): chi batte rimessa, angolo, punizione, rinvio, calcio d'inizio o
+  rigore non può toccare il pallone finché non l'ha toccato un altro (compagno, avversario o portiere: dopo il palo il
+  rigorista no, dopo la parata sì). Niente punizione indiretta: semplicemente non lo tocca (`b.dbl`, `dblBan`). La CPU
+  manda sul pallone un altro e il controllo passa a lui; se dopo 6 s nessuno l'ha toccato il battitore torna libero
+  (`DBL_FREE`, sicurezza). Il rilancio del portiere dalle mani non conta.
 - Difesa: dito su un proprio giocatore e disegna = linea da seguire (tutti tranne il portiere); tieni premuto sul campo =
   muovi il controllato. Le linee di difesa sono lunghe al massimo 14 m; finita la linea il giocatore torna alla CPU.
   Senza linea la CPU difende (2026-11-20): uno (due vicino alla nostra porta) pressa il portatore, gli altri rientrano

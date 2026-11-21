@@ -185,3 +185,19 @@ static func run(m: SimMatchScript, sec: float, onStep: Callable = Callable()) ->
 		evs.append_array(m.events)
 		m.events.clear()
 	return evs
+
+
+# tocco del tasto Dribbling: prenota il dribbling e fa passi da 1/60 s finché non parte davvero (evento 'dribble',
+# al massimo 2 s); ritorna gli eventi visti dal tocco in poi (vuoto se il tasto non ha fatto nulla). = tapDribble di scene.mjs
+static func tapDribble(m: SimMatchScript, tm: int = 0) -> Array:
+	if not m.userDribble(tm):
+		return []
+	var evs: Array = m.events.duplicate()
+	m.events.clear()
+	var i := 0
+	while i < 120 and not evs.any(func(e: Dictionary) -> bool: return e.type == "dribble"):
+		m.step(DT)
+		evs.append_array(m.events)
+		m.events.clear()
+		i += 1
+	return evs

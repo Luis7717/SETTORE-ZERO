@@ -293,7 +293,7 @@ func aerialDuel(p: R.Player) -> R.Player:
 	var o: R.Player = null
 	var dO: float = 0.95
 	for q: R.Player in players:
-		if q.team == p.team or q.off or q.state != "play" or q.stun > 0.0 or (b.noP == q and b.noT > 0.0) or q.pos == "P":
+		if q.team == p.team or q.off or q.state != "play" or q.stun > 0.0 or (b.noP == q and b.noT > 0.0) or dblBan(q) or q.pos == "P":
 			continue
 		var d: float = C.hyp(q.x - b.x, q.y - b.y)
 		if d < dO and (airPlay(q) != "" or b.h < 1.7):
@@ -345,7 +345,7 @@ func slideStep(p: R.Player, dt: float) -> void:
 				p.hit = true
 				foul(p, c)
 				return
-		elif b.owner == null and db < 0.95 and b.h < 0.7 and not (b.noP == p and b.noT > 0.0):
+		elif b.owner == null and db < 0.95 and b.h < 0.7 and not (b.noP == p and b.noT > 0.0) and not dblBan(p):
 			p.hit = true
 			b.vx = p.sdx * 9.0
 			b.vy = p.sdy * 9.0
@@ -377,7 +377,7 @@ func diveStep(p: R.Player, dt: float) -> void:
 	var bt: float = (d.hx - d.dirx * 0.75) if absf(d.hx - d.x0) > 0.75 else d.x0
 	p.x += C.clamp_(bt - p.x, -vs * dt, vs * dt)
 	p.t += dt
-	if phase == "play" and b.owner == null and not (b.noP == p and b.noT > 0.0) and absf(b.y - p.y) < 0.9 + absf(b.vy) * dt:
+	if phase == "play" and b.owner == null and not (b.noP == p and b.noT > 0.0) and not dblBan(p) and absf(b.y - p.y) < 0.9 + absf(b.vy) * dt:
 		var prog: float = C.clamp_(p.t / 0.4, 0.0, 1.0)
 		var dd: float = C.segInfo(b.x, b.h, d.x0, 1.0 - prog * 0.3, d.hx, d.hh)[0]
 		if dd < 0.72 + p.st.por * 0.002:
@@ -523,7 +523,7 @@ func contacts(dt: float) -> void:
 	var bd: float = 9.0
 	var bestAir := ""
 	for p: R.Player in players:
-		if p.off or p.state != "play" or p.stun > 0.0 or (b.noP == p and b.noT > 0.0):
+		if p.off or p.state != "play" or p.stun > 0.0 or (b.noP == p and b.noT > 0.0) or dblBan(p):
 			continue
 		var isGk: bool = p.pos == "P" and inOwnBox(p)
 		var d: float = C.hyp(p.x - b.x, p.y - b.y)

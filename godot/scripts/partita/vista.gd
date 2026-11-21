@@ -286,8 +286,10 @@ func show_preview(points: Array, offside_y: float = NAN) -> void:
 
 
 ## dribbling tentato da p: parte un giochetto, più bello se il dribbling di p è alto (solo grafica).
-## r = numero casuale 0..1 (−1 = lo sceglie la vista). Ritorna {id, name, dur} del giochetto.
-func trick(p: Object, r: float = -1.0) -> Dictionary:
+## r = numero casuale 0..1 (−1 = lo sceglie la vista). side = lato scelto dal motore (evento 'dribble': +1 = sinistra
+## del portatore, −1 = destra): il giochetto porta il pallone da quel lato (+1 col destro, −1 col sinistro, specchiato)
+## e il portatore poi passa di lì; 0 = a caso. Ritorna {id, name, dur} del giochetto.
+func trick(p: Object, r: float = -1.0, side: float = 0.0) -> Dictionary:
 	if m == null:
 		return {}
 	if r < 0.0:
@@ -295,7 +297,8 @@ func trick(p: Object, r: float = -1.0) -> Dictionary:
 	var dri: float = p.st.dri if p.st != null else 50.0
 	var tk := Giochetti.choose_trick(dri, r)
 	var dur := Giochetti.duration(tk.id)
-	_tricks[m.players.find(p)] = {"id": tk.id, "name": tk.name, "dur": dur, "t": 0.0, "side": 1.0 if fmod(r * 1000.0, 2.0) < 1.0 else -1.0}
+	var sd: float = side if absf(side) == 1.0 else (1.0 if fmod(r * 1000.0, 2.0) < 1.0 else -1.0)
+	_tricks[m.players.find(p)] = {"id": tk.id, "name": tk.name, "dur": dur, "t": 0.0, "side": sd}
 	return {"id": tk.id, "name": tk.name, "dur": dur}
 
 

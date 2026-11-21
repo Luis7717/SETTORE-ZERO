@@ -210,7 +210,7 @@ func clear_path() -> void:
 
 
 ## dribbling tentato da p: nome del giochetto (più bello col dribbling alto, come chooseTrick di src/tricks.js)
-func trick(p: R.Player) -> Dictionary:
+func trick(p: R.Player, _r: float = -1.0, _side: float = 0.0) -> Dictionary:
 	var top := clampi(int(floor((p.st.dri - 35.0) / 10.0)), 0, GIOCHETTI.size() - 1)
 	var r := randf()
 	var giu := 0 if r < 0.6 else (1 if r < 0.9 else 2)

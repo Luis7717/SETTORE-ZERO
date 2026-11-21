@@ -31,3 +31,12 @@ export function run(m, sec, onStep) {
   for (let i = 0; i < Math.round(sec * 60); i++) { if (onStep) onStep(m); m.step(1 / 60); ev.push(...m.events); m.events.length = 0; }
   return ev;
 }
+
+// tocco del tasto Dribbling: prenota il dribbling e fa passi da 1/60 s finché non parte davvero (evento 'dribble',
+// al massimo 2 s); ritorna gli eventi visti dal tocco in poi (vuoto se il tasto non ha fatto nulla)
+export function tapDribble(m, T = 0) {
+  if (!m.userDribble(T)) return [];
+  const ev = m.events.splice(0);
+  for (let i = 0; i < 120 && !ev.some(e => e.type === 'dribble'); i++) { m.step(1 / 60); ev.push(...m.events); m.events.length = 0; }
+  return ev;
+}

@@ -21,6 +21,8 @@ const DRIB_BEAT_SPD := 0.5 # ... corre a questa frazione della velocità, non co
 const DRIB_PROTECT := 0.35 # ... e il portatore non può essere contrastato da nessuno per questo tempo (s)
 const DRIB_PAST := 3.0    # il portatore punta a questa distanza oltre il difensore (m)
 const DRIB_SIDE := 2.5    # ... spostato di lato di tanto (m)
+const DRIB_WIDE := 1.5    # ... ma di più se serve per passare accanto al difensore ad almeno tanto di lato (m; da vicino
+                          # la linea dritta verso il punto oltre gli passava addosso)
 const DRIB_STEAL_R := 2.0 # dribbling fallito: entro questa distanza il difensore può prendere il pallone (m)
 const DRIB_STEAL := 0.6   # ... e lo prende con questa probabilità (altrimenti lo devia)
 const DRIB_CD := 1.2      # tempo tra due tentativi di dribbling dello stesso giocatore (s)
@@ -43,10 +45,25 @@ const BURST_T := 1.2      # Scatto: per questo tempo il portatore corre più vel
 const BURST_SPD := 1.15   # ... di questo fattore (sopra lo scatto normale)
 const BURST_SHAKE := 0.6  # ... e l'avversario resta indietro: corre piano e non lo contrasta per questo tempo (s)
 const BURST_RUN := 14.0   # ... poi il portatore prosegue dritto fino a questa distanza (m)
+# Dribbling prenotato (Luis 2026-11-21: "il dribbling lo deve fare vicino all'avversario"): il tasto non decide subito,
+# il portatore corre verso il difensore puntando il lato scelto e il dribbling vero scatta solo quando gli arriva vicino.
+const DRIB_NEAR := 2.0    # il dribbling prenotato scatta quando il portatore arriva a questa distanza dal difensore (m)
+const DRIB_BOOK_MAX := 1.2 # ... o comunque dopo questo tempo di partita dal tocco, anche se non si è avvicinato (s)
+const DRIB_AIM := 1.2     # ... intanto corre verso il difensore puntando un punto spostato di tanto dal lato scelto (m)
+const SIDE_LEAN := 1.5    # scelta del lato: peso dello sbilanciamento del difensore rispetto alla linea di corsa (per m)
+const SIDE_LEAN_T := 0.3  # ... in cui conta anche dove sta andando il difensore (velocità di lato per questo tempo, s)
+const SIDE_FREE := 0.25   # ... peso dello spazio libero da altri avversari oltre il difensore (per m)
+const SIDE_FREE_MAX := 8.0 # ... spazio contato fino a tanto (m)
+const SIDE_EDGE := 8.0    # ... entro tanto dalla linea laterale si va sempre verso il centro (m)
 
 
 func duelFor(tm: int) -> bool:
 	return duel != null and duel.team == tm
+
+
+# la squadra T ha toccato Dribbling e il portatore sta andando verso il difensore (il tasto non serve più)
+func dribBooked(tm: int) -> bool:
+	return duel != null and duel.team == tm and duel.side != 0.0
 
 
 # area di tiro: il portatore controllato della squadra umana T è negli ultimi ZONE_DIST m prima della porta avversaria
@@ -122,10 +139,12 @@ func updateDuel(dt: float) -> void:
 			why = "passaggio" if (b.owner == null and b.kick != null and b.kick.kicker == d.p) else "palla persa"
 		elif d.o.off or C.hyp(d.o.x - d.p.x, d.o.y - d.p.y) > DUEL_END_R or frontDot(d.p, d.o) < DUEL_BEHIND or not aheadLine(d.p, d.o):
 			why = "lontano"
-		elif d.t >= DUEL_MAX:
+		elif d.t >= DUEL_MAX and d.side == 0.0: # col dribbling prenotato decide DRIB_BOOK_MAX
 			why = "tempo"
 		if why != "":
-			endDuel(why)
+			endDuel(why) # anche la prenotazione del dribbling finisce qui (palla persa, difensore lontano, ...)
+		elif d.side != 0.0:
+			dribBookStep(d, dt)
 		return
 	if phase != "play":
 		return
@@ -142,6 +161,8 @@ func updateDuel(dt: float) -> void:
 	duel.p = c
 	duel.o = o
 	duel.t = 0.0
+	duel.side = 0.0 # 0 = niente dribbling prenotato, ±1 = prenotato da quel lato (bt = tempo dal tocco)
+	duel.bt = 0.0
 	ev("duel_start", {"p": c, "o": o})
 
 
@@ -253,14 +274,77 @@ func burst(p: R.Player, o: R.Player) -> void:
 	ev("burst", {"p": p, "o": o})
 
 
+# Lato del dribbling di p su o: +1 = alla sinistra di p (guardando il difensore), -1 = alla destra. Dalla parte opposta
+# allo sbilanciamento del difensore rispetto alla linea di corsa, verso lo spazio libero da altri avversari, e verso il
+# centro se si è vicini alla linea laterale. Niente numeri casuali: a parità vince la sinistra.
+func dribSide(p: R.Player, o: R.Player) -> float:
+	var rd := runDir(p)
+	var rx: float = rd[0]
+	var ry: float = rd[1]
+	var dx: float = o.x - p.x
+	var dy: float = o.y - p.y
+	var d: float = C.orf(C.hyp(dx, dy), 1.0)
+	var ux: float = dx / d
+	var uy: float = dy / d
+	# > 0: il difensore sta (o si sposta) a sinistra della linea di corsa del portatore
+	var lean: float = (dx * -ry + dy * rx) + (o.vx * -ry + o.vy * rx) * SIDE_LEAN_T
+	var best: float = 1.0
+	var bs: float = -1e9
+	for s: float in [1.0, -1.0]:
+		var nx: float = -uy * s
+		var ny: float = ux * s
+		var qx: float = o.x + ux * DRIB_PAST + nx * DRIB_SIDE
+		var qy: float = o.y + uy * DRIB_PAST + ny * DRIB_SIDE
+		var free: float = SIDE_FREE_MAX
+		for q: R.Player in players:
+			if q.team != p.team and q != o and not q.off:
+				free = minf(free, C.hyp(q.x - qx, q.y - qy))
+		var sc: float = -s * lean * SIDE_LEAN + free * SIDE_FREE
+		if absf(p.x) > HW - SIDE_EDGE and nx * p.x > 0.0:
+			sc -= 100.0 # verso la linea laterale vicina: mai
+		if sc > bs:
+			bs = sc
+			best = s
+	return best
+
+
+# dribbling prenotato dal tasto (d = duello con d.side scelto): il portatore corre verso il difensore puntando il lato
+# scelto; arrivato a DRIB_NEAR (o passato DRIB_BOOK_MAX) parte il dribbling vero. Chiamato a ogni passo da updateDuel.
+func dribBookStep(d: R.Duel, dt: float) -> void:
+	var p := d.p
+	var o := d.o
+	var tm := d.team
+	d.bt += dt
+	var dx: float = o.x - p.x
+	var dy: float = o.y - p.y
+	var dist: float = C.hyp(dx, dy)
+	if dist <= DRIB_NEAR or d.bt >= DRIB_BOOK_MAX:
+		dribble(p, o, d.side)
+		return
+	var ux: float = dx / C.orf(dist, 1.0)
+	var uy: float = dy / C.orf(dist, 1.0)
+	var x: float = C.clamp_(o.x - uy * d.side * DRIB_AIM, -HW + 0.5, HW - 0.5)
+	var y: float = C.clamp_(o.y + ux * d.side * DRIB_AIM, -HL + 0.5, HL - 0.5)
+	if human[tm] and ctrl[tm] == p:
+		var mv := R.Move.new()
+		mv.x = x
+		mv.y = y
+		mv.ttl = 0.3
+		mv.held = false
+		mv.sprint = true
+		move[tm] = mv
+
+
 func dribbleChance(p: R.Player, o: R.Player) -> float:
 	return C.clamp_(DRIB_BASE + DRIB_SKILL * (p.st.dri - o.st.dif) / 100.0, DRIB_MIN, DRIB_MAX)
 
 
 # Tentativo di dribbling del portatore p contro o (stessa regola per umano e IA). Ritorna true se riesce.
-func dribble(p: R.Player, o: R.Player) -> bool:
+# side_: lato già scelto (dribbling prenotato dal tasto), altrimenti lo sceglie dribSide.
+func dribble(p: R.Player, o: R.Player, side_: float = 0.0) -> bool:
 	var b := ball
 	var tm := p.team
+	var side: float = side_
 	var ok: bool = rnd() < dribbleChance(p, o)
 	p.dribCd = DRIB_CD
 	var dx: float = o.x - p.x
@@ -269,16 +353,13 @@ func dribble(p: R.Player, o: R.Player) -> bool:
 	var ux: float = dx / d
 	var uy: float = dy / d
 	if ok:
-		# di lato verso il centro se si è vicini alla linea laterale, altrimenti a caso
-		var side: float
-		if absf(p.x) > HW - 8.0:
-			side = -C.sign_(p.x) * C.sign_(C.orf(uy, 1.0))
-		else:
-			side = -1.0 if rnd() < 0.5 else 1.0
+		if side == 0.0:
+			side = dribSide(p, o)
 		var nx: float = -uy * side
 		var ny: float = ux * side
-		var tx: float = C.clamp_(p.x + ux * (d + DRIB_PAST) + nx * DRIB_SIDE, -HW + 1.0, HW - 1.0)
-		var ty: float = C.clamp_(p.y + uy * (d + DRIB_PAST) + ny * DRIB_SIDE, -HL + 1.0, HL - 1.0)
+		var lat: float = maxf(DRIB_SIDE, DRIB_WIDE * (d + DRIB_PAST) / d)
+		var tx: float = C.clamp_(p.x + ux * (d + DRIB_PAST) + nx * lat, -HW + 1.0, HW - 1.0)
+		var ty: float = C.clamp_(p.y + uy * (d + DRIB_PAST) + ny * lat, -HL + 1.0, HL - 1.0)
 		var wx: float = tx - p.x
 		var wy: float = ty - p.y
 		var wn: float = C.orf(C.hyp(wx, wy), 1.0)
@@ -345,7 +426,8 @@ func dribble(p: R.Player, o: R.Player) -> bool:
 			b.noT = 0.4
 			lastPass = null
 			predT = 0.0
-	ev("dribble", {"p": p, "o": o, "ok": ok})
+	# side va anche alla grafica: il giochetto va da quel lato (+1 = sinistra del portatore)
+	ev("dribble", {"p": p, "o": o, "ok": ok, "side": side if side != 0.0 else dribSide(p, o)})
 	if duel != null and duel.p == p:
 		endDuel("dribbling" if ok else "palla persa")
 	return ok

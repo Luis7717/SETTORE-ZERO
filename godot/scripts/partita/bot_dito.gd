@@ -100,6 +100,8 @@ func _attacca(g, now: int, c: R.Player, dir: float) -> void:
 	var m = g.m
 	var me: int = g.me
 	var tiro := r.next()
+	if m.dribBooked(me):
+		return # Dribbling già toccato: il portatore va da solo verso il difensore, il dribbling scatta vicino
 	if m.duelFor(me):
 		if tiro < 0.35:
 			tocca_tasto(g)
