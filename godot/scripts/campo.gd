@@ -50,6 +50,7 @@ func _costruisci_erba() -> void:
 	mat.shader = SHADER_ERBA
 	_mat_erba = mat
 	mat.set_shader_parameter("grana", _texture_grana())
+	mat.set_shader_parameter("ciuffi_tex", _texture_ciuffi())
 	if ResourceLoader.exists(ERBA_N):   # fili d'erba da vicino (tools/genera_texture.gd)
 		mat.set_shader_parameter("dettaglio_n", load(ERBA_N))
 	var piano := PlaneMesh.new()
@@ -100,6 +101,18 @@ func set_taglio(i: int) -> void:
 ## taglio in uso
 func taglio() -> int:
 	return _taglio_forzato if _taglio_forzato >= 0 else _taglio
+
+
+# grana fitta per i ciuffi d'erba (rumore fine, senza giunture)
+func _texture_ciuffi() -> Texture2D:
+	var noise := FastNoiseLite.new()
+	noise.noise_type = FastNoiseLite.TYPE_VALUE
+	noise.frequency = 0.12
+	noise.fractal_octaves = 2
+	noise.seed = 4321
+	var img := noise.get_seamless_image(GRANA_LATO, GRANA_LATO)
+	img.generate_mipmaps()
+	return ImageTexture.create_from_image(img)
 
 
 func _texture_grana() -> Texture2D:

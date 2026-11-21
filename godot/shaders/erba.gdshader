@@ -12,11 +12,15 @@ uniform vec3 chiara_bordo : source_color = vec3(0.325, 0.702, 0.271); // #53b345
 uniform vec3 scura_bordo : source_color = vec3(0.216, 0.541, 0.192);  // #378a31
 uniform int taglio = 0;            // ordine di NOMI in scripts/tagli_campo.gd
 uniform sampler2D grana : filter_linear_mipmap_anisotropic, repeat_enable;
-uniform float forza_grana = 0.3;
+uniform sampler2D ciuffi_tex : filter_linear_mipmap_anisotropic, repeat_enable; // grana fitta (ciuffi), da campo.gd
+uniform float forza_grana = 0.55;  // era 0,3: Luis "deve sembrare ci sia un pochino di erba"
 uniform sampler2D dettaglio_n : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;   // fili d'erba (normal map)
 uniform float forza_dettaglio = 0.55;
 const float DETTAGLIO_M = 0.9;     // m coperti da una ripetizione dei fili
-const float DETTAGLIO_FINE = 26.0; // m dalla telecamera: oltre, niente fili (non si vedono e sfarfallerebbero)
+const float DETTAGLIO_FINE = 40.0; // m dalla telecamera: oltre, niente fili (non si vedono e sfarfallerebbero)
+const float CIUFFI_M = 3.5;        // m di una ripetizione della grana fine (ciuffi d'erba)
+const float CIUFFI_FINE = 34.0;    // m dalla telecamera: oltre, niente grana fine
+const float LUCIDO = 0.07;         // erba piegata: le fasce cambiano di chiaro/scuro con la direzione da cui le guardi
 
 const float HW = 32.0;
 const float HL = 50.0;
@@ -98,11 +102,26 @@ void fragment() {
 	vec3 c = mix(mix(scura_bordo, scura, piega), mix(chiara_bordo, chiara, piega), d.x);
 	float g = texture(grana, pos_mondo / 1.6).r * 0.55 + texture(grana, pos_mondo / 4.3 + vec2(0.37, 0.11)).r * 0.45;
 	c *= 1.0 + forza_grana * (g - 0.5);
+	float dist = length(VERTEX);
+	// ciuffi: grana fine che si vede da vicino e a media distanza, sfuma da lontano (niente sfarfallio)
+	float ciuffi = texture(ciuffi_tex, pos_mondo / CIUFFI_M).r * 0.6 + texture(ciuffi_tex, pos_mondo / (CIUFFI_M * 3.1) + vec2(0.53, 0.17)).r * 0.4;
+	c *= 1.0 + 0.8 * (ciuffi - 0.5) * (1.0 - smoothstep(CIUFFI_FINE * 0.5, CIUFFI_FINE, dist));
+	// da vicino una grana ancora più fitta (i singoli ciuffi)
+	float fitti = texture(ciuffi_tex, pos_mondo / 0.8 + vec2(0.31, 0.77)).r;
+	c *= 1.0 + 0.5 * (fitti - 0.5) * (1.0 - smoothstep(9.0, 20.0, dist));
+	// verde un po' meno acceso, come l'erba vera
+	c = mix(vec3(dot(c, vec3(0.299, 0.587, 0.114))), c, 0.88) * 0.95;
+	// colore che varia un po': qua più giallo, là più azzurro (erba vera non è mai di un verde solo)
+	float tono = texture(grana, pos_mondo / 9.0 + vec2(0.19, 0.83)).r - 0.5;
+	c *= vec3(1.0 + 0.10 * tono, 1.0 + 0.03 * tono, 1.0 - 0.14 * tono);
+	// erba piegata dal taglio: guardando le fasce da un verso o dall'altro il chiaro e lo scuro si scambiano un po'
+	vec3 vista = normalize((INV_VIEW_MATRIX * vec4(VERTEX, 0.0)).xyz);
+	c *= 1.0 + LUCIDO * (d.x * 2.0 - 1.0) * clamp(-vista.z, -1.0, 1.0);
 	// chiazze larghe (erba un po' più gialla o più verde), appena accennate
 	float chiazza = texture(grana, pos_mondo / 23.0 + vec2(0.71, 0.29)).r;
 	c *= mix(vec3(1.0), vec3(1.05, 1.03, 0.9), smoothstep(0.55, 0.8, chiazza) * 0.6);
 	// da vicino: fili d'erba in rilievo, che spariscono piano con la distanza
-	float vicino = 1.0 - smoothstep(DETTAGLIO_FINE * 0.4, DETTAGLIO_FINE, length(VERTEX));
+	float vicino = 1.0 - smoothstep(DETTAGLIO_FINE * 0.35, DETTAGLIO_FINE, dist);
 	NORMAL_MAP = mix(vec3(0.5, 0.5, 1.0), texture(dettaglio_n, pos_mondo / DETTAGLIO_M).rgb, vicino);
 	NORMAL_MAP_DEPTH = forza_dettaglio;
 	ALBEDO = c;
