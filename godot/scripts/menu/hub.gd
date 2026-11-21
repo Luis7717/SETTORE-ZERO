@@ -7,6 +7,7 @@ extends MenuSchermata
 
 const I := preload("res://scripts/menu/icone.gd")
 const Dirigenza := preload("res://scripts/carriera/dirigenza.gd")
+const Meteo := preload("res://scripts/partita/meteo.gd")
 const GIORNATE := 18
 const PULSA := 2.4                 # s: un respiro del pulsante GIOCA (uiPulse)
 
@@ -101,7 +102,12 @@ func _carta_prossima(nm: Dictionary, me: Dictionary, k1: Color) -> Control:
 	pill.add_child(U.testo("IN CASA" if nm.home else "IN TRASFERTA", 11.5, T.GOLD if nm.home else Color("#c9d6ee"), T.PESO_NERO))
 	top.add_child(pill)
 	v.add_child(top)
-	v.add_child(U.spazio(16))
+	# previsione: la stessa che troverà la partita (app.gd → Meteo.per_giornata)
+	var st := stato()
+	var prev := Meteo.per_giornata(int(st.get("seed", 0)), int(st.get("season", 1)), int(nm.day))
+	v.add_child(U.spazio(4))
+	v.add_child(U.testo(Meteo.testo(prev), 12, Color("#b7c7e3"), T.PESO_NERO))
+	v.add_child(U.spazio(12))
 	var vs := U.hbox(6)
 	vs.add_child(_lato_vs(me, str(stato().club), int(c.myRating())))
 	var cerchio := U.pannello_stile(T.stile(Color(1, 1, 1, 0.08), 21, T.LINE2, 1, Vector4.ZERO))

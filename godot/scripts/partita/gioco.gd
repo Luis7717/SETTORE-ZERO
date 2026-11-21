@@ -18,6 +18,7 @@
 #   --esci-dopo=SEC     esce dopo SEC secondi veri
 #   --campo=NOME        taglio dell'erba (strisce, strette, verticali, quadrotti, cerchi, uniforme, rombi, raggi, diagonali)
 #   --manto=NOME        colore dell'erba (vivo, milano, naturale, sintetico, sintetico_chiaro, estivo)
+#   --meteo=sereno|nuvoloso|pioggia|neve  --ora=giorno|tramonto|notte   forzano meteo e ora (scripts/partita/meteo.gd)
 #   --allenamento       allenamento guidato (tipo "allenamento", scripts/partita/allenamento.gd) invece dell'amichevole;
 #                       con --lezione=N [--prova=K] parte da lì, con --scheda mostra la scheda della lezione N
 #
@@ -54,6 +55,7 @@ const AllenamentoHud := preload("res://scripts/partita/allenamento_hud.gd")
 const BotAllenamento := preload("res://scripts/partita/bot_allenamento.gd")
 const Tagli := preload("res://scripts/tagli_campo.gd")
 const ContaGiocatori := preload("res://scripts/partita/conta_giocatori.gd")
+const Meteo := preload("res://scripts/partita/meteo.gd")
 const SCENA_VISTA := "res://scenes/vista_partita.tscn"
 
 # velocità del tempo (rallenty), come src/main.js
@@ -115,6 +117,7 @@ var _fotogrammi := 0
 var _anteprima_viva := false
 var _inizio_ms := 0
 var _seme_partita := 0
+var meteo := {"meteo": "sereno", "ora": "giorno"}  # scripts/partita/meteo.gd: avvio.meteo/ora o a caso col seme
 
 
 ## avvio dall'app: da chiamare prima di aggiungere la scena all'albero o entro il primo fotogramma
@@ -179,9 +182,10 @@ func _parti() -> void:
 	if tipo() == "allenamento":
 		_avvia_allenamento()
 	elif derby:
-		hud.big("DERBY!", "g", 2400, _titolo())
+		hud.big("DERBY!", "g", 2400, _titolo() + "
+" + Meteo.testo(meteo))
 	else:
-		hud.big(_titolo(), "", 1800)
+		hud.big(_titolo(), "", 2200, Meteo.testo(meteo))
 	stato = "partita"
 	if _opzioni.has("bot"):
 		var seme_bot := int(_opzioni.get("seme", "1")) + 99
@@ -201,8 +205,9 @@ func _crea_partita() -> void:
 			tempo = float(_avvio.get("durata_tempo", TEMPO_PREDEFINITO))
 	_seme_partita = seme
 	var auto_gk: bool = _avvio.get("autoGk", false)
+	meteo = Meteo.per_partita(_avvio, _opzioni, seme, tipo() == "allenamento")
 	m = SimMatchScript.new({"seed": seme, "halfLen": tempo, "human": [me == 0, me == 1],
-		"autoGk": [auto_gk and me == 0, auto_gk and me == 1], "teams": squadre})
+		"autoGk": [auto_gk and me == 0, auto_gk and me == 1], "teams": squadre, "meteo": meteo.meteo})
 	if tipo() == "allenamento":
 		tempo = Allenamento.HALF_LEN
 		if not avviata_da_app():
@@ -223,6 +228,11 @@ func _crea_vista() -> void:
 		vista.set_taglio(taglio_campo(_avvio, _seme_partita))
 	if vista.has_method("set_manto"):
 		vista.set_manto(manto_campo(_avvio, _seme_partita))
+	if vista is Node3D:
+		var nodo_meteo := Meteo.new()
+		nodo_meteo.name = "Meteo"
+		add_child(nodo_meteo)
+		nodo_meteo.applica(vista, meteo)
 	gesti.vista = vista
 	gesti.set_match(m, me)
 	gesti.enabled = true

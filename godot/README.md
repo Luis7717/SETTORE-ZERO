@@ -360,6 +360,43 @@ le novità passano da due funzioni nuove che chiama `App`:
 - Prove: `tests/test_carriera_b.gd`; `--stagione-bot` stampa anche derby, crescita, infortuni e obiettivo;
   `--app-schermate` aggiunge hub, classifica, rosa (con un infortunato) e fine stagione.
 
+## Meteo e ora del giorno (2026-11-21)
+
+Ogni partita ha un meteo (sereno, nuvoloso, pioggia, neve) e un'ora (pomeriggio, tramonto, notte coi fari accesi).
+Tutto in `scripts/partita/meteo.gd`; `gioco.gd` lo chiama in due punti (scelta prima di creare `SimMatch`, grafica
+dopo la vista) e mostra "Notte · Pioggia" sotto il titolo all'inizio.
+
+- **Scelta** col seme (`SimRng`, niente `randi`): `Meteo.scegli(seme, giornata)`. Senza giornata (amichevole)
+  probabilità fisse: sereno 45%, nuvoloso 30%, pioggia 20%, neve 5%. In campionato secondo la giornata (la stagione va
+  da fine estate a primavera): prime e ultime giornate 58/28/14/0, autunno e inizio primavera 44/30/22/4, inverno
+  (giornate in mezzo) 30/30/28/12: in media la neve resta intorno al 5%. Ora: pomeriggio 45%, tramonto 25%, notte 30%.
+  In campionato la previsione viene da carriera + stagione + giornata (`Meteo.per_giornata`): l'hub la scrive sulla
+  carta della prossima partita e `App` la passa alla partita (`avvia({... "meteo", "ora"})`), così è la stessa.
+  L'allenamento guidato è sempre sereno di pomeriggio.
+- **Prove**: `--meteo=sereno|nuvoloso|pioggia|neve` e `--ora=giorno|tramonto|notte` (vincono anche con `--app`).
+- **Motore**: campo facoltativo `meteo` delle opzioni di `SimMatch` (e di `Match` in JS), in tutte e due le copie;
+  costanti in cima a `sim/match.gd` / `src/sim/match.js` (`RAIN_ROLL`, `RAIN_SLIDE`, `RAIN_STUN`, `SNOW_ROLL`):
+  pioggia = attrito del rotolamento ×0,75 (palla più veloce e più lunga; i passaggi rasoterra si calciano come
+  all'asciutto, quindi arrivano più svelti), scivolata ×1,3, chi perde un contrasto fermo ×1,25; neve = attrito ×1,35
+  (palla più lenta; i passaggi si calciano più forte per arrivare). Senza campo, sereno o nuvoloso il motore è
+  identico: golden e tracce 0-7 uguali. Tracce nuove `trace_8.json` (pioggia, umano simulato) e `trace_9.json`
+  (neve, IA contro IA), uguali al JS bit per bit (`test_traccia_8_pioggia`, `test_traccia_9_neve`).
+- **Grafica** (niente in `vista.gd` tranne una riga: l'`Environment` della vista ora è una copia sua):
+  - cielo (`ProceduralSkyMaterial` nuovo a ogni partita), luce, ombre più leggere col coperto, nebbia;
+  - erba: uniform `bagnato` (più scura, lucida, con pozze larghe appena accennate) e `neve` (velo bianco più chiazze
+    morbide; le righe restano sopra) in `shaders/erba.gdshader`, da `campo.gd set_meteo()`; a 0 l'erba è come prima;
+  - tramonto: sole basso e caldo da ovest, ombre lunghe;
+  - notte: nessuna luce in più (le ombre multiple costano sull'iPhone). La luce principale diventa quella dei fari
+    (alta, bianca), l'ambiente un colore blu tenue, lo stadio passa su uno strato che la luce non illumina (tribune
+    scure, campo illuminato; cartelloni e maxischermi esclusi), lampade delle torri più forti con un alone finto;
+  - il pubblico 3D (uniform `luce`) si scurisce di notte, al tramonto e col brutto tempo;
+  - pioggia (900 righe) e neve (700 fiocchi): `GPUParticles3D` in una scatola che segue la telecamera (solo la
+    posizione, così cadono dritte); nel rallenty rallentano (`ts` di `gioco.gd`);
+  - sulla neve il pallone diventa arancione.
+- **Prove**: `tests/test_meteo.gd` (stesso seme stesso meteo, neve rara, stagioni, opzioni),
+  `test/unit/weather.test.mjs` (motore JS), `test_meteo_moltiplicatori` in `test_equivalence.gd`.
+  Equilibrio: `npm run balance -- 60 60 60 1 pioggia` (sesto argomento = meteo).
+
 ## Menu (fase 3)
 
 Schermate del web (`src/ui.js`, `ui-squad.js`, `editor.js`) rifatte in Godot, una scena per schermata in

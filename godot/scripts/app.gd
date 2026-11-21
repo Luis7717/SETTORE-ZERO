@@ -38,6 +38,7 @@ signal schermata_cambiata(nome: String)
 const CarrieraScript := preload("res://scripts/carriera/carriera.gd")
 const ProveApp := preload("res://scripts/app_prove.gd")
 const AudioPartita := preload("res://scripts/partita/audio_partita.gd")
+const Meteo := preload("res://scripts/partita/meteo.gd")
 const MUSICA := "res://assets/audio/music.mp3"
 const MUSICA_VOLUME := 0.35     # come Sfx.music del web (gain 0,35)
 const CLIC_HZ := 520.0          # tocco: come Sfx.click del web (triangolo 520 Hz, 0,05 s, volume 0,12)
@@ -129,7 +130,8 @@ func gioca_campionato() -> void:
 	var titolo := ("Derby · " if derby else "") + "Giornata %d · %s" % [nm.day, CarrieraScript.DIV_NAMES[nm.div]]
 	# stadio (taglio e manto dell'erba) della squadra di casa: in casa il mio, fuori quello dell'avversario
 	var stadio: Variant = carriera.s.get("seed") if nm.home else nm.opp.get("seed")
-	_partita("campionato", carriera.aiMatchTeam(nm.opp), titolo, float(carriera.s.settings.half), stadio, derby)
+	_partita("campionato", carriera.aiMatchTeam(nm.opp), titolo, float(carriera.s.settings.half), stadio, derby,
+		Meteo.per_giornata(int(carriera.s.get("seed", 0)), int(carriera.s.get("season", 1)), int(nm.day)))
 
 
 ## avversario: id di una squadra del campionato, oppure livello (numero), oppure null = livello della mia squadra
@@ -166,7 +168,8 @@ func _ha_carriera() -> bool:
 
 
 # stadio_seme: seme della squadra di casa (taglio e manto dell'erba); null = a caso col seme della partita
-func _partita(tipo: String, avversario: Dictionary, titolo: String, durata: float, stadio_seme: Variant = null, derby := false) -> void:
+# meteo: {meteo, ora} previsti (campionato: gli stessi dell'hub); vuoto = a caso col seme della partita
+func _partita(tipo: String, avversario: Dictionary, titolo: String, durata: float, stadio_seme: Variant = null, derby := false, meteo := {}) -> void:
 	if schermata == "partita":
 		return # doppio tocco sul tasto: la partita sta già partendo
 	var s: Dictionary = carriera.s
@@ -176,6 +179,7 @@ func _partita(tipo: String, avversario: Dictionary, titolo: String, durata: floa
 		"derby": derby}
 	if stadio_seme is int or stadio_seme is float:
 		opz["stadio_seme"] = int(stadio_seme)
+	opz.merge(meteo)
 	s.tut = int(s.get("tut", 0)) + 1 # partite iniziate (come il web)
 	carriera.save()
 	var scena: Node = (load(SCENA_PARTITA) as PackedScene).instantiate()
