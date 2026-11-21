@@ -193,11 +193,11 @@ Erba erba_colore(vec2 pos_mondo, vec2 dp, vec2 dx, vec2 dy, float dist, vec3 vis
 	// bagnato: più scuro, con pozze ancora più scure e lucide (all'asciutto la texture non si legge)
 	float pozza = 0.0;
 	if (bagnato > 0.0) {
-		pozza = smoothstep(0.55, 0.85, texture(grana, pos_mondo / 31.0 + vec2(0.83, 0.07)).r) * bagnato;
+		pozza = smoothstep(0.62, 0.9, texture(grana, pos_mondo / 31.0 + vec2(0.83, 0.07)).r) * bagnato;
 	}
 	c *= (1.0 - BAGNATO_SCURO * bagnato) * (1.0 - 0.08 * pozza);
 	e.albedo = c;
-	e.roughness = mix(1.0, 0.32, bagnato) - 0.2 * pozza;
-	e.specular = mix(0.06, 0.45, bagnato);  // all'asciutto 0,06: il riflesso del cielo azzurro spegneva il giallo-verde
+	e.roughness = mix(1.0, 0.5, bagnato) - 0.15 * pozza; // meno lucida: con 0,32 a fondo campo brillavano puntini bianchi
+	e.specular = mix(0.06, 0.3, bagnato);  // all'asciutto 0,06: il riflesso del cielo azzurro spegneva il giallo-verde
 	return e;
 }
