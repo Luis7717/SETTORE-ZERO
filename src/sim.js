@@ -4,4 +4,4 @@
 // Il codice vive in src/sim/: core.js (costanti, fisica), ai.js, motion.js, match.js.
 export { W, L, HW, HL, GW, GH, BOX_W, BOX_D, SIX_W, SIX_D, PEN_D, CIRCLE, rng32, FORMATIONS, effStats, headingOf, ballPhys } from './sim/core.js';
 export { Match, SPRINT_DIST, RUN_MAX_LEN, clipLen } from './sim/match.js';
-export { DUEL_R, DUEL_GUARD, DUEL_MAX, ZONE_DIST, BURST_T, BURST_SPD, BURST_RUN } from './sim/duel.js';
+export { DUEL_R, DUEL_GUARD, DUEL_MAX, ZONE_DIST, FLEE_R, FLEE_MAX, LEVEL_TOL, BURST_T, BURST_SPD, BURST_RUN } from './sim/duel.js';

@@ -29,12 +29,18 @@ const AI_DRIB_TRY = 0.22;      // probabilità di tentare a pari dribbling e dif
 export const WEAR_DRI = 0.03, WEAR_DRI_MIN = 0.8; // ogni dribbling riuscito: -3% di dribbling, fino all'80%
 export const ZONE_DIST = 20;   // negli ultimi metri prima della porta avversaria: area di tiro (rallenty, si può passare)
 export const WEAR_TES = 0.02, WEAR_TES_MIN = 0.85; // ogni colpo di testa vinto: -2% di colpi di testa, fino all'85%
-// Scatto (Luis 2026-11-20): nel duello il tasto in basso è Scatto, non più Dribbling. Il portatore prova a bruciare il
-// difensore in velocità e prosegue dritto (riesce più spesso se è veloce e il difensore difende male)
-export const BURST_T = 1.2;    // riuscito: per questo tempo il portatore corre più veloce (s)
+// Davanti o dietro "per linee" (Luis 2026-11-21): si divide il campo in linee parallele alle linee di porta. L'avversario
+// è davanti solo se sta su una linea più avanti (verso la porta avversaria) di almeno LEVEL_TOL; altrimenti è alla pari o
+// dietro. Davanti = duello (Dribbling o passaggio disegnato); alla pari o dietro = fuga (solo il tasto Scatto).
+export const LEVEL_TOL = 0.5;  // "alla pari": fino a tanto più avanti del portatore conta ancora come stessa linea (m)
+export const FLEE_R = 4;       // avversario alla pari o dietro più vicino di così al portatore apre la fuga (m)
+const FLEE_END_R = 7;          // la fuga si chiude se l'avversario si allontana oltre (m)
+export const FLEE_MAX = 2.5;   // durata massima della fuga (s)
+const FLEE_CD = 1.5;           // dopo la fine, lo stesso portatore non apre una nuova fuga per questo tempo (s)
+export const BURST_T = 1.2;    // Scatto: per questo tempo il portatore corre più veloce (s)
 export const BURST_SPD = 1.15; // ... di questo fattore (sopra lo scatto normale)
-export const BURST_RUN = 14;   // ... e prosegue dritto fino a questa distanza (m)
-const BURST_SIDE = 2;          // ... passando di fianco al difensore a questa distanza, dalla parte opposta, poi dritto (m)
+const BURST_SHAKE = 0.6;       // ... e l'avversario resta indietro: corre piano e non lo contrasta per questo tempo (s)
+export const BURST_RUN = 14;   // ... poi il portatore prosegue dritto fino a questa distanza (m)
 
 export class DuelMethods {
   duelFor(T) { return !!(this.duel && this.duel.team === T); }
@@ -55,13 +61,16 @@ export class DuelMethods {
   runDir(c) { const v = hyp(c.vx, c.vy); return v > 1.5 ? [c.vx / v, c.vy / v] : [c.fx, c.fy]; }
   frontDot(c, o) { const [rx, ry] = this.runDir(c), dx = o.x - c.x, dy = o.y - c.y, d = hyp(dx, dy) || 1; return (dx * rx + dy * ry) / d; }
 
-  // avversario più vicino davanti al portatore entro `R`
-  frontOpp(c, R) {
+  // o sta su una linea più avanti di c (verso la porta che attacca c) di almeno LEVEL_TOL
+  aheadLine(c, o) { return (o.y - c.y) * (c.team === 0 ? 1 : -1) > LEVEL_TOL; }
+
+  // avversario più vicino davanti al portatore entro `R` (lines: anche più avanti "per linee", per il duello della persona)
+  frontOpp(c, R, lines = false) {
     let best = null, bd = R;
     for (const o of this.players) {
       if (o.team === c.team || o.off || o.stun > 0 || this.beaten(o, c) || (o.state !== 'play' && o.state !== 'prep')) continue;
       const d = hyp(o.x - c.x, o.y - c.y);
-      if (d < bd && this.frontDot(c, o) > DUEL_FRONT) { bd = d; best = o; }
+      if (d < bd && this.frontDot(c, o) > DUEL_FRONT && (!lines || this.aheadLine(c, o))) { bd = d; best = o; }
     }
     return best;
   }
@@ -75,7 +84,7 @@ export class DuelMethods {
       let why = null;
       if (this.phase !== 'play') why = 'gioco fermo';
       else if (b.owner !== d.p) why = !b.owner && b.kick && b.kick.kicker === d.p ? 'passaggio' : 'palla persa';
-      else if (d.o.off || hyp(d.o.x - d.p.x, d.o.y - d.p.y) > DUEL_END_R || this.frontDot(d.p, d.o) < DUEL_BEHIND) why = 'lontano';
+      else if (d.o.off || hyp(d.o.x - d.p.x, d.o.y - d.p.y) > DUEL_END_R || this.frontDot(d.p, d.o) < DUEL_BEHIND || !this.aheadLine(d.p, d.o)) why = 'lontano';
       else if (d.t >= DUEL_MAX) why = 'tempo';
       if (why) this.endDuel(why);
       return;
@@ -84,7 +93,7 @@ export class DuelMethods {
     const c = b.owner;
     if (!c || !this.human[c.team] || this.ctrl[c.team] !== c || c.state !== 'play') return;
     if (this.duelCd[c.team] > 0 && this.duelCdP[c.team] === c) return;
-    const o = this.frontOpp(c, DUEL_R);
+    const o = this.frontOpp(c, DUEL_R, true);
     if (!o) return;
     this.duel = { team: c.team, p: c, o, t: 0 };
     this.ev('duel_start', { p: c, o });
@@ -95,34 +104,67 @@ export class DuelMethods {
     this.ev('duel_end', { p: d.p, o: d.o, reason });
   }
 
-  sprintChance(p, o) { return clamp(DRIB_BASE + DRIB_SKILL * (p.st.vel - o.st.dif) / 100, DRIB_MIN, DRIB_MAX); }
+  fleeFor(T) { return !!(this.flee && this.flee.team === T); }
+  // avversario più vicino alla pari o dietro il portatore (per linee) entro `R`
+  sideOpp(c, R) {
+    let best = null, bd = R;
+    for (const o of this.players) {
+      if (o.team === c.team || o.off || o.stun > 0 || this.beaten(o, c) || o.state !== 'play') continue;
+      const d = hyp(o.x - c.x, o.y - c.y);
+      if (d < bd && !this.aheadLine(c, o)) { bd = d; best = o; }
+    }
+    return best;
+  }
+  // apre e chiude la fuga del portatore della squadra umana (dopo updateDuel: il duello ha la precedenza)
+  updateFlee(dt) {
+    for (let T = 0; T < 2; T++) if (this.fleeCd[T] > 0) this.fleeCd[T] -= dt;
+    const b = this.ball, f = this.flee;
+    if (f) {
+      f.t += dt;
+      let why = null;
+      if (this.phase !== 'play') why = 'gioco fermo';
+      else if (b.owner !== f.p) why = 'palla persa';
+      else if (this.duel) why = 'duello';
+      else if (f.o.off || f.o.stun > 0 || hyp(f.o.x - f.p.x, f.o.y - f.p.y) > FLEE_END_R || this.aheadLine(f.p, f.o)) why = 'lontano';
+      else if (f.t >= FLEE_MAX) why = 'tempo';
+      if (why) this.endFlee(why);
+      return;
+    }
+    if (this.phase !== 'play' || this.duel) return;
+    const c = b.owner;
+    if (!c || !this.human[c.team] || this.ctrl[c.team] !== c || c.state !== 'play' || c.burst > 0) return;
+    if (this.fleeCd[c.team] > 0 && this.fleeCdP[c.team] === c) return;
+    const o = this.sideOpp(c, FLEE_R);
+    if (!o) return;
+    this.flee = { team: c.team, p: c, o, t: 0 };
+    this.ev('flee_start', { p: c, o });
+  }
+  endFlee(reason) {
+    const f = this.flee; if (!f) return;
+    this.flee = null; this.fleeCd[f.team] = FLEE_CD; this.fleeCdP[f.team] = f.p;
+    this.ev('flee_end', { p: f.p, o: f.o, reason });
+  }
+  // Scatto: il portatore si stacca dall'avversario e prosegue dritto nel verso di corsa
+  burst(p, o) {
+    const T = p.team, [rx, ry] = this.runDir(p);
+    const tx = clamp(p.x + rx * BURST_RUN, -HW + 1, HW - 1), ty = clamp(p.y + ry * BURST_RUN, -HL + 1, HL - 1);
+    const sp = this.vmax(p);
+    p.burst = BURST_T; p.fx = rx; p.fy = ry;
+    if (p.vx * rx + p.vy * ry < sp) { p.vx = rx * sp; p.vy = ry * sp; } // parte subito, senza la rincorsa
+    if (o && o.state === 'play') { o.beat = Math.max(o.beat, BURST_SHAKE); o.beatBy = p; }
+    if (this.human[T] && this.ctrl[T] === p) this.move[T] = { x: tx, y: ty, ttl: BURST_T + 1, held: false, sprint: true };
+    this.ev('burst', { p, o });
+  }
+
   dribbleChance(p, o) { return clamp(DRIB_BASE + DRIB_SKILL * (p.st.dri - o.st.dif) / 100, DRIB_MIN, DRIB_MAX); }
 
   // Tentativo di dribbling del portatore p contro o (stessa regola per umano e IA). Ritorna true se riesce.
-  // sprint = Scatto della persona: velocità contro difesa, e se riesce il portatore prosegue dritto
-  dribble(p, o, sprint = false) {
+  dribble(p, o) {
     const b = this.ball, T = p.team;
-    const ok = this.rnd() < (sprint ? this.sprintChance(p, o) : this.dribbleChance(p, o));
+    const ok = this.rnd() < this.dribbleChance(p, o);
     p.dribCd = DRIB_CD;
     const dx = o.x - p.x, dy = o.y - p.y, d = hyp(dx, dy) || 1, ux = dx / d, uy = dy / d;
-    if (ok && sprint) {
-      // dritto nel verso di corsa, un po' di lato dalla parte opposta al difensore
-      const [rx, ry] = this.runDir(p), lat = (o.x - p.x) * -ry + (o.y - p.y) * rx;
-      const side = Math.abs(lat) > 0.05 ? -Math.sign(lat) : -Math.sign(p.x || 1), nx = -ry * side, ny = rx * side;
-      const along = Math.max(0, (o.x - p.x) * rx + (o.y - p.y) * ry), L = Math.max(BURST_RUN, along + DRIB_PAST);
-      const cx = (x, y) => ({ x: clamp(x, -HW + 1, HW - 1), y: clamp(y, -HL + 1, HL - 1) });
-      // curva di fianco al difensore, poi dritto nel verso di corsa
-      const side1 = cx(o.x + nx * BURST_SIDE, o.y + ny * BURST_SIDE), side2 = cx(o.x + nx * BURST_SIDE + rx * DRIB_PAST * 0.5, o.y + ny * BURST_SIDE + ry * DRIB_PAST * 0.5);
-      const end = cx(p.x + rx * L + nx * BURST_SIDE, p.y + ry * L + ny * BURST_SIDE), tx = side1.x, ty = side1.y;
-      const wx = tx - p.x, wy = ty - p.y, wn = hyp(wx, wy) || 1, sp = this.vmax(p) * 1.05;
-      p.vx = wx / wn * sp; p.vy = wy / wn * sp; p.fx = wx / wn; p.fy = wy / wn;
-      p.dx = p.tx = tx; p.dy = p.ty = ty; p.aiT = Math.max(p.aiT, 0.35);
-      p.protect = Math.max(p.protect, DRIB_PROTECT); p.burst = BURST_T;
-      o.stun = DRIB_STUN + Math.max(0, d - DRIB_REACH) / sp; o.contact = 0; o.vx *= 0.3; o.vy *= 0.3;
-      o.beat = o.stun + DRIB_BEAT; o.beatBy = p;
-      if (o.state === 'prep') { o.state = 'play'; o.warn = false; }
-      if (this.human[T] && this.ctrl[T] === p) this.move[T] = { x: tx, y: ty, ttl: BURST_T + 2, held: false, sprint: true, path: [side1, side2, end], i: 0, owner: p };
-    } else if (ok) {
+    if (ok) {
       // di lato verso il centro se si è vicini alla linea laterale, altrimenti a caso
       const side = Math.abs(p.x) > HW - 8 ? -Math.sign(p.x) * Math.sign(uy || 1) : (this.rnd() < 0.5 ? -1 : 1);
       const nx = -uy * side, ny = ux * side;
@@ -153,7 +195,7 @@ export class DuelMethods {
         b.kick = null; b.shot = null; b.noP = p; b.noT = 0.4; this.lastPass = null; this.predT = 0;
       }
     }
-    this.ev('dribble', sprint ? { p, o, ok, sprint: true } : { p, o, ok });
+    this.ev('dribble', { p, o, ok });
     if (this.duel && this.duel.p === p) this.endDuel(ok ? 'dribbling' : 'palla persa');
     return ok;
   }

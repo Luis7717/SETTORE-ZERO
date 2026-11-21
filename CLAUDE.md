@@ -65,18 +65,20 @@
 
 ## Gesti (tutto a un dito)
 - Col pallone, fuori dal duello: disegna dal giocatore = **strada da correre** (con tanta strada davanti scatta); linea che finisce in porta = tiro.
-- **Duello** (portatore a 7 m da un difensore davanti): visuale bassa, tempo all'8%. Si passa a qualunque compagno
-  **solo disegnando** fino al compagno (il tocco sul compagno non passa più, 2026-11-20); oppure tasto **Scatto** in basso.
+- **Duello** (portatore a 7 m da un difensore davanti, anche "per linee": vedi Scatto): visuale bassa, tempo all'8%. Si
+  passa a qualunque compagno **solo disegnando** fino al compagno (il tocco sul compagno non passa più, 2026-11-20);
+  oppure tasto **Dribbling** in basso.
 - **Area di tiro** (ultimi 20 m prima della porta avversaria, col pallone): tempo al 22%; linea in porta = tiro,
   linea fino a un compagno (entro 5 m) = passaggio, altrove = strada da correre. Anche sulle rimesse il passaggio si disegna.
 - **Visuale girata col dito** (duello e area di tiro, pallone nostro): trascinare di lato partendo lontano dal portatore
   gira la telecamera intorno a lui (si afferra il campo: 150° per schermo, al massimo ±100°, `src/camuser.js`); niente
   più rotazione automatica. Il tocco breve sul campo o su un compagno lì non fa niente. Resta finché dura il rallenty
   con lo stesso portatore, poi torna dritta da sola.
-- **Scatto** (2026-11-20, al posto del tasto Dribbling): nel duello il tasto in basso è **Scatto**. Il portatore prova a
-  bruciare il difensore in velocità (riesce più spesso se la sua velocità supera la difesa dell'avversario): se riesce
-  gira di fianco al difensore a 2 m e prosegue dritto per 14 m, più veloce per 1,2 s; se fallisce perde o si fa deviare il
-  pallone come col vecchio dribbling. Il passaggio disegnato resta. L'IA dribbla ancora coi giochetti.
+- **Scatto** (fuga, Luis 2026-11-21): si divide il campo in linee parallele alle linee di porta. Avversario a meno di
+  4 m **alla pari o dietro** il portatore (non più avanti di 0,5 m verso la porta avversaria, `LEVEL_TOL`) = niente duello:
+  il tempo rallenta (8%) e il tasto in basso è **Scatto**; toccandolo il portatore si stacca (+15% di velocità per 1,2 s,
+  l'avversario resta indietro e non contrasta per 0,6 s) e prosegue dritto per 14 m. Riesce sempre. Avversario **davanti**
+  per linee = duello col **Dribbling** o il passaggio disegnato. L'IA dribbla come prima.
 - La finta è stata tolta (2026-11-20).
 - Calcio d'angolo: telecamera alle spalle del battitore; dito vicino al battitore = cross, lontano = trascinando si gira la visuale.
 - Difesa: dito su un proprio giocatore e disegna = linea da seguire (tutti tranne il portiere); tieni premuto sul campo =

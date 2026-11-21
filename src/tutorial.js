@@ -11,7 +11,7 @@ export const REPS = 3;    // prove per ogni meccanica
 // Ogni lezione: testo della scheda, 3 situazioni (setup con indice k), come si riconosce la riuscita,
 // chi resta fermo. `needs`: metodo del motore senza il quale la lezione si salta.
 const PASS_DEF_DIST = 11; // lezione Passaggio: distanza iniziale del difensore davanti al portatore (m)
-const DRIB_DEF_DIF = 15;  // lezione Scatto: difesa del difensore, così il dribbling riesce quasi sempre (è una lezione)
+const DRIB_DEF_DIF = 15;  // lezione Dribbling: difesa del difensore, così il dribbling riesce quasi sempre (è una lezione)
 
 export const LESSONS = [
   {
@@ -63,10 +63,10 @@ export const LESSONS = [
     freeze: 'opp', noAutoDef: true,
   },
   {
-    title: 'Scatto',
-    short: 'Avvicinati al difensore e tocca Scatto.',
-    text: 'Quando arrivi addosso a un difensore la visuale si abbassa e il tempo rallenta: puoi <b>passare</b> a un compagno libero oppure toccare <b>Scatto</b> in basso per bruciarlo in velocità e proseguire dritto.',
-    needs: 'userSprint',
+    title: 'Dribbling',
+    short: 'Avvicinati al difensore e tocca Dribbling.',
+    text: 'Quando arrivi addosso a un difensore la visuale si abbassa e il tempo rallenta: puoi <b>passare</b> a un compagno libero oppure toccare <b>Dribbling</b> in basso per saltarlo.',
+    needs: 'userDribble',
     setup(m, T, k) {
       const c = T.carrier(m, 7, [0, -10, 10][k], [-6, 0, -2][k]); T.clearOpp(m);
       const o = m.players[16]; T.put(m, o, c.x + [0, 1, -1][k], c.y + 7); o.fx = 0; o.fy = -1;
@@ -75,6 +75,19 @@ export const LESSONS = [
       return { c, o };
     },
     check(e) { return e.type === 'dribble' && e.p.team === 0 && e.ok; },
+    freeze: 'opp-but-o',
+  },
+  {
+    title: 'Scatto',
+    short: 'Hai un avversario alle spalle: tocca Scatto.',
+    text: "Se un avversario ti arriva <b>alla pari o alle spalle</b> il tempo rallenta e in basso compare <b>Scatto</b>: toccalo e il tuo giocatore si stacca e prosegue dritto. Con l'avversario davanti, invece, si dribbla o si passa.",
+    needs: 'userSprint',
+    setup(m, T, k) {
+      const c = T.carrier(m, 7, [0, -12, 12][k], [-8, -2, -14][k]); T.clearOpp(m);
+      const o = m.players[16]; T.put(m, o, c.x + [-1.5, 2, 0][k], c.y - [2, 0.5, 2.5][k]);
+      return { c, o };
+    },
+    check(e) { return e.type === 'burst' && e.p.team === 0; },
     freeze: 'opp-but-o',
   },
   {
@@ -131,7 +144,7 @@ export class Tutorial {
     // e niente attese rimaste dalla prova prima: duello, dribbling e contrasti ripartono da zero
     // (prima, dopo un dribbling fallito, il tasto Dribbling della prova nuova non faceva nulla per secondi)
     for (const p of m.players) { p.off = false; p.yellow = 0; p.energy = 1; p.vx = p.vy = 0; p.stun = 0; p.dribCd = 0; p.tackleCd = 0; p.protect = 0; p.beat = 0; p.burst = 0; }
-    m.duel = null; m.duelCd = [0, 0]; m.duelCdP = [null, null];
+    m.duel = null; m.duelCd = [0, 0]; m.duelCdP = [null, null]; m.flee = null; m.fleeCd = [0, 0]; m.fleeCdP = [null, null]; m.flee = null; m.fleeCd = [0, 0]; m.fleeCdP = [null, null];
     m.ctrl[0] = null;
     m.place(m.gk(0), 0, -49); m.place(m.gk(1), 0, 49);
     for (const p of m.team(0)) if (p.pos !== 'P' && p.i !== 7 && p.i !== 9) { const [ax, ay] = m.anchor(p); this.put(m, p, ax, Math.min(ay, -5)); }

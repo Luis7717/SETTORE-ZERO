@@ -802,7 +802,23 @@ Legge `SimMatch` e non lo cambia; contratto nel README di `godot/`. Ciclo di gio
   (fotogramma 2,8-3 ms; vista 1,5 ms di CPU, di cui ~0,6 ms le 22 AnimationTree; motore 0,2 ms).
   **Non verificato sull'iPhone.**
 
-## 2026-11-20 — Tasto Scatto al posto del Dribbling (richiesta di Luis)
+## 2026-11-21 — Scatto solo con l'avversario alla pari o dietro "per linee" (richiesta di Luis)
+- Luis: "lo scatto deve essere attivabile solo se l'avversario é dietro (a livello di campo se lo dividessimo in tante linee
+  parallele lui dovrebbe stare dietro o in parallelo alla nostra, se é davanti allora valgono le solite regole, dribling o
+  passaggio)". Annulla la voce sotto del 2026-11-20 (Scatto nel duello) e riprende la fuga di `dfe6bd8`, ma col criterio
+  "per linee" (coordinata lungo il campo) invece che di lato/alle spalle rispetto al verso di corsa.
+- `aheadLine(c, o)` in `src/sim/duel.js`: o è davanti se sta più avanti di `LEVEL_TOL` = 0,5 m verso la porta che attacca c
+  (1 m era troppo: un difensore a 1 m dritto davanti non apriva il duello). Il duello della persona si apre solo con
+  l'avversario davanti per linee (oltre al cono di 70° di prima) e si chiude ("lontano") quando arriva alla pari: allora
+  si apre la fuga. Fuga = avversario alla pari o dietro entro `FLEE_R` = 4 m, rallenty 8%, tasto Scatto (`userSprint` →
+  `burst`: riesce sempre, +15% per 1,2 s, avversario "saltato" per 0,6 s, dritto 14 m nel verso di corsa). Nella fuga non
+  si passa (fuori dall'area di tiro). Il tasto del duello torna **Dribbling**.
+- Allenamento: torna la lezione "Dribbling" e se ne aggiunge una "Scatto" (avversario alle spalle). Prove:
+  `test/unit/flee.test.mjs` (11 casi, anche squadra 1 e portatore che corre di lato), `node test/flee-shot.mjs shots`.
+- Equilibrio (`npm run balance -- 60 60 20`): prima V5 N6 P9, gol 0,4-0,7, tiri 6,3-4,3; dopo V4 N7 P9, gol 0,4-0,8,
+  tiri 6,0-4,5 (il bot non tocca Scatto; cambia solo quando si apre/chiude il duello). Impronte golden rigenerate.
+
+## 2026-11-20 — Tasto Scatto al posto del Dribbling (richiesta di Luis) — SOSTITUITA dalla voce del 2026-11-21
 - Luis: "quando sei davanti all'avversario ... il tempo rallenta comunque, come se fosse per il passaggio, però compare un
   tasto che è lo scatto e lui scatta per staccarsi. E poi prosegue dritto." e poi "se è davanti non appare il tasto
   dribbling, appare il tasto scatto". Un primo tentativo (`dfe6bd8`: "fuga" con l'avversario di lato o alle spalle) era
