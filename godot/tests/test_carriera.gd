@@ -27,11 +27,14 @@ func same(got: Variant, want: Variant, msg: String) -> bool:
 	return check(d == "", d)
 
 
-## stato della carriera senza le impostazioni che il web non ha (music, vibra)
+## stato della carriera senza quello che il web non ha: impostazioni music e vibra, chiavi della fase B
+## (CHIAVI_GODOT: forma, infortuni, obiettivo, rivale, ...)
 static func come_web(s: Dictionary) -> Dictionary:
 	var c: Dictionary = s.duplicate(true)
 	c.settings.erase("music")
 	c.settings.erase("vibra")
+	for k: String in CarrieraScript.CHIAVI_GODOT:
+		c.erase(k)
 	return c
 
 

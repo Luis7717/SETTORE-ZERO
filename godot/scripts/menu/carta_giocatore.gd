@@ -1,7 +1,8 @@
 # Carta di un giocatore nella Rosa (card() di src/ui-squad.js, .fc del web): valutazione nel ruolo del posto,
 # ruolo, ritratto, nome breve; fuori ruolo = ruolo vero in arancio a sinistra, a destra quanto cambia la squadra
 # scambiandola col giocatore scelto (verde/rosso). Bordo per fascia di valutazione; scelta = gialla, confronto =
-# bianca che pulsa, appena scambiata = lampo giallo che si spegne.
+# bianca che pulsa, appena scambiata = lampo giallo che si spegne. Stato fisico (solo Godot, fisico()): croce rossa
+# sugli infortunati e barretta della forma in basso quando non è piena (verde, gialla, rossa).
 # Disegnata tutta in _draw (un nodo per carta: la Rosa ne ha fino a 24 e si ridisegna a ogni tocco).
 # Un tocco (dito giù e su senza spostarsi) manda `toccata`; trascinando, il movimento passa a chi sta sotto
 # (la panchina scorre di lato).
@@ -38,6 +39,8 @@ var scelta := false
 var confronto := false
 var appena := false
 var faccia_svg := ""
+var forma := 100                 # 0..100
+var infortunio := 0              # giornate che mancano (0 = sano)
 
 var _t := 0.0
 var _giu := Vector2.INF
@@ -66,6 +69,15 @@ func imposta(p: Dictionary, slot_pos: String, faccia: String, d: Variant) -> voi
 	delta = d
 	tooltip_text = "%s, %s %d" % [str(p.get("name", "")), D.pos_name(ruolo), ovr]
 	set_process(appena or confronto)
+	queue_redraw()
+
+
+## forma (0..100) e giornate di infortunio (0 = sano)
+func fisico(forma_: int, infortunio_: int) -> void:
+	forma = forma_
+	infortunio = infortunio_
+	if infortunio > 0:
+		tooltip_text += " · infortunato (%d)" % infortunio
 	queue_redraw()
 
 
@@ -162,6 +174,20 @@ func _draw() -> void:
 	var testo := _taglia(fn, nome, 10.5, W - 8.0)
 	var tw := fn.get_string_size(testo, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
 	draw_string(fn, Vector2((W - tw) / 2.0, 63), testo, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, T.TXT)
+	_disegna_fisico()
+
+
+# croce rossa (infortunato) a sinistra del ritratto; barretta della forma sotto il nome
+func _disegna_fisico() -> void:
+	if infortunio > 0:
+		_rett(Rect2(3, 21, 15, 15), T.BAD, 4)
+		draw_rect(Rect2(9, 23.5, 3, 10), Color.WHITE)
+		draw_rect(Rect2(5.5, 27, 10, 3), Color.WHITE)
+	if forma < 100:
+		var col := T.GOOD if forma >= 80 else (Color("#f1c75a") if forma >= 50 else T.BAD)
+		var w := W - 16.0
+		draw_rect(Rect2(8, H - 5, w, 2), Color(1, 1, 1, 0.12))
+		draw_rect(Rect2(8, H - 5, w * clampf(forma / 100.0, 0.0, 1.0), 2), col)
 
 
 func _rett(r: Rect2, c: Color, raggio: int) -> void:

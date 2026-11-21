@@ -12,6 +12,11 @@
 # - Numeri: gli interi restano int anche dopo il caricamento (JSON di Godot li legge come float: js.gd → int_numbers).
 # - Le funzioni libere di career.js (overall, value, fmtMoney, genPlayer, ...) sono funzioni statiche:
 #   `Carriera.overall(p)`, `Carriera.fmtMoney(k)`; le costanti `Carriera.DIV_NAMES`, `Carriera.KITS`, ...
+#
+# Novità solo Godot (fase B, in fondo al file; il web non le ha): campione che cresce giocando (crescita.gd),
+# obiettivi della dirigenza e rivale/derby (dirigenza.gd), forma e infortuni tra le partite (forma.gd).
+# Stanno in chiavi nuove dello stato (CHIAVI_GODOT) e passano da dopoPartita()/squadraPartita(), chiamate da
+# scripts/app.gd: le funzioni portate dal JS (finishMatch, endSeason, ...) restano identiche al web.
 class_name Carriera
 extends RefCounted
 
@@ -20,6 +25,9 @@ const Asp := preload("res://scripts/carriera/aspetto.gd")
 const Stemma := preload("res://scripts/carriera/stemma_dati.gd")
 const Salv := preload("res://scripts/carriera/salvataggio.gd")
 const C := preload("res://sim/core.gd")
+const Crescita := preload("res://scripts/carriera/crescita.gd")
+const Forma := preload("res://scripts/carriera/forma.gd")
+const Dirigenza := preload("res://scripts/carriera/dirigenza.gd")
 
 const FORMATIONS := C.FORMATIONS
 const DIV_NAMES := ["Prima Divisione", "Seconda Divisione", "Terza Divisione"]
@@ -45,11 +53,16 @@ const SQUAD_MAX := 24
 const SQUAD_MIN := 14
 const MARKET_SIZE := 20
 const STAT_KEYS := ["vel", "fis", "dri", "tir", "dif", "pas", "por"]
+## chiavi dello stato che ha solo la versione Godot (fase B): semeB = seme dei numeri casuali delle novità,
+## forma/infortuni/progressi = per id del giocatore (testo), obiettivo = {stagione, div, tipo, posto}, rivale = id
+const CHIAVI_GODOT := ["semeB", "forma", "infortuni", "progressi", "obiettivo", "rivale"]
 
 ## stato della carriera (null = nessuna carriera): stesse chiavi di `career.s` nel web
 var s: Variant = null
 ## file del salvataggio (le prove ne usano un altro)
 var percorso := Salv.PERCORSO
+## obiettivo della stagione appena chiusa da endSeason (per il giudizio in dopoPartita; non si salva)
+var _obiettivo_finito := {}
 ## da dove è venuto l'ultimo caricamento: "principale", "temporaneo", "copia" o "" (nessuno)
 var fonte := ""
 
@@ -253,6 +266,7 @@ func completa(st: Dictionary) -> Dictionary:
 		fixLineup()
 	if st.day >= ROUNDS: # stagione finita ma non chiusa (salvataggio a metà): la si chiude adesso
 		endSeason()
+	novita()
 	return st
 
 
@@ -367,6 +381,7 @@ func create(name: String, kit: int, seme: int = -1) -> void:
 	s.teams.me.rating = myRating()
 	newSeason(true)
 	refreshMarket(MARKET_SIZE)
+	novita()
 	save()
 
 
@@ -537,6 +552,7 @@ func autoLineup() -> void:
 		l[i] = best.id
 		used[best.id] = true
 	s.lineup = l
+	schieraSani()
 
 
 ## dopo vendite e acquisti: riempie i buchi della formazione
@@ -568,6 +584,7 @@ func fixLineup() -> void:
 		if best != null:
 			s.lineup[i] = best.id
 			used[best.id] = true
+	schieraSani()
 
 
 func bench() -> Array:
@@ -580,7 +597,7 @@ func bench() -> Array:
 
 ## scambia due giocatori (titolare/titolare o titolare/panchina)
 func swap(a: int, b: int) -> void:
-	if not canSwap(s.lineup, a, b):
+	if not canSwap(s.lineup, a, b) or entraInfortunato(a, b):
 		return
 	s.lineup = swapLineup(s.lineup, a, b)
 	save()
@@ -893,4 +910,188 @@ func endSeason() -> Dictionary:
 	newSeason(false)
 	s.market = []
 	refreshMarket(MARKET_SIZE)
+	_obiettivo_finito = obiettivo().duplicate() if s.get("obiettivo") is Dictionary else {}
+	novita() # solo Godot: obiettivo e rivale della stagione nuova (niente numeri casuali)
 	return {"pos": pos, "prize": prize, "bonus": bonus, "outcome": outcome, "div": d, "newDiv": div(), "retired": []}
+
+
+# ---------------------------------------------------------------- novità solo Godot (fase B)
+## chiavi nuove con valori predefiniti (carriere nuove e salvataggi vecchi); obiettivo e rivale della stagione
+## corrente se mancano o sono di un'altra stagione / divisione. Niente numeri casuali di `s.seed`.
+func novita() -> void:
+	if not s is Dictionary or not s.get("squad") is Array:
+		return
+	if not JS.is_integer(s.get("semeB")):
+		s["semeB"] = Asp.hash32("novita", s.club, s.get("seed", 0))
+	for k: String in ["forma", "infortuni", "progressi"]:
+		if not s.get(k) is Dictionary:
+			s[k] = {}
+	var ids := {}
+	for p: Dictionary in s.squad:
+		ids[str(p.id)] = true
+	for k: Variant in s.forma.keys():
+		if not ids.has(k) or not JS.is_integer(s.forma[k]):
+			s.forma.erase(k)
+		else:
+			s.forma[k] = clampi(s.forma[k], 0, Forma.FORMA_MAX)
+	for k: Variant in s.infortuni.keys():
+		if not ids.has(k) or not JS.is_integer(s.infortuni[k]) or s.infortuni[k] <= 0:
+			s.infortuni.erase(k)
+	for k: Variant in s.progressi.keys():
+		if not ids.has(k) or not s.progressi[k] is Dictionary:
+			s.progressi.erase(k)
+	var d := div()
+	if d < 0:
+		return
+	var altre: Array = []
+	var ids_div: Array = []
+	for id: String in s.divs[d]:
+		if id != "me" and s.teams.has(id):
+			altre.append(int(s.teams[id].rating))
+			ids_div.append(id)
+	var mia := myRating()
+	s["rivale"] = Dirigenza.scegli_rivale(s.get("rivale"), ids_div, s.teams, mia)
+	var ob: Variant = s.get("obiettivo")
+	if not ob is Dictionary or not JS.is_integer(ob.get("stagione")) or int(ob.stagione) != int(s.season) \
+			or not Dirigenza.TIPI.has(ob.get("tipo")) or not JS.is_integer(ob.get("posto")):
+		s["obiettivo"] = Dirigenza.nuovo(int(s.season), d, mia, altre)
+
+
+## numeri casuali delle novità per questa giornata (stessa carriera = stessi numeri)
+func _rng_novita(nome: String) -> Callable:
+	return JS.rng32(Asp.hash32(s.get("semeB", 0), nome, s.season, s.day))
+
+
+## il giocatore principale (creato nell'editor iniziale), o null
+func campione() -> Variant:
+	for p: Dictionary in s.squad:
+		if p.get("champ", false):
+			return p
+	return null
+
+
+func forma_di(id: Variant) -> int:
+	var f: Variant = s.get("forma", {}).get(str(id), Forma.FORMA_MAX) if s.get("forma") is Dictionary else Forma.FORMA_MAX
+	return int(f)
+
+
+## giornate di infortunio che restano (0 = sano)
+func infortunio(id: Variant) -> int:
+	var inf: Variant = s.get("infortuni")
+	return int(inf.get(str(id), 0)) if inf is Dictionary else 0
+
+
+func _ha_infortunati() -> bool:
+	return s is Dictionary and s.get("infortuni") is Dictionary and not s.infortuni.is_empty()
+
+
+## lo scambio a⇄b farebbe entrare in campo un infortunato?
+func entraInfortunato(a: Variant, b: Variant) -> bool:
+	if s.lineup.has(a) and not s.lineup.has(b):
+		return infortunio(b) > 0
+	if s.lineup.has(b) and not s.lineup.has(a):
+		return infortunio(a) > 0
+	return false
+
+
+## titolari infortunati → il miglior sostituto sano per quel posto (la CPU fa i cambi). Ritorna [{fuori, dentro}]
+func schieraSani() -> Array:
+	var cambi: Array = []
+	if not _ha_infortunati():
+		return cambi
+	var F: Array = FORMATIONS[s.formation]
+	for i in s.lineup.size():
+		var id: Variant = s.lineup[i]
+		if id == null or infortunio(id) <= 0:
+			continue
+		var best: Variant = null
+		var bo := -1
+		for p: Dictionary in s.squad:
+			if s.lineup.has(p.id) or infortunio(p.id) > 0:
+				continue
+			var o := overallAs(p, F[i][0])
+			if o > bo:
+				bo = o
+				best = p
+		if best != null:
+			var fuori: Variant = player(id)
+			cambi.append({"fuori": fuori.name if fuori != null else "?", "dentro": best.name})
+			s.lineup[i] = best.id
+	return cambi
+
+
+## la mia squadra per la partita (al posto di myMatchTeam): niente infortunati, e chi è giù di forma parte
+## stanco (energia iniziale `energy0` del motore). I giocatori sono copie: lo stato della carriera non cambia.
+func squadraPartita() -> Dictionary:
+	schieraSani()
+	var t := myMatchTeam()
+	var gioc: Array = []
+	for p: Variant in t.players:
+		if not p is Dictionary:
+			gioc.append(p)
+			continue
+		var q: Dictionary = p.duplicate()
+		var e := Forma.energia(forma_di(p.id))
+		if e < 1.0:
+			q["energy0"] = e
+		gioc.append(q)
+	t.players = gioc
+	t.bench = t.bench.filter(func(p: Dictionary) -> bool: return infortunio(p.id) <= 0)
+	return t
+
+
+func rivale() -> Variant:
+	var id: Variant = s.get("rivale")
+	return team(id) if id is String and id != "" else null
+
+
+## la partita contro questa squadra è un derby?
+func isDerby(t: Variant) -> bool:
+	return t is Dictionary and t.get("id", "") != "" and t.get("id") == s.get("rivale")
+
+
+func obiettivo() -> Dictionary:
+	var ob: Variant = s.get("obiettivo")
+	return ob if ob is Dictionary else {}
+
+
+## dopo finishMatch (partita di campionato): premio del derby, crescita del campione, forma e infortuni,
+## e a fine stagione l'obiettivo della dirigenza (premio o penalità) e quello nuovo. Aggiunge a res:
+## derby (soldi), crescita {nome, righe}, infortuni [{id, name, giornate}], cambi [{fuori, dentro}],
+## obiettivo {tipo, testo, riuscito, soldi, messaggio} (anche in res.season). esito = quello della partita
+## ({gol_a, gol_b, me, derby, conteggi}). Ritorna res.
+func dopoPartita(res: Dictionary, esito: Dictionary) -> Dictionary:
+	if res.is_empty() or not s is Dictionary:
+		return res
+	var stagione: Variant = res.get("season")
+	# obiettivo della stagione giocata: a fine stagione endSeason l'ha già sostituito con quello nuovo
+	var ob: Dictionary = _obiettivo_finito if stagione is Dictionary else obiettivo().duplicate()
+	_obiettivo_finito = {}
+	novita()
+	var d: int = int(stagione.div) if stagione is Dictionary else div()
+	var base: int = DIV_INCOME[clampi(d, 0, 2)]
+	var me := int(esito.get("me", 0))
+	var mie := int(esito.get("gol_a", 0)) if me == 0 else int(esito.get("gol_b", 0))
+	var loro := int(esito.get("gol_b", 0)) if me == 0 else int(esito.get("gol_a", 0))
+	if esito.get("derby", false):
+		var premio := Dirigenza.premio_derby(base, mie, loro)
+		res["derby"] = premio
+		s.money += premio
+	var ch: Variant = campione()
+	var cont: Variant = esito.get("conteggi", {})
+	if ch != null and cont is Dictionary and cont.get(str(ch.id)) is Dictionary:
+		res["crescita"] = {"nome": ch.name, "righe": Crescita.applica(ch, cont[str(ch.id)], s.progressi)}
+		s.teams.me.rating = myRating()
+	if stagione is Dictionary:
+		Forma.estate(s.forma, s.infortuni)
+		if not ob.is_empty() and int(ob.get("stagione", -1)) == int(s.season) - 1:
+			var val := Dirigenza.valuta(ob, int(stagione.pos), base, int(s.money))
+			s.money += int(val.soldi)
+			res["obiettivo"] = val
+			stagione["obiettivo"] = val
+		novita() # obiettivo e rivale della stagione nuova
+	else:
+		res["infortuni"] = Forma.giornata(s.squad, s.lineup.duplicate(), s.forma, s.infortuni, _rng_novita("infortuni"))
+		res["cambi"] = schieraSani()
+	save()
+	return res

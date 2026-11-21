@@ -1,6 +1,8 @@
 # Suoni della partita (porting di src/audio.js): file veri di assets/audio/ agganciati agli eventi del motore.
 # Un file che manca non blocca nulla: quel suono si salta (il palo, che non ha un file, è un tono generato qui).
 # Pubblico di sottofondo in loop, più forte quando il pallone si avvicina a una porta e subito dopo un gol.
+# Ogni tanto un coro (il pubblico sale per qualche secondo); nel derby (`derby = true`, partita contro la rivale in
+# carriera) il pubblico è più forte e i cori sono più frequenti e più alti.
 extends Node
 
 const CARTELLA := "res://assets/audio/"
@@ -12,16 +14,26 @@ const FOLLA_GOL := 0.5           # livello subito dopo un gol ...
 const FOLLA_GOL_TIENI := 2.0     # ... tenuto per tanti secondi, poi torna giù
 const FOLLA_TAU := 0.4           # costante di tempo del cambio di livello (s), come setTargetAtTime del web
 const FOLLA_TAU_GOL := 1.0
+const DERBY_FOLLA := 1.3        # derby: pubblico più forte di così
+const CORO := 0.08               # coro: livello in più al culmine ...
+const CORO_DERBY := 0.14         # ... nel derby
+const CORO_DURATA := 3.5         # s
+const CORO_OGNI := Vector2(28.0, 45.0)        # s tra un coro e l'altro (a caso nell'intervallo)
+const CORO_OGNI_DERBY := Vector2(9.0, 15.0)
 const VOCI := 6                  # suoni brevi che possono suonare insieme
 const DB_MAX := 12.0
 
 var acceso := true
+var derby := false
 var _flussi := {}                # id → AudioStream
 var _voci: Array[AudioStreamPlayer] = []
 var _folla: AudioStreamPlayer
 var _folla_liv := 0.0
 var _folla_meta := 0.0
 var _gol_t := -10.0              # tempo dal gol: > 0 = folla tenuta alta, 0..−3 = sta tornando giù
+var _coro_t := 0.0               # tempo che resta del coro in corso
+var _prossimo_coro := 12.0       # s al prossimo coro
+var _rng := RandomNumberGenerator.new()  # solo per i cori (suoni, non il motore)
 
 
 func _ready() -> void:
@@ -54,7 +66,7 @@ func _process(delta: float) -> void:
 	if _gol_t > -10.0:
 		_gol_t -= delta
 	var tau := FOLLA_TAU_GOL if _gol_t > -3.0 and _gol_t <= 0.0 else FOLLA_TAU
-	var meta := FOLLA_GOL if _gol_t > 0.0 else _folla_meta
+	var meta := FOLLA_GOL if _gol_t > 0.0 else _folla_meta + _coro(delta)
 	_folla_liv += (meta - _folla_liv) * (1.0 - exp(-delta / tau))
 	if _folla.stream != null:
 		_folla.volume_db = _db(_folla_liv * CROWD_SAMPLE_GAIN if acceso else 0.0)
@@ -76,7 +88,23 @@ func ferma() -> void:
 
 ## livello del pubblico (0 = zitto); eccitazione 0..1 = pallone vicino a una porta
 func folla(livello: float, eccitazione: float = 0.0) -> void:
-	_folla_meta = 0.0 if livello <= 0.0 else livello + FOLLA_PORTA * clampf(eccitazione, 0.0, 1.0)
+	_folla_meta = 0.0 if livello <= 0.0 else (livello + FOLLA_PORTA * clampf(eccitazione, 0.0, 1.0)) * (DERBY_FOLLA if derby else 1.0)
+
+
+# livello in più del coro (sale e scende come mezza onda); i cori partono solo col pubblico acceso
+func _coro(delta: float) -> float:
+	if _folla_meta <= 0.0:
+		_coro_t = 0.0
+		return 0.0
+	_prossimo_coro -= delta
+	if _prossimo_coro <= 0.0:
+		var ogni := CORO_OGNI_DERBY if derby else CORO_OGNI
+		_prossimo_coro = _rng.randf_range(ogni.x, ogni.y)
+		_coro_t = CORO_DURATA
+	if _coro_t <= 0.0:
+		return 0.0
+	_coro_t -= delta
+	return (CORO_DERBY if derby else CORO) * sin(PI * clampf(1.0 - _coro_t / CORO_DURATA, 0.0, 1.0))
 
 
 ## eccitazione del pubblico come lo stadio del web: dagli ultimi 25 m prima di una porta fino alla linea

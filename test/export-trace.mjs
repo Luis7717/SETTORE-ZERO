@@ -53,6 +53,8 @@ export const TRACE_SCENARIOS = [
   { seed: 5, mode: 'ai', my: 50, op: 80, halfLen: 60, fA: '4-2-3-1' },
   { seed: 7, mode: 'bot', my: 60, op: 60, halfLen: 150 },
   { seed: 42, mode: 'ai', my: 60, op: 60, halfLen: 150, fA: '4-3-3', fB: '4-2-3-1' },
+  // giocatori che partono stanchi (energia iniziale, campo energy0: carriera Godot, stanchezza tra le partite)
+  { seed: 8, mode: 'bot', my: 60, op: 60, halfLen: 60, tired: [[0, 9, 0.45], [0, 3, 0.7], [1, 6, 0.3], [1, 0, 0.6]] },
 ];
 
 function trace(sc) {

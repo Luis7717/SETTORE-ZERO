@@ -16,6 +16,7 @@ const ADV_FREE = 3; // vantaggio solo se nessun altro avversario è più vicino 
 const ADV_MIN_Y = -5; // ... e solo da qui in avanti (m nel verso d'attacco, 0 = metà campo)
 // Calci da fermo (Luis 2026-11-21): chi batte non può toccare il pallone una seconda volta finché non l'ha toccato un altro.
 const DBL_FREE = 6;      // sicurezza: dopo tanto tempo di pallone libero senza che nessun altro lo tocchi, il battitore può riprenderlo (s)
+const ENERGY_MIN = 0.2; // energia più bassa possibile (come il calo in partita, motion.js)
 const SPEED_TIRED = 0.86; // a energia 0 la velocità massima scende a questa frazione (l'energia cala più piano con più fisico = resistenza)
 const PATH_STEP = 1.2;   // distanza minima tra due punti della strada disegnata (m)
 const PATH_REACH = 1.3;  // punto raggiunto quando il portatore è più vicino di così (m)
@@ -25,6 +26,13 @@ const PATH_TTL = 20;     // durata massima di una strada disegnata (s)
 const PATH_LOOK = 3;     // il giocatore punta a un punto della strada almeno così avanti: un punto troppo vicino lo frenava e lo scatto non si vedeva (m)
 export const RUN_MAX_LEN = 14; // lunghezza massima di una linea di difesa, misurata dal giocatore: il resto si taglia (m)
 export const SPRINT_DIST = 6; // dito più lontano di così dal giocatore controllato (m) = scatto
+
+// Energia a inizio partita (o all'ingresso dalla panchina): il campo facoltativo `energy0` del giocatore sorgente
+// (carriera Godot: chi arriva stanco dalle partite prima), tra ENERGY_MIN e 1; senza il campo 1, come sempre.
+export function startEnergy(src) {
+  const e = src ? src.energy0 : undefined;
+  return typeof e === 'number' && Number.isFinite(e) ? Math.min(1, Math.max(ENERGY_MIN, e)) : 1;
+}
 
 // Taglia una linea che parte da (x0, y0) e passa per pts alla lunghezza max (m): l'ultimo punto cade esattamente a max.
 // Usata dal motore (userRun) e dal disegno della linea (src/input.js), così a schermo si vede già tagliata.
@@ -76,7 +84,7 @@ export class Match {
     return {
       team, i, src, name: src.name, pos: slot[0], bx: slot[1], by: slot[2], st: effStats(src, slot[0]),
       x: 0, y: 0, vx: 0, vy: 0, fx: 0, fy: dir, tx: 0, ty: 0, spdF: 1, state: 'play', t: 0, stun: 0, protect: 0,
-      contact: 0, tackleCd: 0, kickAnim: 0, energy: 1, sprint: false, dribCd: 0, beat: 0, beatBy: null, burst: 0, wear: { dri: 1, tes: 1 }, wall: null, yellow: 0, off: false, sdx: 0, sdy: 0, hit: false,
+      contact: 0, tackleCd: 0, kickAnim: 0, energy: startEnergy(src), sprint: false, dribCd: 0, beat: 0, beatBy: null, burst: 0, wear: { dri: 1, tes: 1 }, wall: null, yellow: 0, off: false, sdx: 0, sdy: 0, hit: false,
       dive: null, phase: this.rnd() * 6, aiT: 0, dx: 0, dy: 0, reactT: 0, decided: true, warn: false,
       sox: 0, soy: 0, soT: this.rnd(), cele: 0, look: this.lookFor(src),
     };
@@ -652,7 +660,7 @@ export class Match {
   }
   substitute(T, idx, src) {
     const p = this.team(T)[idx]; if (!p || p.off) return false;
-    p.src = src; p.name = src.name; p.st = effStats(src, p.pos); p.energy = 1; p.wear = { dri: 1, tes: 1 }; p.dribCd = 0; p.yellow = 0; p.look = this.lookFor(src);
+    p.src = src; p.name = src.name; p.st = effStats(src, p.pos); p.energy = startEnergy(src); p.wear = { dri: 1, tes: 1 }; p.dribCd = 0; p.yellow = 0; p.look = this.lookFor(src);
     if (this.duel && (this.duel.p === p || this.duel.o === p)) this.endDuel('gioco fermo');
     if (this.flee && (this.flee.p === p || this.flee.o === p)) this.endFlee('gioco fermo');
     this.ev('sub', { p }); return true;

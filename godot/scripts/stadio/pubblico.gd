@@ -6,6 +6,8 @@
 # Le tribune sono divise in pezzi da ~30 m (un MultiMesh ciascuno): Godot scarta quelli fuori dall'inquadratura.
 # Densità (0..1) per i livelli di qualità: si mostrano solo i primi tifosi di ogni pezzo (sono in ordine casuale,
 # quindi la tribuna si sfoltisce in modo uniforme).
+# Derby (`derby = true`, partita contro la rivale in carriera): più tifosi in piedi e un coro ogni tanto (tutti su
+# con le braccia alzate per qualche secondo).
 extends Node3D
 
 const Coord := preload("res://scripts/coord.gd")
@@ -21,6 +23,10 @@ const CELLA_W := 32            # una persona nell'atlante (px)
 const CELLA_H := 64
 # stato di base delle tifoserie (in piedi, braccia, salti, applauso) e quanto in fretta lo si insegue (1/s)
 const BASE := Vector4(0.12, 0.0, 0.0, 0.0)
+const BASE_DERBY := Vector4(0.35, 0.12, 0.0, 0.1)
+const CORO_STATO := Vector4(1.0, 0.8, 0.25, 0.0)
+const CORO_DURATA := 3.0       # s
+const CORO_OGNI := 11.0        # s tra un coro e l'altro nel derby
 const SALE := 7.0
 const SCENDE := 1.6
 # reazioni: [durata (s), stato di chi tifa per la squadra dell'evento, stato degli altri]
@@ -41,6 +47,8 @@ var _stato := [BASE, BASE]
 var _impulsi: Array = []       # {squadra (0/1), stato, fine}
 var _t := 0.0
 var _densita := 1.0
+var _coro_t := 4.0             # s al prossimo coro (derby)
+var derby := false
 var n_tifosi := 0
 
 
@@ -86,11 +94,17 @@ func tifo(tipo: String, squadra: int) -> void:
 ## a ogni fotogramma (dt = tempo vero: la folla non va al rallentatore)
 func aggiorna(dt: float) -> void:
 	_t += dt
+	if derby:
+		_coro_t -= dt
+		if _coro_t <= 0.0:
+			_coro_t = CORO_OGNI
+			for sq in 2:
+				_impulsi.append({"squadra": sq, "stato": CORO_STATO, "fine": _t + CORO_DURATA})
 	for i in range(_impulsi.size() - 1, -1, -1):
 		if _impulsi[i].fine <= _t:
 			_impulsi.remove_at(i)
 	for s in 2:
-		var meta := BASE
+		var meta := BASE_DERBY if derby else BASE
 		var giu := false
 		for im: Dictionary in _impulsi:
 			if im.squadra == s:

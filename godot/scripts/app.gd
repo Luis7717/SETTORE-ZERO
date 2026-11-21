@@ -22,8 +22,8 @@
 #   segnale schermata_cambiata(nome)
 #
 # Dopo la partita (risultato registrato al fischio finale, schermata cambiata col tasto "Continua"):
-# campionato → Carriera.finishMatch e schermata "dopo_partita" (arg = ultimo_esito, con
-# res.season a fine stagione); amichevole finita → "dopo_partita" (res = null); amichevole abbandonata e
+# campionato → Carriera.finishMatch + Carriera.dopoPartita (derby, crescita del campione, forma e infortuni,
+# obiettivo a fine stagione) e schermata "dopo_partita" (arg = ultimo_esito, con res.season a fine stagione); amichevole finita → "dopo_partita" (res = null); amichevole abbandonata e
 # allenamento → "principale". L'app che va in sottofondo salva subito.
 #
 # Prove da riga di comando (dopo "--"):
@@ -125,10 +125,11 @@ func gioca_campionato() -> void:
 	if nm == null:
 		vai(PRINCIPALE)
 		return
-	var titolo := "Giornata %d · %s" % [nm.day, CarrieraScript.DIV_NAMES[nm.div]]
-	# stadio (taglio dell'erba) della squadra di casa: in casa il mio, fuori quello dell'avversario
+	var derby := carriera.isDerby(nm.opp)
+	var titolo := ("Derby · " if derby else "") + "Giornata %d · %s" % [nm.day, CarrieraScript.DIV_NAMES[nm.div]]
+	# stadio (taglio e manto dell'erba) della squadra di casa: in casa il mio, fuori quello dell'avversario
 	var stadio: Variant = carriera.s.get("seed") if nm.home else nm.opp.get("seed")
-	_partita("campionato", carriera.aiMatchTeam(nm.opp), titolo, float(carriera.s.settings.half), stadio)
+	_partita("campionato", carriera.aiMatchTeam(nm.opp), titolo, float(carriera.s.settings.half), stadio, derby)
 
 
 ## avversario: id di una squadra del campionato, oppure livello (numero), oppure null = livello della mia squadra
@@ -164,13 +165,15 @@ func _ha_carriera() -> bool:
 	return true
 
 
-# stadio_seme: seme della squadra di casa (taglio dell'erba); null = a caso col seme della partita
-func _partita(tipo: String, avversario: Dictionary, titolo: String, durata: float, stadio_seme: Variant = null) -> void:
+# stadio_seme: seme della squadra di casa (taglio e manto dell'erba); null = a caso col seme della partita
+func _partita(tipo: String, avversario: Dictionary, titolo: String, durata: float, stadio_seme: Variant = null, derby := false) -> void:
 	if schermata == "partita":
 		return # doppio tocco sul tasto: la partita sta già partendo
 	var s: Dictionary = carriera.s
-	var opz := {"squadra_a": carriera.myMatchTeam(), "squadra_b": avversario, "me": 0, "tipo": tipo,
-		"durata_tempo": durata, "seme": randi() % 1000000000, "titolo": titolo, "autoGk": bool(s.settings.autoGk)}
+	# squadraPartita: niente infortunati, chi è giù di forma parte stanco
+	var opz := {"squadra_a": carriera.squadraPartita(), "squadra_b": avversario, "me": 0, "tipo": tipo,
+		"durata_tempo": durata, "seme": randi() % 1000000000, "titolo": titolo, "autoGk": bool(s.settings.autoGk),
+		"derby": derby}
 	if stadio_seme is int or stadio_seme is float:
 		opz["stadio_seme"] = int(stadio_seme)
 	s.tut = int(s.get("tut", 0)) + 1 # partite iniziate (come il web)
@@ -203,6 +206,8 @@ func _fine_partita(esito: Dictionary, titolo: String) -> void:
 		res = carriera.finishMatch(mie, loro, _marcatori_per_me(esito.marcatori, me))
 		if (res as Dictionary).is_empty(): # nessuna partita da registrare (calendario finito o rotto)
 			res = null
+		else:
+			res = carriera.dopoPartita(res, esito)
 	ultimo_esito = {"esito": esito, "res": res, "titolo": titolo + (" · abbandonata" if esito.abbandonata else ""), "tipo": tipo}
 	if esito.abbandonata:
 		_continua()

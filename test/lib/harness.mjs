@@ -46,8 +46,11 @@ export function makeBot(seed, press = 1) {
  * mode 'bot' = umano simulato (squadra 0) contro IA; 'ai' = IA contro IA.
  * onStep(m) viene chiamato a ogni passo prima che gli eventi vengano svuotati.
  */
-export function playMatch({ seed, my = 60, op = 60, mode = 'bot', halfLen = 150, fA = '4-4-2', fB = '4-4-2', onStep, maxSteps = 60 * 60 * 30 }) {
-  const m = new Match({ seed, halfLen, human: mode === 'bot' ? [true, false] : [false, false], teams: [mkTeam('A', my, seed * 7 + 1, fA), mkTeam('B', op, seed * 13 + 5, fB)] });
+// tired (facoltativo) = [[squadra, indice, energia iniziale], ...]: giocatori che partono stanchi (campo energy0)
+export function playMatch({ seed, my = 60, op = 60, mode = 'bot', halfLen = 150, fA = '4-4-2', fB = '4-4-2', tired = [], onStep, maxSteps = 60 * 60 * 30 }) {
+  const teams = [mkTeam('A', my, seed * 7 + 1, fA), mkTeam('B', op, seed * 13 + 5, fB)];
+  for (const [t, i, e] of tired) teams[t].players[i].energy0 = e;
+  const m = new Match({ seed, halfLen, human: mode === 'bot' ? [true, false] : [false, false], teams });
   const bot = mode === 'bot' ? makeBot(seed + 9) : null;
   let steps = 0;
   while (m.phase !== 'full' && steps < maxSteps) {

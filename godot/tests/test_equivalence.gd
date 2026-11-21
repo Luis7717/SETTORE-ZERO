@@ -146,7 +146,7 @@ func _trace(idx: int) -> bool:
 			st.fi += 1
 		st.n = n + 1
 	var opt := {"seed": int(sc.seed), "mode": sc.mode, "my": float(sc.my), "op": float(sc.op), "halfLen": float(sc.halfLen),
-		"fA": sc.get("fA", "4-4-2"), "fB": sc.get("fB", "4-4-2")}
+		"fA": sc.get("fA", "4-4-2"), "fB": sc.get("fB", "4-4-2"), "tired": sc.get("tired", [])}
 	var res := H.playMatch(opt, onStep)
 	var m: SimMatchScript = res.m
 	var firstEv := -1
@@ -201,6 +201,32 @@ func test_traccia_5() -> bool:
 
 func test_traccia_6() -> bool:
 	return _trace(6)
+
+
+# giocatori che partono stanchi (energia iniziale energy0, carriera: stanchezza tra le partite)
+func test_traccia_7_energia_iniziale() -> bool:
+	return _trace(7)
+
+
+# senza il campo energy0 si parte a 1 come prima; col campo si parte da lì (tra 0,2 e 1)
+func test_energia_iniziale_facoltativa() -> bool:
+	var a := H.mkTeam("A", 60, 11)
+	var b := H.mkTeam("B", 60, 22)
+	a.players[9]["energy0"] = 0.7
+	a.players[4]["energy0"] = 0.01
+	a.players[5]["energy0"] = "stanco"
+	var m := H.newMatch(5, 60.0, [false, false], a, b)
+	near(m.players[9].energy, 0.7, 1e-12, "energy0 0,7")
+	near(m.players[4].energy, 0.2, 1e-12, "sotto 0,2 si tiene a 0,2")
+	near(m.players[5].energy, 1.0, 0.0, "valore sbagliato = 1")
+	var altri := 0
+	for k in 22:
+		if k != 9 and k != 4 and m.players[k].energy == 1.0:
+			altri += 1
+	eq(altri, 20, "gli altri partono a 1")
+	eq(SimMatchScript.startEnergy({"energy0": 3}), 1.0, "sopra 1 si tiene a 1")
+	eq(SimMatchScript.startEnergy(null), 1.0, "senza giocatore 1")
+	return done()
 
 
 # Fuga e tasto Scatto (userSprint → burst): le partite col bot non li usano mai, quindi hanno scene loro

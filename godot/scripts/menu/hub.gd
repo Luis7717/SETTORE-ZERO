@@ -1,10 +1,12 @@
 # Casa della carriera (hub() di src/ui.js): barra della squadra (stemma, nome, divisione, stagione, posto),
-# prossima partita (giornata, casa/trasferta, le due squadre con la forza, avanzamento, GIOCA che pulsa),
+# obiettivo della dirigenza (verde se oggi è raggiunto), prossima partita (giornata, casa/trasferta, DERBY contro
+# la rivale, le due squadre con la forza, avanzamento, GIOCA che pulsa),
 # ultimo risultato e le otto caselle (Rosa, Mercato, Classifica, Calendario, Amichevole, 1 contro 1,
 # Come si gioca, Impostazioni).
 extends MenuSchermata
 
 const I := preload("res://scripts/menu/icone.gd")
+const Dirigenza := preload("res://scripts/carriera/dirigenza.gd")
 const GIORNATE := 18
 const PULSA := 2.4                 # s: un respiro del pulsante GIOCA (uiPulse)
 
@@ -38,6 +40,10 @@ func costruisci() -> void:
 	info.add_child(U.corto(str(s.club), 23, T.TXT, T.PESO_NERO))
 	var riga := U.bb("%s · Stagione %d · [color=#ffd93d][b]%d°[/b][/color] posto" % [D.div_names()[d], int(s.season), pos], 13, T.DIM)
 	info.add_child(riga)
+	var ob: Dictionary = c.obiettivo()
+	if not ob.is_empty():
+		var ok := pos <= int(ob.get("posto", 8))
+		info.add_child(U.bb("Obiettivo: [color=%s][b]%s[/b][/color]" % ["#4aeb9f" if ok else "#ffd93d", U.esc(Dirigenza.testo(ob))], 12.5, T.DIM))
 	bar.add_child(info)
 	corpo.add_child(bar)
 
@@ -87,6 +93,10 @@ func _carta_prossima(nm: Dictionary, me: Dictionary, k1: Color) -> Control:
 	var top := U.hbox(8)
 	top.add_child(U.testo("GIORNATA %d DI %d" % [int(nm.day), GIORNATE], 12, Color("#b7c7e3"), T.PESO_NERO))
 	top.add_child(U.riempi())
+	if c.isDerby(nm.opp):
+		var derby := U.pannello_stile(T.stile(Color("#ff4d5e"), 999, Color(0, 0, 0, 0), 0, Vector4(10, 3, 10, 3)))
+		derby.add_child(U.testo("DERBY", 11.5, Color.WHITE, T.PESO_NERO))
+		top.add_child(derby)
 	var pill := U.pannello("PillolaOro" if nm.home else "Pillola")
 	pill.add_child(U.testo("IN CASA" if nm.home else "IN TRASFERTA", 11.5, T.GOLD if nm.home else Color("#c9d6ee"), T.PESO_NERO))
 	top.add_child(pill)
