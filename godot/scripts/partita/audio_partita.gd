@@ -152,3 +152,25 @@ static func _tono_palo() -> AudioStreamWAV:
 	w.stereo = false
 	w.data = dati
 	return w
+
+
+## tono breve come Sfx.tone del web (onda a triangolo): volume che scende da `volume` a 0,001 in `durata` secondi
+## (exponentialRampToValueAtTime). Serve al tocco dei menu (App.clic, come Sfx.click: 520 Hz, 0,05 s, 0,12).
+static func tono_triangolo(hz: float, durata: float, volume: float) -> AudioStreamWAV:
+	var mix := 22050
+	var n := int(mix * durata)
+	var dati := PackedByteArray()
+	dati.resize(n * 2)
+	var fase := 0.0
+	for i in n:
+		var t := float(i) / mix
+		fase = fmod(fase + hz / mix, 1.0)
+		var tri := 4.0 * absf(fase - 0.5) - 1.0
+		var inv := volume * pow(0.001 / volume, t / durata)
+		dati.encode_s16(i * 2, int(clampf(tri * inv, -1.0, 1.0) * 32767.0))
+	var w := AudioStreamWAV.new()
+	w.format = AudioStreamWAV.FORMAT_16_BITS
+	w.mix_rate = mix
+	w.stereo = false
+	w.data = dati
+	return w

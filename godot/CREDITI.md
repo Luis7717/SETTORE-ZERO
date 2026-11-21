@@ -23,7 +23,7 @@ pagina Gumroad letto il 2026-11-20 non riporta condizioni scritte. Vale quindi l
 pack, che Luis ha confermato. Citiamo comunque l'autore, qui e nel README. Se l'autore pubblica condizioni diverse,
 valgono quelle.
 
-## Suoni (non ancora usati nella fase 1)
+## Suoni (partita; `music.mp3` nei menu dal 2026-11-21)
 
 Tutti da Freesound, **CC0 1.0**, ritagliati per il web (dettagli e tempi in `assets/CREDITI.md`):
 

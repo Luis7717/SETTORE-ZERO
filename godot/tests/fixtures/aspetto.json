@@ -1,0 +1,680 @@
+{
+ "lookOf": [
+  [
+   {
+    "id": "0_0",
+    "name": "L. Ferrante"
+   },
+   {
+    "skin": 0,
+    "hair": 7,
+    "hairColor": 1,
+    "eyes": 3,
+    "eyeColor": 6,
+    "brows": 2,
+    "beard": 1,
+    "boots": 1
+   }
+  ],
+  [
+   {
+    "id": "0_1",
+    "name": "Mario Rossi"
+   },
+   {
+    "skin": 5,
+    "hair": 1,
+    "hairColor": 0,
+    "eyes": 3,
+    "eyeColor": 1,
+    "brows": 5,
+    "beard": 1,
+    "boots": 0
+   }
+  ],
+  [
+   {
+    "id": "0_2",
+    "name": ""
+   },
+   {
+    "skin": 0,
+    "hair": 14,
+    "hairColor": 3,
+    "eyes": 2,
+    "eyeColor": 0,
+    "brows": 0,
+    "beard": 3,
+    "boots": 1
+   }
+  ],
+  [
+   {
+    "id": "0_3",
+    "name": "A.B. De Rossi Lunghissimo"
+   },
+   {
+    "skin": 2,
+    "hair": 13,
+    "hairColor": 2,
+    "eyes": 2,
+    "eyeColor": 0,
+    "brows": 0,
+    "beard": 5,
+    "boots": 0
+   }
+  ],
+  [
+   {
+    "id": "0_4",
+    "name": "Città di Pàlermo"
+   },
+   {
+    "skin": 5,
+    "hair": 2,
+    "hairColor": 1,
+    "eyes": 2,
+    "eyeColor": 0,
+    "brows": 5,
+    "beard": 1,
+    "boots": 5
+   }
+  ],
+  [
+   {
+    "id": "0_5",
+    "name": "x.  y"
+   },
+   {
+    "skin": 3,
+    "hair": 4,
+    "hairColor": 3,
+    "eyes": 0,
+    "eyeColor": 3,
+    "brows": 0,
+    "beard": 0,
+    "boots": 0
+   }
+  ],
+  [
+   {
+    "id": "0_6",
+    "name": "squadra 0"
+   },
+   {
+    "skin": 4,
+    "hair": 13,
+    "hairColor": 0,
+    "eyes": 0,
+    "eyeColor": 0,
+    "brows": 4,
+    "beard": 0,
+    "boots": 4
+   }
+  ],
+  [
+   {
+    "id": "0_7",
+    "name": "FC Tiro a Giro"
+   },
+   {
+    "skin": 1,
+    "hair": 7,
+    "hairColor": 1,
+    "eyes": 5,
+    "eyeColor": 3,
+    "brows": 4,
+    "beard": 1,
+    "boots": 0
+   }
+  ],
+  [
+   {
+    "id": "0_8",
+    "name": "Virtus"
+   },
+   {
+    "skin": 1,
+    "hair": 1,
+    "hairColor": 1,
+    "eyes": 2,
+    "eyeColor": 0,
+    "brows": 0,
+    "beard": 4,
+    "boots": 0
+   }
+  ],
+  [
+   {
+    "id": "0_9",
+    "name": "L. Ferrante"
+   },
+   {
+    "skin": 5,
+    "hair": 14,
+    "hairColor": 0,
+    "eyes": 5,
+    "eyeColor": 0,
+    "brows": 5,
+    "beard": 1,
+    "boots": 1
+   }
+  ],
+  [
+   {
+    "id": "0_10",
+    "name": "Mario Rossi"
+   },
+   {
+    "skin": 2,
+    "hair": 2,
+    "hairColor": 3,
+    "eyes": 4,
+    "eyeColor": 1,
+    "brows": 0,
+    "beard": 0,
+    "boots": 5
+   }
+  ],
+  [
+   {
+    "id": "1_0",
+    "name": ""
+   },
+   {
+    "skin": 6,
+    "hair": 5,
+    "hairColor": 2,
+    "eyes": 2,
+    "eyeColor": 0,
+    "brows": 1,
+    "beard": 0,
+    "boots": 5
+   }
+  ],
+  [
+   {
+    "id": "1_1",
+    "name": "A.B. De Rossi Lunghissimo"
+   },
+   {
+    "skin": 3,
+    "hair": 15,
+    "hairColor": 5,
+    "eyes": 1,
+    "eyeColor": 4,
+    "brows": 4,
+    "beard": 0,
+    "boots": 5
+   }
+  ],
+  [
+   {
+    "id": "1_2",
+    "name": "Città di Pàlermo"
+   },
+   {
+    "skin": 3,
+    "hair": 10,
+    "hairColor": 2,
+    "eyes": 5,
+    "eyeColor": 4,
+    "brows": 4,
+    "beard": 0,
+    "boots": 2
+   }
+  ],
+  [
+   {
+    "id": "1_3",
+    "name": "x.  y"
+   },
+   {
+    "skin": 5,
+    "hair": 2,
+    "hairColor": 0,
+    "eyes": 0,
+    "eyeColor": 1,
+    "brows": 1,
+    "beard": 4,
+    "boots": 4
+   }
+  ],
+  [
+   {
+    "id": "1_4",
+    "name": "squadra 0"
+   },
+   {
+    "skin": 7,
+    "hair": 11,
+    "hairColor": 0,
+    "eyes": 5,
+    "eyeColor": 0,
+    "brows": 2,
+    "beard": 0,
+    "boots": 0
+   }
+  ],
+  [
+   {
+    "id": "1_5",
+    "name": "FC Tiro a Giro"
+   },
+   {
+    "skin": 1,
+    "hair": 3,
+    "hairColor": 2,
+    "eyes": 4,
+    "eyeColor": 1,
+    "brows": 2,
+    "beard": 0,
+    "boots": 1
+   }
+  ],
+  [
+   {
+    "id": "1_6",
+    "name": "Virtus"
+   },
+   {
+    "skin": 7,
+    "hair": 2,
+    "hairColor": 1,
+    "eyes": 1,
+    "eyeColor": 1,
+    "brows": 3,
+    "beard": 5,
+    "boots": 5
+   }
+  ],
+  [
+   {
+    "id": "1_7",
+    "name": "L. Ferrante"
+   },
+   {
+    "skin": 0,
+    "hair": 15,
+    "hairColor": 4,
+    "eyes": 0,
+    "eyeColor": 5,
+    "brows": 3,
+    "beard": 0,
+    "boots": 5
+   }
+  ],
+  [
+   {
+    "id": "1_8",
+    "name": "Mario Rossi"
+   },
+   {
+    "skin": 0,
+    "hair": 3,
+    "hairColor": 3,
+    "eyes": 1,
+    "eyeColor": 1,
+    "brows": 0,
+    "beard": 3,
+    "boots": 4
+   }
+  ],
+  [
+   {
+    "id": "1_9",
+    "name": ""
+   },
+   {
+    "skin": 4,
+    "hair": 2,
+    "hairColor": 0,
+    "eyes": 2,
+    "eyeColor": 1,
+    "brows": 4,
+    "beard": 5,
+    "boots": 2
+   }
+  ],
+  [
+   {
+    "id": "1_10",
+    "name": "A.B. De Rossi Lunghissimo"
+   },
+   {
+    "skin": 7,
+    "hair": 1,
+    "hairColor": 0,
+    "eyes": 2,
+    "eyeColor": 1,
+    "brows": 3,
+    "beard": 0,
+    "boots": 5
+   }
+  ],
+  [
+   {
+    "id": 1,
+    "name": "Mario Rossi"
+   },
+   {
+    "skin": 3,
+    "hair": 16,
+    "hairColor": 0,
+    "eyes": 2,
+    "eyeColor": 1,
+    "brows": 0,
+    "beard": 0,
+    "boots": 5
+   }
+  ],
+  [
+   {
+    "id": 2,
+    "name": ""
+   },
+   {
+    "skin": 3,
+    "hair": 10,
+    "hairColor": 3,
+    "eyes": 3,
+    "eyeColor": 1,
+    "brows": 3,
+    "beard": 4,
+    "boots": 0
+   }
+  ],
+  [
+   {
+    "id": 7,
+    "name": "FC Tiro a Giro"
+   },
+   {
+    "skin": 3,
+    "hair": 7,
+    "hairColor": 2,
+    "eyes": 2,
+    "eyeColor": 1,
+    "brows": 1,
+    "beard": 2,
+    "boots": 5
+   }
+  ],
+  [
+   {
+    "id": -1,
+    "name": "Mario Rossi"
+   },
+   {
+    "skin": 0,
+    "hair": 1,
+    "hairColor": 1,
+    "eyes": 3,
+    "eyeColor": 0,
+    "brows": 3,
+    "beard": 0,
+    "boots": 0
+   }
+  ],
+  [
+   {
+    "id": -11,
+    "name": ""
+   },
+   {
+    "skin": 0,
+    "hair": 3,
+    "hairColor": 7,
+    "eyes": 2,
+    "eyeColor": 0,
+    "brows": 5,
+    "beard": 5,
+    "boots": 2
+   }
+  ],
+  [
+   {
+    "id": 123456,
+    "name": "A.B. De Rossi Lunghissimo"
+   },
+   {
+    "skin": 1,
+    "hair": 16,
+    "hairColor": 1,
+    "eyes": 1,
+    "eyeColor": 4,
+    "brows": 0,
+    "beard": 5,
+    "boots": 4
+   }
+  ],
+  [
+   {
+    "id": 5,
+    "name": "M. Rossi",
+    "look": {
+     "skin": 9,
+     "hair": -1,
+     "beard": 3
+    }
+   },
+   {
+    "skin": 1,
+    "hair": 16,
+    "hairColor": 2,
+    "eyes": 5,
+    "eyeColor": 0,
+    "brows": 2,
+    "beard": 3,
+    "boots": 1
+   }
+  ],
+  [
+   {
+    "id": 6,
+    "name": "Prova",
+    "look": {
+     "skin": 2,
+     "hair": 16,
+     "hairColor": 10,
+     "eyes": 5,
+     "eyeColor": 6,
+     "brows": 5,
+     "beard": 6,
+     "boots": 5
+    }
+   },
+   {
+    "skin": 2,
+    "hair": 16,
+    "hairColor": 10,
+    "eyes": 5,
+    "eyeColor": 6,
+    "brows": 5,
+    "beard": 6,
+    "boots": 5
+   }
+  ]
+ ],
+ "kitStyle": [
+  [
+   "L. Ferrante",
+   {
+    "fit": 0,
+    "sleeves": 1,
+    "collar": 2,
+    "pattern": 1,
+    "shorts": 0,
+    "socks": 0
+   }
+  ],
+  [
+   "Mario Rossi",
+   {
+    "fit": 0,
+    "sleeves": 0,
+    "collar": 0,
+    "pattern": 0,
+    "shorts": 0,
+    "socks": 2
+   }
+  ],
+  [
+   "",
+   {
+    "fit": 1,
+    "sleeves": 1,
+    "collar": 0,
+    "pattern": 4,
+    "shorts": 0,
+    "socks": 2
+   }
+  ],
+  [
+   "A.B. De Rossi Lunghissimo",
+   {
+    "fit": 1,
+    "sleeves": 0,
+    "collar": 2,
+    "pattern": 0,
+    "shorts": 0,
+    "socks": 0
+   }
+  ],
+  [
+   "Città di Pàlermo",
+   {
+    "fit": 0,
+    "sleeves": 0,
+    "collar": 2,
+    "pattern": 2,
+    "shorts": 0,
+    "socks": 2
+   }
+  ],
+  [
+   "x.  y",
+   {
+    "fit": 0,
+    "sleeves": 0,
+    "collar": 1,
+    "pattern": 1,
+    "shorts": 0,
+    "socks": 0
+   }
+  ],
+  [
+   "squadra 0",
+   {
+    "fit": 0,
+    "sleeves": 1,
+    "collar": 2,
+    "pattern": 1,
+    "shorts": 0,
+    "socks": 0
+   }
+  ],
+  [
+   "FC Tiro a Giro",
+   {
+    "fit": 0,
+    "sleeves": 0,
+    "collar": 2,
+    "pattern": 1,
+    "shorts": 0,
+    "socks": 0
+   }
+  ],
+  [
+   "Virtus",
+   {
+    "fit": 1,
+    "sleeves": 0,
+    "collar": 0,
+    "pattern": 4,
+    "shorts": 0,
+    "socks": 0
+   }
+  ]
+ ],
+ "backName": [
+  [
+   "L. Ferrante",
+   "FERRANTE"
+  ],
+  [
+   "Mario Rossi",
+   "MARIO ROSSI"
+  ],
+  [
+   "",
+   ""
+  ],
+  [
+   "A.B. De Rossi Lunghissimo",
+   "DE ROSSI LUN"
+  ],
+  [
+   "Città di Pàlermo",
+   "CITTÀ DI PÀL"
+  ],
+  [
+   "x.  y",
+   "Y"
+  ],
+  [
+   "squadra 0",
+   "SQUADRA 0"
+  ],
+  [
+   "FC Tiro a Giro",
+   "FC TIRO A GI"
+  ],
+  [
+   "Virtus",
+   "VIRTUS"
+  ]
+ ],
+ "colori": {
+  "skins": [
+   "#f6d5bc",
+   "#eec09c",
+   "#e3ad8a",
+   "#d29b6c",
+   "#b67c50",
+   "#93603b",
+   "#6e432a",
+   "#4b2d1e"
+  ],
+  "hair": [
+   "#17110e",
+   "#3a2417",
+   "#5f3b22",
+   "#8b5b33",
+   "#a97c46",
+   "#d7b26b",
+   "#eadfba",
+   "#9e3c1b",
+   "#c2692d",
+   "#8e8e8e",
+   "#e6e6e6"
+  ],
+  "eyes": [
+   "#3b2517",
+   "#6c4424",
+   "#8f6b33",
+   "#4e7b3a",
+   "#4a90ca",
+   "#7c8995",
+   "#b27b1f"
+  ],
+  "boots": [
+   "#17171b",
+   "#efefef",
+   "#d4202c",
+   "#f2d21b",
+   "#2fa6e8",
+   "#ff7a1a"
+  ]
+ }
+}

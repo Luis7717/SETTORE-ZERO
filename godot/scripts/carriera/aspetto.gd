@@ -1,5 +1,6 @@
 # Aspetto dei giocatori e stile della divisa: porting 1:1 di src/looks.js (stessi nomi, stessi numeri).
-# Dati puri, niente grafica: lo usano la carriera, la vista della partita e l'editor dei menu.
+# Dati puri (al massimo dei Color per lo shader): lo usano la carriera, la vista della partita e l'editor dei menu.
+# È l'unico porting di looks.js (prima ce n'era un secondo in scripts/partita/aspetto.gd, tolto il 2026-11-21).
 #
 # look di un giocatore: {skin, hair, hairColor, eyes, eyeColor, brows, beard, boots} = indici negli elenchi sotto.
 # Giocatori senza `look` (mercato, avversari): aspetto calcolato da id e nome, sempre uguale (lookOf).
@@ -115,13 +116,22 @@ static func lookOf(p: Variant) -> Dictionary:
 	return normalizeLook(look, auto) if look is Dictionary else auto
 
 
-## colori di un look (per la grafica): pelle, capelli, occhi, scarpe come Color
-static func colori(look: Dictionary) -> Dictionary:
+## parametri di shaders/divisa.gdshader per un look (vista della partita e anteprima dell'editor):
+## pelle, capelli, iride, scarpe (Color) e stile2 = (taglio, barba, sopracciglia, calzoncini dello stile della divisa)
+static func parametri_figura(look: Variant, stile_divisa: Variant = null) -> Dictionary:
 	var l := normalizeLook(look)
+	var st := normalizeKitStyle(stile_divisa)
 	return {
 		"pelle": Color(SKINS[l.skin][1]), "capelli": Color(HAIR_COLORS[l.hairColor][1]),
-		"occhi": Color(EYE_COLORS[l.eyeColor][1]), "scarpe": Color(BOOTS[l.boots][1]),
+		"iride": Color(EYE_COLORS[l.eyeColor][1]), "scarpe": Color(BOOTS[l.boots][1]),
+		"stile2": Vector4(l.hair, l.beard, l.brows, st.shorts),
 	}
+
+
+## parametro `stile` dello shader per uno stile della divisa: (maniche, colletto, motivo, calzettoni)
+static func stile_figura(stile_divisa: Variant) -> Vector4:
+	var st := normalizeKitStyle(stile_divisa)
+	return Vector4(st.sleeves, st.collar, st.pattern, st.socks)
 
 
 # ---------------------------------------------------------------- stile della divisa

@@ -13,6 +13,12 @@
 #                                     oppure null (livello della mia squadra)
 #   App.allenamento()                 partita di allenamento (avversario debole, senza fine)
 #   App.ultimo_esito                  {esito, res, titolo, tipo} dell'ultima partita (anche come arg della schermata)
+#   App.clic()                        suono del tocco (api.click del web), se l'audio è acceso
+#   App.impostazioni()                applica subito le impostazioni della carriera (api.settings del web):
+#                                     audio spento = bus principale muto (menu e partita); musica di sottofondo
+#                                     (assets/audio/music.mp3) solo nei menu, con audio e musica accesi.
+#                                     Durata, difficoltà e portiere valgono dalla partita dopo (le legge _partita);
+#                                     la vibrazione la legge MenuSchermata._tocco a ogni tocco.
 #   segnale schermata_cambiata(nome)
 #
 # Dopo la partita (risultato registrato al fischio finale, schermata cambiata col tasto "Continua"):
@@ -31,6 +37,12 @@ signal schermata_cambiata(nome: String)
 
 const CarrieraScript := preload("res://scripts/carriera/carriera.gd")
 const ProveApp := preload("res://scripts/app_prove.gd")
+const AudioPartita := preload("res://scripts/partita/audio_partita.gd")
+const MUSICA := "res://assets/audio/music.mp3"
+const MUSICA_VOLUME := 0.35     # come Sfx.music del web (gain 0,35)
+const CLIC_HZ := 520.0          # tocco: come Sfx.click del web (triangolo 520 Hz, 0,05 s, volume 0,12)
+const CLIC_DURATA := 0.05
+const CLIC_VOLUME := 0.12
 const SCENA_PARTITA := "res://scenes/partita.tscn"
 const DIR_MENU := "res://scenes/menu/"
 const SEGNAPOSTO := "res://scenes/menu/segnaposto.tscn"
@@ -47,6 +59,8 @@ var ultimo_esito := {}
 var opzioni := {}               # opzioni da riga di comando
 
 var _avviata := false
+var _clic: AudioStreamPlayer
+var _musica: AudioStreamPlayer
 
 
 func _ready() -> void:
@@ -59,6 +73,10 @@ func _ready() -> void:
 	if opzioni.has("salvataggio"):
 		carriera.percorso = opzioni.salvataggio
 	carriera.load()
+	_prepara_audio()
+	# a ogni cambio di schermata: musica sì/no (niente nella partita) e impostazioni di una carriera appena
+	# creata o cancellata
+	schermata_cambiata.connect(func(_nome: String) -> void: impostazioni())
 
 
 ## primo avvio (da scenes/app.tscn): menu principale, oppure subito la partita di prova se ci sono le sue opzioni
@@ -66,6 +84,7 @@ func avvio() -> void:
 	if _avviata:
 		return
 	_avviata = true
+	impostazioni()
 	if opzioni.has("esci-dopo"):
 		var t0 := Time.get_ticks_msec()
 		var f0 := Engine.get_process_frames()
@@ -211,6 +230,60 @@ func _metti(n: Node) -> void:
 	albero.current_scene = n
 	if vecchia != null and vecchia != n:
 		vecchia.queue_free()
+
+
+# ---------------------------------------------------------------- suoni dei menu e impostazioni
+func _prepara_audio() -> void:
+	_clic = AudioStreamPlayer.new()
+	_clic.name = "Clic"
+	add_child(_clic)
+	_musica = AudioStreamPlayer.new()
+	_musica.name = "Musica"
+	_musica.volume_db = linear_to_db(MUSICA_VOLUME)
+	add_child(_musica)
+	if DisplayServer.get_name() == "headless":
+		return # senza schermo (prove, build) niente suoni, come audio_partita.gd
+	_clic.stream = AudioPartita.tono_triangolo(CLIC_HZ, CLIC_DURATA, CLIC_VOLUME)
+	if ResourceLoader.exists(MUSICA):
+		var m: AudioStream = (load(MUSICA) as AudioStream).duplicate()
+		if m is AudioStreamMP3:
+			(m as AudioStreamMP3).loop = true
+		_musica.stream = m
+
+
+## suono breve a ogni tocco nei menu (api.click del web)
+func clic() -> void:
+	if _clic != null and _clic.stream != null and _impostazione("sound"):
+		_clic.play()
+
+
+## applica subito le impostazioni (api.settings del web); la chiamano la schermata Impostazioni dopo ogni scelta,
+## l'avvio e ogni cambio di schermata
+func impostazioni() -> void:
+	AudioServer.set_bus_mute(AudioServer.get_bus_index("Master"), not _impostazione("sound"))
+	if _musica == null:
+		return
+	var suona := _musica.stream != null and _impostazione("sound") and _impostazione("music") 		and schermata != "" and schermata != "partita"
+	if suona and not _musica.playing:
+		_musica.play()
+	elif not suona and _musica.playing:
+		_musica.stop()
+
+
+# impostazione della carriera (accese se mancano o se la carriera non c'è ancora: come SETTINGS_DEFAULT)
+func _impostazione(chiave: String) -> bool:
+	if carriera == null or carriera.s == null:
+		return true
+	var st: Variant = carriera.s.get("settings")
+	return bool(st.get(chiave, true)) if st is Dictionary else true
+
+
+# a fine programma si fermano i suoni (un suono ancora in corso resterebbe in memoria)
+func _exit_tree() -> void:
+	for p: AudioStreamPlayer in [_clic, _musica]:
+		if p != null:
+			p.stop()
+			p.stream = null
 
 
 # l'app va in sottofondo o si chiude: si salva subito

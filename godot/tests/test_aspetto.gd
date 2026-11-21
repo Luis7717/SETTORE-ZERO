@@ -1,22 +1,41 @@
-# Aspetto dei giocatori (scripts/partita/aspetto.gd, porting di src/looks.js): stessi numeri del web.
-# Valori attesi presi da Node con src/looks.js (hash32, seeded, lookFromSeed, kitStyleFromSeed, backName).
+# Aspetto dei giocatori (scripts/carriera/aspetto.gd, unico porting di src/looks.js): stessi numeri del web.
+# Valori attesi presi da Node con src/looks.js: quelli scritti qui sotto (hash32, seeded, lookFromSeed,
+# kitStyleFromSeed, backName) e tests/fixtures/aspetto.json (`node test/export-aspetto.mjs`: aspetto di chi è in campo,
+# stile della divisa dal nome della squadra, cognomi, colori). Il resto di looks.js lo prova test_carriera.gd.
 extends "test_base.gd"
 
-const A := preload("res://scripts/partita/aspetto.gd")
+const A := preload("res://scripts/carriera/aspetto.gd")
+const FIX := "res://tests/fixtures/aspetto.json"
+
+
+func _fixture() -> Dictionary:
+	var f := FileAccess.open(FIX, FileAccess.READ)
+	if f == null:
+		return {}
+	var d: Variant = JSON.parse_string(f.get_as_text())
+	return d if d is Dictionary else {}
+
+
+# il JSON dà numeri decimali: si confrontano come interi
+static func _interi(d: Dictionary) -> Dictionary:
+	var out := {}
+	for k: String in d:
+		out[k] = int(d[k])
+	return out
 
 
 func test_hash32_come_il_web() -> bool:
-	eq(A.hash32(["look", 5]), 1166894537, "hash32('look', 5)")
-	eq(A.hash32([123456789, 3]), 1658020841, "hash32(123456789, 3)")
-	eq(A.hash32(["Virtus", "Mario Rossi"]), 3169179679, "hash32 di due testi")
-	eq(A.hash32([""]), 1039343097, "hash32('')")
+	eq(A.hash32("look", 5), 1166894537, "hash32('look', 5)")
+	eq(A.hash32(123456789, 3), 1658020841, "hash32(123456789, 3)")
+	eq(A.hash32("Virtus", "Mario Rossi"), 3169179679, "hash32 di due testi")
+	eq(A.hash32(""), 1039343097, "hash32('')")
 	return done()
 
 
 func test_seeded_come_il_web() -> bool:
 	var r := A.seeded(42)
 	for v: float in [0.6011037519201636, 0.44829055899754167, 0.8524657934904099]:
-		check(absf(A.next(r) - v) < 1e-12, "seeded(42) deve dare %s" % v)
+		check(absf(r.call() - v) < 1e-12, "seeded(42) deve dare %s" % v)
 	return done()
 
 
@@ -26,28 +45,61 @@ func test_look_from_seed_come_il_web() -> bool:
 		[1, {"skin": 4, "hair": 14, "hairColor": 1, "eyes": 2, "eyeColor": 0, "brows": 2, "beard": 0, "boots": 0}],
 		[7, {"skin": 7, "hair": 8, "hairColor": 0, "eyes": 0, "eyeColor": 1, "brows": 0, "beard": 0, "boots": 5}],
 		[99, {"skin": 0, "hair": 2, "hairColor": 0, "eyes": 5, "eyeColor": 4, "brows": 5, "beard": 2, "boots": 3}],
-		[A.hash32([3141592, 4]), {"skin": 3, "hair": 7, "hairColor": 1, "eyes": 2, "eyeColor": 3, "brows": 2, "beard": 5, "boots": 2}],
+		[A.hash32(3141592, 4), {"skin": 3, "hair": 7, "hairColor": 1, "eyes": 2, "eyeColor": 3, "brows": 2, "beard": 5, "boots": 2}],
 	]
 	for a: Array in attesi:
-		check(A.look_from_seed(a[0]) == a[1], "lookFromSeed(%d) = %s, atteso %s" % [a[0], A.look_from_seed(a[0]), a[1]])
+		check(A.lookFromSeed(a[0]) == a[1], "lookFromSeed(%d) = %s, atteso %s" % [a[0], A.lookFromSeed(a[0]), a[1]])
 	return done()
 
 
 func test_stile_divisa_e_cognome_come_il_web() -> bool:
-	check(A.kit_style_from_seed(0) == {"fit": 0, "sleeves": 0, "collar": 1, "pattern": 2, "shorts": 0, "socks": 0}, "kitStyleFromSeed(0)")
-	check(A.kit_style_from_seed(5) == {"fit": 0, "sleeves": 0, "collar": 0, "pattern": 4, "shorts": 0, "socks": 1}, "kitStyleFromSeed(5)")
-	check(A.kit_style_from_seed(77) == {"fit": 0, "sleeves": 0, "collar": 2, "pattern": 0, "shorts": 0, "socks": 0}, "kitStyleFromSeed(77)")
-	eq(A.back_name("L. Ferrante"), "FERRANTE", "cognome")
-	eq(A.back_name("mario rossi"), "MARIO ROSSI", "nome senza punto")
+	check(A.kitStyleFromSeed(0) == {"fit": 0, "sleeves": 0, "collar": 1, "pattern": 2, "shorts": 0, "socks": 0}, "kitStyleFromSeed(0)")
+	check(A.kitStyleFromSeed(5) == {"fit": 0, "sleeves": 0, "collar": 0, "pattern": 4, "shorts": 0, "socks": 1}, "kitStyleFromSeed(5)")
+	check(A.kitStyleFromSeed(77) == {"fit": 0, "sleeves": 0, "collar": 2, "pattern": 0, "shorts": 0, "socks": 0}, "kitStyleFromSeed(77)")
+	eq(A.backName("L. Ferrante"), "FERRANTE", "cognome")
+	eq(A.backName("mario rossi"), "MARIO ROSSI", "nome senza punto")
 	return done()
 
 
 func test_look_incompleto_si_completa() -> bool:
-	var l := A.normalize_look({"skin": 9, "hair": -1, "beard": 3.0}, A.LOOK_BASE)
+	var l := A.normalizeLook({"skin": 9, "hair": -1, "beard": 3.0}, A.DEFAULT_LOOK)
 	eq(l.skin, 1, "pelle fuori elenco: si gira")
 	eq(l.hair, 16, "capelli negativi: dall'ultimo")
 	eq(l.beard, 3, "barba come numero decimale intero")
 	eq(l.boots, 0, "campo mancante: valore di base")
-	var auto := A.look_of({"name": "Mario"})
-	check(auto == A.look_of({"name": "Mario"}), "senza look: sempre lo stesso aspetto dal nome")
+	var auto := A.lookOf({"name": "Mario"})
+	check(auto == A.lookOf({"name": "Mario"}), "senza look: sempre lo stesso aspetto dal nome")
+	return done()
+
+
+# quello che usa la vista della partita (vista.gd: _aspetto_di, _stile_squadra, _prepara_schiene), confrontato col JS
+func test_vista_come_il_web() -> bool:
+	var fx := _fixture()
+	if not check(not fx.is_empty(), "manca %s (node test/export-aspetto.mjs)" % FIX):
+		return done()
+	for c: Array in fx.lookOf:
+		var l := A.lookOf(c[0])
+		check(l == _interi(c[1]), "lookOf(%s) = %s, atteso %s" % [c[0], l, c[1]])
+	for c: Array in fx.kitStyle:
+		var st := A.kitStyleFromSeed(A.hash32(str(c[0])))
+		check(st == _interi(c[1]), "stile della squadra %s = %s, atteso %s" % [c[0], st, c[1]])
+	for c: Array in fx.backName:
+		eq(A.backName(c[0]), c[1], "backName(%s)" % c[0])
+	var liste := {"skins": A.SKINS, "hair": A.HAIR_COLORS, "eyes": A.EYE_COLORS, "boots": A.BOOTS}
+	for k: String in liste:
+		eq(liste[k].map(func(x: Array) -> String: return x[1]), fx.colori[k], "colori %s" % k)
+	return done()
+
+
+# parametri dello shader per la figura: stessi per la partita e per l'anteprima dell'editor
+func test_parametri_figura() -> bool:
+	var look := {"skin": 2, "hair": 13, "hairColor": 7, "eyes": 1, "eyeColor": 4, "brows": 3, "beard": 6, "boots": 2}
+	var p := A.parametri_figura(look, {"shorts": 1})
+	eq(p.pelle, Color("#e3ad8a"), "pelle")
+	eq(p.capelli, Color("#9e3c1b"), "capelli")
+	eq(p.iride, Color("#4a90ca"), "iride")
+	eq(p.scarpe, Color("#d4202c"), "scarpe")
+	eq(p.stile2, Vector4(13, 6, 3, 1), "stile2 = taglio, barba, sopracciglia, calzoncini")
+	eq(A.parametri_figura(null).stile2, Vector4(2, 0, 0, 0), "senza look: aspetto di base")
+	eq(A.stile_figura({"sleeves": 2, "collar": 1, "pattern": 4, "socks": 2, "fit": 1}), Vector4(2, 1, 4, 2), "stile della divisa")
 	return done()

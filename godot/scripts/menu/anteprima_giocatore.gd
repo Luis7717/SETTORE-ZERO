@@ -119,7 +119,8 @@ func _misura() -> void:
 	_vp.size = Vector2i(int(size.x * k), int(size.y * k))
 
 
-## giocatore da mostrare: kit = {maglia, calzoncini, calzettoni, bordino} (Color), aspetto = {pelle, capelli}
+## giocatore da mostrare: kit = {maglia, calzoncini, calzettoni, bordino (Color), stile, numero (Vector4)},
+## aspetto = Aspetto.parametri_figura (pelle, capelli, iride, scarpe, stile2 con taglio, barba e sopracciglia)
 func metti(kit: Dictionary, aspetto: Dictionary) -> void:
 	if _fig == null:
 		_fig = Figura.new()

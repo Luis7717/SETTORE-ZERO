@@ -29,7 +29,7 @@ const Coord := preload("res://scripts/coord.gd")
 const Figura := preload("figura.gd")
 const PALLA_HD := "res://assets/textures/pallone.png"
 const PALLA_N := "res://assets/textures/pallone_n.png"
-const AspettoVista := preload("aspetto.gd") # stesso porting di looks.js di scripts/carriera/aspetto.gd (Aspetto)
+const Asp := preload("res://scripts/carriera/aspetto.gd") # porting di src/looks.js (classe Aspetto)
 const Schiene := preload("schiene.gd")
 const Giocatore := preload("res://scripts/giocatore.gd")
 const TV := preload("texture_vista.gd")
@@ -456,7 +456,7 @@ func _kit_di(p: Object) -> Dictionary:
 	var cel := Schiene.cella(maxi(i, 0))
 	return {"maglia": shirt, "calzoncini": shorts, "calzettoni": _colore(k.get("socks", k.get("shirt", 0xffffff))),
 		"bordino": _secondo_colore(shirt, shorts),
-		"stile": Vector4(st.sleeves, st.collar, st.pattern, st.socks),
+		"stile": Asp.stile_figura(st),
 		"numero": Vector4(cel.x, cel.y, 1.0 if i >= 0 else 0.0, st.fit)}
 
 
@@ -464,8 +464,8 @@ func _stile_squadra(k: int) -> Dictionary:
 	var team: Dictionary = m.teams[k]
 	var kit: Variant = team.get("kit")
 	if kit is Dictionary and kit.has("style"):
-		return AspettoVista.normalize_kit_style(kit["style"])
-	return AspettoVista.kit_style_from_seed(AspettoVista.hash32([str(team.get("name", "squadra %d" % k))]))
+		return Asp.normalizeKitStyle(kit["style"])
+	return Asp.kitStyleFromSeed(Asp.hash32(str(team.get("name", "squadra %d" % k))))
 
 
 # secondo colore della divisa (altH di src/athlete3d.js): i calzoncini, o bianco / quasi nero se sono come la maglia
@@ -478,10 +478,8 @@ static func _secondo_colore(maglia: Color, calzoncini: Color) -> Color:
 # aspetto (src/looks.js): il `look` del giocatore se c'è (completato), sennò dal suo id e nome come lookOf del web
 func _aspetto_di(p: Object) -> Dictionary:
 	var src: Dictionary = p.src if p.src is Dictionary else {}
-	var l := AspettoVista.look_of(src if not src.is_empty() else {"id": "%d_%d" % [p.team, p.i], "name": str(p.name)})
-	return {"pelle": AspettoVista.colore(AspettoVista.SKINS, l.skin), "capelli": AspettoVista.colore(AspettoVista.HAIR_COLORS, l.hairColor),
-		"iride": AspettoVista.colore(AspettoVista.EYE_COLORS, l.eyeColor), "scarpe": AspettoVista.colore(AspettoVista.BOOTS, l.boots),
-		"stile2": Vector4(l.hair, l.beard, l.brows, _stile_squadra(p.team).shorts)}
+	var l := Asp.lookOf(src if not src.is_empty() else {"id": "%d_%d" % [p.team, p.i], "name": str(p.name)})
+	return Asp.parametri_figura(l, _stile_squadra(p.team))
 
 
 # cognomi e numeri di chi è in campo (numero: src.num, sennò il posto in squadra + 1, come figFor del web)
@@ -493,7 +491,7 @@ func _prepara_schiene() -> void:
 		var st: Vector4 = k.stile
 		var ink := Schiene.inchiostro(k.maglia, k.bordino, int(st.z))
 		var src: Dictionary = p.src if p.src is Dictionary else {}
-		voci.append({"num": int(src.get("num", p.i + 1)), "nome": AspettoVista.back_name(str(src.get("name", p.name))),
+		voci.append({"num": int(src.get("num", p.i + 1)), "nome": Asp.backName(str(src.get("name", p.name))),
 			"fill": ink[0], "line": ink[1]})
 	_schiene.prepara(voci, Giocatore._materiale)
 

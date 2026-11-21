@@ -3,7 +3,8 @@
 #                             (da usare con --app --bot --veloce=K --tempo=SEC), poi salva, ricarica il file e
 #                             controlla che la carriera ricaricata sia identica; stampa il riassunto ed esce
 #                             (codice 0 se tutto bene, 1 se no). Senza carriera ne crea una (seme fisso 4242).
-#   --app-schermate=CARTELLA  schermate 390×844 del giro menu → partita → fine partita → dopo partita → menu
+#   --app-schermate=CARTELLA  schermate 390×844 del giro menu → impostazioni → editor (taglio afro e chignon) →
+#                             partita → fine partita → dopo partita → menu
 #                             (da usare con --app --bot --veloce=K --tempo=SEC, finestra vera, non --headless)
 #   --prova-uscite            "Esci" dalla pausa: in campionato sconfitta 0-3 registrata, in amichevole niente
 #                             cambia e si torna al menu; stampa i controlli ed esce (codice 0 se tutti veri)
@@ -118,6 +119,7 @@ func _giro_schermate() -> void:
 		_app.vai(_app.PRINCIPALE)
 		await _attendi(ATTESA_MENU)
 	await _scatto(dir, "menu")
+	await _giro_impostazioni_editor(dir)
 	_app.gioca_campionato()
 	await _attendi(ATTESA_PARTITA)
 	await _scatto(dir, "partita")
@@ -133,6 +135,37 @@ func _giro_schermate() -> void:
 	await _attendi(ATTESA_MENU)
 	await _scatto(dir, "menu_dopo")
 	get_tree().quit(0)
+
+
+# Impostazioni (con controllo dell'audio spento / acceso) e editor dell'aspetto con un taglio vistoso, da vicino
+# (scheda Capelli) e da lontano (scheda Scarpe). Il look provato non si salva.
+func _giro_impostazioni_editor(dir: String) -> void:
+	var st: Dictionary = _app.carriera.s.settings
+	var suono: bool = st.get("sound", true)
+	_app.vai("impostazioni")
+	await _attendi(ATTESA_MENU)
+	await _scatto(dir, "impostazioni")
+	var master := AudioServer.get_bus_index("Master")
+	st.sound = false
+	_app.impostazioni()
+	_controlla(AudioServer.is_bus_mute(master), "audio spento: bus principale muto")
+	st.sound = true
+	_app.impostazioni()
+	_controlla(not AudioServer.is_bus_mute(master), "audio acceso: bus principale attivo")
+	st.sound = suono
+	_app.impostazioni()
+	var p: Dictionary = _app.carriera.s.squad[0]
+	for prova: Array in [["hair", 9, "editor_capelli"], ["boots", 13, "editor_corpo"]]:
+		_app.vai("editor", {"flow": "look", "id": p.id, "tab": prova[0]})
+		var ed: Node = get_tree().current_scene
+		ed.d.look = ed.d.look.duplicate()
+		ed.d.look.hair = prova[1]   # 9 afro, 13 chignon
+		ed.d.look.beard = 6
+		ed.mostra(false)
+		await _attendi(1.2)
+		await _scatto(dir, prova[2])
+	_app.vai(_app.PRINCIPALE)
+	await _attendi(ATTESA_MENU)
 
 
 func _attendi(sec: float) -> void:

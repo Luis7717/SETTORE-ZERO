@@ -453,8 +453,10 @@ func _entra() -> void:
 	if testata.visible:
 		testata.create_tween().tween_property(testata, "modulate:a", 1.0, 0.25)
 	for i in figli.size():
+		if not is_instance_valid(figli[i]):   # ridisegnata nel frattempo (due mostra() nello stesso fotogramma)
+			continue
 		var n := figli[i] as Control
-		if n == null or not is_instance_valid(n):
+		if n == null:
 			continue
 		var y := n.position.y
 		n.position.y = y + ENTRATA_SALTO

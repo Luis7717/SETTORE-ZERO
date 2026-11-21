@@ -1034,3 +1034,29 @@ Clip vere del "Free mocap pack 05: Soccer" di Anderson Rohr nella versione Godot
   vista 0,93-1,05 ms). Costo circa 0,15 ms a fotogramma per 22 giocatori. Sull'iPhone A12 non è misurato: resta da provare.
 - **Limiti**: niente rincorsa prima del calcio; colpo di testa calcolato; difesa poco visibile in partita vera; la
   parata alta è un salto più che un tuffo; nelle clip di palleggi e cartellini non c'è il pallone.
+
+## 2026-11-21 — Godot: rifiniture menu
+- **Tocco** (`App.clic()`): come `api.click` / `Sfx.click` del web, un triangolo a 520 Hz di 0,05 s che scende da 0,12
+  a 0,001, generato in codice (`AudioPartita.tono_triangolo`), niente file. Suona solo con l'audio acceso; senza schermo
+  niente suoni (come `audio_partita.gd`).
+- **Impostazioni** (`App.impostazioni()`, come `api.settings`): chiamata dopo ogni scelta, all'avvio e a ogni cambio di
+  schermata (così vale anche per una carriera appena creata o cancellata). Audio spento = bus principale muto: tace
+  tutto, anche la partita (prima la partita suonava sempre). Musica: `assets/audio/music.mp3` c'era già in
+  `godot/assets/` e in `godot/CREDITI.md` (neko_4444, CC0) ma non suonava; ora suona in loop a 0,35 nei menu con audio
+  e musica accesi e si ferma in partita, come il web (che non ha la voce Musica: lì segue l'audio). Vibrazione: già letta
+  a ogni tocco da `MenuSchermata._tocco` (in partita non si vibra). Durata, difficoltà e portiere valgono dalla partita
+  dopo. Qualità grafica: nessuna voce, resta automatica (`qualita.gd`), come nel web.
+- **Un solo porting di looks.js**: tolto `scripts/partita/aspetto.gd`, la vista usa `scripts/carriera/aspetto.gd`
+  (`Aspetto`), con due funzioni nuove per lo shader della figura (`parametri_figura`, `stile_figura`) che usa anche
+  l'editor; tolta `Aspetto.colori()` (mai usata). Risultati uguali: confronto vecchio/nuovo su ~6000 casi (aspetto,
+  stile della squadra, cognomi, parametri) senza differenze, e `tests/test_aspetto.gd` ora confronta col JS anche
+  tramite `tests/fixtures/aspetto.json` (`node test/export-aspetto.mjs`). Unica differenza teorica: un giocatore con
+  `src` senza `id` ora fa come il web (`"undefined"`), prima usava `""`; nel gioco non succede (tutti hanno un id).
+- **Anteprima dell'editor**: la figura riceve gli stessi parametri della partita (taglio, barba, sopracciglia, occhi,
+  scarpe, stile della divisa, portiere con maniche lunghe/tinta unita/girocollo come `kitFor` del web). Manca solo
+  numero e cognome sulla schiena (il web li ha): l'atlante delle schiene (`schiene.gd`) sta nel materiale condiviso
+  della partita e prepararlo dall'editor è un lavoro a parte.
+- **Corretto**: `MenuSchermata._entra` dava "Trying to cast a freed object" se la schermata si ridisegnava due volte
+  nello stesso fotogramma (es. `vai` e subito `mostra`). Ora salta i nodi già liberati.
+- Prove: `--app-schermate` passa anche da Impostazioni (con il controllo audio spento/acceso sul bus) ed editor
+  dell'aspetto con taglio afro (Capelli, da vicino) e chignon (Scarpe, corpo intero).

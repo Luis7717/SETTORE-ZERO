@@ -54,7 +54,7 @@ interfaccia dei menu, sfondo del menu e allenamento guidato, grafica.
 | `scripts/app.gd` | autoload **`App`**: carriera corrente, schermate del menu, partita, fine partita, salvataggio in sottofondo |
 | `scripts/app_prove.gd` | prove automatiche del flusso: stagione intera col dito finto, giro di schermate |
 | `scripts/carriera/carriera.gd` | **`Carriera`**: porting 1:1 di `src/career.js` (stessi nomi, stato in `c.s`) |
-| `scripts/carriera/aspetto.gd`, `stemma_dati.gd` | `src/looks.js` e la parte dati di `src/crest.js` (forme, motivi, simboli, colori) |
+| `scripts/carriera/aspetto.gd`, `stemma_dati.gd` | `src/looks.js` (unico porting, usato da carriera, menu e vista; `parametri_figura` / `stile_figura` = parametri dello shader della figura; `tests/test_aspetto.gd` col JS via `node test/export-aspetto.mjs`) e la parte dati di `src/crest.js` (forme, motivi, simboli, colori) |
 | `scripts/carriera/salvataggio.gd`, `js.gd` | file `user://salvataggio.json` (scrittura sicura, ripiego); aiuti per rifare il JS esatto (ordinamento di V8, toFixed, …) |
 | `scenes/menu/<nome>.tscn` | **schermate dei menu** (`scripts/menu/<nome>.gd`, sotto "Menu (fase 3)"); `segnaposto.tscn` resta per un nome che non esiste |
 | `scripts/menu/` | interfaccia dei menu: tema, stemmi e visi in SVG, carte della Rosa, editor con anteprima 3D |
@@ -90,7 +90,6 @@ interfaccia dei menu, sfondo del menu e allenamento guidato, grafica.
 | `scripts/stadio/maxischermo.gd` | maxischermi col risultato e "GOOOL!" (`src/stadium-screen.js`) |
 | `scripts/partita/effetti.gd` | scia del pallone, sbuffi d'erba, coriandoli |
 | `scripts/partita/qualita.gd` | livelli grafici automatici (logica pura, `tests/test_qualita.gd`) |
-| `scripts/partita/aspetto.gd` | porting di `src/looks.js` (look e stile della divisa dal seme, uguali al web: `tests/test_aspetto.gd`) |
 | `scripts/partita/schiene.gd` | atlante di cognomi e numeri sulle schiene |
 | `tools/genera_texture.gd` | genera `assets/textures/` (pallone HD e normal map, fili d'erba) |
 | `scenes/prova_vista.tscn` | prova: computer contro computer disegnato dalla vista, scene per le schermate e misure |
@@ -188,7 +187,8 @@ fotogramma), `--bot`, `--esci-a-fine`, `--scena=area|duello|fuga|disegno|angolo|
 spenti (non si sentono e col driver audio finto resterebbero in memoria all'uscita).
 
 Non ancora fatti (fasi dopo): menu e carriera (la partita parte subito con le squadre di prova), cambi in pausa,
-salvataggio della scritta "Trascina il campo" (si ricorda solo finché l'app è aperta), musica.
+salvataggio della scritta "Trascina il campo" (si ricorda solo finché l'app è aperta). La musica c'è dal 2026-11-21:
+solo nei menu (`App`, `assets/audio/music.mp3`), mai in partita, come il web.
 
 ## Sfondo del menu e allenamento guidato (fase 3)
 
@@ -317,8 +317,14 @@ Il nome della scena è il nome per `App.vai(nome, arg)`:
 | `fine_stagione` | season | risultato di `endSeason` (`{pos, prize, bonus, outcome, div, newDiv}`) |
 
 - **Contratto con `App`**: le schermate chiamano `App.vai`, `App.gioca_campionato()`, `App.gioca_amichevole(livello)`,
-  `App.allenamento()` e leggono `App.carriera` (`s == null` = nessuna carriera). Facoltativi: `App.clic()` (suono del
-  tocco) e `App.impostazioni()` (chiamata dopo ogni scelta in Impostazioni, per applicare suono e musica). Senza `App`
+  `App.allenamento()` e leggono `App.carriera` (`s == null` = nessuna carriera), più `App.clic()` (suono del tocco:
+  triangolo 520 Hz di 0,05 s generato in codice come `Sfx.click` del web, solo con l'audio acceso) e
+  `App.impostazioni()` (dopo ogni scelta in Impostazioni; anche all'avvio e a ogni cambio di schermata). Effetto
+  delle voci di Impostazioni: **Audio** subito (bus principale muto: menu, tocchi e partita); **Musica** subito
+  (sottofondo dei menu, solo con l'audio acceso; in partita si ferma); **Vibrazione** subito (la legge
+  `MenuSchermata._tocco` a ogni tocco, solo su telefono); **Durata di un tempo**, **Difficoltà** e **Portiere** dalla
+  partita dopo (li leggono `App._partita` e `Carriera.aiMatchTeam`). La qualità grafica non è una voce: scende da
+  sola in partita (`qualita.gd`), come nel web. Senza `App`
   (scena aperta da sola) si cambia scena con `change_scene_to_file` e la carriera è `MenuSchermata.carriera_prova`.
 - **Dati**: tutto passa da `menu_dati.gd` (`MenuDati`), che gira le chiamate a `Carriera`, `Aspetto`, `StemmaDati`.
 - **Tema** (`tema_menu.gd` → `assets/tema/tema.tres`, `tools/crea_tema.gd` lo rigenera): colori, raggi e varianti dei
@@ -332,7 +338,9 @@ Il nome della scena è il nome per `App.vai(nome, arg)`:
   variazione della forza.
 - **Editor** (`editor.gd`, `anteprima_giocatore.gd`): palco fisso in alto (stemma grande, oppure il giocatore della
   partita in una SubViewport che gira piano e si gira col dito, inquadratura della testa per Viso e Capelli, più il
-  viso disegnato in alto a destra), schede, scelte che scorrono, Casuale e Avanti/Salva in fondo.
+  viso disegnato in alto a destra), schede, scelte che scorrono, Casuale e Avanti/Salva in fondo. La figura ha gli
+  stessi parametri della partita (`Aspetto.parametri_figura`: taglio, barba, sopracciglia, occhi, scarpe; stile della
+  divisa, il portiere con maniche lunghe e tinta unita); manca solo numero e cognome sulla schiena.
 - **Sfondo 3D** (`sfondo_menu.tscn`, altro lavoro) dietro `principale` e `hub` (con un velo scuro), col campione
   della carriera (`MenuSchermata.giocatore_sfondo()`); `--senza-3d` lo toglie.
 

@@ -6,6 +6,7 @@
 # mezzo le scelte che scorrono, in fondo Casuale e Avanti / Salva.
 extends MenuSchermata
 
+const Asp := preload("res://scripts/carriera/aspetto.gd")
 const KIT_LABELS := {"fit": "Maglia", "sleeves": "Maniche", "collar": "Colletto", "pattern": "Motivo", "shorts": "Pantaloncini", "socks": "Calzettoni"}
 const SCHEDE := {
 	"crest": [["shape", "Forma"], ["pattern", "Motivo"], ["icon", "Simbolo"]],
@@ -208,7 +209,7 @@ func _crea_palco() -> void:
 	_anteprima = MenuAnteprima.new()
 	_anteprima.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_palco.add_child(_anteprima)
-	# viso disegnato in alto a destra: occhi, sopracciglia e barba (il modello 3D mostra solo pelle e capelli)
+	# viso disegnato in alto a destra (come il web); il modello 3D mostra anche taglio, barba, sopracciglia e occhi
 	var k := D.kit(d.kit)
 	_faccia = MenuFaccia.nuovo(d.look, D.hex(int(k[1])), D.hex(int(k[2])), FACCIA, int(k[1]))
 	_faccia.set_anchors_preset(Control.PRESET_TOP_RIGHT)
@@ -248,16 +249,24 @@ func _aggiorna_palco() -> void:
 	_faccia.queue_redraw()
 
 
-# colori per Figura (kitFor del web: il portiere ha la sua divisa)
+# colori e stile per Figura (kitFor del web: il portiere ha la sua divisa, maniche lunghe, tinta unita e girocollo).
+# Niente numero né cognome sulla schiena (numero.z = 0): nella partita li disegna l'atlante di schiene.gd.
 func _kit_figura() -> Dictionary:
 	var k := D.kit(d.kit)
-	var kit: Dictionary = GK_KIT if d.pos == "P" else {"shirt": int(k[1]), "shorts": int(k[2]), "socks": int(k[1])}
-	return {"maglia": D.colore(kit.shirt), "calzoncini": D.colore(kit.shorts), "calzettoni": D.colore(kit.socks), "bordino": D.colore(kit.shorts)}
+	var gk: bool = d.pos == "P"
+	var kit: Dictionary = GK_KIT if gk else {"shirt": int(k[1]), "shorts": int(k[2]), "socks": int(k[1])}
+	var st: Dictionary = D.normalize_kit_style(d.get("style"))
+	if gk:
+		st.sleeves = 1
+		st.pattern = 0
+		st.collar = 0
+	return {"maglia": D.colore(kit.shirt), "calzoncini": D.colore(kit.shorts), "calzettoni": D.colore(kit.socks),
+		"bordino": D.colore(kit.shorts), "stile": Asp.stile_figura(st), "numero": Vector4(0, 0, 0, st.fit)}
 
 
+# pelle, capelli, occhi, scarpe e taglio, barba, sopracciglia: come la figura in partita (Aspetto.parametri_figura)
 func _aspetto_figura() -> Dictionary:
-	var l: Dictionary = D.normalize_look(d.look)
-	return {"pelle": Color(D.SKINS[l.skin][1]), "capelli": Color(D.HAIR_COLORS[l.hairColor][1])}
+	return Asp.parametri_figura(d.look, d.get("style"))
 
 
 func _schede(schede: Array) -> Control:
