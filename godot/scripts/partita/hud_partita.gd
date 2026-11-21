@@ -1,5 +1,5 @@
 # Interfaccia della partita (come #hud di src/index.tpl.html e le funzioni di src/main.js): punteggio con sigle e
-# colori, tempo, minimappa, suggerimenti in basso, tasto Scatto (era Dribbling), tasto pausa, scritte grandi ("Gol!", "Calcio
+# colori, tempo, minimappa, suggerimenti in basso, tasto Dribbling / Scatto, tasto pausa, scritte grandi ("Gol!", "Calcio
 # d'angolo"...), frecce e scritta della visuale girata nel rallenty, bordo scuro del rallenty, anteprima del calcio,
 # menu di pausa / intervallo / fine partita, contatore FPS piccolo. Tutto dentro l'area sicura dell'iPhone.
 # Non decide niente: scripts/partita/gioco.gd la aggiorna e ascolta i segnali dei tasti.
@@ -238,7 +238,7 @@ func _crea_basso() -> void:
 	_suggerimento.visible = false
 	add_child(_suggerimento)
 	_dribbling = Button.new()
-	_dribbling.text = "Scatto" # nel duello (era Dribbling, Luis 2026-11-20)
+	_dribbling.text = "Dribbling" # nel duello; "Scatto" nella fuga (mostra_dribbling)
 	_dribbling.focus_mode = Control.FOCUS_NONE
 	_dribbling.custom_minimum_size = Vector2(170, 58)
 	_dribbling.add_theme_font_override("font", _font_forte)
@@ -315,7 +315,7 @@ func _metti_suggerimento() -> void:
 	var s := _sicura
 	_adatta_pillola(_suggerimento, s.size.x - 24.0)
 	_suggerimento.position = Vector2(s.position.x + (s.size.x - _suggerimento.size.x) / 2.0, s.end.y - 14.0 - _suggerimento.size.y)
-	# tasto Scatto 62 punti sopra il fondo come nel web, ma sempre sopra il suggerimento (che può andare a capo)
+	# tasto Dribbling / Scatto 62 punti sopra il fondo come nel web, ma sempre sopra il suggerimento (che può andare a capo)
 	_dribbling.reset_size()
 	var fondo := s.end.y - 62.0
 	if _suggerimento.visible:
@@ -388,8 +388,13 @@ func suggerimento(testo: String, caldo: bool) -> void:
 	_metti_suggerimento()
 
 
-func mostra_dribbling(si: bool) -> void:
+## tasto in basso: visibile nel duello ("Dribbling") e nella fuga (scatto = true: "Scatto")
+func mostra_dribbling(si: bool, scatto: bool = false) -> void:
 	_dribbling.visible = si
+	var testo := "Scatto" if scatto else "Dribbling"
+	if _dribbling.text != testo:
+		_dribbling.text = testo
+		_dribbling.reset_size()
 
 
 func rallenty(si: bool) -> void:

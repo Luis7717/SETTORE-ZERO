@@ -1,4 +1,4 @@
-# Duello col difensore, dribbling e calo delle statistiche per l'uso (porting di src/sim/duel.js).
+# Duello col difensore, dribbling, fuga con lo Scatto e calo delle statistiche per l'uso (porting di src/sim/duel.js).
 extends "base.gd"
 
 # Regolazioni (misurate con test/diag-flow.mjs e i test in test/unit/duel.test.mjs)
@@ -31,12 +31,18 @@ const WEAR_DRI_MIN := 0.8
 const ZONE_DIST := 20.0   # negli ultimi metri prima della porta avversaria: area di tiro (rallenty, si può passare)
 const WEAR_TES := 0.02    # ogni colpo di testa vinto: -2% di colpi di testa, fino all'85%
 const WEAR_TES_MIN := 0.85
-# Scatto (Luis 2026-11-20): nel duello il tasto in basso è Scatto, non più Dribbling. Il portatore prova a bruciare il
-# difensore in velocità e prosegue dritto (riesce più spesso se è veloce e il difensore difende male)
-const BURST_T := 1.2      # riuscito: per questo tempo il portatore corre più veloce (s)
+# Davanti o dietro "per linee" (Luis 2026-11-21): si divide il campo in linee parallele alle linee di porta. L'avversario
+# è davanti solo se sta su una linea più avanti (verso la porta avversaria) di almeno LEVEL_TOL; altrimenti è alla pari o
+# dietro. Davanti = duello (Dribbling o passaggio disegnato); alla pari o dietro = fuga (Scatto o passaggio disegnato).
+const LEVEL_TOL := 0.5    # "alla pari": fino a tanto più avanti del portatore conta ancora come stessa linea (m)
+const FLEE_R := 4.0       # avversario alla pari o dietro più vicino di così al portatore apre la fuga (m)
+const FLEE_END_R := 7.0   # la fuga si chiude se l'avversario si allontana oltre (m)
+const FLEE_MAX := 2.5     # durata massima della fuga (s)
+const FLEE_CD := 1.5      # dopo la fine, lo stesso portatore non apre una nuova fuga per questo tempo (s)
+const BURST_T := 1.2      # Scatto: per questo tempo il portatore corre più veloce (s)
 const BURST_SPD := 1.15   # ... di questo fattore (sopra lo scatto normale)
-const BURST_RUN := 14.0   # ... e prosegue dritto fino a questa distanza (m)
-const BURST_SIDE := 2.0   # ... passando di fianco al difensore a questa distanza, dalla parte opposta, poi dritto (m)
+const BURST_SHAKE := 0.6  # ... e l'avversario resta indietro: corre piano e non lo contrasta per questo tempo (s)
+const BURST_RUN := 14.0   # ... poi il portatore prosegue dritto fino a questa distanza (m)
 
 
 func duelFor(tm: int) -> bool:
@@ -51,9 +57,9 @@ func inZone(tm: int) -> bool:
 	return (HL - c.y if tm == 0 else c.y + HL) <= ZONE_DIST
 
 
-# si può passare (duello col difensore o area di tiro)
+# si può passare (duello col difensore, fuga o area di tiro)
 func passFor(tm: int) -> bool:
-	return duelFor(tm) or inZone(tm)
+	return duelFor(tm) or fleeFor(tm) or inZone(tm)
 
 
 # il difensore del duello non può ancora rubare palla
@@ -81,15 +87,20 @@ func frontDot(c: R.Player, o: R.Player) -> float:
 	return (dx * rd[0] + dy * rd[1]) / d
 
 
-# avversario più vicino davanti al portatore entro `Rr`
-func frontOpp(c: R.Player, Rr: float) -> R.Player:
+# o sta su una linea più avanti di c (verso la porta che attacca c) di almeno LEVEL_TOL
+func aheadLine(c: R.Player, o: R.Player) -> bool:
+	return (o.y - c.y) * (1.0 if c.team == 0 else -1.0) > LEVEL_TOL
+
+
+# avversario più vicino davanti al portatore entro `Rr` (lines: anche più avanti "per linee", per il duello della persona)
+func frontOpp(c: R.Player, Rr: float, lines: bool = false) -> R.Player:
 	var best: R.Player = null
 	var bd: float = Rr
 	for o: R.Player in players:
 		if o.team == c.team or o.off or o.stun > 0.0 or beaten(o, c) or (o.state != "play" and o.state != "prep"):
 			continue
 		var d: float = C.hyp(o.x - c.x, o.y - c.y)
-		if d < bd and frontDot(c, o) > DUEL_FRONT:
+		if d < bd and frontDot(c, o) > DUEL_FRONT and (not lines or aheadLine(c, o)):
 			bd = d
 			best = o
 	return best
@@ -109,7 +120,7 @@ func updateDuel(dt: float) -> void:
 			why = "gioco fermo"
 		elif b.owner != d.p:
 			why = "passaggio" if (b.owner == null and b.kick != null and b.kick.kicker == d.p) else "palla persa"
-		elif d.o.off or C.hyp(d.o.x - d.p.x, d.o.y - d.p.y) > DUEL_END_R or frontDot(d.p, d.o) < DUEL_BEHIND:
+		elif d.o.off or C.hyp(d.o.x - d.p.x, d.o.y - d.p.y) > DUEL_END_R or frontDot(d.p, d.o) < DUEL_BEHIND or not aheadLine(d.p, d.o):
 			why = "lontano"
 		elif d.t >= DUEL_MAX:
 			why = "tempo"
@@ -123,7 +134,7 @@ func updateDuel(dt: float) -> void:
 		return
 	if duelCd[c.team] > 0.0 and duelCdP[c.team] == c:
 		return
-	var o := frontOpp(c, DUEL_R)
+	var o := frontOpp(c, DUEL_R, true)
 	if o == null:
 		return
 	duel = R.Duel.new()
@@ -144,8 +155,102 @@ func endDuel(reason: String) -> void:
 	ev("duel_end", {"p": d.p, "o": d.o, "reason": reason})
 
 
-func sprintChance(p: R.Player, o: R.Player) -> float:
-	return C.clamp_(DRIB_BASE + DRIB_SKILL * (p.st.vel - o.st.dif) / 100.0, DRIB_MIN, DRIB_MAX)
+func fleeFor(tm: int) -> bool:
+	return flee != null and flee.team == tm
+
+
+# avversario più vicino alla pari o dietro il portatore (per linee) entro `Rr`
+func sideOpp(c: R.Player, Rr: float) -> R.Player:
+	var best: R.Player = null
+	var bd: float = Rr
+	for o: R.Player in players:
+		if o.team == c.team or o.off or o.stun > 0.0 or beaten(o, c) or o.state != "play":
+			continue
+		var d: float = C.hyp(o.x - c.x, o.y - c.y)
+		if d < bd and not aheadLine(c, o):
+			bd = d
+			best = o
+	return best
+
+
+# apre e chiude la fuga del portatore della squadra umana (dopo updateDuel: il duello ha la precedenza)
+func updateFlee(dt: float) -> void:
+	for tm in 2:
+		if fleeCd[tm] > 0.0:
+			fleeCd[tm] -= dt
+	var b := ball
+	var f := flee
+	if f != null:
+		f.t += dt
+		var why := ""
+		if phase != "play":
+			why = "gioco fermo"
+		elif b.owner != f.p:
+			why = "passaggio" if (b.owner == null and b.kick != null and b.kick.kicker == f.p) else "palla persa"
+		elif duel != null:
+			why = "duello"
+		elif f.o.off or f.o.stun > 0.0 or C.hyp(f.o.x - f.p.x, f.o.y - f.p.y) > FLEE_END_R or aheadLine(f.p, f.o):
+			why = "lontano"
+		elif f.t >= FLEE_MAX:
+			why = "tempo"
+		if why != "":
+			endFlee(why)
+		return
+	if phase != "play" or duel != null:
+		return
+	var c := b.owner
+	if c == null or not human[c.team] or ctrl[c.team] != c or c.state != "play" or c.burst > 0.0:
+		return
+	if fleeCd[c.team] > 0.0 and fleeCdP[c.team] == c:
+		return
+	var o := sideOpp(c, FLEE_R)
+	if o == null:
+		return
+	flee = R.Duel.new()
+	flee.team = c.team
+	flee.p = c
+	flee.o = o
+	flee.t = 0.0
+	ev("flee_start", {"p": c, "o": o})
+
+
+func endFlee(reason: String) -> void:
+	var f := flee
+	if f == null:
+		return
+	flee = null
+	fleeCd[f.team] = FLEE_CD
+	fleeCdP[f.team] = f.p
+	ev("flee_end", {"p": f.p, "o": f.o, "reason": reason})
+
+
+# Scatto: il portatore si stacca dall'avversario e prosegue dritto nel verso di corsa
+func burst(p: R.Player, o: R.Player) -> void:
+	var tm := p.team
+	var rd := runDir(p)
+	var rx: float = rd[0]
+	var ry: float = rd[1]
+	var tx: float = C.clamp_(p.x + rx * BURST_RUN, -HW + 1.0, HW - 1.0)
+	var ty: float = C.clamp_(p.y + ry * BURST_RUN, -HL + 1.0, HL - 1.0)
+	var sp: float = vmax(p)
+	p.burst = BURST_T
+	p.fx = rx
+	p.fy = ry
+	if p.vx * rx + p.vy * ry < sp: # parte subito, senza la rincorsa
+		p.vx = rx * sp
+		p.vy = ry * sp
+	if o != null and o.state == "play":
+		o.beat = maxf(o.beat, BURST_SHAKE)
+		o.beatBy = p
+	if human[tm] and ctrl[tm] == p:
+		var mv := R.Move.new()
+		mv.x = tx
+		mv.y = ty
+		mv.ttl = BURST_T + 1.0
+		mv.held = false
+		mv.sprint = true
+		move[tm] = mv
+	ev("burst", {"p": p, "o": o})
 
 
 func dribbleChance(p: R.Player, o: R.Player) -> float:
@@ -153,20 +258,17 @@ func dribbleChance(p: R.Player, o: R.Player) -> float:
 
 
 # Tentativo di dribbling del portatore p contro o (stessa regola per umano e IA). Ritorna true se riesce.
-# sprint = Scatto della persona: velocità contro difesa, e se riesce il portatore prosegue dritto
-func dribble(p: R.Player, o: R.Player, sprint: bool = false) -> bool:
+func dribble(p: R.Player, o: R.Player) -> bool:
 	var b := ball
 	var tm := p.team
-	var ok: bool = rnd() < (sprintChance(p, o) if sprint else dribbleChance(p, o))
+	var ok: bool = rnd() < dribbleChance(p, o)
 	p.dribCd = DRIB_CD
 	var dx: float = o.x - p.x
 	var dy: float = o.y - p.y
 	var d: float = C.orf(C.hyp(dx, dy), 1.0)
 	var ux: float = dx / d
 	var uy: float = dy / d
-	if ok and sprint:
-		_sprintPast(p, o, d)
-	elif ok:
+	if ok:
 		# di lato verso il centro se si è vicini alla linea laterale, altrimenti a caso
 		var side: float
 		if absf(p.x) > HW - 8.0:
@@ -243,74 +345,10 @@ func dribble(p: R.Player, o: R.Player, sprint: bool = false) -> bool:
 			b.noT = 0.4
 			lastPass = null
 			predT = 0.0
-	if sprint:
-		ev("dribble", {"p": p, "o": o, "ok": ok, "sprint": true})
-	else:
-		ev("dribble", {"p": p, "o": o, "ok": ok})
+	ev("dribble", {"p": p, "o": o, "ok": ok})
 	if duel != null and duel.p == p:
 		endDuel("dribbling" if ok else "palla persa")
 	return ok
-
-
-# Scatto riuscito (ramo `ok && sprint` di dribble in JS): dritto nel verso di corsa, un po' di lato dalla parte
-# opposta al difensore; d = distanza dal difensore
-func _sprintPast(p: R.Player, o: R.Player, d: float) -> void:
-	var tm := p.team
-	var rd := runDir(p)
-	var rx: float = rd[0]
-	var ry: float = rd[1]
-	var lat: float = (o.x - p.x) * -ry + (o.y - p.y) * rx
-	var side: float = -C.sign_(lat) if absf(lat) > 0.05 else -C.sign_(C.orf(p.x, 1.0))
-	var nx: float = -ry * side
-	var ny: float = rx * side
-	var along: float = maxf(0.0, (o.x - p.x) * rx + (o.y - p.y) * ry)
-	var Lr: float = maxf(BURST_RUN, along + DRIB_PAST)
-	# curva di fianco al difensore, poi dritto nel verso di corsa
-	var side1 := _inField(o.x + nx * BURST_SIDE, o.y + ny * BURST_SIDE)
-	var side2 := _inField(o.x + nx * BURST_SIDE + rx * DRIB_PAST * 0.5, o.y + ny * BURST_SIDE + ry * DRIB_PAST * 0.5)
-	var end := _inField(p.x + rx * Lr + nx * BURST_SIDE, p.y + ry * Lr + ny * BURST_SIDE)
-	var tx: float = side1.x
-	var ty: float = side1.y
-	var wx: float = tx - p.x
-	var wy: float = ty - p.y
-	var wn: float = C.orf(C.hyp(wx, wy), 1.0)
-	var sp: float = vmax(p) * 1.05
-	p.vx = wx / wn * sp
-	p.vy = wy / wn * sp
-	p.fx = wx / wn
-	p.fy = wy / wn
-	p.tx = tx
-	p.dx = tx
-	p.ty = ty
-	p.dy = ty
-	p.aiT = maxf(p.aiT, 0.35)
-	p.protect = maxf(p.protect, DRIB_PROTECT)
-	p.burst = BURST_T
-	o.stun = DRIB_STUN + maxf(0.0, d - DRIB_REACH) / sp
-	o.contact = 0.0
-	o.vx *= 0.3
-	o.vy *= 0.3
-	o.beat = o.stun + DRIB_BEAT
-	o.beatBy = p
-	if o.state == "prep":
-		o.state = "play"
-		o.warn = false
-	if human[tm] and ctrl[tm] == p:
-		var mv := R.Move.new()
-		mv.x = tx
-		mv.y = ty
-		mv.ttl = BURST_T + 2.0
-		mv.held = false
-		mv.sprint = true
-		mv.path = [side1, side2, end]
-		mv.i = 0
-		mv.owner = p
-		move[tm] = mv
-
-
-# punto {x, y} riportato dentro il campo (a 1 m dalle linee)
-func _inField(x: float, y: float) -> Dictionary:
-	return {"x": C.clamp_(x, -HW + 1.0, HW - 1.0), "y": C.clamp_(y, -HL + 1.0, HL - 1.0)}
 
 
 # l'IA (e l'umano simulato) col pallone e un avversario davanti a volte prova il dribbling

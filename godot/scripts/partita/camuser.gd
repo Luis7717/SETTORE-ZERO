@@ -17,7 +17,7 @@ static func corner_cam_on(m: Object) -> bool:
 	return m != null and m.phase == "restart" and m.restart != null and m.restart.type == "corner"
 
 
-## visuale che si può girare: calcio d'angolo, oppure rallenty (gioco, pallone a un giocatore di tm, duello o area di tiro)
+## visuale che si può girare: calcio d'angolo, oppure rallenty (gioco, pallone a un giocatore di tm, duello, fuga o area di tiro)
 static func user_cam_on(m: Object, tm: int) -> bool:
 	if corner_cam_on(m):
 		return true
@@ -26,7 +26,7 @@ static func user_cam_on(m: Object, tm: int) -> bool:
 	var c: Object = m.ball.owner
 	if c == null or c.team != tm:
 		return false
-	return m.duelFor(tm) or m.inZone(tm)
+	return m.duelFor(tm) or m.fleeFor(tm) or m.inZone(tm)
 
 
 ## angolo mentre si trascina: parte da yaw0 (angolo quando il dito si è appoggiato) e segue lo spostamento orizzontale

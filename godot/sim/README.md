@@ -17,7 +17,7 @@ lo stato (pallone e 22 giocatori) è identico al JS a ogni passo, con stessi eve
 | — | `fmath.gd` (`SimMath`) | `sin`, `cos`, `atan2` fdlibm, gli stessi bit di V8 (vedi sotto) |
 | oggetti letterali del JS | `records.gd` (`SimRec`) | classi dei dati: `Player`, `Ball`, `Kick`, `Shot`, `Move`, `Run`, `Duel`, `Restart`, `Advantage`, … |
 | `src/sim/match.js` (stato e aiuti) | `base.gd` | campi della partita, `rnd`, `ev`, `team`, `gk`, `place`, `anchor`, `offsideY`, `runOf`, … |
-| `src/sim/duel.js` | `duel.gd` | duello, dribbling, area di tiro, calo per uso |
+| `src/sim/duel.js` | `duel.gd` | duello, dribbling, fuga e Scatto (`aheadLine`, `updateFlee`, `burst`), area di tiro, calo per uso |
 | `src/sim/motion.js` | `motion.gd` | movimento, contrasti, contatti col pallone, colpi di testa, parate, falli |
 | `src/sim/ai.js` | `ai.gd` | IA: tiro, passaggi, portatore, difesa, appoggi, portiere |
 | `src/sim/match.js` | `match.gd` (`SimMatch`) | `Match`: calci, pallone, ripartenze, regole, comandi del giocatore (`user*`) |
@@ -71,7 +71,7 @@ Attenzione: con `-s`, un errore di script blocca Godot senza uscire; in automati
 | `test_defense.gd` | `defense-help`, `defense-runs`, `defense-shape` | linee corte, contrasto magnetico, intercetto, raggio difensivo, pressing, rientro |
 | `test_attack.gd` | `attack-spacing`, `sprint` | smarcamento, profondità sul fuorigioco, scatto ed energia |
 | `test_duel.gd` | `duel`, `dribble-beat` | duello, dribbling, difensore saltato, colpi di testa e `tes`, stanchezza, area di tiro |
-| `test_sprint.gd` | `sprint` (Scatto nel duello) | tasto Scatto: fuori dal duello niente, riuscito = dritto oltre il difensore, velocità contro difesa |
+| `test_sprint.gd` | `flee` (fuga e Scatto) | fuga con l'avversario alla pari o dietro "per linee", duello solo davanti, chiusure (tempo, alla pari, passaggio), Scatto dritto senza contrasti, squadra 1 |
 | `test_rules.gd` | `out-of-play`, `advantage`, `wall`, `path`, `preview`, `sanity`, `air` | portiere e respinte, spazzata, contrasti, vantaggio, barriera, strada disegnata, anteprima, fuorigioco, partita senza NaN |
 
 Non portati: i test della grafica e del menu (`busto`, `camfit`, `camuser`, `eyes`, `gambe`, `hair`, `head`, `looks`,
@@ -84,8 +84,9 @@ campi di `m.duel` (qui è una classe); in `sprint` la scelta del clip d'animazio
 ### Equivalenza col JS
 
 `node test/export-trace.mjs` scrive in `tests/fixtures/` i riferimenti presi dal motore JS:
-`rng.json` (500 numeri per 7 semi), `math.json` (2000 valori di sin, cos, atan2, hypot), `sprint.json` (14 scene del
-tasto Scatto nel duello, che le partite col bot non usano mai: esito e impronta dello stato per 2,4 s), `trace_0..6.json`
+`rng.json` (500 numeri per 7 semi), `math.json` (2000 valori di sin, cos, atan2, hypot), `sprint.json` (17 scene di
+fuga e tasto Scatto, che le partite col bot non usano mai: avversario dietro, alla pari, davanti per linee, squadra 1;
+apertura di fuga o duello, esito del tocco e impronta dello stato per 2,4 s), `trace_0..6.json`
 (7 partite: un'impronta dello stato a ogni passo, gli eventi col passo, lo stato in chiaro ogni 120 passi,
 punteggio e statistiche). **Va rilanciato a ogni modifica del motore JS**, e il porting va aggiornato finché
 `test_equivalence.gd` torna verde: se un'impronta differisce, il test dice da quale passo e di quanto.

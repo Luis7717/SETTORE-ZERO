@@ -137,6 +137,7 @@ func setRestart(type: String, tm: int, x: float, y: float, taker: R.Player = nul
 	b.ct = 0.0
 	b.noT = 0.0
 	endDuel("gioco fermo")
+	endFlee("gioco fermo")
 	phase = "restart"
 	move = [null, null]
 	runs = [[], []]
@@ -586,6 +587,7 @@ func goal(forT: int) -> void:
 	var mnt: int = mini(90, int(floor((half - 1) * 45 + t / halfLen * 45.0)) + 1)
 	goalsLog.append({"team": forT, "name": scorer.name if scorer != null else "Autogol", "minute": mnt, "scorer": scorer.src if scorer != null else null, "assist": assist.src if assist != null else null})
 	endDuel("gioco fermo")
+	endFlee("gioco fermo")
 	advantage = null
 	phase = "goal"
 	goalT = 3.2
@@ -630,6 +632,7 @@ func step(dt: float) -> void:
 	movePlayers(dt)
 	updateBall(dt)
 	updateDuel(dt)
+	updateFlee(dt)
 	if phase == "play":
 		contacts(dt)
 		if phase == "play":
@@ -686,6 +689,7 @@ func useAdvantage(tm: int) -> void:
 
 func endHalf() -> void:
 	endDuel("gioco fermo")
+	endFlee("gioco fermo")
 	resetStates()
 	ball.shot = null
 	if half == 1:
@@ -959,15 +963,16 @@ func userDribble(tm: int) -> bool:
 	return true
 
 
-# Scatto nel duello aperto per la squadra T (tasto in basso, al posto del Dribbling). Come userDribble.
+# Scatto nella fuga aperta per la squadra T (avversario alla pari o dietro, tasto in basso). Ritorna true se è partito.
 func userSprint(tm: int) -> bool:
-	var d := duel
-	if d == null or d.team != tm or phase != "play":
+	var f := flee
+	if f == null or f.team != tm or phase != "play":
 		return false
-	var p := d.p
+	var p := f.p
 	if ball.owner != p or p.stun > 0.0 or p.state != "play":
 		return false
-	dribble(p, d.o, true)
+	burst(p, f.o)
+	endFlee("scatto")
 	return true
 
 
@@ -1004,6 +1009,8 @@ func substitute(tm: int, idx: int, src: Dictionary) -> bool:
 	p.look = lookFor(src)
 	if duel != null and (duel.p == p or duel.o == p):
 		endDuel("gioco fermo")
+	if flee != null and (flee.p == p or flee.o == p):
+		endFlee("gioco fermo")
 	ev("sub", {"p": p})
 	return true
 

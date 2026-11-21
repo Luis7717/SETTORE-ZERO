@@ -19,7 +19,7 @@ static func corner_cam_on(m: SimMatchScript) -> bool:
 	return m != null and m.phase == "restart" and m.restart != null and m.restart.type == "corner"
 
 
-## visuale che si può girare: calcio d'angolo, oppure rallenty (in gioco, pallone a un giocatore di tm, duello o area di tiro)
+## visuale che si può girare: calcio d'angolo, oppure rallenty (in gioco, pallone a un giocatore di tm, duello, fuga o area di tiro)
 static func user_cam_on(m: SimMatchScript, tm: int) -> bool:
 	if corner_cam_on(m):
 		return true
@@ -28,7 +28,7 @@ static func user_cam_on(m: SimMatchScript, tm: int) -> bool:
 	var c: R.Player = m.ball.owner
 	if c == null or c.team != tm:
 		return false
-	return m.duelFor(tm) or m.inZone(tm)
+	return m.duelFor(tm) or m.fleeFor(tm) or m.inZone(tm)
 
 
 ## angolo mentre si trascina: parte da yaw0 e segue lo spostamento orizzontale dx (px) rispetto alla larghezza w (px)

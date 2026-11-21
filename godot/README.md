@@ -64,7 +64,7 @@ interfaccia dei menu, sfondo del menu e allenamento guidato, grafica.
 | `scripts/partita/gioco.gd` | ciclo della partita (`frame()` di `src/main.js`): gesti → motore col tempo scalato → eventi → vista; pausa, intervallo, fine |
 | `scripts/partita/gesti.gd` | comandi a un dito, porting di `src/input.js` (logica pura, provata senza schermo) |
 | `scripts/partita/visuale_dito.gd` | visuale girata col dito: la parte "gesto" di `src/camuser.js` |
-| `scripts/partita/hud_partita.gd` | punteggio, tempo, minimappa, suggerimenti, Dribbling, pausa, scritte, frecce, menu, FPS |
+| `scripts/partita/hud_partita.gd` | punteggio, tempo, minimappa, suggerimenti, tasto Dribbling / Scatto, pausa, scritte, frecce, menu, FPS |
 | `scripts/partita/minimappa.gd`, `anteprima.gd` | minimappa; anteprima del calcio disegnato (volo, fuorigioco, chi riceve) |
 | `scripts/partita/audio_partita.gd` | suoni agganciati agli eventi del motore, pubblico che cresce vicino alla porta |
 | `scripts/partita/squadre_prova.gd` | due squadre inventate (Virtus Borgoalto, Aurora Portosole) finché non c'è la carriera |
@@ -139,7 +139,7 @@ $G --path godot -- --app --app-schermate=shots/fase3 --bot --veloce=8 --tempo=15
 Ciclo come `src/main.js`: a ogni fotogramma **gesti** (`gesti.update`) → **motore** a passi di al massimo 1/60 s
 col tempo scalato → **eventi** (suoni, scritte) → **vista** (`update_view(dt_game, dt_real)`, con
 `dt_game = dt · max(velocità del tempo, 0,25)` e `dt_real = dt`, come `view.update` e `view.rdt` del web).
-Rallenty con le costanti di `src/main.js`: duello 0,08, area di tiro 0,1, disegno di passaggio o tiro 0,04, di strada
+Rallenty con le costanti di `src/main.js`: duello 0,08, fuga 0,08, area di tiro 0,1, disegno di passaggio o tiro 0,04, di strada
 0,25, di linea di difesa 0,13, parata 0,1; il tempo passa dolcemente da una velocità all'altra (14/s).
 Tempo di un tempo: 150 s (come il web). Squadra della persona: la 0 (Virtus Borgoalto), contro Aurora Portosole (IA).
 
@@ -163,7 +163,9 @@ usa `scripts/partita/vista_finta.gd`, che ha le stesse firme):
 
 Gesti (porting di `src/input.js`, costanti con nome in cima a `gesti.gd`): strada dal portatore (con tanta strada
 scatta), linea in porta = tiro, linea fino a un compagno = passaggio (**il tocco su un compagno col pallone non passa
-mai**), duello col tasto Dribbling, area di tiro (linea al compagno entro 5 m = passaggio, altrove = corsa), linee di
+mai**), duello (avversario davanti "per linee") col tasto Dribbling, fuga (avversario alla pari o dietro entro 4 m)
+col tasto Scatto, e in ogni rallenty (duello, fuga, area di tiro) niente corsa disegnata: ogni linea è un passaggio
+(al compagno o nello spazio) o un tiro se finisce in porta (Luis 2026-11-21), linee di
 difesa da ogni proprio giocatore tranne il portiere (si vedono già tagliate a 14 m), tieni premuto = muovi il
 controllato (lontano = scatto), tocco su un proprio giocatore in difesa = comandarlo, portiere (linea dal portiere al
 punto della porta, tuffo al rilascio), rimesse (si disegna da ovunque, tranne nel calcio d'angolo: solo vicino al
@@ -181,7 +183,7 @@ $G --path godot -- --seme=4 --bot --veloce=12 --tempo=40 --esci-a-fine --alla-fi
 ```
 
 Opzioni di `gioco.gd`: `--seme=N`, `--tempo=SEC` (un tempo), `--vista-finta`, `--veloce=K` (tempo fisso K/60 s a
-fotogramma), `--bot`, `--esci-a-fine`, `--scena=area|duello|disegno|angolo|pausa`, `--schermata=… [--dopo=SEC |
+fotogramma), `--bot`, `--esci-a-fine`, `--scena=area|duello|fuga|disegno|angolo|pausa`, `--schermata=… [--dopo=SEC |
 --alla-fine]`, `--allenamento [--lezione=N --prova=K --scheda]`, `--esci-dopo=SEC` (stampa "FPS medi", come vuole la build su GitHub). Senza schermo i suoni sono
 spenti (non si sentono e col driver audio finto resterebbero in memoria all'uscita).
 
@@ -211,8 +213,8 @@ Da solo (`$G --path godot res://scenes/menu/sfondo_menu.tscn`) si apre come scen
 `--tempo=SEC` (istante della routine), `--sequenza=cartella` (14 schermate: palleggi, giochetti, corsa, tiro),
 `--vicino`, `--senza-vsync --esci-dopo=SEC` (stampa "FPS medi").
 
-**Allenamento guidato** (`scripts/partita/allenamento.gd`, porting di `src/tutorial.js`): sei lezioni (Passaggio,
-Tiro, Corsa e scatto, Recupera palla, Dribbling, Portiere), per ognuna una scheda di spiegazione a partita ferma
+**Allenamento guidato** (`scripts/partita/allenamento.gd`, porting di `src/tutorial.js`): sette lezioni (Passaggio,
+Tiro, Corsa e scatto, Recupera palla, Dribbling, Scatto, Portiere), per ognuna una scheda di spiegazione a partita ferma
 ("Prova (3 volte)" / "Salta l'allenamento") e poi tre prove in situazioni diverse; avanza quando il motore manda
 l'evento giusto, rimette a posto la prova se il pallone esce, se lo prendono loro o dopo 16 s. Stessi testi e stesse
 costanti del web, compresa la correzione del dribbling (ogni prova azzera le attese di duello, dribbling e contrasto,

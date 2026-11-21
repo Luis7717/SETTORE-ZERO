@@ -819,6 +819,16 @@ Legge `SimMatch` e non lo cambia; contratto nel README di `godot/`. Ciclo di gio
   `test/unit/flee.test.mjs` (11 casi, anche squadra 1 e portatore che corre di lato), `node test/flee-shot.mjs shots`.
 - Equilibrio (`npm run balance -- 60 60 20`): prima V5 N6 P9, gol 0,4-0,7, tiri 6,3-4,3; dopo V4 N7 P9, gol 0,4-0,8,
   tiri 6,0-4,5 (il bot non tocca Scatto; cambia solo quando si apre/chiude il duello). Impronte golden rigenerate.
+- **Godot allineato** (motore `godot/sim/duel.gd`/`match.gd`/`base.gd` riga per riga: `aheadLine`, `frontOpp(c, R, lines)`,
+  `fleeFor`/`sideOpp`/`updateFlee`/`endFlee`/`burst`, `passFor` con la fuga, chiusura 'passaggio'; tolti `sprintChance` e
+  il ramo Scatto di `dribble`). Identico al JS bit per bit: `sprint.json` rifatta per la fuga (17 scene: dietro, alla pari,
+  davanti per linee, squadra 1) e le 7 tracce rigenerate da `node test/export-trace.mjs`. Partita: tasto "Dribbling" nel
+  duello e "Scatto" nella fuga, rallenty 8% anche nella fuga, scritta "Scatto!" sull'evento `burst` (niente giochetto),
+  visuale larga e girabile nella fuga, nel rallenty ogni linea è un passaggio (`gesti.gd` → `run_path` usa `passFor`);
+  allenamento con le lezioni Dribbling e Scatto; Come si gioca aggiornato. Test: `tests/test_sprint.gd` (porting di
+  `flee.test.mjs` + 2 casi), fuga in `test_gesti.gd`. Dito finto: la linea ora finisce davvero sul punto voluto
+  (`gesti.up` non usa il punto del rilascio; prima i tiri finivano poco prima della porta e diventavano strade, ora nel
+  rallenty sarebbero passaggi nel vuoto) e nella lezione Passaggio passa anche nella fuga. **Non provato sull'iPhone.**
 
 ## 2026-11-20 — Tasto Scatto al posto del Dribbling (richiesta di Luis) — SOSTITUITA dalla voce del 2026-11-21
 - Luis: "quando sei davanti all'avversario ... il tempo rallenta comunque, come se fosse per il passaggio, però compare un

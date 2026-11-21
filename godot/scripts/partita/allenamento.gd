@@ -20,7 +20,7 @@ const DONE_PAUSE := 1.3       # secondi di "Bravo!" prima della prova successiva
 const FREEZE := 0.2           # stordimento rinnovato a ogni fotogramma per tenere fermi i giocatori fuori dalla prova
 const REPS := 3               # prove per ogni meccanica
 const PASS_DEF_DIST := 11.0   # lezione Passaggio: distanza iniziale del difensore davanti al portatore (m)
-const DRIB_DEF_DIF := 15.0    # lezione Scatto: difesa del difensore, così lo scatto riesce quasi sempre (è una lezione)
+const DRIB_DEF_DIF := 15.0    # lezione Dribbling: difesa del difensore, così il dribbling riesce quasi sempre (è una lezione)
 const HALF_LEN := 99999.0     # in allenamento il tempo non finisce mai
 const BRAVO := "Bravo!"
 
@@ -53,9 +53,16 @@ const LESSONS := [
 		"freeze": "opp", "noAutoDef": true,
 	},
 	{
-		"id": "scatto", "title": "Scatto", # era "Dribbling" (Luis 2026-11-20: nel duello il tasto è Scatto)
-		"short": "Avvicinati al difensore e tocca Scatto.",
-		"text": "Quando arrivi addosso a un difensore la visuale si abbassa e il tempo rallenta: puoi <b>passare</b> a un compagno libero oppure toccare <b>Scatto</b> in basso per bruciarlo in velocità e proseguire dritto.",
+		"id": "dribbling", "title": "Dribbling",
+		"short": "Avvicinati al difensore e tocca Dribbling.",
+		"text": "Quando arrivi addosso a un difensore la visuale si abbassa e il tempo rallenta: puoi <b>passare</b> a un compagno libero oppure toccare <b>Dribbling</b> in basso per saltarlo.",
+		"needs": "userDribble",
+		"freeze": "opp-but-o",
+	},
+	{
+		"id": "scatto", "title": "Scatto", # Luis 2026-11-21: Scatto solo con l'avversario alla pari o dietro (fuga)
+		"short": "Hai un avversario alle spalle: tocca Scatto.",
+		"text": "Se un avversario ti arriva <b>alla pari o alle spalle</b> il tempo rallenta e in basso compare <b>Scatto</b>: toccalo e il tuo giocatore si stacca e prosegue dritto. Puoi anche <b>passare</b> disegnando fino a un compagno. Con l'avversario davanti, invece, si dribbla o si passa.",
 		"needs": "userSprint",
 		"freeze": "opp-but-o",
 	},
@@ -197,6 +204,9 @@ func reset() -> void:
 	m.duel = null
 	m.duelCd = [0.0, 0.0]
 	m.duelCdP = [null, null]
+	m.flee = null
+	m.fleeCd = [0.0, 0.0]
+	m.fleeCdP = [null, null]
 	m.ctrl[0] = null
 	m.place(m.gk(0), 0.0, -49.0)
 	m.place(m.gk(1), 0.0, 49.0)
@@ -339,7 +349,7 @@ func _poll_recupera() -> bool:
 	return m.ball.owner != null and m.ball.owner.team == 0
 
 
-func _setup_scatto(kk: int) -> Dictionary:
+func _setup_dribbling(kk: int) -> Dictionary:
 	var c := carrier(7, [0.0, -10.0, 10.0][kk], [-6.0, 0.0, -2.0][kk])
 	clear_opp()
 	var o: R.Player = m.players[16]
@@ -351,8 +361,20 @@ func _setup_scatto(kk: int) -> Dictionary:
 	return {"c": c, "o": o}
 
 
-func _check_scatto(e: Dictionary) -> bool:
+func _check_dribbling(e: Dictionary) -> bool:
 	return e.type == "dribble" and (e.p as R.Player).team == 0 and e.ok
+
+
+func _setup_scatto(kk: int) -> Dictionary:
+	var c := carrier(7, [0.0, -12.0, 12.0][kk], [-8.0, -2.0, -14.0][kk])
+	clear_opp()
+	var o: R.Player = m.players[16]
+	put(o, c.x + [-1.5, 2.0, 0.0][kk], c.y - [2.0, 0.5, 2.5][kk])
+	return {"c": c, "o": o}
+
+
+func _check_scatto(e: Dictionary) -> bool:
+	return e.type == "burst" and (e.p as R.Player).team == 0
 
 
 func _setup_portiere(kk: int) -> Dictionary:

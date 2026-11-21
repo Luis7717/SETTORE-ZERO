@@ -1,13 +1,14 @@
 # "Dito finto" dell'allenamento guidato (gioco.gd --allenamento --bot): supera ogni lezione SOLO coi gesti veri,
-# cioè posizioni sullo schermo passate a gesti.gd come farebbe un dito (giù, trascina, su), più il tasto Scatto e
+# cioè posizioni sullo schermo passate a gesti.gd come farebbe un dito (giù, trascina, su), più il tasto Dribbling / Scatto e
 # "Prova (3 volte)" sulla scheda. Usa gli aiuti di bot_dito.gd (linee disegnate nel tempo di più fotogrammi).
-#   Passaggio: strada verso il difensore, poi nel duello linea dal pallone al compagno
+#   Passaggio: strada verso il difensore, poi nel rallenty (duello o fuga) linea dal pallone al compagno
 #   Tiro: linea dal pallone dentro la porta · Corsa e scatto: strada in avanti, verso la fascia, lunga
-#   Recupera palla: linea dal proprio giocatore al portatore · Scatto: strada verso il difensore, poi il tasto
+#   Recupera palla: linea dal proprio giocatore al portatore · Dribbling: strada verso il difensore, poi il tasto
+#   Scatto: con l'avversario alle spalle si apre la fuga, poi il tasto
 #   Portiere: linea dal portiere al punto della porta dove arriva il tiro
 extends "res://scripts/partita/bot_dito.gd"
 
-const DRIB_ATTESA := 0.5      # s veri di duello prima di toccare Scatto (come una persona)
+const DRIB_ATTESA := 0.5      # s veri di duello (o di fuga) prima di toccare il tasto (come una persona)
 const CORSA_K := [Vector2(0, 16), Vector2(14, 6), Vector2(0, 22)]   # strade della lezione Corsa (dx, dy) per prova
 const PORTA_H := 1.0          # altezza a cui finisce la linea del tiro (m)
 const PROFONDITA_MIN := 0.05  # m davanti alla telecamera sotto cui un punto non si proietta
@@ -28,20 +29,20 @@ func _decidi(g, now: int) -> void:
 		var gk: R.Player = m.gk(0)
 		_linea(g, now, _sch(g, gk.x, gk.y, 1.0), _sch(g, s.cx, -C.HL, s.ch), "tuffo")
 		return
-	if not m.duelFor(0):
+	if not m.duelFor(0) and not m.fleeFor(0):
 		_duello_ms = 0
 	match titolo:
 		"Passaggio":
 			if c == null or b.owner != c:
 				return
-			if m.duelFor(0):
+			if m.passFor(0): # duello o fuga (difensore arrivato alla pari): il tempo rallenta, si passa
 				var q: R.Player = m.players[9]
 				_linea(g, now, _sch(g, b.x, b.y, 0.3), _sch(g, q.x, q.y, 0.0), "passaggio")
 			else:
 				_verso(g, now, c, t.st.o)
 		"Tiro":
 			if c != null and b.owner == c:
-				_linea(g, now, _sch(g, b.x, b.y, 0.3), _sch(g, 1.5, C.HL, PORTA_H), "tiro")
+				_linea(g, now, _sch(g, b.x, b.y, 0.3), _sch(g, 1.5, C.HL, PORTA_H), "tiro", Vector3(1.5, C.HL, PORTA_H))
 		"Corsa e scatto":
 			if c != null and b.owner == c and m.move[0] == null:
 				var d: Vector2 = CORSA_K[t.k]
@@ -49,17 +50,25 @@ func _decidi(g, now: int) -> void:
 		"Recupera palla":
 			if c != null and b.owner != null and b.owner.team == 1 and m.runOf(c) == null:
 				_linea(g, now, _sch(g, c.x, c.y, 0.9), _sch(g, b.x, b.y, 0.0), "difesa")
-		"Scatto":
+		"Dribbling":
 			if c == null or b.owner != c:
 				return
 			if m.duelFor(0):
-				if _duello_ms == 0:
-					_duello_ms = now
-				elif now - _duello_ms > DRIB_ATTESA * 1000.0:
-					tocca_scatto(g)
-					_duello_ms = now + 100000 # una volta per duello
+				_tasto_dopo_attesa(g, now)
 			else:
 				_verso(g, now, c, t.st.o)
+		"Scatto": # l'avversario è già alle spalle: la fuga si apre da sola
+			if c != null and b.owner == c and m.fleeFor(0):
+				_tasto_dopo_attesa(g, now)
+
+
+# tocca il tasto in basso dopo DRIB_ATTESA s veri di duello o di fuga, una volta sola
+func _tasto_dopo_attesa(g, now: int) -> void:
+	if _duello_ms == 0:
+		_duello_ms = now
+	elif now - _duello_ms > DRIB_ATTESA * 1000.0:
+		tocca_tasto(g)
+		_duello_ms = now + 100000 # una volta per duello
 
 
 # strada dal portatore verso un avversario (fino a 2 m prima)

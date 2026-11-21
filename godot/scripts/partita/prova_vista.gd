@@ -162,9 +162,8 @@ func _process(delta: float) -> void:
 func _eventi() -> void:
 	for e: Dictionary in m.events:
 		match e.type:
-			"dribble":
-				if not e.get("sprint", false): # lo Scatto non ha giochetto
-					vista.trick(e.p)
+			"dribble": # lo Scatto (evento 'burst') non ha giochetto
+				vista.trick(e.p)
 			"kick":
 				if e.get("kind") == "shot" and e.p != null:
 					_ultimo_tiro = e.p.team

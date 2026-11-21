@@ -203,38 +203,43 @@ func test_traccia_6() -> bool:
 	return _trace(6)
 
 
-# Scatto nel duello (userSprint): le partite col bot non lo usano mai, quindi ha scene sue (fixtures/sprint.json):
-# stesso esito e stessa impronta dello stato a ogni passo dopo il tocco
+# Fuga e tasto Scatto (userSprint → burst): le partite col bot non li usano mai, quindi hanno scene loro
+# (fixtures/sprint.json: avversario dietro, alla pari, davanti "per linee", squadra 1): stessa apertura di fuga o
+# duello, stesso esito del tocco e stessa impronta dello stato a ogni passo dopo
 func test_scatto_come_js() -> bool:
 	var ref: Variant = readJson("sprint.json")
 	if not check(ref != null, "manca fixtures/sprint.json"):
 		return done()
 	var nSteps: int = int(C.round_(float(ref.sec) * 60.0))
-	var riusciti := 0
+	var scatti := 0
 	for r: Dictionary in ref.scenes:
 		var sc: Dictionary = r.scene
 		var tag := "scena %d" % int(sc.seed)
-		var m := H.scene(int(sc.seed))
-		var p: R.Player = m.players[9]
-		var o: R.Player = m.players[11 + 3]
+		var tm := int(sc.team)
+		var dir := -1.0 if tm == 1 else 1.0
+		var m := H.scene(int(sc.seed), [false, true] if tm == 1 else [true, false])
+		var p: R.Player = m.players[tm * 11 + 9]
+		var o: R.Player = m.players[(1 - tm) * 11 + 3]
 		H.wake(p, float(sc.px), float(sc.py))
 		p.fx = 0
-		p.fy = 1
-		p.st.vel = float(sc.vel)
+		p.fy = dir
+		p.vy = float(sc.vy0) * dir
 		H.give(m, p)
-		m.updateCtrl(0)
-		H.wake(o, float(sc.px) + float(sc.ox), float(sc.py) + float(sc.dist))
-		o.st.dif = float(sc.dif)
+		m.updateCtrl(tm)
+		H.wake(o, float(sc.px) + float(sc.ox), float(sc.py) + float(sc.oy) * dir)
 		o.fx = 0
-		o.fy = -1
-		m.userMove(0, p.x, p.y, true)
+		o.fy = dir
+		if sc.run:
+			m.userMove(tm, p.x, p.y + 10.0 * dir, true)
+		else:
+			m.userMove(tm, p.x, p.y, true)
 		m.step(DT)
 		m.events.clear()
-		eq(m.duelFor(0), r.duel, tag + ": duello")
-		eq(m.userSprint(0), r.tapped, tag + ": tasto")
-		var e: Variant = findEvent(m.events, "dribble")
-		eq(e.ok if e != null else null, r.ok, tag + ": esito")
+		eq(m.fleeFor(tm), r.flee, tag + ": fuga")
+		eq(m.duelFor(tm), r.duel, tag + ": duello")
+		eq(m.userSprint(tm), r.tapped, tag + ": tasto")
 		eq(p.burst, float(r.burst), tag + ": burst")
+		eq(str(m.events.map(func(x: Dictionary) -> String: return x.type)), str(r.tapEvents), tag + ": eventi del tocco")
 		m.events.clear()
 		var hashes: String = r.hashes
 		var firstDiff := -1
@@ -249,8 +254,8 @@ func test_scatto_come_js() -> bool:
 			m.events.clear()
 		eq(firstDiff, -1, tag + ": stato diverso dal JS dal passo")
 		eq(str(evs), str((r.events as Array).map(func(a: Array) -> Array: return [int(a[0]), a[1], int(a[2])])), tag + ": eventi")
-		if r.ok == true:
-			riusciti += 1
+		if r.tapped == true:
+			scatti += 1
 		m.dispose()
-	note("%d scene di Scatto (%d riuscite) identiche al JS per %d passi" % [ref.scenes.size(), riusciti, nSteps])
+	note("%d scene di fuga (%d con lo Scatto) identiche al JS per %d passi" % [ref.scenes.size(), scatti, nSteps])
 	return done()

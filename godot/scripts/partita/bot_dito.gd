@@ -1,7 +1,7 @@
 # "Dito finto" per le prove senza persona (gioco.gd --bot): gioca la squadra 0 SOLO coi gesti veri, cioè posizioni
 # sullo schermo passate a scripts/partita/gesti.gd come farebbe un dito (giù, trascina, su). Disegna strade, passaggi,
-# tiri, linee di difesa e tuffi del portiere, tiene premuto per muovere il controllato, preme Scatto nel duello (userSprint) e
-# gira la visuale nel rallenty. Non è un giocatore bravo: serve a far passare una partita intera da tutti i gesti.
+# tiri, linee di difesa e tuffi del portiere, tiene premuto per muovere il controllato, preme Dribbling nel duello e Scatto
+# nella fuga (avversario alla pari o dietro) e gira la visuale nel rallenty. Non è un giocatore bravo: serve a far passare una partita intera da tutti i gesti.
 extends RefCounted
 
 const SimRng := preload("res://sim/rng.gd")
@@ -14,8 +14,9 @@ const ATTESA_MIN := 6          # fotogrammi tra un gesto e l'altro (più un po' 
 const ATTESA_CASO := 10
 
 var r: SimRng
-var conti := {"strada": 0, "passaggio": 0, "tiro": 0, "difesa": 0, "tuffo": 0, "scatto": 0, "scatto_riuscito": 0, "visuale": 0, "tieni": 0, "saltati": 0}
+var conti := {"strada": 0, "passaggio": 0, "tiro": 0, "difesa": 0, "tuffo": 0, "dribbling": 0, "scatto": 0, "visuale": 0, "tieni": 0, "saltati": 0}
 var _gesto: Array[Vector2] = []
+var _fine_mondo: Variant = null  # Vector3(x, y, h) del campo dove deve finire la linea (si riproietta al rilascio)
 var _attesa := 0
 
 
@@ -36,6 +37,16 @@ func passo(g, now: int) -> void:
 	if not _gesto.is_empty():
 		var p: Vector2 = _gesto.pop_front()
 		if _gesto.is_empty():
+			# la telecamera si muove mentre si disegna: il dito vero segue quello che vede, quindi l'ultimo punto si
+			# riproietta sul punto del campo voluto (un tiro che finiva poco prima della porta, nel rallenty, dove ogni
+			# linea è un passaggio, diventava un passaggio nel vuoto)
+			if _fine_mondo != null:
+				var w: Vector3 = _fine_mondo
+				var s := _sch(g, w.x, w.y, w.z)
+				if _dentro(g, s):
+					p = Vector2(s.x, s.y)
+				_fine_mondo = null
+			gs.move_ev(p, 0) # gesti.up non usa il punto del rilascio: la linea finisce dove il dito si è mosso l'ultima volta
 			gs.up(p, now, 0)
 		else:
 			gs.move_ev(p, 0)
@@ -75,13 +86,14 @@ func _decidi(g, now: int) -> void:
 				_tieni(g, now, _sch(g, b.x + (r.next() - 0.5) * 6.0, b.y - dir * 3.0, 0.0))
 
 
-# tocca il tasto Scatto del duello (gioco.gd → m.userSprint) e conta com'è andata (evento 'dribble' con sprint)
-func tocca_scatto(g) -> void:
+# tocca il tasto in basso (gioco.gd → m.userDribble nel duello, m.userSprint nella fuga) e lo conta
+func tocca_tasto(g) -> void:
+	var fuga: bool = g.m.fleeFor(g.me)
 	g._dribbling()
-	conti.scatto += 1
-	for e: Dictionary in g.m.events:
-		if e.type == "dribble" and e.get("sprint", false) and e.ok:
-			conti.scatto_riuscito += 1
+	if fuga:
+		conti.scatto += 1
+	else:
+		conti.dribbling += 1
 
 
 func _attacca(g, now: int, c: R.Player, dir: float) -> void:
@@ -90,17 +102,22 @@ func _attacca(g, now: int, c: R.Player, dir: float) -> void:
 	var tiro := r.next()
 	if m.duelFor(me):
 		if tiro < 0.35:
-			tocca_scatto(g)
+			tocca_tasto(g)
 		elif tiro < 0.5:
 			var w: float = g.gesti.dim.x
 			var y0: float = g.gesti.dim.y * 0.3
 			_linea(g, now, Vector3(w * 0.15, y0, 1.0), Vector3(w * 0.55, y0 + 10.0, 1.0), "visuale")
 		else:
 			_passa(g, now, c)
+	elif m.fleeFor(me) and tiro < 0.75: # fuga: Scatto o passaggio disegnato
+		if tiro < 0.5:
+			tocca_tasto(g)
+		else:
+			_passa(g, now, c)
 	elif m.inZone(me):
 		if tiro < 0.65:
-			var fine := _sch(g, (r.next() - 0.5) * 5.0, dir * C.HL, 0.4 + r.next() * 1.6)
-			_linea(g, now, _sch(g, m.ball.x, m.ball.y, 0.3), fine, "tiro")
+			var porta := Vector3((r.next() - 0.5) * 5.0, dir * C.HL, 0.4 + r.next() * 1.6)
+			_linea(g, now, _sch(g, m.ball.x, m.ball.y, 0.3), _sch(g, porta.x, porta.y, porta.z), "tiro", porta)
 		else:
 			_passa(g, now, c)
 	else:
@@ -149,10 +166,11 @@ func _dentro(g, s: Vector3) -> bool:
 	return s.z > 0.5 and s.x >= 0.0 and s.y >= 0.0 and s.x <= dim.x and s.y <= dim.y
 
 
-func _linea(g, now: int, a: Vector3, b: Vector3, tipo: String) -> void:
+func _linea(g, now: int, a: Vector3, b: Vector3, tipo: String, fine_mondo: Variant = null) -> void:
 	if not _dentro(g, a) or not _dentro(g, b):
 		conti.saltati += 1
 		return
+	_fine_mondo = fine_mondo
 	var pa := Vector2(a.x, a.y)
 	var pb := Vector2(b.x, b.y)
 	g.gesti.down(pa, now, 0)
@@ -169,6 +187,7 @@ func _tieni(g, now: int, a: Vector3) -> void:
 	var pa := Vector2(a.x, a.y)
 	g.gesti.down(pa, now, 0)
 	_gesto.clear()
+	_fine_mondo = null
 	for i in range(1, TIENI_FOTOGRAMMI + 1):
 		_gesto.append(pa + Vector2(i * 1.0, 0.0))
 	conti.tieni += 1

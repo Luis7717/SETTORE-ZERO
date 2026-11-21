@@ -13,7 +13,7 @@
 #   --veloce=K          tempo fisso di K/60 s a fotogramma (prove senza schermo: la partita va più veloce del vero)
 #   --bot               un "dito finto" gioca la squadra 0 coi gesti veri (scripts/partita/bot_dito.gd)
 #   --esci-a-fine       a fine partita stampa il riassunto ed esce (codice 0)
-#   --scena=area|duello|angolo|pausa   mette la partita in una situazione da fotografare
+#   --scena=area|duello|fuga|angolo|pausa   mette la partita in una situazione da fotografare
 #   --schermata=PERCORSO.png [--dopo=SEC] [--alla-fine]   schermata dopo SEC secondi veri, o alla fine partita
 #   --esci-dopo=SEC     esce dopo SEC secondi veri
 #   --allenamento       allenamento guidato (tipo "allenamento", scripts/partita/allenamento.gd) invece dell'amichevole;
@@ -55,6 +55,7 @@ const GK_SLOW := 0.1          # mentre si para
 const DEF_DRAW_SLOW := 0.13   # mentre si disegna una linea di difesa
 const PASS_DRAW_SLOW := 0.04  # mentre si disegna un passaggio o un tiro
 const DUEL_SLOW := 0.08       # duello col difensore
+const FLEE_SLOW := 0.08       # fuga: avversario alla pari o alle spalle, tasto Scatto
 const ZONE_SLOW := 0.1        # area di tiro (ultimi 20 m prima della porta avversaria)
 const TEMPO_K := 14.0         # 1/s: il tempo passa dolcemente da una velocità all'altra
 const DT_MAX := 0.05          # fotogramma più lungo considerato (s)
@@ -71,7 +72,8 @@ const HINTS := {
 	"defend": "Difende la CPU: disegna una linea da un tuo giocatore per guidarlo tu",
 	"loose": "Palla libera: disegna una linea da un tuo giocatore per andarci",
 	"dive": "PARA! Tira una linea dal portiere al punto della porta",
-	"duel": "Disegna fino a un compagno per passare · oppure tocca Scatto",
+	"duel": "Disegna fino a un compagno per passare · oppure tocca Dribbling",
+	"flee": "Disegna fino a un compagno per passare · oppure tocca Scatto",
 	"zone": "Area di tiro: linea in porta = tiro · fino a un compagno = passaggio",
 }
 const RHINT := {
@@ -241,7 +243,8 @@ func _process(delta: float) -> void:
 func velocita_voluta() -> float:
 	var dive: bool = m.diveWin(me) and not m.autoGk[me]
 	var duel: bool = m.duelFor(me)
-	var zone: bool = not duel and m.inZone(me)
+	var flee: bool = not duel and m.fleeFor(me)
+	var zone: bool = not duel and not flee and m.inZone(me)
 	if gesti.mode == "dpath":
 		return DEF_DRAW_SLOW
 	if gesti.drawing:
@@ -250,6 +253,8 @@ func velocita_voluta() -> float:
 		return GK_SLOW
 	if duel:
 		return DUEL_SLOW
+	if flee:
+		return FLEE_SLOW
 	if zone:
 		return ZONE_SLOW
 	return 1.0
@@ -257,7 +262,8 @@ func velocita_voluta() -> float:
 
 func _passi_motore(dt: float) -> void:
 	var target := velocita_voluta()
-	hud.mostra_dribbling(m.duelFor(me) and not gesti.drawing)
+	var flee: bool = not m.duelFor(me) and m.fleeFor(me)
+	hud.mostra_dribbling((m.duelFor(me) or flee) and not gesti.drawing, flee)
 	ts += (target - ts) * minf(1.0, dt * TEMPO_K)
 	var sdt := dt * ts * _velocita
 	var n := maxi(1, ceili(sdt / PASSO_MAX))
@@ -287,7 +293,7 @@ func _aggiorna_hud() -> void:
 		_cam_tip_visto = true
 	var on: bool = allenamento == null and not paused and not gesti.drawing and VD.user_cam_on(m, me)
 	hud.aiuto_visuale(("arr" if _cam_tip_visto else "tip") if on else "")
-	var h: String = "duel" if m.duelFor(me) else ("zone" if m.inZone(me) else m.hint(me))
+	var h: String = "duel" if m.duelFor(me) else ("flee" if m.fleeFor(me) else ("zone" if m.inZone(me) else m.hint(me)))
 	var txt: String = RHINT.get(m.restart.type, "") if h == "restart" else HINTS.get(h, "")
 	var caldo := h == "dive" or (h == "restart" and m.restart.type == "penalty")
 	if allenamento != null:
@@ -320,12 +326,11 @@ func _evento(e: Dictionary, adv: bool) -> void:
 			hud.big("Si torna alla punizione", "", 1300)
 		"tackle", "block":
 			audio.kick(9.0)
-		"dribble":
-			if e.get("sprint", false): # tasto Scatto: niente giochetto, solo la scritta
+		"burst": # tasto Scatto nella fuga: niente giochetto, solo suono e scritta
+			if (e.p as R.Player).team == me:
 				audio.kick(6.0)
-				if (e.p as R.Player).team == me:
-					hud.big("Scatto!" if e.ok else "Fermato!", "g" if e.ok else "", 900)
-				return
+				hud.big("Scatto!", "g", 800)
+		"dribble":
 			var nome := _nome_giochetto(vista.trick(e.p))
 			if (e.p as R.Player).team == me:
 				hud.big(nome + ("!" if e.ok else ""), "g" if e.ok else "", 1000)
@@ -428,10 +433,14 @@ func _notification(what: int) -> void:
 			_mostra_pausa()
 
 
-# tasto in basso nel duello: Scatto (era Dribbling; i nomi interni restano _dribbling / mostra_dribbling)
+# tasto in basso: Scatto nella fuga (avversario alla pari o dietro), altrimenti Dribbling nel duello
 func _dribbling() -> void:
-	if stato == "partita" and not paused:
+	if stato != "partita" or paused:
+		return
+	if m.fleeFor(me):
 		m.userSprint(me)
+	else:
+		m.userDribble(me)
 
 
 # ---------------------------------------------------------------- pausa, intervallo, fine
@@ -626,12 +635,14 @@ func _prepara_scena(nome: String) -> void:
 	await get_tree().create_timer(0.4).timeout
 	var att: R.Player = m.team(me)[9]
 	match nome:
-		"area", "duello", "disegno":
+		"area", "duello", "fuga", "disegno":
 			_metti_in_gioco()
-			var y := 8.0 if nome == "duello" else 33.0
+			var y := 8.0 if nome == "duello" or nome == "fuga" else 33.0
 			_sposta(att, 4.0, y)
 			if nome == "duello":
 				_sposta(m.team(1 - me)[3], 4.5, y + 4.5)
+			elif nome == "fuga": # avversario alle spalle: si apre la fuga col tasto Scatto
+				_sposta(m.team(1 - me)[3], 5.0, y - 2.5)
 			m.ball.owner = att
 			m.ball.last = att
 			m.ball.x = att.x

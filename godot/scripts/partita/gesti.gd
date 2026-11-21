@@ -226,8 +226,8 @@ func mate_at(px: float, py: float, Rr: float = PASS_SNAP) -> R.Player:
 	return best
 
 
-## la linea è una strada da correre? No se finisce in porta, se si è in duello o rimessa (ogni linea è un passaggio),
-## e nell'area di tiro se finisce su un compagno (altrimenti si corre lì)
+## la linea è una strada da correre? No se finisce in porta, in rimessa e in ogni rallenty (duello, fuga, area di tiro):
+## lì ogni linea è un passaggio (Luis 2026-11-21: durante il rallenty niente corsa disegnata)
 func run_path() -> bool:
 	var m := partita
 	if pts.is_empty():
@@ -235,11 +235,9 @@ func run_path() -> bool:
 	var e: Dictionary = pts[-1]
 	if e.get("goal", false):
 		return false
-	if m.phase == "restart" or m.duelFor(team):
+	if m.phase == "restart":
 		return false
-	if m.inZone(team):
-		return mate_at(e.x, e.y) == null
-	return true
+	return not m.passFor(team)
 
 
 ## punto del campo sotto il dito; null se guarda il cielo

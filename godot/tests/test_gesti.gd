@@ -276,7 +276,8 @@ func test_area_di_tiro_linea_in_porta_e_un_tiro() -> bool:
 	return done()
 
 
-func test_area_di_tiro_linea_al_compagno_passa_altrove_corre() -> bool:
+# Luis 2026-11-21: durante il rallenty niente corsa disegnata, ogni linea è un passaggio (al compagno o nello spazio)
+func test_area_di_tiro_ogni_linea_e_un_passaggio() -> bool:
 	prepara(4.0, 33.0)
 	H.wake(mate, -8.0, 38.0)
 	trascina(linea(sch(m.ball.x, m.ball.y, 0.3), sch(mate.x, mate.y)))
@@ -284,7 +285,7 @@ func test_area_di_tiro_linea_al_compagno_passa_altrove_corre() -> bool:
 	prepara(4.0, 33.0)
 	H.wake(mate, -8.0, 38.0)
 	trascina(linea(sch(m.ball.x, m.ball.y, 0.3), sch(10.0, 40.0)))
-	eq(reg.nomi(), ["path"], "altrove = strada da correre")
+	eq(reg.nomi(), ["kick"], "anche nello spazio = passaggio, non corsa")
 	return done()
 
 
@@ -487,4 +488,31 @@ func test_secondo_dito_e_tocco_annullato_ignorati() -> bool:
 	eq(reg.calls.size(), 0, "tocco annullato dal sistema: nessun ordine")
 	eq(g.mode, "", "gesto chiuso")
 	check(not g.drawing, "non si disegna più")
+	return done()
+
+
+# fuga (avversario alla pari o dietro, Luis 2026-11-21): come nell'area di tiro e nel duello ogni linea è un
+# passaggio (fino al compagno o nello spazio); fuori dal rallenty la stessa linea nel vuoto è una corsa
+func _metti_fuga() -> void:
+	H.wake(opp, c.x + 1.0, c.y - 2.0)
+	m.flee = R.Duel.new()
+	m.flee.team = 0
+	m.flee.p = c
+	m.flee.o = opp
+
+
+func test_fuga_ogni_linea_e_un_passaggio() -> bool:
+	prepara()
+	_metti_fuga()
+	H.wake(mate, -8.0, 6.0)
+	trascina(linea(sch(m.ball.x, m.ball.y, 0.3), sch(mate.x, mate.y)))
+	eq(reg.nomi(), ["kick"], "fino al compagno (entro 5 m) = passaggio")
+	prepara()
+	_metti_fuga()
+	H.wake(mate, -8.0, 6.0)
+	trascina(linea(sch(m.ball.x, m.ball.y, 0.3), sch(6.0, 10.0)))
+	eq(reg.nomi(), ["kick"], "anche nello spazio = passaggio")
+	prepara()
+	trascina(linea(sch(m.ball.x, m.ball.y, 0.3), sch(6.0, 10.0)))
+	eq(reg.nomi(), ["path"], "fuori dal rallenty = strada da correre")
 	return done()
