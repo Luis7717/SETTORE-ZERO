@@ -17,6 +17,7 @@
 #   set_rallenty(k)                    quanto è forte il rallenty (0..1) per la profondità di campo; −1 = la vista lo
 #                                      ricava da sola da dt_game / dt_real (predefinito)
 #   set_taglio(i)                      taglio dell'erba dello stadio (scripts/tagli_campo.gd)
+#   replay                             true durante il replay del gol (replay.gd muove la telecamera)
 #   set_qualita(l) / qualita_auto     livello grafico 0..3 (qualita.gd); con qualita_auto scende da solo sotto 58 fps
 #   user_yaw, cam_drag, drawing        scritti da chi gestisce il dito (src/input.js), letti qui; il ritorno dolce
 #                                      di user_yaw a 0 (relaxYaw) lo fa la vista in update_view
@@ -67,6 +68,8 @@ var user_yaw := 0.0
 var cam_drag := false
 ## il dito sta disegnando una linea (col pallone: visuale larga del rallenty)
 var drawing := false
+## replay del gol in corso (replay.gd): la telecamera la muove il replay; niente anello, segnalino né linee di corsa
+var replay := false
 
 var m: Object = null           # SimMatch
 var me := 0
@@ -208,15 +211,20 @@ func update_view(dt_game: float, dt_real: float) -> void:
 		by = lerpf(by, -s * pm.z, pm.w)
 		bh = lerpf(bh, maxf(0.0, pm.y - BALL_R), pm.w)
 	_aggiorna_pallone(b, bx, by, bh, dt_game)
-	_aggiorna_segni()
+	if replay:
+		_ring.visible = false
+		_marker.visible = false
+	else:
+		_aggiorna_segni()
 	# visuale girata dalla persona: resta finché dura il rallenty in attacco con lo stesso portatore e mentre si
 	# disegna; poi torna dolcemente dritta (src/camuser.js). Con un portatore nuovo si riparte dritti.
 	if cam_drag:
 		_yaw_owner = b.owner
 	var hold: bool = (CU.user_cam_on(m, me) and b.owner == _yaw_owner) or drawing
 	user_yaw = CU.relax_yaw(user_yaw, hold, dt_real)
-	cam.aggiorna(m, me, dt_game, dt_real, drawing, cam_drag, user_yaw, _zoom_t)
-	_nastri.mostra_corse(m.runs[me] if m.runs != null else [])
+	if not replay:
+		cam.aggiorna(m, me, dt_game, dt_real, drawing, cam_drag, user_yaw, _zoom_t)
+	_nastri.mostra_corse(m.runs[me] if m.runs != null and not replay else [])
 	if dt_game > 0.0:
 		_aggiorna_reti(b, dt_game)
 	_aggiorna_stadio(dt_real)

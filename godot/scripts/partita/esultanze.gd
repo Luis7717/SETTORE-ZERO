@@ -6,7 +6,7 @@ extends RefCounted
 ## [id, nome] nell'ordine in cui si vedono nell'editor
 const ELENCO := [
 	["aeroplano", "Aeroplano"],
-	["ginocchio", "Scivolata in ginocchio"],
+	["ginocchio", "In ginocchio"],
 	["capriola", "Capriola"],
 	["pugno", "Pugno al cielo"],
 	["indice", "Indici al cielo"],

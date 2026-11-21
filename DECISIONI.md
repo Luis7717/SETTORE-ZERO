@@ -1201,3 +1201,81 @@ Punti 6-9 del piano, solo nella versione Godot (dettagli in `godot/README.md`, "
 - **Salvataggio**: stessa versione 1; chiavi nuove riempite al caricamento (`novita()`), salvataggi vecchi senza
   di esse si caricano (test).
 
+## Statistiche a fine partita (Godot, fase C punto 14) — 2026-11-21
+
+- **Dove**: schermata nuova `statistiche`, dal dopo partita col tasto "Statistiche e pagelle" (sopra "Continua",
+  che resta l'ultimo). Vale per campionato e amichevole; l'allenamento non ha dopo partita, quindi niente
+  statistiche (non aveva senso aggiungere una schermata in più a un allenamento senza fine).
+- **Raccolta nel contatore che c'era già** (`conta_giocatori.gd`) invece di un secondo lettore di eventi: in
+  `gioco.gd` cambia una riga (`tabellino` nell'esito). `per_giocatore()` resta identico per la crescita.
+- **Posizione del tiro** = posizione di chi tira nel fotogramma del calcio. **Esito** = il primo fatto che segue:
+  gol della sua squadra → gol; parata, o pallone preso dal portiere avversario → parato; respinta, spazzata o
+  pallone preso da un altro → respinto; fuori, intervallo o ripresa del gioco → fuori. Il numero di tiri della
+  mappa può differire di poco da "Tiri" del motore (il motore conta anche i passaggi che finiscono verso la porta).
+- **Palla persa** = contrasto subito o passaggio preso da un avversario (un dribbling sbagliato finisce in un
+  contrasto, quindi conta lì). **Gol subiti** = solo per chi era in campo in quel momento (gli espulsi no, chi
+  entra dopo no).
+- **Formula dei voti** (`voti.gd`): 6 di base; vittoria +0,5, sconfitta −0,5; gol +1, assist +0,6; dribbling +0,2
+  (max +1), contrasti +0,25 (max +1,25), intercetti +0,15 (max +0,75), passaggi riusciti +0,03 (max +0,6), parate
+  +0,4 (max +2); gol subiti −0,5 portiere, −0,3 difensore, −0,1 centrocampista; porta inviolata +0,5 portiere,
+  +0,3 difensore; palle perse −0,1 (max −1,5); poi fra 4 e 10, al mezzo punto. Migliore in campo = più punti prima
+  dell'arrotondamento (a pari punti il primo in elenco). Con i tetti un difensore che non sbaglia niente non supera
+  quasi mai 8: i voti alti restano per chi segna o para tanto. **Da provare**: se i voti sembrano tutti uguali
+  (6-6,5) nelle partite vere, alzare i pesi di contrasti e passaggi.
+- **Colori**: squadra 0 gialla, squadra 1 blu, come le barre del dopo partita (non "mia/loro"); la mappa si gira
+  perché la persona attacchi sempre verso l'alto.
+
+
+## Fase C: replay del gol e cronaca scritta (solo Godot), 2026-11-21
+
+- **Replay senza toccare il motore**: `scripts/partita/replay_buffer.gd` tiene gli ultimi 6 s di gioco (un campione
+  ogni 1/30 s di gioco, 182 campioni; nei rallenty si registra meno spesso del video) con posizione, verso,
+  velocità, stato, tuffo, calcio, festa ecc. di giocatori e pallone, più fase e ripresa. Nel replay, per ogni
+  fotogramma, i valori registrati si scrivono sugli oggetti della partita, la vista li legge con `update_view` e
+  subito dopo si rimettono i valori veri (le stesse Variant: identici bit per bit). Il motore è fermo per tutto il
+  replay, quindi non vede mai i valori del replay. Scelta più semplice che rifare la vista su oggetti finti: figure,
+  mocap, reti e scia funzionano da sole. Test: `test_replay_non_cambia_la_partita` (partita gemella identica dopo
+  il replay, 20 s dopo). I file `godot/sim/*` non sono cambiati.
+- **Quando**: dopo la festa del motore (fase "goal", 3,2 s), quando il passo dopo farebbe il calcio d'inizio, il
+  motore resta fermo (`replay.trattieni`); poi `_fine_festa_gol()` → `dopo_esultanza()` → replay → calcio d'inizio.
+  L'esultanza del campione (altro lavoro) si aggancia in `_fine_festa_gol()` e chiama `dopo_esultanza()` alla fine.
+- **Cosa si rigioca**: da 2,2 s prima del gol a 0,6 s dopo; velocità 0,75, rallentatore 0,35 da 0,35 s prima del
+  tiro a 0,5 s dopo; circa 5 s veri (al massimo 5: se l'azione è lunga si accelera tutto). Il tiro è l'ultimo calcio
+  prima del gol trovato nel buffer (`tiro_prima`); la linea gialla col mirino e i puntini del volo crescono dietro al
+  pallone. Visuale a caso (caso della grafica): "porta" (bassa dietro la linea di fondo di fianco al palo, 55%) o
+  "lato" (bassa dalla linea laterale). Prima avevo messo la telecamera dietro la rete: la rete copriva tutto.
+- **Non rigiocati**: i giochetti del dribbling (stanno nella vista, non nel motore) e la visuale girata col dito.
+- **Niente replay in allenamento** (i gol degli esercizi sono tanti e brevi). Opzione `--senza-replay` per le prove.
+- **Cronaca**: `scripts/partita/cronaca.gd`, logica pura (evento → frase o ""), caso suo (RandomNumberGenerator con
+  seme a caso), 3-6 frasi per tipo, mai la stessa due volte di fila. Ritmo: il gol sempre; parata, palo, tiro fuori,
+  occasione (tiro respinto da un difensore), rigore e cartellini se dall'ultima frase sono passati 2 s; dribbling
+  riuscito, contrasto con pallone rubato, angolo e fallo semplice solo dopo 6 s e non sempre (70/35/60/60%). "Tiro
+  fuori" = rinvio dal fondo entro 3 s da un tiro; un colpo di testa o al volo conta come tiro entro 20 m dalla porta.
+  IA contro IA, 240 s: 7 frasi (`test_cronaca_di_una_partita_vera`). Niente cronaca in allenamento.
+- **Dove**: pillola in alto a sinistra, 96 punti sotto il bordo dell'area sicura (sotto punteggio e scritta della
+  visuale), larga al massimo fino alla minimappa; il gol in giallo per 5 s, il resto 3,6 s. Dentro l'HUD, sotto i
+  menu (la pausa la copre).
+
+## Fase C: esultanze del campione (solo Godot), 2026-11-21
+
+- **15 esultanze procedurali** (`godot/scripts/partita/mosse/esultanza.gd`), fatte col sistema delle mosse che c'era
+  già (chiavi di bacino, busto, testa, gambe, braccia + IK) più un "corpo intero" che sposta e gira tutta la figura
+  (salti, capriola, giravolta, scivolata). Niente animazioni scaricate: dove il giocatore corre (aeroplano, rincorsa
+  della scivolata, bandierina) le gambe le fa il clip di corsa che il gioco ha già. Controllate a occhio con
+  `tests/foto_esultanze.gd` (6 istanti, due lati) e con i test (caviglie, mani, durata).
+- **Solo il campione esulta** e solo dopo un gol suo per la mia squadra (non autogol, non in allenamento). Gli altri
+  come prima.
+- **Il motore non cambia**: l'esultanza dura 2,8-3,0 s e parte all'evento "goal", dentro la festa del motore (3,2 s).
+  Il replay è trattenuto finché l'esultanza non finisce (o non la si salta col tocco): ordine esultanza → replay →
+  calcio d'inizio. Finita, la posa finale resta fino al replay.
+- **Telecamera**: davanti al campione, di tre quarti, 6,6 m, alta 2,4 m (i giocatori sono alti 2,3 m con la scala
+  1,25); prima avevo messo 4,8 m e in ginocchio le mani uscivano dallo schermo. Il campione si gira verso il centro
+  del campo nei primi 0,45 s.
+- **Salvataggio**: il campo `esultanza` lo scrive solo `setEsultanza()` (dall'editor), **non** `addChampion()`:
+  così il campione appena creato resta identico a quello del JS (test di equivalenza con le fixture) e i salvataggi
+  vecchi, senza il campo, valgono come "Aeroplano" (predefinita). Valore sconosciuto → predefinita.
+- **Editor**: scheda in più "Esultanza" (anche nella creazione); per farci stare 5 schede "Nome e ruolo" si chiama
+  ora "Nome". Il nome lungo "Scivolata in ginocchio" è diventato "In ginocchio". Nel modellino del menu l'esultanza
+  si ripete con una pausa di 1,1 s e la telecamera segue il bacino.
+- **Da provare sull'iPhone**: se 3 s di esultanza più 5 s di replay sono troppi a ogni gol (il tocco salta tutti e due).
+

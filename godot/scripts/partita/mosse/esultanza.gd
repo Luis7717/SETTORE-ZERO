@@ -45,7 +45,6 @@ class Coreografia:
 	var _cp: Mossa.Curva = null
 	var _ca: Mossa.Curva = null
 	var _poli := {}
-	var centro := Vector3.ZERO             # centro dello spostamento (l'anteprima del menu lo toglie)
 
 	func _init(id_: String, tt: float) -> void:
 		id = id_
@@ -87,16 +86,11 @@ class Coreografia:
 		Mossa._by_t(corpo_k)
 		var pk: Array = []
 		var ak: Array = []
-		var lo := Vector3(INF, 0, INF)
-		var hi := Vector3(-INF, 0, -INF)
 		for k: Dictionary in corpo_k:
 			pk.append({"t": k.t, "p": k.p, "v": k.v})
 			ak.append({"t": k.t, "p": k.a})
-			lo = Vector3(minf(lo.x, k.p.x), 0, minf(lo.z, k.p.z))
-			hi = Vector3(maxf(hi.x, k.p.x), 0, maxf(hi.z, k.p.z))
 		_cp = Mossa.Curva.new(pk)
 		_ca = Mossa.Curva.new(ak)
-		centro = (lo + hi) / 2.0
 		corsa_k.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.x < b.x)
 		for s: String in ["l", "r"]:
 			var kk: Array = Mossa._by_t(poli_k[s])

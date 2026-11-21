@@ -28,6 +28,7 @@ const C := preload("res://sim/core.gd")
 const Crescita := preload("res://scripts/carriera/crescita.gd")
 const Forma := preload("res://scripts/carriera/forma.gd")
 const Dirigenza := preload("res://scripts/carriera/dirigenza.gd")
+const Esultanze := preload("res://scripts/partita/esultanze.gd")
 
 const FORMATIONS := C.FORMATIONS
 const DIV_NAMES := ["Prima Divisione", "Seconda Divisione", "Terza Divisione"]
@@ -955,6 +956,22 @@ func novita() -> void:
 	if not ob is Dictionary or not JS.is_integer(ob.get("stagione")) or int(ob.stagione) != int(s.season) \
 			or not Dirigenza.TIPI.has(ob.get("tipo")) or not JS.is_integer(ob.get("posto")):
 		s["obiettivo"] = Dirigenza.nuovo(int(s.season), d, mia, altre)
+
+
+## esultanza del giocatore p (campo "esultanza" del campione, fase C): senza campo, o sbagliato, la predefinita.
+## Il campo si scrive solo con setEsultanza (editor): addChampion resta identico al JS, i salvataggi vecchi vanno.
+static func esultanza_di(p: Variant) -> String:
+	return Esultanze.valida(p.get("esultanza") if p is Dictionary else null)
+
+
+## sceglie l'esultanza del campione (solo lui ne ha una); false se id non è il campione
+func setEsultanza(id: Variant, e: Variant) -> bool:
+	var p: Variant = player(id)
+	if not p is Dictionary or not p.get("champ", false):
+		return false
+	p["esultanza"] = Esultanze.valida(e)
+	save()
+	return true
 
 
 ## numeri casuali delle novità per questa giornata (stessa carriera = stessi numeri)

@@ -4,13 +4,18 @@
 # un giocatore della rosa), "kit" (stile della divisa). Nuova squadra: stemma → campione → Carriera.create, poi
 # l'allenamento guidato. Sopra resta fisso il palco (stemma grande o giocatore 3D che gira), poi le schede, in
 # mezzo le scelte che scorrono, in fondo Casuale e Avanti / Salva.
+# Il campione ha anche la scheda Esultanza (nella creazione e poi in "look" se il giocatore è il campione): si sceglie
+# tra le 15 di scripts/partita/esultanze.gd e il modellino la fa vedere (MenuAnteprima.mostra_esultanza).
 extends MenuSchermata
 
 const Asp := preload("res://scripts/carriera/aspetto.gd")
+const Esultanze := preload("res://scripts/partita/esultanze.gd")
+const CarrieraScript := preload("res://scripts/carriera/carriera.gd")
+const SCHEDA_ESULTANZA := ["cele", "Esultanza"]
 const KIT_LABELS := {"fit": "Maglia", "sleeves": "Maniche", "collar": "Colletto", "pattern": "Motivo", "shorts": "Pantaloncini", "socks": "Calzettoni"}
 const SCHEDE := {
 	"crest": [["shape", "Forma"], ["pattern", "Motivo"], ["icon", "Simbolo"]],
-	"champ": [["face", "Viso"], ["hair", "Capelli"], ["kit", "Divisa"], ["me", "Nome e ruolo"]],
+	"champ": [["face", "Viso"], ["hair", "Capelli"], ["kit", "Divisa"], ["me", "Nome"], SCHEDA_ESULTANZA],
 	"look": [["face", "Viso"], ["hair", "Capelli"], ["boots", "Scarpe"]],
 	"kit": [["kit", "Divisa"]],
 }
@@ -66,7 +71,7 @@ func _titoli() -> void:
 func _apri_nuova(club: String, kit: int) -> void:
 	var seme := D.hash32([club, kit, Time.get_ticks_usec()])
 	d = {"club": club, "kit": kit, "crest": D.crest_from_seed(seme), "style": D.normalize_kit_style(null),
-		"look": D.look_from_seed(seme), "name": D.random_name(seme), "pos": "A", "num": 9}
+		"look": D.look_from_seed(seme), "name": D.random_name(seme), "pos": "A", "num": 9, "esultanza": Esultanze.PREDEFINITA}
 	mode = "crest"
 	tab = "shape"
 
@@ -79,7 +84,8 @@ func _apri_aspetto(id: Variant) -> bool:
 	mode = "look"
 	tab = "face"
 	var s := stato()
-	d = {"id": id, "kit": s.kit, "crest": c.crest(), "style": c.kitStyle(), "look": D.look_of(p), "name": p.name, "pos": p.pos, "num": p.get("num", 0)}
+	d = {"id": id, "kit": s.kit, "crest": c.crest(), "style": c.kitStyle(), "look": D.look_of(p), "name": p.name, "pos": p.pos, "num": p.get("num", 0),
+		"champ": p.get("champ", false), "esultanza": CarrieraScript.esultanza_di(p)}
 	return true
 
 
@@ -141,11 +147,19 @@ func costruisci() -> void:
 		_crea_palco()
 	fisso_sopra.add_child(_palco)
 	_aggiorna_palco()
-	var schede: Array = SCHEDE[mode]
+	var schede := schede_del_modo()
 	if schede.size() > 1:
 		fisso_sopra.add_child(_schede(schede))
 	_pannello()
 	fisso_sotto.add_child(_barra())
+
+
+## schede del modo attuale: in "look" il campione ha anche l'Esultanza
+func schede_del_modo() -> Array:
+	var schede: Array = SCHEDE[mode].duplicate()
+	if mode == "look" and d.get("champ", false):
+		schede.append(SCHEDA_ESULTANZA)
+	return schede
 
 
 func _cambia_palco() -> void:
@@ -241,6 +255,7 @@ func _aggiorna_palco() -> void:
 		return
 	_cartellino.text = "%s · %s" % [d.name, str(d.num) if int(d.num) > 0 else ""]
 	_anteprima.vicino = tab == "face" or tab == "hair"
+	_anteprima.mostra_esultanza(str(d.get("esultanza", "")) if tab == "cele" else "")
 	_anteprima.metti(_kit_figura(), _aspetto_figura())
 	_faccia.look = d.look
 	var gk: bool = d.pos == "P"
@@ -365,6 +380,8 @@ func _pannello() -> void:
 				_tinte("look.boots", D.BOOTS, l.boots)
 		"me":
 			_pannello_nome()
+		"cele":
+			_pannello_esultanza()
 
 
 func _pannello_stemma() -> void:
@@ -443,6 +460,28 @@ func _pannello_nome() -> void:
 	corpo.add_child(U.paragrafo("Il campione entra in rosa come un giovane forte della Terza Divisione (%s), con l'aspetto che hai scelto." % D.pos_name(d.pos), 13.5))
 
 
+func _pannello_esultanza() -> void:
+	corpo.add_child(U.paragrafo("Dopo ogni suo gol il campione esulta così, con la telecamera su di lui. Tocca una scelta per vederla; in partita un tocco la salta.", 13.5))
+	var cur := Esultanze.valida(d.get("esultanza"))
+	_riga("Esultanza", Esultanze.nome(cur))
+	var g := U.griglia(2, 8, 8)
+	for e: Array in Esultanze.ELENCO:
+		var b := U.chip(str(e[1]), e[0] == cur, _scegli_esultanza.bind(e[0]))
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.custom_minimum_size = Vector2(0, 48)
+		b.clip_text = true   # i nomi lunghi non allargano la griglia oltre lo schermo
+		b.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		g.add_child(b)
+	corpo.add_child(g)
+
+
+# scelta (anche la stessa di prima: la rifà da capo nel modellino)
+func _scegli_esultanza(id: String) -> void:
+	if _anteprima != null:
+		_anteprima.riparti()
+	_imposta("esultanza", id)
+
+
 func _barra() -> Control:
 	var fondo := U.pannello_stile(T.stile(Color(0.039, 0.071, 0.141, 0.95), 0, Color(0, 0, 0, 0), 0, Vector4(16, 12, 16, 14 + sicura_sotto())))
 	var h := U.hbox(10)
@@ -493,6 +532,9 @@ func _casuale() -> void:
 		d.style = D.kit_style_from_seed(seme)
 	elif tab == "me":
 		d.name = D.random_name(seme)
+	elif tab == "cele":
+		var ids := Esultanze.ids()
+		d.esultanza = ids[seme % ids.size()]
 	else:
 		# "Casuale" cambia solo la scheda aperta, il resto resta com'è
 		var nuovo := D.look_from_seed(seme)
@@ -524,7 +566,8 @@ func _conferma() -> void:
 			c.create(d.club, d.kit)
 			c.setCrest(d.crest)
 			c.setKitStyle(d.style)
-			c.addChampion({"name": d.name, "pos": d.pos, "look": d.look, "num": d.num})
+			var champ: Dictionary = c.addChampion({"name": d.name, "pos": d.pos, "look": d.look, "num": d.num})
+			c.setEsultanza(champ.id, d.get("esultanza", Esultanze.PREDEFINITA))
 			gioca("allenamento")
 		"crest":
 			c.setCrest(d.crest)
@@ -534,6 +577,8 @@ func _conferma() -> void:
 			_esci("Divisa salvata")
 		"look":
 			c.setLook(d.id, d.look)
+			if d.get("champ", false):
+				c.setEsultanza(d.id, d.get("esultanza"))
 			_esci("Aspetto salvato")
 
 

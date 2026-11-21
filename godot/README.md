@@ -360,6 +360,86 @@ le novità passano da due funzioni nuove che chiama `App`:
 - Prove: `tests/test_carriera_b.gd`; `--stagione-bot` stampa anche derby, crescita, infortuni e obiettivo;
   `--app-schermate` aggiunge hub, classifica, rosa (con un infortunato) e fine stagione.
 
+## Statistiche a fine partita (fase C, punto 14, solo Godot)
+
+Dal "dopo partita" (campionato e amichevole) il tasto **Statistiche e pagelle** apre la schermata `statistiche`
+(`scenes/menu/statistiche.tscn`, `scripts/menu/statistiche.gd`); ‹ o "Torna al risultato" riportano al dopo partita
+con lo stesso esito. L'allenamento non ha dopo partita (torna al menu) e quindi niente statistiche. Il motore non
+cambia: tutto si raccoglie lato grafica dagli eventi.
+
+- **Raccolta**: `partita/conta_giocatori.gd` (lo stesso oggetto dei conteggi della crescita) con `tabellino()`,
+  che `gioco.gd` mette nell'esito (`esito.tabellino`, una riga): passaggi tentati e riusciti e km per squadra,
+  mappa dei tiri `[{team, x, y, kind, esito, nome}]` (posizione di chi tira, coordinate del motore; esito `gol`,
+  `parato`, `respinto` o `fuori`), giocatori della persona scesi in campo (anche i cambi) con `conti` = i conteggi
+  di sempre più `perse` (contrasto subito o passaggio preso dall'avversario) e `subiti` (gol subiti mentre era in
+  campo, non dopo un'espulsione). `per_giocatore()` per la crescita resta com'era (stesse chiavi).
+- **Numeri**: possesso, tiri, tiri in porta, falli, angoli e parate da `m.stats`; passaggi riusciti (%) e km dal
+  tabellino. Squadra 0 a sinistra in giallo, squadra 1 a destra in blu, come nel dopo partita (`riga_stat`).
+- **Mappa dei tiri** (`partita/mappa_tiri.gd`, conti puri): campo intero verticale, la persona attacca verso
+  l'alto; pallino pieno = gol, cerchio vuoto = parato, respinto o fuori.
+- **Pagella** (`partita/voti.gd`, logica pura): voto da 4 a 10 a mezzi punti; 6 di base, vittoria +0,5 / sconfitta
+  −0,5, gol +1, assist +0,6, dribbling +0,2 (max +1), contrasti +0,25 (max +1,25), intercetti +0,15 (max +0,75),
+  passaggi riusciti +0,03 (max +0,6), parate +0,4 (max +2), gol subiti −0,5 portiere / −0,3 difensore / −0,1
+  centrocampista, porta inviolata +0,5 portiere / +0,3 difensore, palle perse −0,1 (max −1,5). Migliore in campo
+  (più punti prima dell'arrotondamento) con bordo giallo e scritta; il campione col nome in giallo e "★ Campione".
+- Prove: `tests/test_voti.gd` (voti, mappa, tabellino da eventi scritti a mano e da una partita vera del motore),
+  `tests/controlli_menu.gd` (tasto, pagella con un solo migliore, ritorno), schermate 25-26 di `prova_menu.gd` e
+  `--app-schermate` (statistiche, mappa, pagella della partita appena giocata).
+
+## Replay del gol e cronaca scritta (fase C)
+
+Solo grafica: il motore (`sim/*`) non cambia e non vede mai i valori del replay.
+
+| Cosa | File | Aggancio in `gioco.gd` |
+|---|---|---|
+| Buffer circolare degli ultimi 6 s | `scripts/partita/replay_buffer.gd` | `replay.registra(m)` dopo i passi del motore |
+| Replay (stati, telecamera, linea del tiro, scritte, tocco per saltare) | `scripts/partita/replay.gd` | `replay.gol(m)` in `_gol`, `replay.trattieni()` nei passi, `replay.fotogramma()` in `_process` |
+| Cronaca: evento → frase (logica pura) | `scripts/partita/cronaca.gd` | `cronaca.leggi(e, ora)` in `_eventi` |
+| Cronaca a schermo | `scripts/partita/cronaca_vista.gd` | figlia dell'HUD (sotto i menu) |
+
+- **Sequenza dopo un gol**: festa del motore (fase "goal", 3,2 s) → quando il passo dopo farebbe il calcio d'inizio
+  il motore resta fermo → `_fine_festa_gol()` → `dopo_esultanza()` → replay (~5 s) → il motore riparte e fa il
+  calcio d'inizio. **Esultanza del campione** (sezione sotto): `_fine_festa_gol()` aspetta anche che sia finita;
+  finché non si chiama `dopo_esultanza()` il motore resta fermo (la vista continua).
+- **Replay**: per ogni fotogramma `buffer.applica(m, t)` scrive lo stato registrato sugli oggetti della partita,
+  `vista.update_view()` lo disegna, `buffer.ripristina(m)` rimette i valori veri (identici). La vista ha `replay = true`:
+  non muove la telecamera (la muove `replay.gd`), niente anello, segnalino né linee di corsa. Visuale "porta" (dietro
+  la linea di fondo, di fianco al palo) o "lato" (dalla linea laterale), bassa, FOV 48. Un tocco fuori dai tasti
+  dell'HUD lo salta; la pausa lo ferma.
+- **Cronaca**: frasi brevi per gol, autogol, parata, palo, tiro fuori, occasione, dribbling riuscito, contrasto,
+  angolo, fallo, giallo, rosso, rigore, coi nomi; caso della grafica; poche frasi (vedi `PAUSA`, `PAUSA_FORTE`, `PROB`
+  in cima al file). Niente replay né cronaca nell'allenamento guidato.
+- **Prove**: `-- --scena=gol` (tiro a porta vuota) con `--replay=porta|lato` e `--schermata=... --dopo=SEC`
+  (seme 3: gol a ~3 s, replay da ~5 a ~10 s); `--senza-replay`. Test: `tests/test_replay.gd`, `tests/test_cronaca.gd`.
+
+## Esultanze del campione (fase C, punto 12, solo Godot)
+
+Solo grafica: il motore (`sim/*`) non cambia; l'esultanza si fa nella pausa dopo il gol che c'è già.
+
+| Cosa | File |
+|---|---|
+| Elenco (15 id e nomi), predefinita `aeroplano`, `valida()` | `scripts/partita/esultanze.gd` |
+| Pose: una `Coreografia` per esultanza = `Mossa` (bacino, busto, testa, gambe, braccia) + corpo intero (spostamento e rotazioni: salti, capriola, giravolta) + tratti di corsa col clip vero + poli dei gomiti | `scripts/partita/mosse/esultanza.gd` |
+| La figura la esegue (`Figura.esultanza = posa`, `applica_mossa` con pesi separati gambe / busto / braccia) | `scripts/partita/figura.gd` |
+| Regia in partita (chi esulta, giro verso il centro del campo, telecamera, scritta, tocco per saltare) | `scripts/partita/esultanza_regia.gd` |
+| Scelta: scheda **Esultanza** nell'editor (creazione del campione e poi Aspetto del campione), il modellino la fa | `scripts/menu/editor.gd`, `scripts/menu/anteprima_giocatore.gd` |
+| Salvataggio: campo `esultanza` del campione, scritto solo da `setEsultanza(id, e)`; letto con `Carriera.esultanza_di(p)` (manca o è sbagliato → predefinita) | `scripts/carriera/carriera.gd` |
+
+Le 15: Aeroplano, In ginocchio (scivolata), Capriola, Pugno al cielo, Indici al cielo, Saluto militare, Cuore con le
+mani, Balletto, Mani alle orecchie, Dito sulla bocca, Salto col pugno, Inchino, Braccia conserte, Giravolta, Calcio
+alla bandierina. Durano 2,8-3,0 s; solo pose procedurali (niente animazioni scaricate).
+
+- **Sequenza dopo un gol** (`gioco.gd`): all'evento "goal" `_gol` chiama `esultanza.avvia(...)`: parte solo se ha
+  segnato il campione (`src.champ`) della mia squadra, non in allenamento. La festa del motore va avanti; quando il
+  motore è trattenuto (`_fine_festa_gol`) si aspetta anche la fine dell'esultanza (segnale `finita` della regia →
+  `_esultanza_finita`), poi `dopo_esultanza()` → replay → calcio d'inizio. Un tocco fuori dai tasti la salta.
+  Gli altri gol: come prima (subito il replay a fine festa).
+- **Prove**: `-- --scena=gol --esultanza=ID [--schermata=... --dopo=SEC]` (seme 3: gol a ~3 s, esultanza fino a
+  ~6 s, poi replay). Foto di tutte le esultanze, 6 istanti da due lati:
+  `$G --path godot -s res://tests/foto_esultanze.gd [-- --solo=capriola,saluto --istanti=...]` → `shots/esultanze/`.
+  `--app-schermate` fotografa anche la scheda Esultanza. Test: `tests/test_esultanze.gd` (pose: caviglie mai sotto
+  terra, mani mai dentro il busto, durata dentro la festa; salvataggio vecchio senza il campo).
+
 ## Menu (fase 3)
 
 Schermate del web (`src/ui.js`, `ui-squad.js`, `editor.js`) rifatte in Godot, una scena per schermata in

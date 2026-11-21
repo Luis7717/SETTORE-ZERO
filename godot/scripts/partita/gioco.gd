@@ -13,10 +13,13 @@
 #   --veloce=K          tempo fisso di K/60 s a fotogramma (prove senza schermo: la partita va più veloce del vero)
 #   --bot               un "dito finto" gioca la squadra 0 coi gesti veri (scripts/partita/bot_dito.gd)
 #   --esci-a-fine       a fine partita stampa il riassunto ed esce (codice 0)
-#   --scena=area|duello|fuga|angolo|pausa   mette la partita in una situazione da fotografare
+#   --scena=area|duello|fuga|angolo|pausa|gol   mette la partita in una situazione da fotografare (gol: tiro a
+#                       porta vuota, per vedere cronaca e replay)
+#   --esultanza=ID      con --scena=gol chi segna è il campione e fa quell'esultanza (id in esultanze.gd)
+#   --senza-replay      dopo il gol niente replay (si va subito al calcio d'inizio)
+#   --replay=porta|lato visuale del replay del gol (predefinito: a caso)
 #   --schermata=PERCORSO.png [--dopo=SEC] [--alla-fine]   schermata dopo SEC secondi veri, o alla fine partita
 #   --esci-dopo=SEC     esce dopo SEC secondi veri
-#   --scena=gol [--esultanza=ID]   gol del n. 10 di casa; con --esultanza è il campione e fa quell'esultanza
 #   --campo=NOME        taglio dell'erba (strisce, strette, verticali, quadrotti, cerchi, uniforme, rombi, raggi, diagonali)
 #   --manto=NOME        colore dell'erba (vivo, milano, naturale, sintetico, sintetico_chiaro, estivo)
 #   --allenamento       allenamento guidato (tipo "allenamento", scripts/partita/allenamento.gd) invece dell'amichevole;
@@ -28,8 +31,8 @@
 # manto dell'erba; senza, vengono dal seme della partita), derby (facoltativo: partita contro la rivale, pubblico più
 # rumoroso)}; `--campo=<nome>`/`--manto=<nome>` li forzano per le prove; squadre come Carriera.squadraPartita()/aiMatchTeam() (kit compreso).
 # Al fischio finale (la schermata di fine resta sopra) o se si esce dalla pausa la scena emette `finita(esito)` con
-# {gol_a, gol_b, marcatori, statistiche, abbandonata, tipo, me, derby, conteggi}; conteggi = per giocatore della
-# persona (scripts/partita/conta_giocatori.gd); "Esci" in campionato = sconfitta 0-3 a tavolino.
+# {gol_a, gol_b, marcatori, statistiche, abbandonata, tipo, me, derby, conteggi, tabellino}; conteggi = per giocatore della
+# persona (scripts/partita/conta_giocatori.gd), tabellino = dati della schermata delle statistiche (stesso file); "Esci" in campionato = sconfitta 0-3 a tavolino.
 # Il tasto "Continua" della schermata di fine emette poi `continua` (chi ha avviato la partita cambia schermata).
 # Così il risultato si registra subito, anche se l'app viene chiusa sulla schermata di fine (come il web).
 # Se nessuno chiama avvia, la partita parte da sola con le squadre di prova (come prima, per le prove).
@@ -37,9 +40,6 @@ extends Node
 
 signal finita(esito: Dictionary)
 signal continua
-## dopo ogni gol, quando l'esultanza è finita: subito se non esulta il campione, alla fine (o al tocco che la salta)
-## se esulta. Il replay del gol si aggancia qui (ordine: esultanza → replay → calcio d'inizio)
-signal esultanza_finita
 
 const SimMatchScript := preload("res://sim/match.gd")
 const C := preload("res://sim/core.gd")
@@ -59,6 +59,9 @@ const BotAllenamento := preload("res://scripts/partita/bot_allenamento.gd")
 const Tagli := preload("res://scripts/tagli_campo.gd")
 const ContaGiocatori := preload("res://scripts/partita/conta_giocatori.gd")
 const EsultanzaRegia := preload("res://scripts/partita/esultanza_regia.gd")
+const Replay := preload("res://scripts/partita/replay.gd")
+const Cronaca := preload("res://scripts/partita/cronaca.gd")
+const CronacaVista := preload("res://scripts/partita/cronaca_vista.gd")
 const SCENA_VISTA := "res://scenes/vista_partita.tscn"
 
 # velocità del tempo (rallenty), come src/main.js
@@ -108,6 +111,11 @@ var bot: BotDito = null
 var abbandonata := false
 var conta: ContaGiocatori = null  # conteggi per giocatore (carriera: crescita del campione)
 var esultanza: EsultanzaRegia = null  # esultanza del campione dopo un suo gol (esultanza_regia.gd)
+var replay: Replay = null     # replay del gol (null in allenamento o con --senza-replay)
+var cronaca: Cronaca = null   # cronaca scritta (null in allenamento)
+var cronaca_vista: CronacaVista = null
+var _festa_finita := false    # il motore ha finito la festa del gol ed è trattenuto (aspetta esultanza e replay)
+var _esultanza_in_corso := false
 
 var _opzioni := {}
 var _avvio := {}              # opzioni di avvia() (vuoto = partita di prova da sola)
@@ -182,7 +190,7 @@ func _parti() -> void:
 	add_child(audio)
 	esultanza = EsultanzaRegia.new()
 	add_child(esultanza)
-	esultanza.finita.connect(_dopo_esultanza)
+	esultanza.finita.connect(_esultanza_finita)
 	audio.folla(FOLLA_BASE)
 	var derby := _segna_derby()
 	if tipo() == "allenamento":
@@ -191,6 +199,7 @@ func _parti() -> void:
 		hud.big("DERBY!", "g", 2400, _titolo())
 	else:
 		hud.big(_titolo(), "", 1800)
+	_crea_replay_e_cronaca()
 	stato = "partita"
 	if _opzioni.has("bot"):
 		var seme_bot := int(_opzioni.get("seme", "1")) + 99
@@ -257,12 +266,18 @@ func _process(delta: float) -> void:
 		_secondo_tempo() # il dito finto preme "Secondo tempo"
 	elif paused and bot != null and _all_hud != null and _all_hud.scheda_aperta():
 		_all_hud.premi_prova() # ... e "Prova (3 volte)" sulla scheda dell'allenamento
+	if replay != null and replay.attivo(): # replay del gol: motore fermo, la vista rigioca gli ultimi secondi
+		if not paused:
+			replay.fotogramma(m, vista, dt * _velocita)
+		return
 	if not paused:
 		if bot != null:
 			bot.passo(self, now)
 		gesti.update(now)
 		_passi_motore(dt)
 		_eventi()
+		if replay != null:
+			replay.registra(m)
 		_zoom()
 		if _fine_ms > 0 and now > _fine_ms:
 			_fine_ms = 0
@@ -315,7 +330,11 @@ func _passi_motore(dt: float) -> void:
 	if allenamento != null:
 		allenamento.before()
 	for i in n:
+		if replay != null and replay.trattieni(m, sdt / n): # fine della festa del gol: motore fermo
+			break
 		m.step(sdt / n)
+	if replay != null and replay.festa_finita():
+		_fine_festa_gol()
 	if allenamento != null:
 		_allenamento_dopo(sdt)
 	hud.rallenty(ts < RALLENTY_SOTTO)
@@ -355,6 +374,8 @@ func _eventi() -> void:
 			adv = true
 	for e: Dictionary in m.events:
 		_evento(e, adv)
+		if cronaca != null:
+			cronaca_vista.mostra(cronaca.leggi(e, Time.get_ticks_msec() / 1000.0), e.type == "goal")
 	m.events.clear()
 
 
@@ -423,14 +444,60 @@ func _gol(e: Dictionary) -> void:
 	else:
 		audio.ooh()
 		hud.big("Gol subito", "b", 2400, piccolo)
-	# gol del campione: parte la sua esultanza (alla fine chiama _dopo_esultanza); negli altri casi si va avanti subito
-	if allenamento != null or not esultanza.avvia(e, m, me, vista):
-		_dopo_esultanza()
+	# gol del campione: la sua esultanza parte subito, durante la festa del motore; il replay aspetta che finisca
+	_festa_finita = false
+	_esultanza_in_corso = allenamento == null and esultanza.avvia(e, m, me, vista)
+	if replay != null:
+		replay.gol(m)
 
 
-## fine dell'esultanza del campione (o gol di un altro): qui si aggancia il replay del gol
-func _dopo_esultanza() -> void:
-	esultanza_finita.emit()
+# ---------------------------------------------------------------- dopo il gol: esultanza → replay → calcio d'inizio
+# Il motore fa la sua festa (fase "goal", 3,2 s di gioco); quando il passo dopo farebbe il calcio d'inizio,
+# replay.trattieni() lo tiene fermo lì e si arriva qui, una volta per gol.
+# Esultanza del campione (esultanza_regia.gd): parte all'evento "goal" (in _gol) e dura circa quanto la festa; se a
+# questo punto non è ancora finita, il motore resta fermo finché non finisce (o la si salta col tocco), poi il replay.
+func _fine_festa_gol() -> void:
+	_festa_finita = true
+	_forse_replay()
+
+
+# fine (o tocco) dell'esultanza del campione
+func _esultanza_finita() -> void:
+	_esultanza_in_corso = false
+	_forse_replay()
+
+
+func _forse_replay() -> void:
+	if not _festa_finita or _esultanza_in_corso:
+		return
+	_festa_finita = false
+	dopo_esultanza()
+
+
+## dopo l'esultanza (o subito, se non c'è): parte il replay; finito o saltato, il motore riparte col calcio d'inizio
+func dopo_esultanza() -> void:
+	esultanza.ferma() # la posa finale dell'esultanza resta fino a qui
+	if replay == null or stato != "partita":
+		return
+	gesti.cancel()
+	hud.mostra_dribbling(false)
+	hud.aiuto_visuale("")
+	hud.rallenty(false)
+	hud.suggerimento("", false)
+	replay.avvia(vista, hud) # se non parte, emette subito `finito` e il motore riparte da solo
+
+
+func _crea_replay_e_cronaca() -> void:
+	if tipo() == "allenamento":
+		return
+	var nomi := [str(m.teams[0].get("name", m.teams[0].short)), str(m.teams[1].get("name", m.teams[1].short))]
+	cronaca = Cronaca.new(0, nomi)
+	cronaca_vista = CronacaVista.new()
+	hud.add_child(cronaca_vista)
+	hud.move_child(cronaca_vista, 1) # sopra il bordo del rallenty, sotto punteggio, tasti e menu
+	if not _opzioni.has("senza-replay"):
+		replay = Replay.new()
+		add_child(replay)
 
 
 func _ripartenza(e: Dictionary) -> void:
@@ -468,8 +535,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	var now := Time.get_ticks_msec()
 	if event is InputEventScreenTouch:
 		var e := event as InputEventScreenTouch
-		if e.pressed and esultanza != null and esultanza.attiva and not hud.tocca_hud(e.position):
+		if e.pressed and esultanza != null and esultanza.attiva and not paused and not hud.tocca_hud(e.position):
 			esultanza.salta() # un tocco salta l'esultanza del campione
+			return
+		if replay != null and replay.attivo(): # un tocco salta il replay (i tasti dell'HUD restano tasti)
+			if e.pressed and not paused and not hud.tocca_hud(e.position):
+				replay.salta()
 			return
 		if e.pressed:
 			if giocabile and gesti.dito < 0 and not hud.tocca_hud(e.position):
@@ -640,7 +711,8 @@ func _esci_dalla_pausa() -> void:
 func esito() -> Dictionary:
 	return {"gol_a": m.score[0], "gol_b": m.score[1], "marcatori": m.goalsLog.duplicate(),
 		"statistiche": m.stats.duplicate(true), "abbandonata": abbandonata, "tipo": tipo(), "me": me,
-		"derby": bool(_avvio.get("derby", false)), "conteggi": conta.per_giocatore() if conta != null else {}}
+		"derby": bool(_avvio.get("derby", false)), "conteggi": conta.per_giocatore() if conta != null else {},
+		"tabellino": conta.tabellino() if conta != null else {}}
 
 
 # derby (opzione di avvia): pubblico più rumoroso, più cori e tifosi più in piedi. Ritorna true se è un derby
@@ -722,15 +794,24 @@ func _prepara_scena(nome: String) -> void:
 				_disegno_di_prova(m.team(me)[10])
 		"angolo":
 			m.setRestart("corner", me, C.HW, C.HL)
-		"gol": # il n. 10 segna (con --esultanza=ID è il campione): esultanza, telecamera, tocco per saltare
+		"gol": # corsa verso la porta col portiere fuori dai pali, poi tiro: gol quasi sicuro (cronaca e replay)
 			_metti_in_gioco()
-			var marcatore: R.Player = m.team(me)[9]
-			if _opzioni.has("esultanza"):
-				marcatore.src["champ"] = true # (nello stesso dizionario: la vista non rifà la figura)
-				marcatore.src["esultanza"] = _opzioni["esultanza"]
-			_sposta(marcatore, 3.0, 36.0 if me == 0 else -36.0)
-			m.ball.last = marcatore
-			m.goal(me)
+			var dir := 1.0 if me == 0 else -1.0
+			if _opzioni.has("esultanza"): # il n. 10 è il campione e fa quell'esultanza (stesso dizionario: niente figura nuova)
+				att.src["champ"] = true
+				att.src["esultanza"] = _opzioni["esultanza"]
+			_sposta(att, 6.0, dir * 30.0)
+			_sposta(m.team(1 - me)[0], -12.0, dir * (C.HL - 1.0))
+			m.ball.owner = att
+			m.ball.last = att
+			m.ball.x = att.x
+			m.ball.y = att.y + 0.6 * dir
+			m.ctrl[me] = att
+			if replay != null:
+				replay.buffer.svuota() # niente salto dai posti del calcio d'inizio nel replay
+			m.userPath(me,[{"x": 3.0, "y": dir * 34.0}, {"x": 1.0, "y": dir * 38.0}])
+			await get_tree().create_timer(0.9).timeout
+			m.userKick(me, {"type": "shot", "tx": -1.5, "ty": dir * C.HL, "th": 0.7, "curve": 0.0})
 		"pausa":
 			await get_tree().create_timer(0.8).timeout
 			_mostra_pausa()

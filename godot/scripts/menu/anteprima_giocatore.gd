@@ -2,11 +2,14 @@
 # in posa, che gira piano su sé stesso e si gira col dito; inquadratura del corpo o da vicino sulla testa (lì
 # oscilla davanti invece di girare). Mondo 3D a parte in una SubViewport, disegnata alla risoluzione dello schermo
 # (al massimo 2 pixel per punto: basta e non pesa). Si spegne da sola quando la schermata si chiude.
+# Esultanza (scheda Esultanza del campione): mostra_esultanza(id) la fa vedere di fronte, inquadratura più larga,
+# ripetuta con una pausa; la telecamera segue il bacino (scivolata, capriola, corsa) così resta inquadrato.
 class_name MenuAnteprima
 extends Control
 
 const Figura := preload("res://scripts/partita/figura.gd")
 const TV := preload("res://scripts/partita/texture_vista.gd")
+const Esult := preload("res://scripts/partita/mosse/esultanza.gd")
 const Coord := preload("res://scripts/coord.gd")
 
 const SPIN := 0.45               # rad/s: rotazione lenta (come il web)
@@ -14,12 +17,18 @@ const TRASCINA := 0.012          # rad per px di dito
 const SCALA_MAX := 2.0           # pixel per punto della SubViewport
 const CAM_BODY := {"y": 1.3, "z": 5.6, "look": 1.2}
 const CAM_HEAD := {"y": 2.13, "z": 1.45, "look": 2.07}
+const CAM_ESULTANZA := {"y": 1.45, "z": 8.2, "look": 1.05}
 const FOV := 30.0
+const ES_ENTRA := 0.25           # s: entrata nella posa dell'esultanza
+const ES_ESCE := 0.4             # s: alla fine torna fermo...
+const ES_PAUSA := 1.1            # s: ... e dopo questa pausa la rifà
 
 var vicino := false:             # inquadratura della testa (schede Viso e Capelli)
 	set(v):
 		vicino = v
 		_goal = CAM_HEAD if v else CAM_BODY
+		if _es_id != "":
+			_goal = CAM_ESULTANZA
 
 var _vp: SubViewport
 var _tex: TextureRect
@@ -33,6 +42,9 @@ var _t := 0.0
 var _drag := NAN
 var _drag_yaw := 0.0
 var _fermo := Fermo.new()
+var _es_id := ""                 # esultanza in mostra ("" = nessuna)
+var _es_t := 0.0
+var _segui := Vector3.ZERO       # punto seguito dalla telecamera sul prato (bacino durante l'esultanza)
 var _ctx := {"t": 0.0, "phase": "menu", "flip": 1.0, "yaw": 0.0, "ball": null, "trick": null}
 
 
@@ -136,6 +148,40 @@ func metti(kit: Dictionary, aspetto: Dictionary) -> void:
 		_mesh.set_instance_shader_parameter(k, aspetto[k])
 
 
+## esultanza da mostrare ("" = nessuna, il giocatore torna fermo); un id nuovo riparte da capo
+func mostra_esultanza(id: String) -> void:
+	if id == _es_id:
+		return
+	_es_id = id
+	_es_t = 0.0
+	vicino = vicino   # ricalcola l'inquadratura
+	if id == "" and _fig != null:
+		_fig.esultanza = null
+
+
+## rifà l'esultanza da capo (tocco sulla stessa scelta)
+func riparti() -> void:
+	_es_t = 0.0
+
+
+## esultanza in mostra e a che punto è (per le prove)
+func esultanza_in_mostra() -> Dictionary:
+	return {"id": _es_id, "t": _es_t}
+
+
+func _esultanza(dt: float) -> void:
+	var c: Esult.Coreografia = Esult.coreografia(_es_id)
+	_es_t = fmod(_es_t + dt, c.T + ES_PAUSA)
+	var t := minf(_es_t, c.T)
+	var w := minf(_es_t / ES_ENTRA, 1.0 - clampf((_es_t - c.T) / ES_ESCE, 0.0, 1.0))
+	var po := c.posa(t)
+	po["w"] = smoothstep(0.0, 1.0, w)
+	_fig.esultanza = po
+	# di fronte alla telecamera
+	_yaw = wrapf(_yaw, -PI, PI)
+	_yaw += (0.0 - _yaw) * minf(1.0, dt * 6.0)
+
+
 func _gui_input(ev: InputEvent) -> void:
 	if ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT:
 		_drag = ev.position.x if ev.pressed else NAN
@@ -151,13 +197,21 @@ func _process(dt: float) -> void:
 		return
 	dt = minf(dt, 0.05)
 	_t += dt
-	if is_nan(_drag):
-		_yaw = _yaw + (0.55 * sin(_t * 0.7) - _yaw) * minf(1.0, dt * 2.0) if vicino else _yaw + dt * SPIN
+	if _es_id != "":
+		_esultanza(dt)
+	else:
+		if is_nan(_drag):
+			_yaw = _yaw + (0.55 * sin(_t * 0.7) - _yaw) * minf(1.0, dt * 2.0) if vicino else _yaw + dt * SPIN
 	var k := minf(1.0, dt * 6.0)
 	for n: String in ["y", "z", "look"]:
 		_cur[n] += (_goal[n] - _cur[n]) * k
 	_fig.rotation.y = _yaw
 	_ctx.t = _t
 	_fig.posa(_fermo, dt, _ctx)
-	_cam.position = Vector3(0, _cur.y, _cur.z)
-	_cam.look_at(Vector3(0, _cur.look, 0))
+	var segui := Vector3.ZERO
+	if _es_id != "":
+		segui = _fig.corpo.to_global(Vector3(0, 0.9, 0))
+		segui.y = 0.0
+	_segui = _segui.lerp(segui, minf(1.0, dt * 9.0))
+	_cam.position = _segui + Vector3(0, _cur.y, _cur.z)
+	_cam.look_at(_segui + Vector3(0, _cur.look, 0))
