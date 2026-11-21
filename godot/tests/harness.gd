@@ -33,8 +33,12 @@ static func mkTeam(name: String, rating: float, seed_value: int, formation: Stri
 static var live: Array = []
 
 
-static func newMatch(seed_value: int, halfLen: float, human: Array, teamA: Dictionary, teamB: Dictionary) -> SimMatchScript:
-	var m := SimMatchScript.new({"seed": seed_value, "halfLen": halfLen, "human": human, "teams": [teamA, teamB]})
+## meteo (facoltativo, "" = nessuno): campo meteo delle opzioni della partita ("pioggia", "neve", ...)
+static func newMatch(seed_value: int, halfLen: float, human: Array, teamA: Dictionary, teamB: Dictionary, meteo := "") -> SimMatchScript:
+	var o := {"seed": seed_value, "halfLen": halfLen, "human": human, "teams": [teamA, teamB]}
+	if meteo != "":
+		o["meteo"] = meteo
+	var m := SimMatchScript.new(o)
 	live.append(m)
 	return m
 
@@ -105,7 +109,7 @@ static func playMatch(opt: Dictionary, onStep: Callable = Callable()) -> Diction
 	var tb := mkTeam("B", opt.get("op", 60.0), sd * 13 + 5, opt.get("fB", "4-4-2"))
 	for t: Array in opt.get("tired", []): # [squadra, indice, energia iniziale]: giocatori che partono stanchi
 		([ta, tb][int(t[0])].players[int(t[1])] as Dictionary)["energy0"] = float(t[2])
-	var m := newMatch(sd, opt.get("halfLen", 150.0), [true, false] if mode == "bot" else [false, false], ta, tb)
+	var m := newMatch(sd, opt.get("halfLen", 150.0), [true, false] if mode == "bot" else [false, false], ta, tb, String(opt.get("meteo", "")))
 	var bot: Bot = Bot.new(sd + 9) if mode == "bot" else null
 	var maxSteps: int = opt.get("maxSteps", 60 * 60 * 30)
 	var steps := 0

@@ -43,7 +43,8 @@ export function effStats(src, slotPos) {
   return s;
 }
 
-export function ballPhys(s, dt) {
+// roll = attrito del rotolamento (m/s²): la partita passa il suo (meteo, Match.roll); senza, ROLL come sempre
+export function ballPhys(s, dt, roll = ROLL) {
   if (s.ct > 0) { s.vx += s.cax * dt; s.vy += s.cay * dt; s.ct -= dt; }
   s.x += s.vx * dt; s.y += s.vy * dt;
   if (s.h > 0 || s.vh > 0) {
@@ -54,7 +55,7 @@ export function ballPhys(s, dt) {
     }
   } else {
     const v = hyp(s.vx, s.vy);
-    if (v > 0) { const nv = Math.max(0, v - ROLL * dt); s.vx *= nv / v; s.vy *= nv / v; }
+    if (v > 0) { const nv = Math.max(0, v - roll * dt); s.vx *= nv / v; s.vy *= nv / v; }
   }
 }
 

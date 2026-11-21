@@ -1279,3 +1279,31 @@ Punti 6-9 del piano, solo nella versione Godot (dettagli in `godot/README.md`, "
   si ripete con una pausa di 1,1 s e la telecamera segue il bacino.
 - **Da provare sull'iPhone**: se 3 s di esultanza più 5 s di replay sono troppi a ogni gol (il tocco salta tutti e due).
 
+
+## 2026-11-21 — Meteo e ora del giorno (piano, fase C punto 10)
+Dettagli in `godot/README.md`, "Meteo e ora del giorno".
+- **Motore, in tutte e due le copie** (`src/sim/*` e `godot/sim/*`): campo facoltativo `meteo` delle opzioni della
+  partita. Pioggia: attrito del rotolamento ×0,75 (`RAIN_ROLL`), scivolata ×1,3 (`RAIN_SLIDE`), chi perde un contrasto
+  resta fermo ×1,25 (`RAIN_STUN`, i tre `stun` dei contrasti). Neve: attrito ×1,35 (`SNOW_ROLL`). Sereno, nuvoloso,
+  valori sconosciuti o niente = motore identico (golden e tracce 0-7 uguali senza rigenerarle).
+- **Passaggi rasoterra**: la forza si calcola con `max(ROLL, attrito)` (`rollKick`). Sul bagnato si calcia come
+  all'asciutto e il pallone arriva più veloce (è la "palla più veloce" che si vede); sulla neve si calcia più forte,
+  altrimenti tutti i passaggi si fermerebbero corti (un passaggio di 20 m finiva a 16,7 m). La durata del volo per
+  l'effetto usa l'attrito vero.
+- **La scivolata** del motore oggi non la fa nessuno (quella del giocatore è stata tolta, l'IA non entra più nello
+  stato `prep`): il moltiplicatore c'è e ha il suo test, ma in partita conta soprattutto il contrasto più lungo.
+- **Equilibrio** (`npm run balance -- 60 60 60 1 <meteo>`, 60 partite, umano simulato contro IA a pari forza):
+  sereno V15 N22 P23, gol 0,6-0,7, tiri 6,5-4,8, possesso 48% · pioggia V19 N22 P19, gol 0,7-0,7, tiri 9,0-5,0, 50% ·
+  neve V20 N18 P22, gol 1,0-1,1, tiri 8,8-6,3, 50%. Col brutto tempo si tira e si segna un po' di più (palla che
+  corre sul bagnato, passaggi più forti sulla neve), senza cambiare chi vince: accettato.
+- **Scelta**: seme proprio (`seme ^ SALE`, così non consuma i numeri della partita). In campionato la previsione
+  dipende da carriera, stagione e giornata, così l'hub la può mostrare prima (stessa nella partita). Neve rara: 4,4%
+  senza giornata, circa 5% di media su una stagione (0% alle prime e ultime giornate, 12% d'inverno).
+- **Notte senza luci in più**: una sola luce con ombre (quella dei fari, alta e bianca); lo stadio va su uno strato
+  che quella luce non illumina (`light_cull_mask`), così le tribune restano scure e il campo illuminato senza costi.
+  FPS sul PC (finestra 390×844, `--esci-dopo=6`, PC carico di altre sessioni): sereno di giorno 96-98, pioggia di
+  notte 96, neve al tramonto 98: uguali entro il rumore.
+- **Pallone arancione sulla neve**: bianco su bianco non si vedeva.
+- **Da provare sull'iPhone**: FPS con la pioggia (900 particelle) e di notte; se la notte sembra troppo chiara o
+  troppo scura (`ORA_NOTTE.energia`, `NOTTE_AMBIENTE`); se le pozze sul bagnato piacciono; quanto si sente la palla
+  più veloce sotto la pioggia.

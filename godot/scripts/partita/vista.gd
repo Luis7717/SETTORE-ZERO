@@ -133,6 +133,7 @@ func _ready() -> void:
 	add_child(_effetti)
 	_attr = CameraAttributesPractical.new()
 	cam.attributes = _attr
+	_ambiente.environment = _ambiente.environment.duplicate() # tutto suo: il meteo (meteo.gd) lo cambia
 	_env = _ambiente.environment
 	_imposta_bagliore()
 	if DisplayServer.get_name() == "headless":

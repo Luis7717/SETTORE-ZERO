@@ -93,7 +93,7 @@ func _consider(best: Variant, p: R.Player, tm: int, dir: float, gy: float, sk: f
 	var d: float = C.hyp(tx - ox, ty - oy)
 	if d < 4.0 or d > 44.0:
 		return best
-	var vp: float = minf(17.0 + p.st.pas * 0.13, sqrt(25.0 + 2.0 * ROLL * d)) * 0.8
+	var vp: float = minf(17.0 + p.st.pas * 0.13, sqrt(25.0 + 2.0 * rollKick * d)) * 0.8
 	var safe: float = lane(ox, oy, tx, ty, tm, vp)
 	var type := "ground"
 	var open: float = nearOpp(tx, ty, tm)
@@ -378,7 +378,7 @@ func _computeChase(b: R.Ball) -> void:
 		py[k] = C.clamp_(s.y, -HL, HL)
 		ph[k] = s.h
 		for j in 4:
-			C.ballPhys(s, 0.025)
+			C.ballPhys(s, 0.025, roll)
 	for tm in 2:
 		var dir: float = -1.0 if tm else 1.0
 		var best: R.Chase = null

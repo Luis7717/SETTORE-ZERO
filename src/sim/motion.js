@@ -4,6 +4,7 @@ import { WEAR_TES, WEAR_TES_MIN, DRIB_BEAT_SPD, BURST_SPD } from './duel.js';
 import { W, L, HW, HL, GW, GH, BOX_W, BOX_D, SIX_W, SIX_D, PEN_D, CIRCLE, G, ROLL, clamp, hyp, rng32, FORMATIONS, effStats, ballPhys, segInfo } from './core.js';
 
 // Regolazioni (misurate con test/balance.mjs, test/diag-flow.mjs e i test in test/unit)
+const SLIDE_T = 0.45;       // durata della scivolata (s); sotto la pioggia ×Match.slideK
 const GK_AI_SPEED = 2.6;    // velocità base del tuffo del portiere comandato dal computer (m/s)
 const GK_HUMAN_SPEED = 2.4; // velocità base del tuffo quando lo comanda il giocatore (m/s)
 const SHOT_BLOCK_R = 0.6;   // un tiro forte si ferma su un difensore solo se lo prende quasi in pieno (m)
@@ -175,14 +176,14 @@ export class MotionMethods {
   }
 
   slideStep(p, dt) {
-    const b = this.ball, sp = 10.5 * (1 - p.t / 0.45) + 2.5;
+    const b = this.ball, st = SLIDE_T * this.slideK, sp = 10.5 * (1 - p.t / st) + 2.5;
     p.vx = p.sdx * sp; p.vy = p.sdy * sp; p.x += p.vx * dt; p.y += p.vy * dt; p.t += dt;
     if (this.phase === 'play' && !p.hit) {
       const db = hyp(b.x - p.x, b.y - p.y);
       if (b.owner && b.owner.team !== p.team && !this.duelGuard(p) && !this.beaten(p, b.owner)) {
         const c = b.owner, dc = hyp(c.x - p.x, c.y - p.y);
         if (db < 0.95) {
-          p.hit = true; c.stun = 0.55; c.tackleCd = 0.8;
+          p.hit = true; c.stun = 0.55 * this.stunK; c.tackleCd = 0.8;
           b.owner = null; b.vx = p.sdx * 7 + (this.rnd() - .5) * 2; b.vy = p.sdy * 7 + (this.rnd() - .5) * 2; b.vh = 1; b.h = 0.05; b.ct = 0;
           b.prev = b.last; b.last = p; b.kick = null; b.noP = c; b.noT = 0.5; this.predT = 0;
           this.ev('tackle', { p, on: c, slide: true });
@@ -193,7 +194,7 @@ export class MotionMethods {
         this.ev('tackle', { p, slide: true });
       }
     }
-    if (p.t >= 0.45 && p.state === 'slide') { p.state = 'down'; p.t = 0.6; p.vx = p.vy = 0; }
+    if (p.t >= st && p.state === 'slide') { p.state = 'down'; p.t = 0.6; p.vx = p.vy = 0; }
   }
 
   diveStep(p, dt) {
@@ -287,7 +288,7 @@ export class MotionMethods {
           // chi va sul portatore da solo (CPU) ruba più piano di chi muove la persona (controllato, linea, linea appena finita)
           if (ho && !dir) need *= 2.4;
           if (o.contact >= need && this.rnd() < TACKLE_LOOSE) {
-            o.contact = 0; o.tackleCd = 0.5; c.stun = 0.3; c.tackleCd = 0.6;
+            o.contact = 0; o.tackleCd = 0.5; c.stun = 0.3 * this.stunK; c.tackleCd = 0.6;
             const side = Math.abs(b.x) > HW - 12 ? Math.sign(b.x) : (this.rnd() < 0.5 ? -1 : 1);
             const ang = Math.atan2(b.y - o.y, b.x - o.x) + (this.rnd() - 0.5) * 1.6, sp = 5 + this.rnd() * 4;
             b.owner = null; b.vx = Math.cos(ang) * sp * 0.6 + side * (4 + this.rnd() * 5); b.vy = Math.sin(ang) * sp; b.vh = 1 + this.rnd() * 1.5; b.h = 0.05; b.ct = 0;
@@ -298,7 +299,7 @@ export class MotionMethods {
           if (o.contact >= need) {
             b.owner = o; b.prev = b.last; b.last = o; b.kick = null; this.lastPass = null;
             o.protect = 0.5; o.contact = 0; o.aiT = 0.25; o.dx = o.x; o.dy = o.y; o.holdN = 0;
-            c.stun = 0.4; c.tackleCd = 0.8;
+            c.stun = 0.4 * this.stunK; c.tackleCd = 0.8;
             this.ev('tackle', { p: o, on: c });
             if (o.pos === 'P' && this.inOwnBox(o)) this.setRestart('gk', o.team, o.x, o.y, o);
             return;

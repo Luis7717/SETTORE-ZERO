@@ -2,6 +2,7 @@
 extends "duel.gd"
 
 # Regolazioni (misurate con test/balance.mjs, test/diag-flow.mjs e i test in test/unit)
+const SLIDE_T := 0.45       # durata della scivolata (s); sotto la pioggia ×slideK
 const GK_AI_SPEED := 2.6    # velocità base del tuffo del portiere comandato dal computer (m/s)
 const GK_HUMAN_SPEED := 2.4 # velocità base del tuffo quando lo comanda il giocatore (m/s)
 const SHOT_BLOCK_R := 0.6   # un tiro forte si ferma su un difensore solo se lo prende quasi in pieno (m)
@@ -313,7 +314,8 @@ func aerialDuel(p: R.Player) -> R.Player:
 
 func slideStep(p: R.Player, dt: float) -> void:
 	var b := ball
-	var sp: float = 10.5 * (1.0 - p.t / 0.45) + 2.5
+	var st: float = SLIDE_T * slideK
+	var sp: float = 10.5 * (1.0 - p.t / st) + 2.5
 	p.vx = p.sdx * sp
 	p.vy = p.sdy * sp
 	p.x += p.vx * dt
@@ -326,7 +328,7 @@ func slideStep(p: R.Player, dt: float) -> void:
 			var dc: float = C.hyp(c.x - p.x, c.y - p.y)
 			if db < 0.95:
 				p.hit = true
-				c.stun = 0.55
+				c.stun = 0.55 * stunK
 				c.tackleCd = 0.8
 				b.owner = null
 				b.vx = p.sdx * 7.0 + (rnd() - 0.5) * 2.0
@@ -360,7 +362,7 @@ func slideStep(p: R.Player, dt: float) -> void:
 			b.noT = 0.3
 			predT = 0.0
 			ev("tackle", {"p": p, "slide": true})
-	if p.t >= 0.45 and p.state == "slide":
+	if p.t >= st and p.state == "slide":
 		p.state = "down"
 		p.t = 0.6
 		p.vx = 0.0
@@ -627,7 +629,7 @@ func _contactsOwned(dt: float, b: R.Ball) -> void:
 			if o.contact >= need and rnd() < TACKLE_LOOSE:
 				o.contact = 0.0
 				o.tackleCd = 0.5
-				c.stun = 0.3
+				c.stun = 0.3 * stunK
 				c.tackleCd = 0.6
 				var side: float = C.sign_(b.x) if absf(b.x) > HW - 12.0 else (-1.0 if rnd() < 0.5 else 1.0)
 				var ang: float = F.atan2_(b.y - o.y, b.x - o.x) + (rnd() - 0.5) * 1.6
@@ -660,7 +662,7 @@ func _contactsOwned(dt: float, b: R.Ball) -> void:
 				o.dx = o.x
 				o.dy = o.y
 				o.holdN = 0
-				c.stun = 0.4
+				c.stun = 0.4 * stunK
 				c.tackleCd = 0.8
 				ev("tackle", {"p": o, "on": c})
 				if o.pos == "P" and inOwnBox(o):

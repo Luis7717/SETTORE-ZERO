@@ -16,6 +16,12 @@ const ADV_FREE = 3; // vantaggio solo se nessun altro avversario è più vicino 
 const ADV_MIN_Y = -5; // ... e solo da qui in avanti (m nel verso d'attacco, 0 = metà campo)
 // Calci da fermo (Luis 2026-11-21): chi batte non può toccare il pallone una seconda volta finché non l'ha toccato un altro.
 const DBL_FREE = 6;      // sicurezza: dopo tanto tempo di pallone libero senza che nessun altro lo tocchi, il battitore può riprenderlo (s)
+// Meteo: campo facoltativo `meteo` delle opzioni della partita ('sereno' | 'nuvoloso' | 'pioggia' | 'neve').
+// Senza il campo (o sereno, nuvoloso, valori sconosciuti) il motore resta identico a prima.
+const RAIN_ROLL = 0.75;  // pioggia: attrito del rotolamento ×0,75 = palla più veloce sull'erba bagnata
+const RAIN_SLIDE = 1.3;  // pioggia: la scivolata dura (e scorre) ×1,3
+const RAIN_STUN = 1.25;  // pioggia: chi perde un contrasto resta fermo ×1,25 (scivola sull'erba bagnata)
+const SNOW_ROLL = 1.35;  // neve: attrito del rotolamento ×1,35 = palla più lenta
 const ENERGY_MIN = 0.2; // energia più bassa possibile (come il calo in partita, motion.js)
 const SPEED_TIRED = 0.86; // a energia 0 la velocità massima scende a questa frazione (l'energia cala più piano con più fisico = resistenza)
 const PATH_STEP = 1.2;   // distanza minima tra due punti della strada disegnata (m)
@@ -32,6 +38,14 @@ export const SPRINT_DIST = 6; // dito più lontano di così dal giocatore contro
 export function startEnergy(src) {
   const e = src ? src.energy0 : undefined;
   return typeof e === 'number' && Number.isFinite(e) ? Math.min(1, Math.max(ENERGY_MIN, e)) : 1;
+}
+
+// Effetti del meteo sul motore: roll = attrito del rotolamento del pallone (m/s²), slide = durata della scivolata,
+// stun = tempo da fermo di chi perde un contrasto (moltiplicatori; 1 = come sempre).
+export function weatherFx(meteo) {
+  if (meteo === 'pioggia') return { roll: ROLL * RAIN_ROLL, slide: RAIN_SLIDE, stun: RAIN_STUN };
+  if (meteo === 'neve') return { roll: ROLL * SNOW_ROLL, slide: 1, stun: 1 };
+  return { roll: ROLL, slide: 1, stun: 1 };
 }
 
 // Taglia una linea che parte da (x0, y0) e passa per pts alla lunghezza max (m): l'ultimo punto cade esattamente a max.
@@ -59,6 +73,11 @@ export class Match {
     this.human = o.human || [true, false];
     this.autoGk = o.autoGk || [false, false];
     this.teams = o.teams;
+    const wx = weatherFx(o.meteo);
+    this.meteo = typeof o.meteo === 'string' ? o.meteo : '';
+    this.roll = wx.roll; this.slideK = wx.slide; this.stunK = wx.stun;
+    // forza dei passaggi rasoterra: sul bagnato si calcia come all'asciutto (il pallone corre di più), sulla neve più forte
+    this.rollKick = Math.max(ROLL, wx.roll);
     this.players = [];
     for (let t = 0; t < 2; t++) {
       const tm = this.teams[t], F = FORMATIONS[tm.formation] || FORMATIONS['4-4-2'];
@@ -295,8 +314,9 @@ export class Match {
     const nx = -uy, ny = ux;
     let v0, Tt, vh = 0;
     if (type === 'ground') {
-      v0 = Math.min(17 + p.st.pas * 0.13, Math.sqrt(25 + 2 * ROLL * D));
-      const disc = v0 * v0 - 2 * ROLL * D; Tt = disc > 0 ? (v0 - Math.sqrt(disc)) / ROLL : v0 / ROLL;
+      const rl = this.roll;
+      v0 = Math.min(17 + p.st.pas * 0.13, Math.sqrt(25 + 2 * this.rollKick * D));
+      const disc = v0 * v0 - 2 * rl * D; Tt = disc > 0 ? (v0 - Math.sqrt(disc)) / rl : v0 / rl;
     } else if (type === 'loft') {
       const vm = 15 + p.st.pas * 0.11; Tt = clamp(D / 14, 0.75, 2.6);
       if (D / Tt > vm) D = vm * Tt;
@@ -320,7 +340,7 @@ export class Match {
     const s = { x: L.sx, y: L.sy, h: 0.02, vx: L.vx, vy: L.vy, vh: L.vh, cax: L.cax, cay: L.cay, ct: L.ct };
     const pts = [{ t: 0, x: s.x, y: s.y, h: s.h }];
     for (let k = 1; k <= sec * 60; k++) {
-      ballPhys(s, 1 / 60);
+      ballPhys(s, 1 / 60, this.roll);
       if (k % 2 === 0) pts.push({ t: k / 60, x: s.x, y: s.y, h: s.h });
       if (Math.abs(s.x) > HW + 1 || Math.abs(s.y) > HL + 1 || (s.h === 0 && hyp(s.vx, s.vy) < 0.3)) break;
     }
@@ -362,7 +382,7 @@ export class Match {
     const dt = 1 / 60;
     for (let i = 0; i < 200; i++) {
       const py = s.y, px = s.x, ph = s.h;
-      ballPhys(s, dt);
+      ballPhys(s, dt, this.roll);
       if (Math.abs(s.y) >= HL) {
         const f = (HL - Math.abs(py)) / (Math.abs(s.y) - Math.abs(py) || 1e-6);
         const cx = px + (s.x - px) * f, ch = ph + (s.h - ph) * f;
@@ -393,7 +413,7 @@ export class Match {
     // un altro ha toccato il pallone dopo il calcio da fermo: il battitore torna libero (anche dopo DBL_FREE s, per sicurezza)
     if (b.dbl && (b.last !== b.dbl || (this.phase === 'play' && (b.dblT += dt) >= DBL_FREE))) b.dbl = null;
     const px = b.x, py = b.y, ph = b.h;
-    ballPhys(b, dt);
+    ballPhys(b, dt, this.roll);
     if (this.phase !== 'play') {
       if (this.phase === 'goal') { b.vx *= 0.92; b.vy *= 0.9; b.x = clamp(b.x, -GW / 2 + 0.2, GW / 2 - 0.2); b.y = clamp(b.y, -HL - 1.9, HL + 1.9); }
       return;

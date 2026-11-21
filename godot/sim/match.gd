@@ -7,6 +7,12 @@ extends "ai.gd"
 
 # Calci da fermo (Luis 2026-11-21): chi batte non può toccare il pallone una seconda volta finché non l'ha toccato un altro.
 const DBL_FREE := 6.0 # sicurezza: dopo tanto tempo di pallone libero senza che nessun altro lo tocchi, il battitore può riprenderlo (s)
+# Meteo: campo facoltativo "meteo" delle opzioni della partita ("sereno" | "nuvoloso" | "pioggia" | "neve").
+# Senza il campo (o sereno, nuvoloso, valori sconosciuti) il motore resta identico a prima. Come src/sim/match.js.
+const RAIN_ROLL := 0.75  # pioggia: attrito del rotolamento ×0,75 = palla più veloce sull'erba bagnata
+const RAIN_SLIDE := 1.3  # pioggia: la scivolata dura (e scorre) ×1,3
+const RAIN_STUN := 1.25  # pioggia: chi perde un contrasto resta fermo ×1,25 (scivola sull'erba bagnata)
+const SNOW_ROLL := 1.35  # neve: attrito del rotolamento ×1,35 = palla più lenta
 const ENERGY_MIN := 0.2 # energia più bassa possibile (come il calo in partita, motion.gd)
 const PREVIEW_SEC := 2.4 # durata massima dell'anteprima della traiettoria (s)
 const SHOT_V0 := 22.0 # velocità base del tiro (m/s), più la bravura del tiratore
@@ -26,6 +32,16 @@ const RUN_MAX_LEN := 14.0 # lunghezza massima di una linea di difesa, misurata d
 const SPRINT_DIST := 6.0 # dito più lontano di così dal giocatore controllato (m) = scatto
 const CORNER_ATT := [[-3.0, 7.0], [3.0, 8.5], [0.0, 11.5], [-6.0, 10.0], [6.0, 12.5], [-2.0, 19.0], [9.0, 22.0], [-10.0, 46.0], [8.0, 50.0], [0.0, 44.0]]
 const CORNER_DEF := [[-2.6, 5.5], [2.6, 5.5], [0.0, 8.0], [-5.0, 8.5], [5.0, 9.5], [0.0, 13.0], [-3.0, 3.0], [-7.0, 20.0], [8.0, 21.0], [0.0, 38.0]]
+
+
+## Effetti del meteo sul motore: roll = attrito del rotolamento del pallone (m/s²), slide = durata della scivolata,
+## stun = tempo da fermo di chi perde un contrasto (moltiplicatori; 1 = come sempre). Come weatherFx di src/sim/match.js.
+static func weatherFx(m: Variant) -> Dictionary:
+	if m is String and m == "pioggia":
+		return {"roll": ROLL * RAIN_ROLL, "slide": RAIN_SLIDE, "stun": RAIN_STUN}
+	if m is String and m == "neve":
+		return {"roll": ROLL * SNOW_ROLL, "slide": 1.0, "stun": 1.0}
+	return {"roll": ROLL, "slide": 1.0, "stun": 1.0}
 
 
 ## Energia a inizio partita (o all'ingresso dalla panchina): il campo facoltativo `energy0` del giocatore sorgente
@@ -79,6 +95,14 @@ func _init(o: Dictionary) -> void:
 	human = o.get("human", [true, false])
 	autoGk = o.get("autoGk", [false, false])
 	teams = o.teams
+	var wx := weatherFx(o.get("meteo"))
+	var mt: Variant = o.get("meteo")
+	meteo = mt if mt is String else ""
+	roll = wx.roll
+	slideK = wx.slide
+	stunK = wx.stun
+	# forza dei passaggi rasoterra: sul bagnato si calcia come all'asciutto (il pallone corre di più), sulla neve più forte
+	rollKick = maxf(ROLL, roll)
 	players = []
 	for tt in 2:
 		var tmd: Dictionary = teams[tt]
@@ -386,9 +410,10 @@ func launch(p: R.Player, spec: Dictionary, noise: bool) -> Dictionary:
 	var Tt: float
 	var vh: float = 0.0
 	if type == "ground":
-		v0 = minf(17.0 + p.st.pas * 0.13, sqrt(25.0 + 2.0 * ROLL * D))
-		var disc: float = v0 * v0 - 2.0 * ROLL * D
-		Tt = (v0 - sqrt(disc)) / ROLL if disc > 0.0 else v0 / ROLL
+		var rl: float = roll
+		v0 = minf(17.0 + p.st.pas * 0.13, sqrt(25.0 + 2.0 * rollKick * D))
+		var disc: float = v0 * v0 - 2.0 * rl * D
+		Tt = (v0 - sqrt(disc)) / rl if disc > 0.0 else v0 / rl
 	elif type == "loft":
 		var vm: float = 15.0 + p.st.pas * 0.11
 		Tt = C.clamp_(D / 14.0, 0.75, 2.6)
@@ -425,7 +450,7 @@ func predictKick(p: R.Player, spec: Dictionary, sec: float = PREVIEW_SEC) -> Arr
 	var pts: Array = [{"t": 0.0, "x": s.x, "y": s.y, "h": s.h}]
 	var k: int = 1
 	while k <= sec * 60.0:
-		C.ballPhys(s, 1.0 / 60.0)
+		C.ballPhys(s, 1.0 / 60.0, roll)
 		if k % 2 == 0:
 			pts.append({"t": k / 60.0, "x": s.x, "y": s.y, "h": s.h})
 		if absf(s.x) > HW + 1.0 or absf(s.y) > HL + 1.0 or (s.h == 0.0 and C.hyp(s.vx, s.vy) < 0.3):
@@ -497,7 +522,7 @@ func detectShot() -> void:
 		var py: float = s.y
 		var px: float = s.x
 		var ph: float = s.h
-		C.ballPhys(s, dt)
+		C.ballPhys(s, dt, roll)
 		if absf(s.y) >= HL:
 			var f: float = (HL - absf(py)) / C.orf(absf(s.y) - absf(py), 1e-6)
 			var cx: float = px + (s.x - px) * f
@@ -547,7 +572,7 @@ func updateBall(dt: float) -> void:
 	var px: float = b.x
 	var py: float = b.y
 	var ph: float = b.h
-	C.ballPhys(b, dt)
+	C.ballPhys(b, dt, roll)
 	if phase != "play":
 		if phase == "goal":
 			b.vx *= 0.92

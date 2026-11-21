@@ -114,6 +114,14 @@ func set_manto(i: int) -> void:
 	_mat_erba.set_shader_parameter("scura_bordo", c[3])
 
 
+## meteo sull'erba (scripts/partita/meteo.gd): bagnato 0..1 (pioggia: più scura e lucida), neve 0..1 (chiazze bianche)
+func set_meteo(bagnato: float, neve: float) -> void:
+	if _mat_erba == null:
+		return
+	_mat_erba.set_shader_parameter("bagnato", clampf(bagnato, 0.0, 1.0))
+	_mat_erba.set_shader_parameter("neve", clampf(neve, 0.0, 1.0))
+
+
 func manto() -> int:
 	return _manto_forzato if _manto_forzato >= 0 else _manto
 
