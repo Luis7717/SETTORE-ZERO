@@ -3,8 +3,8 @@
 import { Match } from '../../src/sim.js';
 import { mkTeam } from './harness.mjs';
 
-export function scene({ seed = 1, human = [true, false], my = 60, op = 60 } = {}) {
-  const m = new Match({ seed, halfLen: 9999, human, teams: [mkTeam('A', my, seed * 7 + 1), mkTeam('B', op, seed * 13 + 5)] });
+export function scene({ seed = 1, human = [true, false], my = 60, op = 60, meteo } = {}) {
+  const m = new Match({ seed, halfLen: 9999, human, teams: [mkTeam('A', my, seed * 7 + 1), mkTeam('B', op, seed * 13 + 5)], ...(meteo ? { meteo } : {}) });
   m.phase = 'play'; m.restart = null;
   const b = m.ball; b.owner = null; b.kick = null; b.shot = null; b.x = 0; b.y = 0; b.h = 0; b.vx = b.vy = b.vh = 0;
   m.players.forEach((p, k) => park(p, k));
