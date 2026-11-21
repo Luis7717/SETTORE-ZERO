@@ -101,9 +101,8 @@ func test_dribbling_riuscito() -> bool:
 		var p: R.Player = s[1]
 		var o: R.Player = s[2]
 		H.run(m, 1.0 / 60.0, hold(m, p))
-		eq(m.userDribble(0), true, "tasto Dribbling nel duello")
-		var evs := m.events.duplicate()
-		m.events.clear()
+		var evs := H.tapDribble(m)
+		check(findEvent(evs, "dribble_book") != null, "tasto Dribbling: dribbling prenotato")
 		var d: Dictionary = findEvent(evs, "dribble")
 		if not d.ok:
 			continue
@@ -125,8 +124,7 @@ func rate(dri: float, dif: float) -> Dictionary:
 		var s := setup(200 + sd, 1.5, dri, dif)
 		var m: SimMatchScript = s[0]
 		H.run(m, 1.0 / 60.0, hold(m, s[1]))
-		m.userDribble(0)
-		var d: Dictionary = findEvent(m.events, "dribble")
+		var d: Dictionary = findEvent(H.tapDribble(m), "dribble")
 		if d.ok:
 			ok += 1
 		elif m.ball.owner != s[1]:
@@ -188,8 +186,7 @@ func test_calo_per_uso_dal_dribbling_riuscito() -> bool:
 	while sd < 20 and p == null:
 		var s := setup(40 + sd, 2.5, 85, 40)
 		H.run(s[0], 1.0 / 60.0, hold(s[0], s[1]))
-		s[0].userDribble(0)
-		if findEvent(s[0].events, "dribble").ok:
+		if findEvent(H.tapDribble(s[0]), "dribble").ok:
 			p = s[1]
 		sd += 1
 	check(p != null and absf(p.wear.dri - 0.97) < 1e-9 and absf(p.st.dri - 85 * 0.97) < 1e-9, "calo applicato")
@@ -355,9 +352,7 @@ func dribbledAt(d: float) -> Array:
 		H.run(m, DT)
 		if not m.duelFor(0):
 			continue
-		eq(m.userDribble(0), true, "tasto Dribbling")
-		var e: Variant = findEvent(m.events, "dribble")
-		m.events.clear()
+		var e: Variant = findEvent(H.tapDribble(m), "dribble")
 		if e != null and e.ok:
 			return st
 	check(false, "nessun dribbling riuscito in 30 prove")

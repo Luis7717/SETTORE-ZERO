@@ -5,6 +5,8 @@
 class_name SimMatch
 extends "ai.gd"
 
+# Calci da fermo (Luis 2026-11-21): chi batte non può toccare il pallone una seconda volta finché non l'ha toccato un altro.
+const DBL_FREE := 6.0 # sicurezza: dopo tanto tempo di pallone libero senza che nessun altro lo tocchi, il battitore può riprenderlo (s)
 const PREVIEW_SEC := 2.4 # durata massima dell'anteprima della traiettoria (s)
 const SHOT_V0 := 22.0 # velocità base del tiro (m/s), più la bravura del tiratore
 const GK_REACT := 0.42 # tempo di reazione base del portiere del computer (s), meno la sua bravura
@@ -136,6 +138,8 @@ func setRestart(type: String, tm: int, x: float, y: float, taker: R.Player = nul
 	b.shot = null
 	b.ct = 0.0
 	b.noT = 0.0
+	b.dbl = null
+	b.dblT = 0.0
 	endDuel("gioco fermo")
 	endFlee("gioco fermo")
 	phase = "restart"
@@ -439,6 +443,9 @@ func kick(p: R.Player, spec: Dictionary) -> void:
 		b.prev = b.last
 		b.last = p
 	var exempt := false
+	# calcio da fermo (il portiere che rilancia dalle mani no): il battitore non può ritoccare il pallone (dblBan)
+	b.dbl = p if (phase == "restart" and restart.type != "gk") else null
+	b.dblT = 0.0
 	if phase == "restart":
 		exempt = restart.type in ["throw", "goalkick", "corner"]
 		phase = "play"
@@ -515,6 +522,14 @@ func updateBall(dt: float) -> void:
 		if phase == "play" and (absf(b.x) > HW or absf(b.y) > HL):
 			out(b.x, b.y, 0.0)
 		return
+	# un altro ha toccato il pallone dopo il calcio da fermo: il battitore torna libero (anche dopo DBL_FREE s, per sicurezza)
+	if b.dbl != null:
+		var freed: bool = b.last != b.dbl
+		if not freed and phase == "play":
+			b.dblT += dt
+			freed = b.dblT >= DBL_FREE
+		if freed:
+			b.dbl = null
 	var px: float = b.x
 	var py: float = b.y
 	var ph: float = b.h
@@ -948,18 +963,23 @@ func userSwitch(tm: int, p: R.Player) -> bool:
 	return true
 
 
-# dribbling nel duello aperto per la squadra T (tasto in basso). Ritorna true se il tentativo è partito;
-# l'esito arriva con l'evento 'dribble' {p, o, ok}.
+# dribbling nel duello aperto per la squadra T (tasto in basso). Ritorna true se il dribbling è stato prenotato:
+# il portatore corre verso il difensore dal lato scelto (evento 'dribble_book' {p, o, side}) e il dribbling vero
+# parte quando gli arriva vicino (duel.gd → dribBookStep); l'esito arriva con l'evento 'dribble' {p, o, ok, side}.
+# Se intanto il duello finisce (palla persa, difensore lontano, passaggio) la prenotazione si annulla con lui.
 func userDribble(tm: int) -> bool:
 	var d := duel
-	if d == null or d.team != tm or phase != "play":
+	if d == null or d.team != tm or phase != "play" or d.side != 0.0:
 		return false
 	var p := d.p
 	# niente attesa tra due tentativi (p.dribCd vale per l'IA): fra due duelli passa già DUEL_CD, e nel rallenty
 	# l'attesa durava molti secondi veri col tasto in vista che non faceva nulla
 	if ball.owner != p or p.stun > 0.0 or p.state != "play":
 		return false
-	dribble(p, d.o)
+	d.side = dribSide(p, d.o)
+	d.bt = 0.0
+	ev("dribble_book", {"p": p, "o": d.o, "side": d.side})
+	dribBookStep(d, 0.0) # già vicino: parte subito
 	return true
 
 

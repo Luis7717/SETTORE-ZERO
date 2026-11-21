@@ -265,9 +265,11 @@ func _process(delta: float) -> void:
 ## velocità del tempo voluta adesso (rallenty)
 func velocita_voluta() -> float:
 	var dive: bool = m.diveWin(me) and not m.autoGk[me]
-	var duel: bool = m.duelFor(me)
+	# dribbling prenotato: il portatore corre verso il difensore a tempo normale (duel.gd → dribBookStep)
+	var booked: bool = m.dribBooked(me)
+	var duel: bool = not booked and m.duelFor(me)
 	var flee: bool = not duel and m.fleeFor(me)
-	var zone: bool = not duel and not flee and m.inZone(me)
+	var zone: bool = not booked and not duel and not flee and m.inZone(me)
 	if gesti.mode == "dpath":
 		return DEF_DRAW_SLOW
 	if gesti.drawing:
@@ -286,7 +288,8 @@ func velocita_voluta() -> float:
 func _passi_motore(dt: float) -> void:
 	var target := velocita_voluta()
 	var flee: bool = not m.duelFor(me) and m.fleeFor(me)
-	hud.mostra_dribbling((m.duelFor(me) or flee) and not gesti.drawing, flee)
+	# toccato Dribbling il tasto sparisce: la prenotazione è partita, il dribbling scatta vicino al difensore
+	hud.mostra_dribbling(((m.duelFor(me) and not m.dribBooked(me)) or flee) and not gesti.drawing, flee)
 	ts += (target - ts) * minf(1.0, dt * TEMPO_K)
 	var sdt := dt * ts * _velocita
 	var n := maxi(1, ceili(sdt / PASSO_MAX))
@@ -316,7 +319,7 @@ func _aggiorna_hud() -> void:
 		_cam_tip_visto = true
 	var on: bool = allenamento == null and not paused and not gesti.drawing and VD.user_cam_on(m, me)
 	hud.aiuto_visuale(("arr" if _cam_tip_visto else "tip") if on else "")
-	var h: String = "duel" if m.duelFor(me) else ("flee" if m.fleeFor(me) else ("zone" if m.inZone(me) else m.hint(me)))
+	var h: String = "duel" if (m.duelFor(me) and not m.dribBooked(me)) else ("flee" if m.fleeFor(me) else ("zone" if m.inZone(me) else m.hint(me)))
 	var txt: String = RHINT.get(m.restart.type, "") if h == "restart" else HINTS.get(h, "")
 	var caldo := h == "dive" or (h == "restart" and m.restart.type == "penalty")
 	if allenamento != null:
@@ -354,7 +357,8 @@ func _evento(e: Dictionary, adv: bool) -> void:
 				audio.kick(6.0)
 				hud.big("Scatto!", "g", 800)
 		"dribble":
-			var nome := _nome_giochetto(vista.trick(e.p))
+			# il giochetto va dal lato scelto dal motore (e.side: +1 = sinistra del portatore)
+			var nome := _nome_giochetto(vista.trick(e.p, -1.0, float(e.get("side", 0.0))))
 			if (e.p as R.Player).team == me:
 				hud.big(nome + ("!" if e.ok else ""), "g" if e.ok else "", 1000)
 		"goal":

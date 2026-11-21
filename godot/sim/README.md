@@ -71,6 +71,7 @@ Attenzione: con `-s`, un errore di script blocca Godot senza uscire; in automati
 | `test_defense.gd` | `defense-help`, `defense-runs`, `defense-shape` | linee corte, contrasto magnetico, intercetto, raggio difensivo, pressing, rientro |
 | `test_attack.gd` | `attack-spacing`, `sprint` | smarcamento, profondità sul fuorigioco, scatto ed energia |
 | `test_duel.gd` | `duel`, `dribble-beat` | duello, dribbling, difensore saltato, colpi di testa e `tes`, stanchezza, area di tiro |
+| `test_dribbling.gd` | `dribble-book`, `no-double-touch` | dribbling prenotato (parte vicino, tempo massimo, annullato col duello, lato), niente doppio tocco sui calci da fermo |
 | `test_sprint.gd` | `flee` (fuga e Scatto) | fuga con l'avversario alla pari o dietro "per linee", duello solo davanti, chiusure (tempo, alla pari, passaggio), Scatto dritto senza contrasti, squadra 1 |
 | `test_rules.gd` | `out-of-play`, `advantage`, `wall`, `path`, `preview`, `sanity`, `air` | portiere e respinte, spazzata, contrasti, vantaggio, barriera, strada disegnata, anteprima, fuorigioco, partita senza NaN |
 
@@ -86,7 +87,9 @@ campi di `m.duel` (qui è una classe); in `sprint` la scelta del clip d'animazio
 `node test/export-trace.mjs` scrive in `tests/fixtures/` i riferimenti presi dal motore JS:
 `rng.json` (500 numeri per 7 semi), `math.json` (2000 valori di sin, cos, atan2, hypot), `sprint.json` (17 scene di
 fuga e tasto Scatto, che le partite col bot non usano mai: avversario dietro, alla pari, davanti per linee, squadra 1;
-apertura di fuga o duello, esito del tocco e impronta dello stato per 2,4 s), `trace_0..6.json`
+apertura di fuga o duello, esito del tocco e impronta dello stato per 2,4 s), `dribble.json` (12 scene del tasto
+Dribbling prenotato: esito del tocco, eventi col lato, impronta per 2,4 s), `restart.json` (10 calci da fermo battuti
+corti, col battitore che insegue il pallone o a campo pieno: impronta per 7,5 s), `trace_0..6.json`
 (7 partite: un'impronta dello stato a ogni passo, gli eventi col passo, lo stato in chiaro ogni 120 passi,
 punteggio e statistiche). **Va rilanciato a ogni modifica del motore JS**, e il porting va aggiornato finché
 `test_equivalence.gd` torna verde: se un'impronta differisce, il test dice da quale passo e di quanto.

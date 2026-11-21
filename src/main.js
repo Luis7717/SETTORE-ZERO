@@ -138,7 +138,7 @@ function events(m) {
       case 'advantage_back': sfx.whistle(); big('Si torna alla punizione', '', 1300); break;
       case 'tackle': case 'block': sfx.kick(9); break;
       case 'burst': if (e.p.team === 0) { sfx.kick(6); big('Scatto!', 'g', 800); } break;
-      case 'dribble': { const T = view.trick(e.p); if (e.p.team === 0) big(T.name + (e.ok ? '!' : ''), e.ok ? 'g' : '', 1000); break; }
+      case 'dribble': { const T = view.trick(e.p, Math.random(), e.side); if (e.p.team === 0) big(T.name + (e.ok ? '!' : ''), e.ok ? 'g' : '', 1000); break; }
       case 'goal':
         if (e.team === 0) { sfx.goal(); big('GOL!', 'g', 2600, (e.scorer ? e.scorer.name : 'Autogol') + ' · ' + e.minute + '\''); }
         else { sfx.ooh(); big('Gol subito', 'b', 2400, (e.scorer ? e.scorer.name : 'Autogol') + ' · ' + e.minute + '\''); }
@@ -261,7 +261,9 @@ function frame(now) {
     if (!G.paused) {
       input.update();
       const dive = m.diveWin(0) && !m.autoGk[0];
-      const duel = !!(m.duelFor && m.duelFor(0)), flee = !duel && !!(m.fleeFor && m.fleeFor(0)), zone = !duel && !flee && !!(m.inZone && m.inZone(0));
+      // dribbling prenotato: il portatore corre verso il difensore a tempo normale e il tasto sparisce (duel.js → dribBookStep)
+      const booked = !!(m.dribBooked && m.dribBooked(0));
+      const duel = !booked && !!(m.duelFor && m.duelFor(0)), flee = !duel && !!(m.fleeFor && m.fleeFor(0)), zone = !booked && !duel && !flee && !!(m.inZone && m.inZone(0));
       const target = input.mode === 'dpath' ? DEF_DRAW_SLOW : input.drawing ? (input.runPath() ? RUN_DRAW_SLOW : PASS_DRAW_SLOW) : dive ? GK_SLOW : duel ? DUEL_SLOW : flee ? FLEE_SLOW : zone ? ZONE_SLOW : 1;
       const drib = $('drib'), lbl = flee ? 'Scatto' : 'Dribbling';
       drib.style.display = (duel || flee) && !input.drawing ? 'block' : 'none';
@@ -285,7 +287,7 @@ function frame(now) {
       hudT = now + 100;
       $('sc').textContent = m.score[0] + ' – ' + m.score[1]; $('clock').textContent = m.minute() + '\'';
       drawRadar(m); camHint(m);
-      const h = m.duelFor && m.duelFor(0) ? 'duel' : m.fleeFor && m.fleeFor(0) ? 'flee' : m.inZone && m.inZone(0) ? 'zone' : m.hint(0); let txt = h === 'restart' ? RHINT[m.restart.type] : (HINTS[h] || '');
+      const h = m.duelFor && m.duelFor(0) && !(m.dribBooked && m.dribBooked(0)) ? 'duel' : m.fleeFor && m.fleeFor(0) ? 'flee' : m.inZone && m.inZone(0) ? 'zone' : m.hint(0); let txt = h === 'restart' ? RHINT[m.restart.type] : (HINTS[h] || '');
       if ((career.s.tut || 0) > 4 && (h === 'attack' || h === 'defend' || h === 'loose')) txt = '';
       if (G.tut) txt = '';
       if (txt !== lastHint) { lastHint = txt; const el = $('hint'); el.className = h === 'dive' || (h === 'restart' && m.restart.type === 'penalty') ? 'hot' : ''; el.innerHTML = txt ? `<span>${txt}</span>` : ''; }

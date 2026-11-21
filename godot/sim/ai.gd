@@ -388,6 +388,8 @@ func _computeChase(b: R.Ball) -> void:
 				continue
 			if b.kick != null and b.kick.kicker == p and b.kick.age < 1.2:
 				continue
+			if dblBan(p):
+				continue # ha battuto il calcio da fermo: non può ritoccarlo, ci vanno gli altri
 			var isGk: bool = p.pos == "P"
 			var vm: float = vmax(p)
 			var hm: float = 2.3 if isGk else 1.5

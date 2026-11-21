@@ -65,7 +65,7 @@ export const LESSONS = [
   {
     title: 'Dribbling',
     short: 'Avvicinati al difensore e tocca Dribbling.',
-    text: 'Quando arrivi addosso a un difensore la visuale si abbassa e il tempo rallenta: puoi <b>passare</b> a un compagno libero oppure toccare <b>Dribbling</b> in basso per saltarlo.',
+    text: 'Quando arrivi addosso a un difensore la visuale si abbassa e il tempo rallenta: puoi <b>passare</b> a un compagno libero oppure toccare <b>Dribbling</b> in basso: il tuo giocatore punta il difensore e lo salta quando gli arriva vicino.',
     needs: 'userDribble',
     setup(m, T, k) {
       const c = T.carrier(m, 7, [0, -10, 10][k], [-6, 0, -2][k]); T.clearOpp(m);

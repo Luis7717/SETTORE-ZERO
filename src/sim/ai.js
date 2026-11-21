@@ -241,6 +241,7 @@ export class AIMethods {
       for (const p of this.players) {
         if (p.team !== T || p.off || p.state !== 'play') continue;
         if (b.kick && b.kick.kicker === p && b.kick.age < 1.2) continue;
+        if (this.dblBan(p)) continue; // ha battuto il calcio da fermo: non può ritoccarlo, ci vanno gli altri
         const gk = p.pos === 'P', vm = this.vmax(p), hm = gk ? 2.3 : 1.5;
         // sui lanci alti vicino alle porte si va incontro al pallone per colpirlo di testa
         const loft = !gk && b.kick && b.kick.type === 'loft' && b.kick.kicker !== p, mate = loft && b.kick.team === T;

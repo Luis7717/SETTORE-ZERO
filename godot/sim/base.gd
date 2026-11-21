@@ -100,6 +100,11 @@ func ev(type: String, d: Dictionary = {}) -> void:
 	events.append(e)
 
 
+# p ha battuto il calcio da fermo e nessun altro ha ancora toccato il pallone: non può toccarlo (niente doppio tocco)
+func dblBan(p: R.Player) -> bool:
+	return ball.dbl == p and ball.last == p
+
+
 func nearOpp(x: float, y: float, tm: int) -> float:
 	var m: float = 99.0
 	for o: R.Player in players:
