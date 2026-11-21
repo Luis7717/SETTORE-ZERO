@@ -4,12 +4,12 @@
 // (scripts/righe_campo.gd + shaders/righe.gdshader), perché calcolate per pixel sull'iPhone non si vedevano.
 // Misure come src/sim/core.js; colori come src/pitch.js. Coordinate del gioco: x = X di Godot, y = −Z di Godot.
 shader_type spatial;
-render_mode diffuse_lambert, specular_schlick_ggx;
+render_mode diffuse_lambert, specular_schlick_ggx, fog_disabled; // niente nebbia: la nebbia azzurra spegneva il giallo-verde (foto di Luis)
 
-uniform vec3 chiara : source_color = vec3(0.298, 0.671, 0.251);      // #4cab40
-uniform vec3 scura : source_color = vec3(0.235, 0.573, 0.208);       // #3c9235
-uniform vec3 chiara_bordo : source_color = vec3(0.325, 0.702, 0.271); // #53b345
-uniform vec3 scura_bordo : source_color = vec3(0.216, 0.541, 0.192);  // #378a31
+uniform vec3 chiara : source_color = vec3(0.200, 0.508, 0.000);      // giallo-verde vivo (foto di riferimento di Luis)
+uniform vec3 scura : source_color = vec3(0.169, 0.450, 0.000);
+uniform vec3 chiara_bordo : source_color = vec3(0.208, 0.527, 0.000);
+uniform vec3 scura_bordo : source_color = vec3(0.162, 0.431, 0.000);
 uniform int taglio = 0;            // ordine di NOMI in scripts/tagli_campo.gd
 uniform sampler2D grana : filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D ciuffi_tex : filter_linear_mipmap_anisotropic, repeat_enable; // grana fitta (ciuffi), da campo.gd
@@ -109,8 +109,6 @@ void fragment() {
 	// da vicino una grana ancora più fitta (i singoli ciuffi)
 	float fitti = texture(ciuffi_tex, pos_mondo / 0.8 + vec2(0.31, 0.77)).r;
 	c *= 1.0 + 0.5 * (fitti - 0.5) * (1.0 - smoothstep(9.0, 20.0, dist));
-	// verde un po' meno acceso, come l'erba vera
-	c = mix(vec3(dot(c, vec3(0.299, 0.587, 0.114))), c, 0.88) * 0.95;
 	// colore che varia un po': qua più giallo, là più azzurro (erba vera non è mai di un verde solo)
 	float tono = texture(grana, pos_mondo / 9.0 + vec2(0.19, 0.83)).r - 0.5;
 	c *= vec3(1.0 + 0.10 * tono, 1.0 + 0.03 * tono, 1.0 - 0.14 * tono);
@@ -125,6 +123,6 @@ void fragment() {
 	NORMAL_MAP = mix(vec3(0.5, 0.5, 1.0), texture(dettaglio_n, pos_mondo / DETTAGLIO_M).rgb, vicino);
 	NORMAL_MAP_DEPTH = forza_dettaglio;
 	ALBEDO = c;
-	ROUGHNESS = 0.93;
-	SPECULAR = 0.25;
+	ROUGHNESS = 1.0;
+	SPECULAR = 0.06;  // era 0,25: il riflesso del cielo azzurro spegneva il giallo-verde
 }
