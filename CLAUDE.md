@@ -58,6 +58,7 @@
 - Le regolazioni del motore sono costanti con nome in cima a `src/sim/ai.js`, `motion.js`, `match.js`.
   Le scelte fatte in autonomia e gli obiettivi non ancora raggiunti sono in `DECISIONI.md`.
   Il lavoro in parallelo coi subagenti (compito, modello, stato, file toccati) è in `PARALLELO.md`.
+  Le novità chieste da Luis, divise in fasi, sono in `PIANO.md` (dal 2026-11-21 le novità vanno nella versione Godot).
 - `npm run golden:update` → rigenera l'impronta delle partite a seme fisso (`test/fixtures/golden.json`).
   Solo quando il comportamento cambia **di proposito**; mai per far passare un refactoring.
 - Prove su schermo: `node test/flow1.mjs shots`, `node test/preview-shot.mjs shots` (Puppeteer, iPhone 390×844). Chrome: variabile `CHROME`,
