@@ -250,7 +250,7 @@ func _linea_tiro(vista: Node) -> void:
 		terra.append(Vector2(p.x, p.y))
 	var ultimo: Vector3 = punti[punti.size() - 1]
 	if vista.has_method("show_path"):
-		vista.show_path(terra, "shot", ultimo.z)
+		vista.show_path(terra, "replay", ultimo.z) # gialla senza mirino (Luis: non sul portiere)
 	if vista.has_method("show_preview"):
 		vista.show_preview(punti, NAN)
 

@@ -24,7 +24,7 @@
 # Dopo la partita (risultato registrato al fischio finale, schermata cambiata col tasto "Continua"):
 # campionato → Carriera.finishMatch + Carriera.dopoPartita (derby, crescita del campione, forma e infortuni,
 # obiettivo a fine stagione) e schermata "dopo_partita" (arg = ultimo_esito, con res.season a fine stagione); amichevole finita → "dopo_partita" (res = null); amichevole abbandonata e
-# allenamento → "principale". L'app che va in sottofondo salva subito.
+# allenamento → "hub" (casa della carriera, salvata). L'app che va in sottofondo salva subito.
 #
 # Prove da riga di comando (dopo "--"):
 #   le opzioni della partita (--bot, --scena, --schermata, --veloce, --seme, --tempo, --vista-finta, --esci-a-fine,
@@ -195,10 +195,15 @@ func _partita(tipo: String, avversario: Dictionary, titolo: String, durata: floa
 # fischio finale o "Esci": il risultato si registra subito; la schermata cambia con "Continua" (o subito se si esce)
 func _fine_partita(esito: Dictionary, titolo: String) -> void:
 	var tipo: String = esito.tipo
-	if tipo == "allenamento" and esito.get("completato", false): # allenamento finito (come il web: tutDone)
-		carriera.s.tutDone = true
-		carriera.save()
-	if tipo == "allenamento" or (tipo == "amichevole" and esito.abbandonata):
+	if tipo == "allenamento":
+		if esito.get("completato", false): # allenamento finito (come il web: tutDone)
+			carriera.s.tutDone = true
+		carriera.save() # anche se saltato: la carriera appena creata resta salvata
+		# dopo il tutorial si va alla casa della carriera, non al titolo con "Nuova carriera" (Luis 2026-11-21)
+		ultimo_esito = {}
+		vai("hub" if carriera.s != null else PRINCIPALE)
+		return
+	if tipo == "amichevole" and esito.abbandonata:
 		ultimo_esito = {}
 		vai(PRINCIPALE)
 		return

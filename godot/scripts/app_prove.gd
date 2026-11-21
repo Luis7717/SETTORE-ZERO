@@ -127,6 +127,12 @@ func _prova_uscite() -> void:
 	await _attendi(0.3)
 	ok = _controlla(_app.schermata == _app.PRINCIPALE, "amichevole: di nuovo al menu principale") and ok
 	ok = _controlla(c.s.money == soldi and c.s.day == giorno2, "amichevole: soldi e giornata invariati") and ok
+	_app.allenamento()
+	await _attendi(1.5)
+	_app.partita._mostra_pausa()
+	_app.partita._esci_dalla_pausa()
+	await _attendi(0.3)
+	ok = _controlla(_app.schermata == "hub", "allenamento: si torna alla casa della carriera (hub), non al titolo") and ok
 	get_tree().quit(0 if ok else 1)
 
 

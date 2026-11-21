@@ -273,7 +273,7 @@ func screen_to_goal(p: Vector2, gy: float) -> Vector3:
 
 
 ## linea disegnata dal dito (punti del gioco). kind: "run" strada da correre, "pass" passaggio (anello verde sul
-## compagno che riceve: recv, o il compagno entro 5 m dalla fine), "shot" tiro (gialla col mirino all'altezza end_h),
+## compagno che riceve: recv, o il compagno entro 5 m dalla fine), "shot" tiro (gialla col mirino all'altezza end_h), "replay" (gialla senza mirino),
 ## "def" linea di difesa
 func show_path(points: PackedVector2Array, kind: String, end_h: float = 0.0, recv: Variant = null) -> void:
 	if kind == "pass" and recv == null and m != null and points.size() >= 2:
