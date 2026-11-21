@@ -1201,3 +1201,33 @@ Punti 6-9 del piano, solo nella versione Godot (dettagli in `godot/README.md`, "
 - **Salvataggio**: stessa versione 1; chiavi nuove riempite al caricamento (`novita()`), salvataggi vecchi senza
   di esse si caricano (test).
 
+
+## Fase C: replay del gol e cronaca scritta (solo Godot), 2026-11-21
+
+- **Replay senza toccare il motore**: `scripts/partita/replay_buffer.gd` tiene gli ultimi 6 s di gioco (un campione
+  ogni 1/30 s di gioco, 182 campioni; nei rallenty si registra meno spesso del video) con posizione, verso,
+  velocità, stato, tuffo, calcio, festa ecc. di giocatori e pallone, più fase e ripresa. Nel replay, per ogni
+  fotogramma, i valori registrati si scrivono sugli oggetti della partita, la vista li legge con `update_view` e
+  subito dopo si rimettono i valori veri (le stesse Variant: identici bit per bit). Il motore è fermo per tutto il
+  replay, quindi non vede mai i valori del replay. Scelta più semplice che rifare la vista su oggetti finti: figure,
+  mocap, reti e scia funzionano da sole. Test: `test_replay_non_cambia_la_partita` (partita gemella identica dopo
+  il replay, 20 s dopo). I file `godot/sim/*` non sono cambiati.
+- **Quando**: dopo la festa del motore (fase "goal", 3,2 s), quando il passo dopo farebbe il calcio d'inizio, il
+  motore resta fermo (`replay.trattieni`); poi `_fine_festa_gol()` → `dopo_esultanza()` → replay → calcio d'inizio.
+  L'esultanza del campione (altro lavoro) si aggancia in `_fine_festa_gol()` e chiama `dopo_esultanza()` alla fine.
+- **Cosa si rigioca**: da 2,2 s prima del gol a 0,6 s dopo; velocità 0,75, rallentatore 0,35 da 0,35 s prima del
+  tiro a 0,5 s dopo; circa 5 s veri (al massimo 5: se l'azione è lunga si accelera tutto). Il tiro è l'ultimo calcio
+  prima del gol trovato nel buffer (`tiro_prima`); la linea gialla col mirino e i puntini del volo crescono dietro al
+  pallone. Visuale a caso (caso della grafica): "porta" (bassa dietro la linea di fondo di fianco al palo, 55%) o
+  "lato" (bassa dalla linea laterale). Prima avevo messo la telecamera dietro la rete: la rete copriva tutto.
+- **Non rigiocati**: i giochetti del dribbling (stanno nella vista, non nel motore) e la visuale girata col dito.
+- **Niente replay in allenamento** (i gol degli esercizi sono tanti e brevi). Opzione `--senza-replay` per le prove.
+- **Cronaca**: `scripts/partita/cronaca.gd`, logica pura (evento → frase o ""), caso suo (RandomNumberGenerator con
+  seme a caso), 3-6 frasi per tipo, mai la stessa due volte di fila. Ritmo: il gol sempre; parata, palo, tiro fuori,
+  occasione (tiro respinto da un difensore), rigore e cartellini se dall'ultima frase sono passati 2 s; dribbling
+  riuscito, contrasto con pallone rubato, angolo e fallo semplice solo dopo 6 s e non sempre (70/35/60/60%). "Tiro
+  fuori" = rinvio dal fondo entro 3 s da un tiro; un colpo di testa o al volo conta come tiro entro 20 m dalla porta.
+  IA contro IA, 240 s: 7 frasi (`test_cronaca_di_una_partita_vera`). Niente cronaca in allenamento.
+- **Dove**: pillola in alto a sinistra, 96 punti sotto il bordo dell'area sicura (sotto punteggio e scritta della
+  visuale), larga al massimo fino alla minimappa; il gol in giallo per 5 s, il resto 3,6 s. Dentro l'HUD, sotto i
+  menu (la pausa la copre).

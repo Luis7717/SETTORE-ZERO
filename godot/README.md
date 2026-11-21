@@ -360,6 +360,32 @@ le novità passano da due funzioni nuove che chiama `App`:
 - Prove: `tests/test_carriera_b.gd`; `--stagione-bot` stampa anche derby, crescita, infortuni e obiettivo;
   `--app-schermate` aggiunge hub, classifica, rosa (con un infortunato) e fine stagione.
 
+## Replay del gol e cronaca scritta (fase C)
+
+Solo grafica: il motore (`sim/*`) non cambia e non vede mai i valori del replay.
+
+| Cosa | File | Aggancio in `gioco.gd` |
+|---|---|---|
+| Buffer circolare degli ultimi 6 s | `scripts/partita/replay_buffer.gd` | `replay.registra(m)` dopo i passi del motore |
+| Replay (stati, telecamera, linea del tiro, scritte, tocco per saltare) | `scripts/partita/replay.gd` | `replay.gol(m)` in `_gol`, `replay.trattieni()` nei passi, `replay.fotogramma()` in `_process` |
+| Cronaca: evento → frase (logica pura) | `scripts/partita/cronaca.gd` | `cronaca.leggi(e, ora)` in `_eventi` |
+| Cronaca a schermo | `scripts/partita/cronaca_vista.gd` | figlia dell'HUD (sotto i menu) |
+
+- **Sequenza dopo un gol**: festa del motore (fase "goal", 3,2 s) → quando il passo dopo farebbe il calcio d'inizio
+  il motore resta fermo → `_fine_festa_gol()` → `dopo_esultanza()` → replay (~5 s) → il motore riparte e fa il
+  calcio d'inizio. **Esultanza del campione**: si mette in `_fine_festa_gol()` al posto della chiamata diretta, e
+  a esultanza finita si chiama `dopo_esultanza()`; finché non la si chiama il motore resta fermo (la vista continua).
+- **Replay**: per ogni fotogramma `buffer.applica(m, t)` scrive lo stato registrato sugli oggetti della partita,
+  `vista.update_view()` lo disegna, `buffer.ripristina(m)` rimette i valori veri (identici). La vista ha `replay = true`:
+  non muove la telecamera (la muove `replay.gd`), niente anello, segnalino né linee di corsa. Visuale "porta" (dietro
+  la linea di fondo, di fianco al palo) o "lato" (dalla linea laterale), bassa, FOV 48. Un tocco fuori dai tasti
+  dell'HUD lo salta; la pausa lo ferma.
+- **Cronaca**: frasi brevi per gol, autogol, parata, palo, tiro fuori, occasione, dribbling riuscito, contrasto,
+  angolo, fallo, giallo, rosso, rigore, coi nomi; caso della grafica; poche frasi (vedi `PAUSA`, `PAUSA_FORTE`, `PROB`
+  in cima al file). Niente replay né cronaca nell'allenamento guidato.
+- **Prove**: `-- --scena=gol` (tiro a porta vuota) con `--replay=porta|lato` e `--schermata=... --dopo=SEC`
+  (seme 3: gol a ~3 s, replay da ~5 a ~10 s); `--senza-replay`. Test: `tests/test_replay.gd`, `tests/test_cronaca.gd`.
+
 ## Menu (fase 3)
 
 Schermate del web (`src/ui.js`, `ui-squad.js`, `editor.js`) rifatte in Godot, una scena per schermata in

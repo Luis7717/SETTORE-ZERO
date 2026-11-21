@@ -13,7 +13,10 @@
 #   --veloce=K          tempo fisso di K/60 s a fotogramma (prove senza schermo: la partita va più veloce del vero)
 #   --bot               un "dito finto" gioca la squadra 0 coi gesti veri (scripts/partita/bot_dito.gd)
 #   --esci-a-fine       a fine partita stampa il riassunto ed esce (codice 0)
-#   --scena=area|duello|fuga|angolo|pausa   mette la partita in una situazione da fotografare
+#   --scena=area|duello|fuga|angolo|pausa|gol   mette la partita in una situazione da fotografare (gol: tiro a
+#                       porta vuota, per vedere cronaca e replay)
+#   --senza-replay      dopo il gol niente replay (si va subito al calcio d'inizio)
+#   --replay=porta|lato visuale del replay del gol (predefinito: a caso)
 #   --schermata=PERCORSO.png [--dopo=SEC] [--alla-fine]   schermata dopo SEC secondi veri, o alla fine partita
 #   --esci-dopo=SEC     esce dopo SEC secondi veri
 #   --campo=NOME        taglio dell'erba (strisce, strette, verticali, quadrotti, cerchi, uniforme, rombi, raggi, diagonali)
@@ -54,6 +57,9 @@ const AllenamentoHud := preload("res://scripts/partita/allenamento_hud.gd")
 const BotAllenamento := preload("res://scripts/partita/bot_allenamento.gd")
 const Tagli := preload("res://scripts/tagli_campo.gd")
 const ContaGiocatori := preload("res://scripts/partita/conta_giocatori.gd")
+const Replay := preload("res://scripts/partita/replay.gd")
+const Cronaca := preload("res://scripts/partita/cronaca.gd")
+const CronacaVista := preload("res://scripts/partita/cronaca_vista.gd")
 const SCENA_VISTA := "res://scenes/vista_partita.tscn"
 
 # velocità del tempo (rallenty), come src/main.js
@@ -102,6 +108,9 @@ var audio: AudioPartita
 var bot: BotDito = null
 var abbandonata := false
 var conta: ContaGiocatori = null  # conteggi per giocatore (carriera: crescita del campione)
+var replay: Replay = null     # replay del gol (null in allenamento o con --senza-replay)
+var cronaca: Cronaca = null   # cronaca scritta (null in allenamento)
+var cronaca_vista: CronacaVista = null
 
 var _opzioni := {}
 var _avvio := {}              # opzioni di avvia() (vuoto = partita di prova da sola)
@@ -182,6 +191,7 @@ func _parti() -> void:
 		hud.big("DERBY!", "g", 2400, _titolo())
 	else:
 		hud.big(_titolo(), "", 1800)
+	_crea_replay_e_cronaca()
 	stato = "partita"
 	if _opzioni.has("bot"):
 		var seme_bot := int(_opzioni.get("seme", "1")) + 99
@@ -248,12 +258,18 @@ func _process(delta: float) -> void:
 		_secondo_tempo() # il dito finto preme "Secondo tempo"
 	elif paused and bot != null and _all_hud != null and _all_hud.scheda_aperta():
 		_all_hud.premi_prova() # ... e "Prova (3 volte)" sulla scheda dell'allenamento
+	if replay != null and replay.attivo(): # replay del gol: motore fermo, la vista rigioca gli ultimi secondi
+		if not paused:
+			replay.fotogramma(m, vista, dt * _velocita)
+		return
 	if not paused:
 		if bot != null:
 			bot.passo(self, now)
 		gesti.update(now)
 		_passi_motore(dt)
 		_eventi()
+		if replay != null:
+			replay.registra(m)
 		_zoom()
 		if _fine_ms > 0 and now > _fine_ms:
 			_fine_ms = 0
@@ -304,7 +320,11 @@ func _passi_motore(dt: float) -> void:
 	if allenamento != null:
 		allenamento.before()
 	for i in n:
+		if replay != null and replay.trattieni(m, sdt / n): # fine della festa del gol: motore fermo
+			break
 		m.step(sdt / n)
+	if replay != null and replay.festa_finita():
+		_fine_festa_gol()
 	if allenamento != null:
 		_allenamento_dopo(sdt)
 	hud.rallenty(ts < RALLENTY_SOTTO)
@@ -344,6 +364,8 @@ func _eventi() -> void:
 			adv = true
 	for e: Dictionary in m.events:
 		_evento(e, adv)
+		if cronaca != null:
+			cronaca_vista.mostra(cronaca.leggi(e, Time.get_ticks_msec() / 1000.0), e.type == "goal")
 	m.events.clear()
 
 
@@ -412,6 +434,43 @@ func _gol(e: Dictionary) -> void:
 	else:
 		audio.ooh()
 		hud.big("Gol subito", "b", 2400, piccolo)
+	if replay != null:
+		replay.gol(m)
+
+
+# ---------------------------------------------------------------- dopo il gol: esultanza → replay → calcio d'inizio
+# Il motore fa la sua festa (fase "goal", 3,2 s di gioco); quando il passo dopo farebbe il calcio d'inizio,
+# replay.trattieni() lo tiene fermo lì e si arriva qui, una volta per gol.
+# AGGANCIO PER L'ESULTANZA DEL CAMPIONE: se il marcatore è il campione, farla partire qui al posto della chiamata
+# diretta e chiamare dopo_esultanza() quando è finita. Finché non si chiama, il motore resta fermo (la vista va avanti
+# con update_view, il campo e i giocatori si vedono come sempre).
+func _fine_festa_gol() -> void:
+	dopo_esultanza()
+
+
+## dopo l'esultanza (o subito, se non c'è): parte il replay; finito o saltato, il motore riparte col calcio d'inizio
+func dopo_esultanza() -> void:
+	if replay == null or stato != "partita":
+		return
+	gesti.cancel()
+	hud.mostra_dribbling(false)
+	hud.aiuto_visuale("")
+	hud.rallenty(false)
+	hud.suggerimento("", false)
+	replay.avvia(vista, hud) # se non parte, emette subito `finito` e il motore riparte da solo
+
+
+func _crea_replay_e_cronaca() -> void:
+	if tipo() == "allenamento":
+		return
+	var nomi := [str(m.teams[0].get("name", m.teams[0].short)), str(m.teams[1].get("name", m.teams[1].short))]
+	cronaca = Cronaca.new(0, nomi)
+	cronaca_vista = CronacaVista.new()
+	hud.add_child(cronaca_vista)
+	hud.move_child(cronaca_vista, 1) # sopra il bordo del rallenty, sotto punteggio, tasti e menu
+	if not _opzioni.has("senza-replay"):
+		replay = Replay.new()
+		add_child(replay)
 
 
 func _ripartenza(e: Dictionary) -> void:
@@ -449,6 +508,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	var now := Time.get_ticks_msec()
 	if event is InputEventScreenTouch:
 		var e := event as InputEventScreenTouch
+		if replay != null and replay.attivo(): # un tocco salta il replay (i tasti dell'HUD restano tasti)
+			if e.pressed and not paused and not hud.tocca_hud(e.position):
+				replay.salta()
+			return
 		if e.pressed:
 			if giocabile and gesti.dito < 0 and not hud.tocca_hud(e.position):
 				gesti.down(e.position, now, e.index)
@@ -700,6 +763,21 @@ func _prepara_scena(nome: String) -> void:
 				_disegno_di_prova(m.team(me)[10])
 		"angolo":
 			m.setRestart("corner", me, C.HW, C.HL)
+		"gol": # corsa verso la porta col portiere fuori dai pali, poi tiro: gol quasi sicuro (cronaca e replay)
+			_metti_in_gioco()
+			var dir := 1.0 if me == 0 else -1.0
+			_sposta(att, 6.0, dir * 30.0)
+			_sposta(m.team(1 - me)[0], -12.0, dir * (C.HL - 1.0))
+			m.ball.owner = att
+			m.ball.last = att
+			m.ball.x = att.x
+			m.ball.y = att.y + 0.6 * dir
+			m.ctrl[me] = att
+			if replay != null:
+				replay.buffer.svuota() # niente salto dai posti del calcio d'inizio nel replay
+			m.userPath(me,[{"x": 3.0, "y": dir * 34.0}, {"x": 1.0, "y": dir * 38.0}])
+			await get_tree().create_timer(0.9).timeout
+			m.userKick(me, {"type": "shot", "tx": -1.5, "ty": dir * C.HL, "th": 0.7, "curve": 0.0})
 		"pausa":
 			await get_tree().create_timer(0.8).timeout
 			_mostra_pausa()
