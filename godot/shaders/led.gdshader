@@ -6,7 +6,7 @@
 shader_type spatial;
 render_mode unshaded, shadows_disabled;
 
-uniform sampler2D grafiche : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D grafiche : source_color, filter_linear_mipmap, repeat_enable;
 uniform float riga_a = 0.0;      // sponsor di adesso
 uniform float riga_b = 5.0;      // sponsor che sta arrivando
 uniform float cambio = 0.0;      // 0..1 durante il cambio

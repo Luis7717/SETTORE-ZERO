@@ -4,7 +4,7 @@
 shader_type spatial;
 render_mode unshaded, cull_disabled, depth_draw_never, shadows_disabled;
 
-uniform sampler2D maglia : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D maglia : source_color, filter_linear_mipmap, repeat_enable;
 uniform sampler2D spostamenti : hint_default_black, filter_linear, repeat_disable;
 uniform vec4 colore : source_color = vec4(0.95, 0.95, 0.95, 1.0);
 uniform float opacita = 0.78;
