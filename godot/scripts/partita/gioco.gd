@@ -25,6 +25,7 @@
 #   --meteo=sereno|nuvoloso|pioggia|neve  --ora=giorno|tramonto|notte   forzano meteo e ora (scripts/partita/meteo.gd)
 #   --allenamento       allenamento guidato (tipo "allenamento", scripts/partita/allenamento.gd) invece dell'amichevole;
 #                       con --lezione=N [--prova=K] parte da lì, con --scheda mostra la scheda della lezione N
+#   --prove=tiri|punizioni|rigori   allenamento libero a punti (tipo "prove", scripts/partita/prove_tiro_regia.gd)
 #
 # Dall'app (scripts/app.gd): chi crea la scena chiama `avvia(opz)` prima di aggiungerla o entro il primo fotogramma,
 # con opz = {squadra_a, squadra_b, me, tipo: "campionato"|"amichevole"|"allenamento", durata_tempo, seme,
@@ -57,6 +58,7 @@ const HudFase1 := preload("res://scripts/hud.gd")
 const Allenamento := preload("res://scripts/partita/allenamento.gd")
 const AllenamentoHud := preload("res://scripts/partita/allenamento_hud.gd")
 const BotAllenamento := preload("res://scripts/partita/bot_allenamento.gd")
+const ProveRegia := preload("res://scripts/partita/prove_tiro_regia.gd")
 const Tagli := preload("res://scripts/tagli_campo.gd")
 const ContaGiocatori := preload("res://scripts/partita/conta_giocatori.gd")
 const EsultanzaRegia := preload("res://scripts/partita/esultanza_regia.gd")
@@ -146,6 +148,8 @@ func avviata_da_app() -> bool:
 func tipo() -> String:
 	if _opzioni.has("allenamento"): # prova da riga di comando
 		return "allenamento"
+	if _opzioni.has("prove"):
+		return "prove"
 	return String(_avvio.get("tipo", "amichevole"))
 
 
@@ -182,6 +186,10 @@ func _parti() -> void:
 	var derby := _segna_derby()
 	if tipo() == "allenamento":
 		_avvia_allenamento()
+	elif tipo() == "prove": # allenamento libero: tiri, punizioni, rigori a punti
+		prove = ProveRegia.new()
+		add_child(prove)
+		prove.avvia(self)
 	elif derby:
 		hud.big("DERBY!", "g", 2400, _titolo() + "
 " + Meteo.testo(meteo))
@@ -189,7 +197,7 @@ func _parti() -> void:
 		hud.big(_titolo(), "", 2200, Meteo.testo(meteo))
 	_crea_replay_e_cronaca()
 	stato = "partita"
-	if _opzioni.has("bot"):
+	if _opzioni.has("bot") and prove == null: # nell'allenamento libero tira la regia
 		var seme_bot := int(_opzioni.get("seme", "1")) + 99
 		bot = BotAllenamento.new(seme_bot) if allenamento != null else BotDito.new(seme_bot)
 	_avvia_prove()
@@ -207,7 +215,7 @@ func _crea_partita() -> void:
 			tempo = float(_avvio.get("durata_tempo", TEMPO_PREDEFINITO))
 	_seme_partita = seme
 	var auto_gk: bool = _avvio.get("autoGk", false)
-	meteo = Meteo.per_partita(_avvio, _opzioni, seme, tipo() == "allenamento")
+	meteo = Meteo.per_partita(_avvio, _opzioni, seme, tipo() == "allenamento" or tipo() == "prove")
 	m = SimMatchScript.new({"seed": seme, "halfLen": tempo, "human": [me == 0, me == 1],
 		"autoGk": [auto_gk and me == 0, auto_gk and me == 1], "teams": squadre, "meteo": meteo.meteo})
 	if tipo() == "allenamento":
@@ -325,6 +333,8 @@ func _passi_motore(dt: float) -> void:
 	var n := maxi(1, ceili(sdt / PASSO_MAX))
 	if allenamento != null:
 		allenamento.before()
+	if prove != null:
+		prove.before()
 	for i in n:
 		if replay != null and replay.trattieni(m, sdt / n): # fine della festa del gol: motore fermo
 			break
@@ -333,6 +343,8 @@ func _passi_motore(dt: float) -> void:
 		_fine_festa_gol()
 	if allenamento != null:
 		_allenamento_dopo(sdt)
+	if prove != null:
+		prove.after(sdt)
 	hud.rallenty(ts < RALLENTY_SOTTO)
 	audio.folla(FOLLA_BASE, AudioPartita.eccitazione(m.ball.y))
 
@@ -351,7 +363,7 @@ func _aggiorna_hud() -> void:
 	# visuale girata col dito: frecce ai lati nel rallenty, la prima volta anche la scritta
 	if gesti.cam_used:
 		_cam_tip_visto = true
-	var on: bool = allenamento == null and not paused and not gesti.drawing and VD.user_cam_on(m, me)
+	var on: bool = allenamento == null and prove == null and not paused and not gesti.drawing and VD.user_cam_on(m, me)
 	hud.aiuto_visuale(("arr" if _cam_tip_visto else "tip") if on else "")
 	# niente suggerimenti in basso (Luis 2026-11-22: "la telecronaca è ok, togli i suggerimenti in basso"): in partita
 	# parla la cronaca in alto, in allenamento il riquadro in alto con la spiegazione di ogni lezione
@@ -438,7 +450,7 @@ func _gol(e: Dictionary) -> void:
 		hud.big("Gol subito", "b", 2400, piccolo)
 	# gol del campione: la sua esultanza parte subito, durante la festa del motore; il replay aspetta che finisca
 	_festa_finita = false
-	_esultanza_in_corso = allenamento == null and esultanza.avvia(e, m, me, vista)
+	_esultanza_in_corso = allenamento == null and prove == null and esultanza.avvia(e, m, me, vista)
 	if replay != null:
 		replay.gol(m)
 
@@ -480,7 +492,7 @@ func dopo_esultanza() -> void:
 
 
 func _crea_replay_e_cronaca() -> void:
-	if tipo() == "allenamento":
+	if tipo() == "allenamento" or tipo() == "prove":
 		return
 	var nomi := [str(m.teams[0].get("name", m.teams[0].short)), str(m.teams[1].get("name", m.teams[1].short))]
 	cronaca = Cronaca.new(0, nomi)
@@ -573,7 +585,7 @@ func _mostra_pausa() -> void:
 	hud.mostra_dribbling(false)
 	hud.aiuto_visuale("")
 	var esci := "Esci dall'amichevole"
-	if allenamento != null:
+	if allenamento != null or prove != null:
 		esci = "Esci dall'allenamento"
 	elif avviata_da_app() and tipo() == "campionato":
 		esci = "Abbandona (sconfitta 0–3)"
@@ -601,6 +613,9 @@ func _secondo_tempo() -> void:
 func _finisci(forfait: bool) -> void:
 	if allenamento != null:
 		_fine_allenamento(forfait)
+		return
+	if prove != null:
+		prove.termina(forfait)
 		return
 	stato = "fine"
 	abbandonata = forfait
@@ -656,6 +671,8 @@ func riassunto() -> String:
 		testo += "\n" + bot.riassunto()
 	if allenamento != null:
 		testo += "\n" + _riassunto_allenamento()
+	if prove != null:
+		testo += "\n" + prove.riassunto()
 	return testo
 
 
@@ -861,6 +878,7 @@ func _sposta(p: R.Player, x: float, y: float) -> void:
 # allenamento.gd (before/after attorno ai passi del motore), il riquadro e le schede in allenamento_hud.gd.
 var allenamento: Allenamento = null
 var _all_hud: AllenamentoHud = null
+var prove: Node = null        # allenamento libero (tipo "prove"): scripts/partita/prove_tiro_regia.gd
 
 
 func _avvia_allenamento() -> void:

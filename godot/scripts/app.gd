@@ -12,6 +12,8 @@
 #   App.gioca_amichevole(avversario)  amichevole: id di una squadra ("t3"), oppure livello (numero, come il web),
 #                                     oppure null (livello della mia squadra)
 #   App.allenamento()                 partita di allenamento (avversario debole, senza fine)
+#   App.allenamento_libero(prova)     allenamento libero a punti: "tiri", "punizioni" o "rigori" (prove_tiro.gd);
+#                                     finito o abbandonato si torna alla schermata "allenamento_libero"
 #   App.ultimo_esito                  {esito, res, titolo, tipo} dell'ultima partita (anche come arg della schermata)
 #   App.clic()                        suono del tocco (api.click del web), se l'audio è acceso
 #   App.impostazioni()                applica subito le impostazioni della carriera (api.settings del web):
@@ -52,6 +54,8 @@ const DOPO_PARTITA := "dopo_partita"
 const OPZIONI_PARTITA := ["bot", "scena", "schermata", "esci-a-fine", "veloce", "vista-finta", "seme", "tempo", "partita"]
 const ALLENAMENTO_TEMPO := 99999.0  # l'allenamento non finisce da solo (come il web)
 const AVVERSARIO_ALLENAMENTO := {"name": "Allenamento", "short": "ALL", "rating": 40, "seed": 7}
+const AVVERSARIO_PROVE := {"name": "Allenamento", "short": "ALL", "rating": 60, "seed": 11} # portiere sempre uguale: record confrontabili
+const ALLENAMENTO_LIBERO := "allenamento_libero"
 
 var carriera: CarrieraScript
 var schermata := ""
@@ -155,6 +159,14 @@ func allenamento() -> void:
 	_partita("allenamento", carriera.avversarioPartita(t), "Allenamento guidato", ALLENAMENTO_TEMPO)
 
 
+func allenamento_libero(prova: String) -> void:
+	if not _ha_carriera():
+		return
+	var t := AVVERSARIO_PROVE.duplicate()
+	t["kit"] = _kit_avversario()
+	_partita("prove", carriera.avversarioPartita(t), "Allenamento libero", ALLENAMENTO_TEMPO, null, false, {}, {"prova": prova})
+
+
 func _kit_avversario() -> int:
 	return (int(carriera.s.kit) + 4) % CarrieraScript.KITS.size()
 
@@ -169,7 +181,8 @@ func _ha_carriera() -> bool:
 
 # stadio_seme: seme della squadra di casa (taglio e manto dell'erba); null = a caso col seme della partita
 # meteo: {meteo, ora} previsti (campionato: gli stessi dell'hub); vuoto = a caso col seme della partita
-func _partita(tipo: String, avversario: Dictionary, titolo: String, durata: float, stadio_seme: Variant = null, derby := false, meteo := {}) -> void:
+# extra: altre opzioni di avvia() (allenamento libero: {prova})
+func _partita(tipo: String, avversario: Dictionary, titolo: String, durata: float, stadio_seme: Variant = null, derby := false, meteo := {}, extra := {}) -> void:
 	if schermata == "partita":
 		return # doppio tocco sul tasto: la partita sta già partendo
 	var s: Dictionary = carriera.s
@@ -180,6 +193,7 @@ func _partita(tipo: String, avversario: Dictionary, titolo: String, durata: floa
 	if stadio_seme is int or stadio_seme is float:
 		opz["stadio_seme"] = int(stadio_seme)
 	opz.merge(meteo)
+	opz.merge(extra)
 	s.tut = int(s.get("tut", 0)) + 1 # partite iniziate (come il web)
 	carriera.save()
 	var scena: Node = (load(SCENA_PARTITA) as PackedScene).instantiate()
@@ -202,6 +216,11 @@ func _fine_partita(esito: Dictionary, titolo: String) -> void:
 		# dopo il tutorial si va alla casa della carriera, non al titolo con "Nuova carriera" (Luis 2026-11-21)
 		ultimo_esito = {}
 		vai("hub" if carriera.s != null else PRINCIPALE)
+		return
+	if tipo == "prove": # i record li ha già salvati la partita (prove_tiro_regia.gd)
+		carriera.save()
+		ultimo_esito = {}
+		vai(ALLENAMENTO_LIBERO)
 		return
 	if tipo == "amichevole" and esito.abbandonata:
 		ultimo_esito = {}

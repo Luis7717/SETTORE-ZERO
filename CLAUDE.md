@@ -113,6 +113,7 @@
 - Comandi (G = `Godot_v4.7.2-stable_win64_console.exe`, in `C:\Users\forma\Documents\godot-tools`):
   `$G --headless --path godot --import` · `$G --headless --path godot -- --esci-dopo=4` (niente errori) ·
   `$G --path godot -- --schermata=shots/x.png --dopo=3` (anche `--vista=vicina|porta|alta`, `--senza-vsync`, `--prova-tocchi`).
+- Allenamento libero (tiri/punizioni/rigori a punti, record nel campo `prove` del salvataggio): `scripts/partita/prove_tiro*.gd`, menu `scripts/menu/allenamento_libero.gd`, prova `-- --prove=tiri --bot`.
 - Meteo e ora della partita: `scripts/partita/meteo.gd` (prove: `--meteo=sereno|nuvoloso|pioggia|neve`, `--ora=giorno|tramonto|notte`).
 - Build: workflow `.github/workflows/tiro-a-giro-godot-ipa.yml` (push su `tiro-a-giro` che tocca `godot/**`) →
   release **`tiro-a-giro-godot-ipa`**, `TiroAGiroGodot.ipa`, bundle `it.tiroagiro.godot` ("Tiro a Giro 3D"), iOS 15+,

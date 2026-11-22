@@ -39,7 +39,13 @@ ogni cambio al motore si fa in tutte e due, con le fixture rigenerate.
   devono essere occasioni vere (posizioni da cui si può segnare). Il resto sono azioni difensive e offensive miste.
   Ogni **azione offensiva parte da centrocampo** (o poco oltre) col pallone alla mia squadra verso la porta avversaria;
   ogni **azione difensiva** è lo stesso al contrario: parte da centrocampo con l'avversario che attacca verso la mia porta.
-- **13. Allenamento libero**: tiri, punizioni, rigori con punteggio.
+- **13. Allenamento libero** (fatto il 2026-11-22, da provare sull'iPhone): tiri, punizioni, rigori con punteggio.
+  Dal menu principale e dalla casa della carriera (casella larga). Tira il **campione** (le sue statistiche contano)
+  coi gesti della partita; portiere vero (squadra "Allenamento" livello 60, sempre uguale perché i record si
+  confrontino). **Tiri**: 10 da posti diversi (4 fuori area, 6 dentro). **Punizioni**: 8 con la barriera del motore,
+  da 18-28 m e di lato. **Rigori**: 5, poi a oltranza fino al primo errore (massimo 15). Gol = 10 punti, +5 vicino al
+  palo (entro 0,9 m), +5 sotto la traversa (sopra 1,64 m): angolino = 20. Record per prova nel salvataggio (campo
+  `prove`, assente nei salvataggi vecchi = nessun record); a fine prova punteggio, record e "Riprova" (posti nuovi).
 
 ## Tenute da parte (da provare più avanti)
 - 2. Tiro caricato col dito fermo (più forza, meno precisione).

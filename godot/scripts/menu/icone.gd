@@ -15,6 +15,7 @@ const ICONS := {
 	"friendly": '<circle cx="12" cy="12" r="9"/><path d="M12 8l3.5 2.5-1.3 4h-4.4l-1.3-4z"/>',
 	"vs": '<circle cx="8" cy="8" r="3"/><circle cx="16" cy="9" r="3"/><path d="M2.5 20c0-4 2.5-6 5.5-6s5.5 2 5.5 6M14 14.5c.7-.3 1.4-.5 2-.5 3 0 5.5 2 5.5 6"/>',
 	"howto": '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 115 0c0 1.7-2.5 2-2.5 4M12 17h.01"/>',
+	"goal": '<path d="M3 19V6h18v13M1.5 19h21"/><path d="M8 6v13M13 6v13M18 6v13M3 10.5h18M3 15h18" stroke-opacity=".45"/>',
 	"settings": '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.2"/><circle cx="9" cy="17" r="2.2"/>',
 }
 # disegni di "Come si gioca" (HOW_ILL), 80×80 a tratto

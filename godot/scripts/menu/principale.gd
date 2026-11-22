@@ -1,5 +1,5 @@
-# Menu principale (title() di src/ui.js senza "new"): logo TIRO A GIRO, frase, tre etichette, "Continua carriera"
-# e "Nuova carriera". Senza carriera salvata porta subito alla nuova carriera (come il web).
+# Menu principale (title() di src/ui.js senza "new"): logo TIRO A GIRO, frase, tre etichette, "Continua carriera",
+# "Allenamento libero" (tiri, punizioni, rigori a punti) e "Nuova carriera". Senza carriera salvata porta subito alla nuova carriera (come il web).
 # Dietro i pulsanti c'è lo sfondo 3D del campione che palleggia (con_3d, vedi MenuSchermata.crea_sfondo); senza
 # (--senza-3d o scena mancante) resta la sfumatura con il campo disegnato.
 extends MenuSchermata
@@ -56,6 +56,7 @@ func costruisci() -> void:
 		v.position = Vector2(0, (hero.size.y - v.size.y) * 0.62))
 	var btn := U.bottone("CONTINUA CARRIERA", "BtnGrande", func() -> void: vai("hub"))
 	corpo.add_child(btn)
+	corpo.add_child(U.bottone("Allenamento libero", "", func() -> void: vai("allenamento_libero")))
 	corpo.add_child(U.bottone("Nuova carriera", "BtnFantasma", func() -> void: vai("nuova_carriera")))
 
 
