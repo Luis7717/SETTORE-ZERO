@@ -65,6 +65,7 @@ const Cronaca := preload("res://scripts/partita/cronaca.gd")
 const CronacaVista := preload("res://scripts/partita/cronaca_vista.gd")
 const Meteo := preload("res://scripts/partita/meteo.gd")
 const TifoEventi := preload("res://scripts/partita/tifo_eventi.gd")
+const FermatempoTesta := preload("res://scripts/partita/fermatempo_testa.gd")
 const SCENA_VISTA := "res://scenes/vista_partita.tscn"
 
 # velocità del tempo (rallenty), come src/main.js
@@ -117,6 +118,7 @@ var _fotogrammi := 0
 var _anteprima_viva := false
 var _inizio_ms := 0
 var _seme_partita := 0
+var _testa_reale := -1.0       # secondi veri dall'apertura del fermatempo del colpo di testa (−1 = chiuso)
 var meteo := {"meteo": "sereno", "ora": "giorno"}  # scripts/partita/meteo.gd: avvio.meteo/ora o a caso col seme
 
 
@@ -211,7 +213,7 @@ func _crea_partita() -> void:
 	var auto_gk: bool = _avvio.get("autoGk", false)
 	meteo = Meteo.per_partita(_avvio, _opzioni, seme, tipo() == "allenamento")
 	m = SimMatchScript.new({"seed": seme, "halfLen": tempo, "human": [me == 0, me == 1],
-		"autoGk": [auto_gk and me == 0, auto_gk and me == 1], "teams": squadre, "meteo": meteo.meteo})
+		"autoGk": [auto_gk and me == 0, auto_gk and me == 1], "teams": squadre, "meteo": meteo.meteo, "testa": true})
 	if tipo() == "allenamento":
 		tempo = Allenamento.HALF_LEN
 		if not avviata_da_app():
@@ -272,6 +274,7 @@ func _process(delta: float) -> void:
 		gesti.update(now)
 		_passi_motore(dt)
 		_eventi()
+		_cerchio_testa()
 		if replay != null:
 			replay.registra(m)
 		_zoom()
@@ -290,6 +293,36 @@ func _process(delta: float) -> void:
 	esultanza.aggiorna(dt_reale, m)
 	vista.update_view(0.0 if paused else dt * maxf(ts, 0.25), dt_reale)
 	esultanza.camera(vista)
+
+
+## fermatempo del colpo di testa (sim/testa.gd): il pallone arriva alla testa FermatempoTesta.TESTA_FERMATEMPO_S secondi
+## veri dopo l'apertura. Linea disegnata = tempo normale subito (il colpo parte appena il pallone arriva). 0 = niente.
+func _velocita_testa(dt: float) -> float:
+	var hw = m.headWin
+	if hw == null or hw.team != me:
+		_testa_reale = -1.0
+		return 0.0
+	if hw.aimed:
+		_testa_reale = -1.0
+		return 1.0
+	if _testa_reale < 0.0:
+		_testa_reale = 0.0
+	else:
+		_testa_reale += dt
+	return FermatempoTesta.velocita(m.headLeft(), FermatempoTesta.TESTA_FERMATEMPO_S - _testa_reale)
+
+
+## cerchio che si svuota intorno a chi deve colpire di testa
+func _cerchio_testa() -> void:
+	if not m.headFor(me) or _testa_reale < 0.0:
+		hud.cerchio_testa(Vector2.ZERO, -1.0)
+		return
+	var p: R.Player = m.headWin.p
+	var s: Vector3 = vista.world_to_screen(p.x, p.y, 1.0)
+	if s.z < 0.5:
+		hud.cerchio_testa(Vector2.ZERO, -1.0)
+		return
+	hud.cerchio_testa(Vector2(s.x, s.y), FermatempoTesta.frazione(_testa_reale))
 
 
 ## velocità del tempo voluta adesso (rallenty)
@@ -322,7 +355,11 @@ func _passi_motore(dt: float) -> void:
 	# nella lezione del passaggio il tasto non c'è (Luis 2026-11-21): lì si impara solo a disegnare il passaggio
 	var tasto_ok := allenamento == null or allenamento.finished or String(allenamento.lesson().get("id", "")) != "passaggio"
 	hud.mostra_dribbling(tasto_ok and ((m.duelFor(me) and not m.dribBooked(me)) or flee) and not gesti.drawing, flee)
-	ts += (target - ts) * minf(1.0, dt * TEMPO_K)
+	var testa := _velocita_testa(dt)
+	if testa > 0.0:
+		ts = testa # fermatempo del colpo di testa: velocità esatta, niente passaggio dolce
+	else:
+		ts += (target - ts) * minf(1.0, dt * TEMPO_K)
 	var sdt := dt * ts * _velocita
 	var n := maxi(1, ceili(sdt / PASSO_MAX))
 	if allenamento != null:
@@ -380,7 +417,13 @@ func _evento(e: Dictionary, adv: bool) -> void:
 			audio.kick(float(e.get("v", 15.0)))
 			var p: R.Player = e.p
 			if not e.get("clear", false) and p.team == me and (e.kind == "header" or e.kind == "volley"):
-				hud.big("Colpo di testa!" if e.kind == "header" else "Al volo!", "", 900)
+				if e.get("sponda", false):
+					hud.big("Sponda!", "", 800)
+				else:
+					hud.big("Colpo di testa!" if e.kind == "header" else "Al volo!", "", 900)
+		"head_win":
+			if int(e.team) == me:
+				gesti.cancel() # una linea a metà (es. difesa) non vale: ora si disegna il colpo di testa
 		"advantage":
 			hud.big("Vantaggio!", "", 1100)
 		"advantage_back":
@@ -787,6 +830,28 @@ func _prepara_scena(nome: String) -> void:
 			m.ctrl[me] = att
 			if nome == "disegno":
 				_disegno_di_prova(m.team(me)[10])
+		"testa", "testa_linea": # cross dalla destra verso il n. 10 in area: fermatempo del colpo di testa
+			_metti_in_gioco()
+			var dt_ := 1.0 if me == 0 else -1.0
+			var cr: R.Player = m.team(me)[7]
+			_sposta(att, 1.0, dt_ * (C.HL - 9.0))
+			_sposta(cr, 24.0, dt_ * (C.HL - 12.0))
+			m.ball.owner = cr
+			m.ball.last = cr
+			m.ball.x = cr.x
+			m.ball.y = cr.y + 0.6 * dt_
+			m.ctrl[me] = cr
+			m.kick(cr, {"type": "loft", "tx": att.x - 1.5, "ty": att.y + dt_ * 1.0})
+			if nome == "testa_linea":
+				while not m.headFor(me):
+					await get_tree().process_frame
+				await get_tree().create_timer(0.8).timeout
+				var hp: R.Player = m.headWin.p
+				var a: Vector3 = vista.world_to_screen(hp.x, hp.y, 1.0)
+				var b: Vector3 = vista.world_to_screen(-2.0, dt_ * C.HL, 1.6)
+				gesti.down(Vector2(a.x, a.y), Time.get_ticks_msec())
+				for i in range(1, 13):
+					gesti.move_ev(Vector2(a.x, a.y).lerp(Vector2(b.x, b.y), i / 12.0))
 		"angolo":
 			m.setRestart("corner", me, C.HW, C.HL)
 		"rinvio": # rinvio dal fondo del nostro portiere (posa rilassata dietro il pallone)

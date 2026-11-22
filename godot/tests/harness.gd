@@ -57,6 +57,7 @@ class Bot:
 	var r: SimRngScript
 	var press: bool
 	var diveAt: float = -1.0
+	var headAt: float = -1.0
 
 	func _init(seed_value: int, press_: bool = true) -> void:
 		r = SimRngScript.new(seed_value)
@@ -84,6 +85,17 @@ class Bot:
 					m.userMove(0, b.x + b.owner.vx * 0.25, b.y + b.owner.vy * 0.25, true)
 			elif b.owner == null and m.manualDef(0) and press:
 				m.userMove(0, b.x + b.vx * 0.3, b.y + b.vy * 0.3, true)
+		# colpo di testa controllato (solo con m.headCtl): dopo un attimo linea verso la porta, lontano dal portiere
+		if m.headFor(0):
+			if headAt < 0.0:
+				headAt = m.time + r.next() * 0.3
+			elif m.time >= headAt:
+				var g0 := m.gk(1)
+				var side: float = -1.0 if g0.x > 0.0 else 1.0
+				m.userHeader(0, {"goal": true, "tx": side * (C.GW / 2.0 - 0.6 - r.next() * 1.2), "th": 0.3 + r.next() * 1.4})
+				headAt = -1.0
+		else:
+			headAt = -1.0
 		if m.diveWin(0):
 			if diveAt < 0.0:
 				diveAt = m.time + 0.12 + r.next() * 0.16
@@ -110,6 +122,7 @@ static func playMatch(opt: Dictionary, onStep: Callable = Callable()) -> Diction
 	for t: Array in opt.get("tired", []): # [squadra, indice, energia iniziale]: giocatori che partono stanchi
 		([ta, tb][int(t[0])].players[int(t[1])] as Dictionary)["energy0"] = float(t[2])
 	var m := newMatch(sd, opt.get("halfLen", 150.0), [true, false] if mode == "bot" else [false, false], ta, tb, String(opt.get("meteo", "")))
+	m.headCtl = bool(opt.get("testa", false))
 	var bot: Bot = Bot.new(sd + 9) if mode == "bot" else null
 	var maxSteps: int = opt.get("maxSteps", 60 * 60 * 30)
 	var steps := 0

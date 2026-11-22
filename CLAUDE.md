@@ -102,6 +102,16 @@
   veloce (attrito del rotolamento ×0,75), scivolata ×1,3 e chi perde un contrasto resta fermo ×1,25; **neve** = palla
   più lenta (×1,35). Sereno e nuvoloso non cambiano niente. Il meteo e l'ora (pomeriggio, tramonto, notte coi fari)
   si scelgono solo nella versione Godot (`godot/scripts/partita/meteo.gd`, col seme; in campionato secondo la giornata).
+- **Colpo di testa controllato** (Godot, Luis 2026-11-22, `godot/sim/testa.gd`): pallone alto di un compagno (cross,
+  lancio, angolo) che sta per arrivare ad altezza di testa a un nostro attaccante entro 17 m dalla porta avversaria =
+  **fermatempo**: il pallone arriva alla testa dopo **3 secondi veri** (`TESTA_FERMATEMPO_S` in
+  `scripts/partita/fermatempo_testa.gd`, velocità = volo che manca / secondi veri che mancano), visuale con la porta,
+  controllo a chi colpisce, cerchio giallo intorno a lui che si svuota con la scritta piccola "Di testa!". Linea col dito
+  verso la porta = colpo di testa lì (precisione secondo `tes`), verso un compagno o il campo = sponda; disegnata la
+  linea il tempo torna normale e il colpo parte appena arriva il pallone. **Senza linea il pallone è perso** (nessun
+  compagno lo tocca: passa sopra, lo prende la difesa o il portiere). Senza fermatempo i colpi di testa restano
+  automatici come prima. Il cross disegnato dalla fascia verso l'area è sempre un pallone alto (`isCross`).
+  Nel motore vale solo con l'opzione `"testa": true` (la mette il gioco; i confronti col JS restano identici).
 - Portiere: sul tiro la visuale va dietro la propria porta e il tempo rallenta; linea dal portiere al punto della porta,
   il tuffo parte quando si alza il dito.
 

@@ -92,6 +92,11 @@ class Registro:
 		if inoltra != null:
 			inoltra.run(i, punti)
 
+	func header(spec: Dictionary) -> void:
+		calls.append(["header", spec.duplicate()])
+		if inoltra != null:
+			inoltra.header(spec)
+
 	func nomi() -> Array:
 		return calls.map(func(c: Array) -> String: return c[0])
 
@@ -558,4 +563,61 @@ func test_fuga_ogni_linea_e_un_passaggio() -> bool:
 	prepara()
 	trascina(linea(sch(m.ball.x, m.ball.y, 0.3), sch(6.0, 10.0)))
 	eq(reg.nomi(), ["path"], "fuori dal rallenty = strada da correre")
+	return done()
+
+
+# ---------------------------------------------------------------- colpo di testa controllato (sim/testa.gd)
+## cross dalla destra verso l'attaccante c in area, fino all'apertura del fermatempo; true se si è aperto
+func prepara_testa() -> bool:
+	prepara(1.0, C.HL - 9.0)
+	m.headCtl = true
+	var k: R.Player = m.team(0)[7]
+	H.wake(k, 24.0, C.HL - 12.0)
+	H.wake(m.gk(1), 0.0, C.HL - 0.8)
+	H.give(m, k)
+	m.ctrl[0] = k
+	m.kick(k, {"type": "loft", "tx": c.x - 1.5, "ty": c.y + 1.0})
+	for i in 180:
+		m.step(DT)
+		m.events.clear()
+		if m.headFor(0):
+			return true
+	return false
+
+
+func test_colpo_di_testa_linea_in_porta() -> bool:
+	if not check(prepara_testa(), "fermatempo aperto"):
+		return done()
+	var hp: R.Player = m.headWin.p
+	trascina(linea(sch(hp.x, hp.y, 1.0), sch(-2.0, C.HL, 1.5)))
+	eq(reg.nomi(), ["header"], "un solo ordine: colpo di testa")
+	var spec: Dictionary = reg.calls[0][1]
+	eq(spec.goal, true, "verso la porta")
+	near(spec.tx, -2.0, 0.4, "punto della porta (x)")
+	check(m.headWin != null and m.headWin.aimed, "il motore ha la linea")
+	return done()
+
+
+func test_colpo_di_testa_linea_al_compagno_e_una_sponda() -> bool:
+	if not check(prepara_testa(), "fermatempo aperto"):
+		return done()
+	H.wake(mate, -8.0, C.HL - 15.0)
+	var hp: R.Player = m.headWin.p
+	trascina(linea(sch(hp.x, hp.y, 1.0), sch(mate.x + 1.0, mate.y)))
+	eq(reg.nomi(), ["header"], "un solo ordine")
+	var spec: Dictionary = reg.calls[0][1]
+	eq(spec.goal, false, "non verso la porta: sponda")
+	near(spec.tx, mate.x, 0.5, "verso il compagno (x)")
+	near(spec.ty, mate.y, 0.5, "verso il compagno (y)")
+	return done()
+
+
+func test_colpo_di_testa_linea_corta_non_fa_niente() -> bool:
+	if not check(prepara_testa(), "fermatempo aperto"):
+		return done()
+	var hp: R.Player = m.headWin.p
+	var a := sch(hp.x, hp.y, 1.0)
+	trascina(linea(a, a + Vector2(8.0, -8.0), 4))
+	eq(reg.nomi(), [], "nessun ordine")
+	check(m.headFor(0), "il fermatempo aspetta ancora la linea")
 	return done()

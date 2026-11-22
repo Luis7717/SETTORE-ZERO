@@ -17,6 +17,7 @@ const R := preload("res://sim/records.gd")
 const SHADER_RALLENTY := preload("res://shaders/rallenty.gdshader")
 const Minimappa := preload("res://scripts/partita/minimappa.gd")
 const Anteprima := preload("res://scripts/partita/anteprima.gd")
+const CerchioTesta := preload("res://scripts/partita/cerchio_testa.gd")
 
 const MARGINE := 10.0
 const GIALLO := Color("#ffe14a")
@@ -40,6 +41,7 @@ var _rallenty: ColorRect
 var _rallenty_mat: ShaderMaterial
 var _rallenty_on := false
 var _anteprima: Control
+var _cerchio: Control             # cerchio del colpo di testa controllato (cerchio_testa.gd)
 var _segnapunti: PanelContainer
 var _k0: ColorRect
 var _k1: ColorRect
@@ -79,6 +81,9 @@ func _ready() -> void:
 	_anteprima.hud = self
 	_anteprima.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_anteprima)
+	_cerchio = CerchioTesta.new()
+	_cerchio.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_cerchio)
 	_crea_segnapunti()
 	_crea_angoli()
 	_crea_centro()
@@ -395,6 +400,18 @@ func mostra_dribbling(si: bool, scatto: bool = false) -> void:
 	if _dribbling.text != testo:
 		_dribbling.text = testo
 		_dribbling.reset_size()
+
+
+## cerchio del colpo di testa intorno al punto `c` dello schermo, pieno per la frazione `f`; f < 0 = nascosto
+func cerchio_testa(c: Vector2, f: float) -> void:
+	if f < 0.0:
+		_cerchio.nascondi()
+	else:
+		_cerchio.mostra(c, f)
+
+
+func cerchio_testa_visibile() -> bool:
+	return _cerchio.visible
 
 
 func rallenty(si: bool) -> void:

@@ -67,6 +67,9 @@ class ComandiPartita:
 	func run(i: int, punti: Array) -> void:
 		m.userRun(tm, m.team(tm)[i], punti)
 
+	func header(spec: Dictionary) -> void:
+		m.userHeader(tm, spec)
+
 
 var partita: SimMatchScript = null
 var team := 0
@@ -75,7 +78,7 @@ var out = null                   # ComandiPartita o registratore dei test
 var enabled := false
 var dim := Vector2(390.0, 844.0) # misura dello schermo in punti logici (w, h)
 
-var mode := ""                   # "" (nessuno), "draw", "dpath", "cam", "dive", "move"
+var mode := ""                   # "" (nessuno), "draw", "dpath", "cam", "dive", "move", "head" (colpo di testa)
 var pts: Array = []              # punti della linea: {x, y, h, sx, sy, goal?}
 var sx := 0.0
 var sy := 0.0
@@ -142,6 +145,12 @@ func down(p: Vector2, now_ms: int, indice: int = 0) -> void:
 	var hint: String = m.hint(T)
 	if hint == "dive":
 		mode = "dive"
+		return
+	# colpo di testa controllato (sim/testa.gd): il dito appoggiato ovunque disegna la linea dal giocatore che colpisce
+	if m.headFor(T):
+		var hp: R.Player = m.headWin.p
+		mode = "head"
+		pts = [{"x": hp.x, "y": hp.y, "h": 0.0, "sx": x, "sy": y}]
 		return
 	if c != null and b.owner == c and (hint == "attack" or hint == "restart"):
 		var sp := _schermo(b.x, b.y, 0.3)
@@ -277,7 +286,7 @@ func move_ev(p: Vector2, indice: int = 0) -> void:
 	moved += Vector2(p.x - x, p.y - y).length()
 	x = p.x
 	y = p.y
-	if mode == "draw":
+	if mode == "draw" or mode == "head":
 		var last: Dictionary = pts[-1]
 		if Vector2(x - last.sx, y - last.sy).length() >= PUNTO_OGNI_PX:
 			var q: Variant = pick(x, y)
@@ -287,7 +296,10 @@ func move_ev(p: Vector2, indice: int = 0) -> void:
 				pts.append(q)
 				if pts.size() > PUNTI_MAX:
 					pts.remove_at(1)
-			show_path()
+			if mode == "head":
+				show_head()
+			else:
+				show_path()
 	elif mode == "dpath":
 		var last: Dictionary = pts[-1]
 		if Vector2(x - last.sx, y - last.sy).length() >= PUNTO_OGNI_PX:
@@ -354,6 +366,30 @@ func show_path() -> void:
 		return
 	var free: bool = m.phase == "restart" and NO_OFFSIDE.has(m.restart.type)
 	anteprima = {"punti": m.predictKick(c, spec()), "fuorigioco": NAN if free else m.offsideY(team), "ricevitore": recv}
+
+
+## linea del colpo di testa: dal giocatore che colpisce alla fine del dito ("shot" verso la porta, "pass" = sponda)
+func show_head() -> void:
+	var m := partita
+	if pts.size() < 2 or m.headWin == null:
+		return
+	var hp: R.Player = m.headWin.p
+	pts[0].x = hp.x
+	pts[0].y = hp.y
+	var e: Dictionary = pts[-1]
+	vista.show_path(_xy([pts[0], e]), "shot" if e.get("goal", false) else "pass")
+
+
+## ordine del colpo di testa dalla linea: in porta {goal, tx, th}, altrimenti sponda verso il compagno vicino alla fine
+## della linea (entro PASS_SNAP) o verso il punto del campo
+func head_spec() -> Dictionary:
+	var e: Dictionary = pts[-1]
+	if e.get("goal", false):
+		return {"goal": true, "tx": e.x, "th": e.h}
+	var q := mate_at(e.x, e.y)
+	if q != null and (partita.headWin == null or q != partita.headWin.p):
+		return {"goal": false, "tx": q.x + q.vx * 0.4, "ty": q.y + q.vy * 0.4}
+	return {"goal": false, "tx": e.x, "ty": e.y}
 
 
 func spec() -> Dictionary:
@@ -450,6 +486,12 @@ func up(_p: Vector2, now_ms: int, indice: int = 0, annullato: bool = false) -> v
 		_pulisci_anteprima()
 		vista.clear_path()
 		return
+	if md == "head":
+		if pts.size() >= 2 and _lunghezza_px(pts) > LINEA_MIN_PX and m.headFor(T):
+			out.header(head_spec())
+		pts = []
+		vista.clear_path()
+		return
 	if md == "dive":
 		if dist > TUFFO_MIN_PX:
 			do_dive()
@@ -517,6 +559,8 @@ func update(now_ms: int) -> void:
 		show_path()
 	if mode == "dive" and partita != null and not partita.diveWin(team):
 		mode = "move"
+	if mode == "head" and partita != null and not partita.headFor(team):
+		cancel() # il pallone è arrivato (o è andato via) prima della fine della linea
 
 
 # ---------------------------------------------------------------- piano della porta senza screen_to_goal

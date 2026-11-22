@@ -74,6 +74,9 @@ var helpers: Array = [[], []]
 var helpWas: Array = []
 var hPress: Variant = null # [[], []] dopo il primo calcolo (in JS parte "undefined")
 var goalT: float = 0.0
+# colpo di testa controllato (testa.gd): solo se l'opzione "testa" della partita è vera (il gioco sì, i confronti col JS no)
+var headCtl: bool = false
+var headWin: R.HeadWin = null
 var nextKick: int = 0
 
 
@@ -332,3 +335,15 @@ func directed(_p: R.Player) -> bool:
 
 func endDuel(_reason: String) -> void:
 	pass # duel.gd
+
+
+func headSkip(_p: R.Player) -> bool:
+	return false # testa.gd
+
+
+func endHead(_reason: String) -> void:
+	pass # testa.gd
+
+
+func headStrike(_p: R.Player, _kind: String) -> void:
+	pass # testa.gd

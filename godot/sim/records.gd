@@ -191,6 +191,25 @@ class Duel:
 	var bt: float = 0.0   # ... tempo di partita dal tocco del tasto
 
 
+# Colpo di testa controllato (testa.gd): pallone alto di un compagno che sta per arrivare a un attaccante della squadra
+# umana vicino alla porta avversaria. Fermatempo finché il pallone arriva alla testa o la persona disegna la linea.
+class HeadWin:
+	extends RefCounted
+	var team: int = 0
+	var p: Player = null     # chi colpisce (diventa il controllato)
+	var kick: Kick = null    # il lancio che ha aperto il fermatempo: se cambia, qualcuno ha toccato il pallone
+	var x: float = 0.0       # punto previsto del colpo (m) ...
+	var y: float = 0.0
+	var h: float = 0.0       # ... e altezza del pallone lì (m)
+	var tc: float = 0.0      # tempo di partita previsto dall'apertura al colpo (s)
+	var age: float = 0.0     # tempo di partita dall'apertura (s)
+	var aimed: bool = false  # la persona ha disegnato la linea
+	var goal: bool = false   # ... verso la porta (altrimenti sponda verso un compagno o un punto del campo)
+	var ax: float = 0.0      # punto mirato: in porta (x, altezza ah) o nel campo (x, y)
+	var ay: float = 0.0
+	var ah: float = 0.0
+
+
 class Restart:
 	extends RefCounted
 	var type: String = ""
