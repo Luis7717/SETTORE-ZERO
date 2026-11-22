@@ -1,7 +1,7 @@
 // Movimento dei giocatori, scivolate, tuffi, parate, falli, possesso e contatti col pallone.
 // I metodi vengono copiati su Match.prototype (vedi match.js): `this` è la partita.
 import { WEAR_TES, WEAR_TES_MIN, DRIB_BEAT_SPD, BURST_SPD } from './duel.js';
-import { W, L, HW, HL, GW, GH, BOX_W, BOX_D, SIX_W, SIX_D, PEN_D, CIRCLE, G, ROLL, clamp, hyp, rng32, FORMATIONS, effStats, ballPhys, segInfo } from './core.js';
+import { W, L, HW, HL, GW, GH, BOX_W, BOX_D, SIX_W, SIX_D, PEN_D, CIRCLE, G, ROLL, GK_HAND_HI, clamp, hyp, rng32, FORMATIONS, effStats, ballPhys, segInfo } from './core.js';
 
 // Regolazioni (misurate con test/balance.mjs, test/diag-flow.mjs e i test in test/unit)
 const SLIDE_T = 0.45;       // durata della scivolata (s); sotto la pioggia ×Match.slideK
@@ -9,6 +9,17 @@ const GK_AI_SPEED = 2.6;    // velocità base del tuffo del portiere comandato d
 const GK_HUMAN_SPEED = 2.4; // velocità base del tuffo quando lo comanda il giocatore (m/s)
 const SHOT_BLOCK_R = 0.6;   // un tiro forte si ferma su un difensore solo se lo prende quasi in pieno (m)
 const PARRY_OUT = 0.6;      // respinte non bloccate che finiscono oltre la linea di fondo
+// Presa o respinta (Luis 2026-11-22: "i portieri non tengono mai la palla"), vedi catchChance
+const CATCH_BASE = 0.95;    // probabilità di presa su un tiro centrale, basso e lento, portiere da 60 di "por"
+const CATCH_POR = 0.008;    // per ogni punto di "por" sopra (o sotto) 60
+const CATCH_V0 = 16;        // fin qui il tiro è lento (m/s)...
+const CATCH_SPD = 0.02;     // ... poi per ogni m/s in più la presa cala di tanto
+const CATCH_WIDE = 0.35;    // parata in tuffo lontano dal corpo (angolata)
+const CATCH_HIGH_H = 2;     // pallone più alto di così (m)...
+const CATCH_HIGH = 0.15;    // ... presa più difficile di tanto
+const CATCH_MIN = 0.03, CATCH_MAX = 0.97;
+const PARRY_SIDE_V = 8;     // respinta in campo: velocità verso l'esterno (m/s, più fino a 3)...
+const PARRY_FWD_V = 4;      // ... e lontano dalla porta (m/s, più fino a 3)
 const BLOCK_OUT = 0.4;      // tiri ribattuti vicino all'area che finiscono in angolo
 const TACKLE_LOOSE = 0.3;   // contrasti vinti in cui la palla schizza via invece di restare al difensore
 const PASS_DEFLECT = 0.3;
@@ -20,10 +31,10 @@ const RECOVER_V = 2.5;      // sotto questa velocità (camminata, fermo) l'energ
 const RECOVER_RATE = 0.004; // energia recuperata al secondo camminando o da fermi
 const ADV_TIME = 2.5;       // vantaggio: entro questo tempo, se la squadra perde palla, si torna alla punizione (s)
 const HEAD_LO = 1.3;        // da questa altezza in su il pallone si colpisce di testa (m)
-const HEAD_HI = 2.6;        // altezza massima raggiungibile di testa, saltando (m)
+export const HEAD_HI = 2.6; // altezza massima raggiungibile di testa, saltando (m)
 const VOLLEY_LO = 0.5;      // sotto HEAD_LO e sopra questa altezza: colpo al volo (m)
 const AIR_SHOT_RANGE = 17;  // distanza massima dalla porta per colpire di testa o al volo verso la porta (m)
-const HEAD_CLEAR_ZONE = 32; // un difensore entro questa distanza dalla propria porta respinge di testa (m)
+export const HEAD_CLEAR_ZONE = 32; // un difensore entro questa distanza dalla propria porta respinge di testa (m)
 const HEAD_V0 = 12;         // velocità base del colpo di testa (m/s), più la bravura
 const VOLLEY_V0 = 18;       // velocità base del tiro al volo (m/s), più la bravura
 const AIR_TES_K = 1.5;      // contrasto aereo: quanto pesa la differenza di colpi di testa (per punto / 100)
@@ -33,6 +44,12 @@ const AIR_WIN_MIN = 0.15, AIR_WIN_MAX = 0.85; // limiti della probabilità di vi
 // (richiesta del 2026-11-20: "rendilo un attimino più magnetico")
 const HUM_TACKLE_R = 0.3;   // raggio di contrasto sul portatore più largo di così (m)
 const HUM_REACH_FREE = 0.25; // pallone libero (non calciato da nessuno) agganciato da così più lontano (m)
+// Portiere sui cross: contro un attaccante sul pallone alto vince con GK_CLAIM_WIN (+ GK_CLAIM_POR per punto di
+// "por" sopra 60, tra MIN e MAX), poi blocca o, con un avversario addosso, a volte respinge di pugno
+const GK_CLAIM_WIN = 0.7, GK_CLAIM_POR = 0.01, GK_CLAIM_MIN = 0.5, GK_CLAIM_MAX = 0.9;
+const GK_BOX_REACH = 1.25;  // raggio in cui il portiere nella propria area tocca il pallone (m)
+const GK_PUNCH = 0.35;      // pallone alto preso con un avversario a meno di GK_PUNCH_NEAR (m): respinta di pugno
+const GK_PUNCH_NEAR = 1.5;
 
 export class MotionMethods {
   // Raggio entro cui p tocca il pallone libero. Sui passaggi avversari è il "raggio difensivo":
@@ -216,12 +233,51 @@ export class MotionMethods {
   save(p, central) {
     const b = this.ball, sp = hyp(b.vx, b.vy, b.vh);
     this.stats.saves[p.team]++;
-    if (sp < 16 || (central && sp < 25)) { this.ev('save', { p, catch: true }); this.give(p); return; }
+    if (this.rnd() < this.catchChance(p, sp, central, b.h)) { this.ev('save', { p, catch: true }); this.give(p); return; }
     if (this.rnd() < PARRY_OUT) { this.deflectBehind(p); this.ev('save', { p, catch: false, out: true }); return; }
-    const sx = p.dive ? p.dive.dirx : (b.x >= p.x ? 1 : -1);
-    b.vx = sx * (5 + this.rnd() * 3); b.vy = -b.vy * 0.15; b.vh = 2 + this.rnd() * 2; b.ct = 0;
+    // respinta in campo: lontano dalla porta e verso l'esterno, dal lato del pallone (al centro: dal lato del tuffo)
+    const sx = Math.abs(b.x) > 0.3 ? Math.sign(b.x) : (p.dive ? p.dive.dirx : (b.x >= p.x ? 1 : -1)), outY = p.team === 0 ? 1 : -1;
+    b.vx = sx * (PARRY_SIDE_V + this.rnd() * 3); b.vy = outY * (PARRY_FWD_V + this.rnd() * 3); b.vh = 2 + this.rnd() * 2; b.ct = 0;
     if (b.last !== p) { b.prev = b.last; b.last = p; } b.kick = null; b.shot = null; b.noP = p; b.noT = 0.4; this.predT = 0;
     this.ev('save', { p, catch: false });
+  }
+
+  // Probabilità che il portiere blocchi il pallone invece di respingerlo: alta sui tiri lenti, centrali e bassi
+  // (colpi di testa deboli compresi), bassa su quelli forti, angolati (tuffo lontano dal corpo) o alti; sale con "por".
+  catchChance(p, sp, central, h) {
+    let c = CATCH_BASE + (p.st.por - 60) * CATCH_POR - Math.max(0, sp - CATCH_V0) * CATCH_SPD;
+    if (!central) c -= CATCH_WIDE;
+    if (h > CATCH_HIGH_H) c -= CATCH_HIGH;
+    return clamp(c, CATCH_MIN, CATCH_MAX);
+  }
+
+  // altezza fino a cui il portiere nella propria area prende il pallone: più in alto sui cross avversari (salta)
+  gkReach(p) {
+    const k = this.ball.kick;
+    return k && k.type === 'loft' && k.team !== p.team ? GK_HAND_HI : 2.35;
+  }
+
+  // Pallone alto conteso da `p` (il più vicino): se il portiere avversario è lì sotto nella sua area e ci arriva con le
+  // mani, contrasto aereo col portiere. Ritorna il portiere se lo vince, null se non c'è o se lo perde.
+  gkContest(p) {
+    const b = this.ball, g = this.gk(1 - p.team);
+    if (!g || g.off || g.state !== 'play' || g.stun > 0 || (b.noP === g && b.noT > 0) || this.dblBan(g) || !this.inOwnBox(g)) return null;
+    if (hyp(g.x - b.x, g.y - b.y) >= GK_BOX_REACH || b.h >= this.gkReach(g)) return null;
+    const win = clamp(GK_CLAIM_WIN + (g.st.por - 60) * GK_CLAIM_POR, GK_CLAIM_MIN, GK_CLAIM_MAX);
+    if (this.rnd() < win) { this.ev('aerial', { p: g, o: p }); return g; }
+    this.ev('aerial', { p, o: g });
+    return null;
+  }
+
+  // respinta di pugno del portiere: alta, lontano dalla porta e verso l'esterno
+  gkPunch(p) {
+    const b = this.ball, dir = p.team ? -1 : 1;
+    const a = Math.atan2(dir, (b.x > 0 ? 1 : -1) * (0.4 + this.rnd() * 0.6)), v = 9 + this.rnd() * 5;
+    b.vx = Math.cos(a) * v; b.vy = Math.sin(a) * v; b.vh = 4 + this.rnd() * 3; b.ct = 0;
+    if (b.last !== p) { b.prev = b.last; b.last = p; }
+    b.kick = null; b.shot = null; b.noP = p; b.noT = 0.4; this.lastPass = null; this.predT = 0;
+    p.kickAnim = 0.35;
+    this.ev('punch', { p });
   }
 
   // Manda il pallone oltre la linea di fondo difesa dalla squadra di p, fuori dai pali
@@ -316,18 +372,21 @@ export class MotionMethods {
       const d = hyp(p.x - b.x, p.y - b.y);
       // palla appena calciata che si allontana: non si può toccare
       if (b.kick && b.kick.age < 0.3 && b.kick.team !== p.team && (p.x - b.x) * b.vx + (p.y - b.y) * b.vy < 0) continue;
-      if (d >= (gk ? 1.25 : this.reachOf(p)) || d >= bd) continue;
+      if (d >= (gk ? GK_BOX_REACH : this.reachOf(p)) || d >= bd) continue;
       const air = gk ? null : this.airPlay(p);
-      if (air || b.h < (gk ? 2.35 : 1.7)) { bd = d; best = p; bestAir = air; }
+      if (air || b.h < (gk ? this.gkReach(p) : 1.7)) { bd = d; best = p; bestAir = air; }
     }
     if (!best) return;
-    if (b.h >= HEAD_LO && !(best.pos === 'P' && this.inOwnBox(best))) {
+    const gc = b.h >= HEAD_LO ? this.gkContest(best) : null;
+    if (gc) { best = gc; bestAir = null; }
+    else if (b.h >= HEAD_LO && !(best.pos === 'P' && this.inOwnBox(best))) {
       const w = this.aerialDuel(best);
       if (w !== best) { best = w; bestAir = this.airPlay(w); if (!bestAir && b.h >= 1.7) return; }
     }
     if (bestAir) { this.airHit(best, bestAir); return; }
     const p = best, sp = hyp(b.vx - p.vx, b.vy - p.vy), gk = p.pos === 'P' && this.inOwnBox(p);
     if (gk && b.shot && b.shot.team !== p.team) { this.save(p, true); return; }
+    if (gk && b.h >= HEAD_LO && this.nearOpp(p.x, p.y, p.team) < GK_PUNCH_NEAR && this.rnd() < GK_PUNCH) { this.gkPunch(p); return; }
     const mate = b.kick && b.kick.team === p.team;
     // squadra umana: un passaggio avversario intercettato (anche in corsa) si controlla sempre, niente rimbalzi né deviazioni.
     // L'IA resta com'era: deviazioni e respinte quando la palla arriva forte (realismo, ed equilibrio già misurato)

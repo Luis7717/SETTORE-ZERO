@@ -1080,3 +1080,4 @@ func dispose() -> void:
 	for p: R.Player in players:
 		p.supC = null
 		p.beatBy = null
+		p.claim = null
