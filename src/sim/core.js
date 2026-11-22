@@ -4,6 +4,7 @@
 export const W = 64, L = 100, HW = W / 2, HL = L / 2;
 export const GW = 7.32, GH = 2.44, BOX_W = 40.32, BOX_D = 16.5, SIX_W = 18.32, SIX_D = 5.5, PEN_D = 11, CIRCLE = 9.15;
 export const G = 11.5, ROLL = 5.0;
+export const GK_HAND_HI = 2.8; // sui cross avversari il portiere prende il pallone con le mani, saltando, fino a questa altezza (m)
 export const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 export const hyp = Math.hypot;
 

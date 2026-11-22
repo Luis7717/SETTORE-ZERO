@@ -1476,3 +1476,25 @@ Dettagli in `godot/README.md`, "Altezza e corporatura". File nuovo `godot/script
   gli avversari non si scelgono il fisico.
 - **Da provare sull'iPhone**: se la differenza di altezza (±6%) e di corporatura si vede in partita, se il robusto
   sembra grasso o solo grosso, se i numeri nella Rosa ("TES+10") sono chiari.
+
+## 2026-11-22 — Portiere sui calci d'angolo e prese sulle parate (Luis: "la CPU segna sempre dagli angoli perché il portiere esce", "i portieri non tengono mai la palla")
+- **Causa degli angoli**: il portiere usciva su quasi ogni cross (188 angoli su 200) verso il punto dove il pallone
+  scendeva a 2,3 m, ma l'attaccante lo colpiva prima, a 2,4-2,6 m (fuori dalle mani del portiere, e il contrasto aereo
+  escludeva il portiere): colpo di testa da 7-9 m a porta vuota (15 gol su 16 erano a porta vuota). In più i difensori
+  della squadra umana non andavano mai sul cross (`humanDefend` inseguiva il pallone solo senza calcio in volo).
+- **Correzione** (motore JS e GDScript, identici bit per bit, tracce e impronta rigenerate di proposito):
+  il portiere esce sul cross solo se arriva sul punto di presa almeno 0,3 s prima del primo attaccante e entro 12 m
+  dalla porta (`GK_CLAIM_*` in `ai`); uscito, non torna indietro a metà (`p.claim`). Altrimenti resta a 1,2 m dalla
+  linea. Sui cross prende con le mani fino a 2,8 m (`GK_HAND_HI`); sotto un pallone alto conteso con un attaccante vince
+  il 70% (+1% per punto di "por" sopra 60) e con un avversario addosso a volte respinge di pugno (evento `punch`).
+  Il difensore umano che arriva prima sul cross vicino alla nostra porta va a colpirlo di testa.
+- **Parate**: prima si bloccava solo sotto i 16 m/s (o centrale sotto 25), ma i tiri viaggiano quasi tutti a 30 m/s:
+  3-6% di prese. Ora probabilità di presa (`catchChance`): alta su tiri lenti, centrali e bassi, cala con velocità,
+  tuffo lontano dal corpo e pallone alto, sale con "por". La respinta in campo va verso l'esterno e lontano dalla porta.
+- **Numeri** (`tests/angoli.gd` 200 angoli, `tests/parate.gd` 20 partite):
+  angoli CPU contro di noi 8% → 12,5% col portiere manuale (15% automatico) ma **0 gol a porta vuota** (erano 15) e
+  uscite a vuoto da 38 a 2; nostri angoli contro la CPU 3,5% → 6%. Prese sulle parate 3-6% → 43-46%.
+- **Non raggiunto**: i gol da angolo contro di noi restano sopra l'obiettivo indicativo 3-8% (12-15%): i gol vengono
+  da colpi di testa parati male dal portiere sulla linea e da seconde palle. Possibile passo: tuffo un po' più rapido
+  sui colpi di testa da vicino.
+- **Da provare sull'iPhone**: se il portiere ora sembra troppo "fermo" sui cross, se si vede la presa alta e il pugno.

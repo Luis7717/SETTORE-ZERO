@@ -89,6 +89,7 @@ class Player:
 	var supX: float = 0.0
 	var supY: float = 0.0
 	var stickT: float = 0.0
+	var claim: Kick = null # portiere: cross avversario su cui è già uscito (non torna indietro a metà strada)
 
 
 # calcio in volo: chi l'ha calciato, giocatori in fuorigioco al momento del calcio, età

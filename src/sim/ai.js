@@ -1,6 +1,7 @@
 // IA: tiro, passaggi, portatore, rimesse, posizioni in attacco e difesa, portiere.
 // I metodi vengono copiati su Match.prototype (vedi match.js): `this` è la partita.
-import { W, L, HW, HL, GW, GH, BOX_W, BOX_D, SIX_W, SIX_D, PEN_D, CIRCLE, G, ROLL, clamp, hyp, rng32, FORMATIONS, effStats, ballPhys, segInfo } from './core.js';
+import { W, L, HW, HL, GW, GH, BOX_W, BOX_D, SIX_W, SIX_D, PEN_D, CIRCLE, G, ROLL, GK_HAND_HI, clamp, hyp, rng32, FORMATIONS, effStats, ballPhys, segInfo } from './core.js';
+import { HEAD_HI, HEAD_CLEAR_ZONE } from './motion.js';
 
 // Regolazioni dell'IA (misurate con test/balance.mjs e test/diag-flow.mjs)
 const CLEAR_ZONE = 30;      // metri dalla propria linea di fondo in cui un difensore pressato può spazzare
@@ -39,6 +40,11 @@ const SPACE_PEN = 0.35;     // penalità per metro mancante nella scelta dello s
 const DEEP_FROM = -30;      // con la palla da qui in avanti (m nel verso d'attacco) le punte attaccano la profondità
 const HELP_KEEP = 4;        // chi è già d'appoggio conta come più vicino di così al portatore: niente cambi continui di compito (m)
 const SUPPORT_FAR = [15, 18]; // il secondo compagno d'appoggio si offre più lontano (m), il primo resta a 8-11 m
+// Portiere sui cross avversari (Luis 2026-11-22: "la CPU segna sempre dagli angoli perché il portiere esce"):
+// esce solo se arriva sicuro sul pallone, prima degli attaccanti e vicino alla porta; altrimenti resta tra i pali.
+const GK_CLAIM_R = 12;        // punto di presa entro questa distanza dal centro della propria porta (m)
+const GK_CLAIM_MARGIN = 0.3;  // ... raggiunto almeno così prima del primo avversario che può colpirlo di testa (s)
+const GK_CROSS_OUT = 1.2;     // cross avversario in volo e portiere che non esce: al massimo così fuori dalla linea (m)
 
 export class AIMethods {
   // side: -1/1 = palo scelto; se manca, lato opposto al portiere (con un po' di casualità)
@@ -235,6 +241,9 @@ export class AIMethods {
       px.push(clamp(s.x, -HW, HW)); py.push(clamp(s.y, -HL, HL)); ph.push(s.h);
       for (let j = 0; j < 4; j++) ballPhys(s, 0.025, this.roll);
     }
+    // cross (lancio alto) in volo: quando arriva a colpirlo il primo avversario di chi difende
+    const cross = !!b.kick && b.kick.type === 'loft', oppT = [99, 99];
+    if (cross) oppT[1 - b.kick.team] = this.firstHeader(b.kick, px, py, ph);
     for (let T = 0; T < 2; T++) {
       const dir = T ? -1 : 1;
       let best = null, bestO = null;
@@ -242,7 +251,8 @@ export class AIMethods {
         if (p.team !== T || p.off || p.state !== 'play') continue;
         if (b.kick && b.kick.kicker === p && b.kick.age < 1.2) continue;
         if (this.dblBan(p)) continue; // ha battuto il calcio da fermo: non può ritoccarlo, ci vanno gli altri
-        const gk = p.pos === 'P', vm = this.vmax(p), hm = gk ? 2.3 : 1.5;
+        const gk = p.pos === 'P', vm = this.vmax(p), gkCross = gk && cross && b.kick.team !== T;
+        const hm = gk ? (gkCross ? GK_HAND_HI : 2.3) : 1.5;
         // sui lanci alti vicino alle porte si va incontro al pallone per colpirlo di testa
         const loft = !gk && b.kick && b.kick.type === 'loft' && b.kick.kicker !== p, mate = loft && b.kick.team === T;
         let r = null;
@@ -252,12 +262,42 @@ export class AIMethods {
           if (d - 0.8 <= vm * Math.max(0, t - 0.12)) { r = { p, t, x: px[k], y: py[k] }; break; }
         }
         if (!r) r = { p, t: 50 + hyp(p.x - px[N - 1], p.y - py[N - 1]), x: px[N - 1], y: py[N - 1] };
-        if (gk) { if (!(Math.abs(r.x) < BOX_W / 2 && r.y * dir < -HL + BOX_D)) continue; }
+        if (gk) {
+          if (!(Math.abs(r.x) < BOX_W / 2 && r.y * dir < -HL + BOX_D)) continue;
+          // sul cross esce solo se ci arriva prima degli attaccanti e vicino alla porta (o se è già uscito)
+          if (gkCross && p.claim !== b.kick && !(r.t + GK_CLAIM_MARGIN <= oppT[T] && hyp(r.x, r.y + dir * HL) <= GK_CLAIM_R)) continue;
+        }
         else if (!bestO || r.t < bestO.t) bestO = r;
         if (!best || r.t < best.t) best = r;
       }
+      if (best && cross && best.p.pos === 'P' && b.kick.team !== T) best.p.claim = b.kick;
       this.chase[T] = best ? { p: best.p, x: best.x, y: best.y, t: best.t, p2: bestO ? bestO.p : null, x2: bestO ? bestO.x : 0, y2: bestO ? bestO.y : 0 } : null;
     }
+  }
+
+  // primo istante (s) in cui un giocatore della squadra che ha crossato (portiere escluso) arriva sul pallone ad altezza
+  // di colpo di testa; 99 se nessuno ci arriva
+  firstHeader(k, px, py, ph) {
+    let best = 99;
+    for (const q of this.players) {
+      if (q.team !== k.team || q.off || q.state !== 'play' || q.pos === 'P' || this.dblBan(q)) continue;
+      if (k.kicker === q && k.age < 1.2) continue;
+      const vm = this.vmax(q);
+      for (let j = 0; j < px.length; j++) {
+        const t = j * 0.1;
+        if (t >= best) break;
+        if (ph[j] > HEAD_HI) continue;
+        if (hyp(q.x - px[j], q.y - py[j]) - 0.8 <= vm * Math.max(0, t - 0.12)) { best = t; break; }
+      }
+    }
+    return best;
+  }
+
+  // cross (lancio alto) avversario che scende vicino alla porta di T, nel punto (x, y): il difensore che ci arriva
+  // prima va a colpirlo di testa anche nella squadra umana (prima ci andava solo il portiere, che usciva a vuoto)
+  crossOnUs(T, x, y) {
+    const k = this.ball.kick, dir = T ? -1 : 1;
+    return !!k && k.type === 'loft' && k.team !== T && hyp(x, y + dir * HL) < HEAD_CLEAR_ZONE;
   }
 
   think(dt) {
@@ -339,7 +379,7 @@ export class AIMethods {
     const b = this.ball, T = p.team, dir = T ? -1 : 1, own = -dir * HL, c = b.owner;
     p.stickT = Math.max(0, (p.stickT || 0) - this.dtT);
     if (p.stickT > 0 && this.magnet(p)) return;
-    if (!c) { const ch = this.chase[T]; if (ch && ch.p2 === p && !b.kick) { p.tx = ch.x2; p.ty = ch.y2; return; } }
+    if (!c) { const ch = this.chase[T]; if (ch && ch.p2 === p && (!b.kick || this.crossOnUs(T, ch.x2, ch.y2))) { p.tx = ch.x2; p.ty = ch.y2; return; } }
     else if (this.hPress && this.hPress[T].includes(p)) { p.tx = b.x + c.vx * 0.25; p.ty = b.y + c.vy * 0.25; return; }
     const [ax, ay] = this.anchor(p);
     let tx = ax, ty = ay, mo = null, md = HUM_MARK_R;
@@ -478,6 +518,7 @@ export class AIMethods {
     if (this.att === T) { p.tx = b.x * 0.1; p.ty = own + dir * clamp((b.y * dir + HL) * 0.22, 3, 16); return; }
     const vx = b.x, vy = b.y - own, d = hyp(vx, vy) || 1;
     let out = clamp(d * 0.09, 0.8, 4.5);
+    if (!b.owner && b.kick && b.kick.type === 'loft' && b.kick.team !== T) out = Math.min(out, GK_CROSS_OUT); // cross su cui non esce: resta tra i pali
     if (b.owner && d < 16) {
       let nd = 99; const c = b.owner;
       for (const q of this.players) if (q.team === T && q !== p && !q.off) nd = Math.min(nd, hyp(q.x - c.x, q.y - c.y));

@@ -7,6 +7,18 @@ const GK_AI_SPEED := 2.6    # velocità base del tuffo del portiere comandato da
 const GK_HUMAN_SPEED := 2.4 # velocità base del tuffo quando lo comanda il giocatore (m/s)
 const SHOT_BLOCK_R := 0.6   # un tiro forte si ferma su un difensore solo se lo prende quasi in pieno (m)
 const PARRY_OUT := 0.6      # respinte non bloccate che finiscono oltre la linea di fondo
+# Presa o respinta (Luis 2026-11-22: "i portieri non tengono mai la palla"), vedi catchChance
+const CATCH_BASE := 0.95    # probabilità di presa su un tiro centrale, basso e lento, portiere da 60 di "por"
+const CATCH_POR := 0.008    # per ogni punto di "por" sopra (o sotto) 60
+const CATCH_V0 := 16.0      # fin qui il tiro è lento (m/s)...
+const CATCH_SPD := 0.02     # ... poi per ogni m/s in più la presa cala di tanto
+const CATCH_WIDE := 0.35    # parata in tuffo lontano dal corpo (angolata)
+const CATCH_HIGH_H := 2.0   # pallone più alto di così (m)...
+const CATCH_HIGH := 0.15    # ... presa più difficile di tanto
+const CATCH_MIN := 0.03
+const CATCH_MAX := 0.97
+const PARRY_SIDE_V := 8.0   # respinta in campo: velocità verso l'esterno (m/s, più fino a 3)...
+const PARRY_FWD_V := 4.0    # ... e lontano dalla porta (m/s, più fino a 3)
 const BLOCK_OUT := 0.4      # tiri ribattuti vicino all'area che finiscono in angolo
 const TACKLE_LOOSE := 0.3   # contrasti vinti in cui la palla schizza via invece di restare al difensore
 const PASS_DEFLECT := 0.3   # passaggi intercettati che vengono solo deviati
@@ -37,6 +49,15 @@ const AIR_WIN_MAX := 0.85
 # (richiesta del 2026-11-20: "rendilo un attimino più magnetico")
 const HUM_TACKLE_R := 0.3   # raggio di contrasto sul portatore più largo di così (m)
 const HUM_REACH_FREE := 0.25 # pallone libero (non calciato da nessuno) agganciato da così più lontano (m)
+# Portiere sui cross: contro un attaccante sul pallone alto vince con GK_CLAIM_WIN (+ GK_CLAIM_POR per punto di
+# "por" sopra 60, tra MIN e MAX), poi blocca o, con un avversario addosso, a volte respinge di pugno
+const GK_CLAIM_WIN := 0.7
+const GK_CLAIM_POR := 0.01
+const GK_CLAIM_MIN := 0.5
+const GK_CLAIM_MAX := 0.9
+const GK_BOX_REACH := 1.25  # raggio in cui il portiere nella propria area tocca il pallone (m)
+const GK_PUNCH := 0.35      # pallone alto preso con un avversario a meno di GK_PUNCH_NEAR (m): respinta di pugno
+const GK_PUNCH_NEAR := 1.5
 
 
 # Raggio entro cui p tocca il pallone libero. Sui passaggi avversari è il "raggio difensivo":
@@ -397,7 +418,7 @@ func save(p: R.Player, central: bool) -> void:
 	var b := ball
 	var sp: float = C.hyp3(b.vx, b.vy, b.vh)
 	stats.saves[p.team] += 1
-	if sp < 16.0 or (central and sp < 25.0):
+	if rnd() < catchChance(p, sp, central, b.h):
 		ev("save", {"p": p, "catch": true})
 		give(p)
 		return
@@ -405,9 +426,11 @@ func save(p: R.Player, central: bool) -> void:
 		deflectBehind(p)
 		ev("save", {"p": p, "catch": false, "out": true})
 		return
-	var sx: float = p.dive.dirx if p.dive != null else (1.0 if b.x >= p.x else -1.0)
-	b.vx = sx * (5.0 + rnd() * 3.0)
-	b.vy = -b.vy * 0.15
+	# respinta in campo: lontano dalla porta e verso l'esterno, dal lato del pallone (al centro: dal lato del tuffo)
+	var sx: float = C.sign_(b.x) if absf(b.x) > 0.3 else (p.dive.dirx if p.dive != null else (1.0 if b.x >= p.x else -1.0))
+	var outY: float = 1.0 if p.team == 0 else -1.0
+	b.vx = sx * (PARRY_SIDE_V + rnd() * 3.0)
+	b.vy = outY * (PARRY_FWD_V + rnd() * 3.0)
 	b.vh = 2.0 + rnd() * 2.0
 	b.ct = 0.0
 	if b.last != p:
@@ -419,6 +442,17 @@ func save(p: R.Player, central: bool) -> void:
 	b.noT = 0.4
 	predT = 0.0
 	ev("save", {"p": p, "catch": false})
+
+
+# Probabilità che il portiere blocchi il pallone invece di respingerlo: alta sui tiri lenti, centrali e bassi
+# (colpi di testa deboli compresi), bassa su quelli forti, angolati (tuffo lontano dal corpo) o alti; sale con "por".
+func catchChance(p: R.Player, sp: float, central: bool, h: float) -> float:
+	var c: float = CATCH_BASE + (p.st.por - 60.0) * CATCH_POR - maxf(0.0, sp - CATCH_V0) * CATCH_SPD
+	if not central:
+		c -= CATCH_WIDE
+	if h > CATCH_HIGH_H:
+		c -= CATCH_HIGH
+	return C.clamp_(c, CATCH_MIN, CATCH_MAX)
 
 
 # Manda il pallone oltre la linea di fondo difesa dalla squadra di p, fuori dai pali
@@ -536,16 +570,20 @@ func contacts(dt: float) -> void:
 		# palla appena calciata che si allontana: non si può toccare
 		if b.kick != null and b.kick.age < 0.3 and b.kick.team != p.team and (p.x - b.x) * b.vx + (p.y - b.y) * b.vy < 0.0:
 			continue
-		if d >= (1.25 if isGk else reachOf(p)) or d >= bd:
+		if d >= (GK_BOX_REACH if isGk else reachOf(p)) or d >= bd:
 			continue
 		var air: String = "" if isGk else airPlay(p)
-		if air != "" or b.h < (2.35 if isGk else 1.7):
+		if air != "" or b.h < (gkReach(p) if isGk else 1.7):
 			bd = d
 			best = p
 			bestAir = air
 	if best == null:
 		return
-	if b.h >= HEAD_LO and not (best.pos == "P" and inOwnBox(best)):
+	var gc: R.Player = gkContest(best) if b.h >= HEAD_LO else null
+	if gc != null:
+		best = gc
+		bestAir = ""
+	elif b.h >= HEAD_LO and not (best.pos == "P" and inOwnBox(best)):
 		var w := aerialDuel(best)
 		if w != best:
 			best = w
@@ -560,6 +598,9 @@ func contacts(dt: float) -> void:
 	var isGk2: bool = p.pos == "P" and inOwnBox(p)
 	if isGk2 and b.shot != null and b.shot.team != p.team:
 		save(p, true)
+		return
+	if isGk2 and b.h >= HEAD_LO and nearOpp(p.x, p.y, p.team) < GK_PUNCH_NEAR and rnd() < GK_PUNCH:
+		gkPunch(p)
 		return
 	var mate: bool = b.kick != null and b.kick.team == p.team
 	# squadra umana: un passaggio avversario intercettato (anche in corsa) si controlla sempre, niente rimbalzi né deviazioni.
@@ -608,6 +649,52 @@ func contacts(dt: float) -> void:
 		ev("block", {"p": p, "hard": false, "deflect": true})
 		return
 	give(p)
+
+
+# altezza fino a cui il portiere nella propria area prende il pallone: più in alto sui cross avversari (salta)
+func gkReach(p: R.Player) -> float:
+	var k := ball.kick
+	return C.GK_HAND_HI if (k != null and k.type == "loft" and k.team != p.team) else 2.35
+
+
+# Pallone alto conteso da `p` (il più vicino): se il portiere avversario è lì sotto nella sua area e ci arriva con le
+# mani, contrasto aereo col portiere. Ritorna il portiere se lo vince, null se non c'è o se lo perde.
+func gkContest(p: R.Player) -> R.Player:
+	var b := ball
+	var g := gk(1 - p.team)
+	if g == null or g.off or g.state != "play" or g.stun > 0.0 or (b.noP == g and b.noT > 0.0) or dblBan(g) or not inOwnBox(g):
+		return null
+	if C.hyp(g.x - b.x, g.y - b.y) >= GK_BOX_REACH or b.h >= gkReach(g):
+		return null
+	var win: float = C.clamp_(GK_CLAIM_WIN + (g.st.por - 60.0) * GK_CLAIM_POR, GK_CLAIM_MIN, GK_CLAIM_MAX)
+	if rnd() < win:
+		ev("aerial", {"p": g, "o": p})
+		return g
+	ev("aerial", {"p": p, "o": g})
+	return null
+
+
+# respinta di pugno del portiere: alta, lontano dalla porta e verso l'esterno
+func gkPunch(p: R.Player) -> void:
+	var b := ball
+	var dir: float = -1.0 if p.team else 1.0
+	var a: float = F.atan2_(dir, (1.0 if b.x > 0.0 else -1.0) * (0.4 + rnd() * 0.6))
+	var v: float = 9.0 + rnd() * 5.0
+	b.vx = F.cos_(a) * v
+	b.vy = F.sin_(a) * v
+	b.vh = 4.0 + rnd() * 3.0
+	b.ct = 0.0
+	if b.last != p:
+		b.prev = b.last
+		b.last = p
+	b.kick = null
+	b.shot = null
+	b.noP = p
+	b.noT = 0.4
+	lastPass = null
+	predT = 0.0
+	p.kickAnim = 0.35
+	ev("punch", {"p": p})
 
 
 # contrasti sul portatore (prima parte di contacts in JS)

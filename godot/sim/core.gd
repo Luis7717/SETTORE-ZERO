@@ -22,6 +22,7 @@ const PEN_D := 11.0
 const CIRCLE := 9.15
 const G := 11.5
 const ROLL := 5.0
+const GK_HAND_HI := 2.8 # sui cross avversari il portiere prende il pallone con le mani, saltando, fino a questa altezza (m)
 
 # [ruolo, x (-1..1), y (0 = propria porta .. 1 = porta avversaria)]
 const FORMATIONS := {

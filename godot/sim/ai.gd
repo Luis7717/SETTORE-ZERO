@@ -42,6 +42,11 @@ const SUPPORT_NEAR := [8.0, 11.0]
 const SPOTS := [[0.0, 0.0], [5.0, 0.0], [-5.0, 0.0], [0.0, 4.0], [3.5, 3.0], [-3.5, 3.0], [0.0, -4.0]]
 const RUN_TRY := [-1.2, -0.7, -0.35, 0.0, 0.35, 0.7, 1.2]
 const CHASE_N := 36
+# Portiere sui cross avversari (Luis 2026-11-22: "la CPU segna sempre dagli angoli perché il portiere esce"):
+# esce solo se arriva sicuro sul pallone, prima degli attaccanti e vicino alla porta; altrimenti resta tra i pali.
+const GK_CLAIM_R := 12.0      # punto di presa entro questa distanza dal centro della propria porta (m)
+const GK_CLAIM_MARGIN := 0.3  # ... raggiunto almeno così prima del primo avversario che può colpirlo di testa (s)
+const GK_CROSS_OUT := 1.2     # cross avversario in volo e portiere che non esce: al massimo così fuori dalla linea (m)
 
 
 # side: -1/1 = palo scelto; se manca (0), lato opposto al portiere (con un po' di casualità)
@@ -379,6 +384,11 @@ func _computeChase(b: R.Ball) -> void:
 		ph[k] = s.h
 		for j in 4:
 			C.ballPhys(s, 0.025, roll)
+	# cross (lancio alto) in volo: quando arriva a colpirlo il primo avversario di chi difende
+	var cross: bool = b.kick != null and b.kick.type == "loft"
+	var oppT: Array = [99.0, 99.0]
+	if cross:
+		oppT[1 - b.kick.team] = _firstHeader(b.kick, px, py, ph)
 	for tm in 2:
 		var dir: float = -1.0 if tm else 1.0
 		var best: R.Chase = null
@@ -392,7 +402,8 @@ func _computeChase(b: R.Ball) -> void:
 				continue # ha battuto il calcio da fermo: non può ritoccarlo, ci vanno gli altri
 			var isGk: bool = p.pos == "P"
 			var vm: float = vmax(p)
-			var hm: float = 2.3 if isGk else 1.5
+			var gkCross: bool = isGk and cross and b.kick.team != tm
+			var hm: float = (C.GK_HAND_HI if gkCross else 2.3) if isGk else 1.5
 			# sui lanci alti vicino alle porte si va incontro al pallone per colpirlo di testa
 			var loft: bool = not isGk and b.kick != null and b.kick.type == "loft" and b.kick.kicker != p
 			var mate: bool = loft and b.kick.team == tm
@@ -421,11 +432,16 @@ func _computeChase(b: R.Ball) -> void:
 			if isGk:
 				if not (absf(r.x) < BOX_W / 2.0 and r.y * dir < -HL + BOX_D):
 					continue
+				# sul cross esce solo se ci arriva prima degli attaccanti e vicino alla porta (o se è già uscito)
+				if gkCross and p.claim != b.kick and not (r.t + GK_CLAIM_MARGIN <= float(oppT[tm]) and C.hyp(r.x, r.y + dir * HL) <= GK_CLAIM_R):
+					continue
 			elif bestO == null or r.t < bestO.t:
 				bestO = r
 			if best == null or r.t < best.t:
 				best = r
 		if best != null:
+			if cross and best.p.pos == "P" and b.kick.team != tm:
+				best.p.claim = b.kick
 			var ch := R.Chase.new()
 			ch.p = best.p
 			ch.x = best.x
@@ -437,6 +453,28 @@ func _computeChase(b: R.Ball) -> void:
 			chase[tm] = ch
 		else:
 			chase[tm] = null
+
+
+# primo istante (s) in cui un giocatore della squadra che ha crossato (portiere escluso) arriva sul pallone ad altezza
+# di colpo di testa; 99 se nessuno ci arriva
+func _firstHeader(k: R.Kick, px: PackedFloat64Array, py: PackedFloat64Array, ph: PackedFloat64Array) -> float:
+	var best: float = 99.0
+	for q: R.Player in players:
+		if q.team != k.team or q.off or q.state != "play" or q.pos == "P" or dblBan(q):
+			continue
+		if k.kicker == q and k.age < 1.2:
+			continue
+		var vm: float = vmax(q)
+		for j in CHASE_N:
+			var tk: float = j * 0.1
+			if tk >= best:
+				break
+			if ph[j] > HEAD_HI:
+				continue
+			if C.hyp(q.x - px[j], q.y - py[j]) - 0.8 <= vm * maxf(0.0, tk - 0.12):
+				best = tk
+				break
+	return best
 
 
 func think(dt: float) -> void:
@@ -593,7 +631,7 @@ func humanDefend(p: R.Player) -> void:
 		return
 	if c == null:
 		var ch: R.Chase = chase[tm]
-		if ch != null and ch.p2 == p and b.kick == null:
+		if ch != null and ch.p2 == p and (b.kick == null or _crossOnUs(tm, ch.x2, ch.y2)):
 			p.tx = ch.x2
 			p.ty = ch.y2
 			return
@@ -646,6 +684,14 @@ func humanDefend(p: R.Player) -> void:
 	# lontano dal proprio posto, con la porta alle spalle: rientro di corsa
 	if C.hyp(p.tx - p.x, p.ty - p.y) > HUM_RECOVER and (p.ty - p.y) * dir < 0.0:
 		p.sprint = true
+
+
+# cross (lancio alto) avversario che scende vicino alla porta di tm, nel punto (x, y): il difensore che ci arriva
+# prima va a colpirlo di testa anche nella squadra umana (prima ci andava solo il portiere, che usciva a vuoto)
+func _crossOnUs(tm: int, x: float, y: float) -> bool:
+	var k := ball.kick
+	var dir: float = -1.0 if tm else 1.0
+	return k != null and k.type == "loft" and k.team != tm and C.hyp(x, y + dir * HL) < HEAD_CLEAR_ZONE
 
 
 # penalità per i compagni troppo vicini al punto (x, y) (squadra umana in attacco): niente grappoli
@@ -843,6 +889,8 @@ func gkAI(p: R.Player) -> void:
 	var vy: float = b.y - own
 	var d: float = C.orf(C.hyp(vx, vy), 1.0)
 	var out_: float = C.clamp_(d * 0.09, 0.8, 4.5)
+	if b.owner == null and b.kick != null and b.kick.type == "loft" and b.kick.team != tm:
+		out_ = minf(out_, GK_CROSS_OUT) # cross su cui non esce: resta tra i pali per il colpo di testa
 	if b.owner != null and d < 16.0:
 		var nd: float = 99.0
 		var c := b.owner
