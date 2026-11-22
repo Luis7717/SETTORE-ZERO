@@ -238,7 +238,7 @@ $G --path godot -- --seme=4 --bot --veloce=12 --tempo=40 --esci-a-fine --alla-fi
 ```
 
 Opzioni di `gioco.gd`: `--seme=N`, `--tempo=SEC` (un tempo), `--vista-finta`, `--veloce=K` (tempo fisso K/60 s a
-fotogramma), `--bot`, `--esci-a-fine`, `--scena=area|duello|fuga|disegno|angolo|pausa`, `--schermata=… [--dopo=SEC |
+fotogramma), `--bot`, `--esci-a-fine`, `--scena=area|duello|fuga|disegno|angolo|rinvio|rilancio|pausa` (rinvio = rinvio dal fondo, rilancio = portiere col pallone in mano), `--schermata=… [--dopo=SEC |
 --alla-fine]`, `--allenamento [--lezione=N --prova=K --scheda]`, `--esci-dopo=SEC` (stampa "FPS medi", come vuole la build su GitHub). Senza schermo i suoni sono
 spenti (non si sentono e col driver audio finto resterebbero in memoria all'uscita).
 

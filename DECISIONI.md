@@ -1391,3 +1391,19 @@ Dettagli in `godot/README.md`, "Capelli e barbe".
 - **Da fare (non erba)**: `led.gdshader` e `rete.gdshader` hanno lo stesso filtro: stessa correzione per far tornare
   sponsor e rete sull'iPhone.
 - **Da provare sull'iPhone**: strisce del manto, grana e fili in partita; colore uguale alle schermate del PC.
+
+## 2026-11-22 — Godot: palla più piccola, portiere a gioco fermo, via i suggerimenti in basso
+1. **Palla**: raggio a schermo da 0,21 a 0,16 m (`Figura.PALLA_R` = `vista.gd BALL_R`): diametro
+   0,32 m su giocatori alti 2,3 m (0,14 dell'altezza; vero 0,12, prima 0,18). Ombra del pallone ridotta in proporzione;
+   rete, mani e replay usano lo stesso raggio; i giochetti restano misurati col pallone del web (0,21) per avere le
+   stesse pose del JS (test_mosse): il pallone nei giochetti sta al più 5 cm più in basso del previsto. Motore invariato.
+2. **Portiere a braccia aperte sul rinvio**: non era una posa a T, era la posa "pronto" (gambe piegate, braccia avanti e
+   aperte) di `figura.gd`, data a ogni portiere fermo anche a gioco fermo e col pallone tra i piedi. Ora "pronto" solo
+   in gioco e, a gioco fermo, solo per chi difende su rigore, angolo, punizione (`Figura.portiere_pronto`); altrimenti
+   clip "fermo" come tutti. Rilancio dalle mani (ripresa "gk"): il portiere tiene il pallone davanti al petto (IK delle
+   braccia, `_tieni_palla`; la vista lo legge con `pallone_in_mano` come nella rimessa), al calcio torna sul vero.
+   Gli altri calci da fermo li battono giocatori di movimento: clip "fermo" o mocap (rimessa), nessuno a braccia aperte.
+3. **Suggerimenti in basso tolti dalla partita** ("la telecronaca è ok"): tolte le tabelle `HINTS`/`RHINT` di `gioco.gd`.
+   In allenamento non c'erano già (spiega il riquadro in alto, che resta). Tolti anche "PARA!" e "RIGORE": se sull'iPhone
+   manca l'avviso del tuffo, si può rimettere solo quello.
+4. Nuove scene di prova `--scena=rinvio` e `--scena=rilancio`.

@@ -7,6 +7,10 @@
 #    finestra, con la scala dello schermo), dal portiere al punto della porta dove arriva il tiro, con la telecamera
 #    dietro la porta: al rilascio il motore riceve il tuffo (stato "dive", verso il punto giusto), la telecamera resta
 #    sulla parata e la figura del portiere si vede tuffarsi (testa giù e di lato rispetto ai piedi).
+#    In allenamento niente suggerimento in basso: spiega il riquadro in alto.
+# 3. Amichevole vera (Luis 2026-11-22): niente suggerimenti in basso; sul rinvio dal fondo il nostro portiere sta
+#    dritto con le braccia giù (non più in posa "pronto" a braccia aperte); sul rilancio dalle mani il pallone a
+#    schermo sta tra le sue mani, davanti al petto.
 # Con la finestra (senza --headless) e `-- --foto=CARTELLA` salva anche una schermata per lezione e una del tuffo.
 extends SceneTree
 
@@ -17,6 +21,10 @@ const LIMITE_FOTOGRAMMI := 20000
 const PALLA_TOLL := 0.8         # m tra il pallone a schermo e quello del motore (giochetti e mani a parte)
 const FOTOGRAMMI_DOPO_SETUP := 30  # mezzo secondo di gioco: la telecamera è arrivata
 const TUFFO_SECONDI := 0.3      # s di gioco dopo il rilascio in cui guardare la figura
+const FOTOGRAMMI_RIPRESA := 40  # dopo il calcio da fermo messo a mano: la figura è in posa
+const BRACCIA_GIU := 0.35       # m (modello): sul rinvio la mano sta almeno così sotto la spalla
+const BRACCIA_LARGHE := 0.45    # m (modello): ... e al massimo così di lato (a braccia aperte era a 0,55-0,6)
+const PALLA_MANI := 0.3         # m: sul rilancio il pallone a schermo dista al massimo così dal mezzo delle mani
 
 var g: Node
 var fallimenti: Array[String] = []
@@ -67,7 +75,7 @@ func _process(_d: float) -> bool:
 		check(false, "tempo scaduto nella fase %s" % fase)
 		fine()
 		return false
-	if g.m == null or g.allenamento == null:
+	if g.m == null or (g.allenamento == null and not fase.begins_with("partita")):
 		return false
 	match fase:
 		"lezioni":
@@ -78,6 +86,8 @@ func _process(_d: float) -> bool:
 			_tuffo_dito()
 		"tuffo_dopo":
 			_tuffo_dopo()
+		"partita_attesa", "partita_rinvio", "partita_rilancio":
+			_partita()
 	return false
 
 
@@ -95,6 +105,8 @@ func _lezioni() -> void:
 	if attesa < FOTOGRAMMI_DOPO_SETUP:
 		return
 	_controlla_pallone(String(t.lesson().id))
+	check(not g.hud._suggerimento.visible, "%s: niente suggerimento in basso" % t.lesson().id)
+	check(g._all_hud.testo_riquadro() != "", "%s: la lezione si spiega nel riquadro in alto" % t.lesson().id)
 	_foto("%d_%s" % [lezione + 1, t.lesson().id])
 	lezione += 1
 	attesa = 0
@@ -189,7 +201,71 @@ func _tuffo_dopo() -> void:
 	print("tuffo: testa prima %s, adesso %s (piedi %s): di lato %.2f m, altezza %.2f m" % [testa_prima, testa, piedi, di_lato, testa.y])
 	_foto("8_tuffo")
 	check(di_lato > 0.6 or testa.y < testa_prima.y - 0.5, "la figura del portiere si tuffa (testa di lato %.2f m, altezza %.2f → %.2f)" % [di_lato, testa_prima.y, testa.y])
-	fine()
+	# 3. amichevole vera
+	g.queue_free()
+	g = (load("res://scenes/partita.tscn") as PackedScene).instantiate()
+	g._opzioni["seme"] = "3"
+	g._opzioni["veloce"] = "1"
+	g._opzioni["senza-replay"] = "1"
+	root.add_child(g)
+	attesa = 0
+	fase = "partita_attesa"
+
+
+# ---------------------------------------------------------------- 3. amichevole: suggerimenti, rinvio, rilancio
+func _partita() -> void:
+	if g.stato != "partita":
+		return
+	attesa += 1
+	var m = g.m
+	var me: int = g.me
+	var gk: R.Player = m.gk(me)
+	var lato := 1.0 if me == 0 else -1.0
+	match fase:
+		"partita_attesa":
+			if attesa < FOTOGRAMMI_DOPO_SETUP:
+				return
+			m.setRestart("goalkick", me, 5.0, -lato * C.HL)
+			attesa = 0
+			fase = "partita_rinvio"
+		"partita_rinvio":
+			if attesa < FOTOGRAMMI_RIPRESA:
+				return
+			check(m.phase == "restart" and m.restart.type == "goalkick", "rinvio dal fondo in corso")
+			g._aggiorna_hud()
+			check(not g.hud._suggerimento.visible, "partita: niente suggerimento in basso sul rinvio")
+			var f: Node3D = g.vista._figs[m.players.find(gk)]
+			f._gcache.clear()
+			for s: String in ["l", "r"]:
+				var spalla: Vector3 = f.pos_corpo("upperarm_" + s)
+				var mano: Vector3 = f.pos_corpo("hand_" + s)
+				print("rinvio: spalla %s %s, mano %s" % [s, spalla, mano])
+				check(mano.y < spalla.y - BRACCIA_GIU, "rinvio: braccio %s giù (mano %.2f m sotto la spalla)" % [s, spalla.y - mano.y])
+				check(absf(mano.x) < BRACCIA_LARGHE, "rinvio: braccio %s non aperto (mano a %.2f m di lato)" % [s, absf(mano.x)])
+			_foto("9_rinvio")
+			# il portiere prende il pallone in area: rilancio dalle mani
+			g._metti_in_gioco()
+			g._sposta(gk, 2.0, -lato * (C.HL - 7.0))
+			m.ball.x = gk.x
+			m.ball.y = gk.y + lato * 0.6
+			m.setRestart("gk", me, gk.x, gk.y, gk)
+			attesa = 0
+			fase = "partita_rilancio"
+		"partita_rilancio":
+			if attesa < FOTOGRAMMI_RIPRESA:
+				return
+			g._aggiorna_hud()
+			check(not g.hud._suggerimento.visible, "partita: niente suggerimento in basso sul rilancio")
+			var f: Node3D = g.vista._figs[m.players.find(gk)]
+			f._gcache.clear()
+			var w: Transform3D = f.global_transform * f.corpo.transform
+			var mani: Vector3 = w * ((f.pos_corpo("hand_l") + f.pos_corpo("hand_r")) * 0.5)
+			var palla: Vector3 = g.vista._ball.global_position
+			print("rilancio: pallone %s, mani %s" % [palla, mani])
+			check(palla.distance_to(mani) < PALLA_MANI, "rilancio: pallone tra le mani (a %.2f m)" % palla.distance_to(mani))
+			check(palla.y > 1.0, "rilancio: pallone davanti al petto (%.2f m da terra)" % palla.y)
+			_foto("10_rilancio")
+			fine()
 
 
 func _foto(nome: String) -> void:
