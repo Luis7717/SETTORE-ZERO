@@ -8,7 +8,7 @@
 # - `load()`/`save()`/`reset()` usano il file `user://salvataggio.json` (salvataggio.gd), non localStorage;
 #   `load()` sopporta file rotti (ripiega sul temporaneo o sulla copia .bak) e riempie i campi mancanti (completa).
 # - Dove il JS ritorna `null` per "tutto bene" (buy, sell) qui si ritorna "" (stringa vuota = falsa in un `if`).
-# - Impostazioni in `s.settings` come nel web, più `music` e `vibra` (nuove, predefinite true).
+# - Impostazioni in `s.settings` come nel web, più `music` e `vibra` (nuove, predefinite true) e `momenti` (false).
 # - Numeri: gli interi restano int anche dopo il caricamento (JSON di Godot li legge come float: js.gd → int_numbers).
 # - Le funzioni libere di career.js (overall, value, fmtMoney, genPlayer, ...) sono funzioni statiche:
 #   `Carriera.overall(p)`, `Carriera.fmtMoney(k)`; le costanti `Carriera.DIV_NAMES`, `Carriera.KITS`, ...
@@ -49,7 +49,8 @@ const PRE := ["Atletico", "Sporting", "Real", "Virtus", "Olimpia", "Dinamo", "Un
 const TOWN := ["Borgoalto", "Roccamarina", "Valdoro", "Monteluce", "Pietrafina", "Castelvento", "Fontechiara", "Portosole", "Collebruno", "Torrelunga", "Rivabianca", "Selvascura", "Pontenero", "Campofiore", "Acquadolce", "Vignarossa", "Poggiosereno", "Lagoverde", "Serralta", "Montefalco Nuovo", "Pratolungo", "Casalbruna", "Villastella", "Costadoro", "Fiumechiaro", "Roveredo Alto", "Sassoforte", "Terranova Ligure", "Marebello", "Querciagrande", "Boscofermo", "Pianoro Sole"]
 ## campione creato nell'editor: un buon giovane della Terza Divisione (le squadre lì stanno tra 50 e 60)
 const CHAMP_LEVEL := 62
-const SETTINGS_DEFAULT := {"half": 150, "diff": 1, "sound": true, "autoGk": false, "music": true, "vibra": true}
+# momenti: false = partita intera, true = momenti chiave (~10 azioni, il resto simulato: scripts/partita/momenti.gd)
+const SETTINGS_DEFAULT := {"half": 150, "diff": 1, "sound": true, "autoGk": false, "music": true, "vibra": true, "momenti": false}
 const ROUNDS := 18           # giornate di una stagione (10 squadre, andata e ritorno)
 const SQUAD_MAX := 24
 const SQUAD_MIN := 14

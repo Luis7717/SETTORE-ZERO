@@ -1476,3 +1476,33 @@ Dettagli in `godot/README.md`, "Altezza e corporatura". File nuovo `godot/script
   gli avversari non si scelgono il fisico.
 - **Da provare sull'iPhone**: se la differenza di altezza (±6%) e di corporatura si vede in partita, se il robusto
   sembra grasso o solo grosso, se i numeri nella Rosa ("TES+10") sono chiari.
+
+## Momenti chiave (2026-11-22, Fase E punto 5, solo Godot)
+- **Quante azioni**: 9, 10 o 11 col seme ("circa 10"). Quota d'attacco = 0,5 + (forza mia − forza loro) / 40, tra
+  0,25 e 0,8; azioni d'attacco = quota × azioni arrotondata, **mai meno di 3**, e almeno **2 in difesa** anche con la
+  squadra più forte (scelta mia: qualcosa da difendere c'è sempre). Forza = media delle statistiche dei titolari
+  (il portiere col suo `por`). Media misurata (79 semi): differenza −14/−5/0/+5/+14 → quota 0,30/0,37/0,53/0,63/0,80.
+- **Quando**: metà circa nel primo tempo tra il 4' e il 40', le altre tra il 49' e l'86', ad almeno 3 minuti l'una
+  dall'altra. Orologio lento in questa modalità (`HALF_LEN` 900 s di gioco per tempo: 20 s = 1 minuto), così
+  un'azione di 30 s porta avanti il tempo di un minuto e mezzo e non arriva mai all'intervallo.
+- **Partenza**: pallone al centrocampista più centrale a 5 m (contropiede) o 11 m (manovra) oltre la metà campo;
+  attaccanti 12-17 m più avanti; i centrocampisti centrali avversari già saltati, 7-10 m alle spalle del pallone
+  (3 nel contropiede, 2 nella manovra; in difesa uno in meno: 2/1; più vicini di così rientravano e rubavano palla da
+  dietro) e la difesa avversaria a 28-31 m (contropiede) o 25-28 m (manovra) dal pallone. Prove da questa partenza:
+  IA contro IA 32 azioni d'attacco su 40 arrivano al tiro; "umano simulato" dei test (H.Bot) in attacco
+  contropiede/manovra su 40: 2/3 gol, 8/15 parate, 16/7 palle perse (quasi tutte passaggi intercettati); in difesa
+  1/3 gol subiti su 40.
+- **Fine dell'azione**: gol (dopo festa e replay), parata (1,2 s dopo), palla fuori o in angolo (0,6 s), palla persa
+  / recuperata (0,8 s), fallo (0,8 s; con il vantaggio si continua), **rigore = si gioca**, oppure 30 s di gioco.
+  Il calcio d'angolo chiude l'azione (scelta mia: un angolo è un'altra azione, la si lascia alla cronaca).
+- **Resto simulato**: minuto per minuto, ogni minuto col suo seme (seme della partita + minuto), quindi lo stesso
+  seme dà gli stessi gol simulati comunque vadano le azioni. Per squadra e minuto: tiro con probabilità
+  10 × quota / 90 (5 tiri in 90' a forze uguali), 40% nello specchio, di questi 30% gol, 6% palo; angoli 8 × quota /
+  90, falli 7/90 (15% gialli). Possesso 0,5 + differenza/60 (tra 0,3 e 0,7). Chi tira: attaccanti 5, centrocampisti
+  2, difensori 0,6; assist nel 60% dei gol. Gol, tiri, parate, angoli, falli e possesso vanno nel motore
+  (punteggio, marcatori, statistiche) e nei conteggi (crescita del campione, voti, mappa dei tiri).
+  Misure: 6 partite IA contro IA a forze uguali 7-5 in tutto; resto simulato 75 contro 50 in 59 partite 49-14.
+- **Non fatto**: cambi e cartellini rossi nel resto simulato (solo gialli scritti); la stanchezza in partita cresce
+  solo durante le azioni giocate (stanchezza e infortuni tra le partite restano quelli della carriera).
+- **Da provare sull'iPhone**: se 10 azioni sono il numero giusto, se l'azione difensiva si capisce (parte con
+  "Difendi!"), se la schermata tra le azioni si legge bene, se le azioni d'attacco sembrano occasioni vere.

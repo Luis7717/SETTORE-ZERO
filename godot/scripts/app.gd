@@ -17,7 +17,8 @@
 #   App.impostazioni()                applica subito le impostazioni della carriera (api.settings del web):
 #                                     audio spento = bus principale muto (menu e partita); musica di sottofondo
 #                                     (assets/audio/music.mp3) solo nei menu, con audio e musica accesi.
-#                                     Durata, difficoltà e portiere valgono dalla partita dopo (le legge _partita);
+#                                     Durata, difficoltà, portiere e modo (partita intera / momenti chiave,
+#                                     settings.momenti) valgono dalla partita dopo (le legge _partita);
 #                                     la vibrazione la legge MenuSchermata._tocco a ogni tocco.
 #   segnale schermata_cambiata(nome)
 #
@@ -176,7 +177,7 @@ func _partita(tipo: String, avversario: Dictionary, titolo: String, durata: floa
 	# squadraPartita: niente infortunati, chi è giù di forma parte stanco
 	var opz := {"squadra_a": carriera.squadraPartita(), "squadra_b": avversario, "me": 0, "tipo": tipo,
 		"durata_tempo": durata, "seme": randi() % 1000000000, "titolo": titolo, "autoGk": bool(s.settings.autoGk),
-		"derby": derby}
+		"derby": derby, "momenti": tipo != "allenamento" and bool(s.settings.get("momenti", false))}
 	if stadio_seme is int or stadio_seme is float:
 		opz["stadio_seme"] = int(stadio_seme)
 	opz.merge(meteo)
