@@ -177,3 +177,29 @@ func test_righe_vicine_ai_ciuffi() -> bool:
 		check(p.box.intersects(Rect2(Vector2(0.0, -10.0), Vector2(20.0, 20.0)), true), "solo pezzi nel quadrato")
 	eq(Campo.righe_vicine(r, Vector2(0.0, C.HL - 8.0), 44.0, 8).size(), 8, "al massimo quanti ne regge lo shader")
 	return done()
+
+
+# Sull'iPhone (Metal) i materiali con campionatori `filter_*_anisotropic` non si disegnano: l'erba spariva e si vedeva
+# il terreno piatto sotto (foto di Luis 2026-11-22). Gli shader dell'erba non devono usarli, e l'erba deve leggere le
+# texture (grana, ciuffi, fili) con un filtro a mipmap.
+func test_erba_senza_filtro_anisotropico() -> bool:
+	for f: String in ["res://shaders/erba.gdshader", "res://shaders/erba_ciuffi.gdshader", "res://shaders/erba_comune.gdshaderinc"]:
+		var testo := FileAccess.get_file_as_string(f)
+		check(testo != "", "si legge " + f)
+		for riga: String in testo.split("\n"):
+			var codice := riga.get_slice("//", 0)
+			check(not codice.contains("anisotropic"), "niente filtro anisotropico in %s: %s" % [f, riga.strip_edges()])
+	var comune := FileAccess.get_file_as_string("res://shaders/erba_comune.gdshaderinc")
+	for nome: String in ["grana", "ciuffi_tex", "fili"]:
+		check(comune.contains("uniform sampler2D %s : filter_linear_mipmap," % nome), "%s con filtro a mipmap" % nome)
+	return done()
+
+
+# i fili d'erba si leggono con la mipmap (da lontano si spengono da soli invece di sfarfallare): l'import la deve fare
+func test_fili_erba_con_mipmap() -> bool:
+	var imp := ConfigFile.new()
+	eq(imp.load("res://assets/textures/erba_fili.png.import"), OK, "import dei fili")
+	eq(imp.get_value("params", "mipmaps/generate", false), true, "mipmap generate")
+	var tex: Texture2D = load("res://assets/textures/erba_fili.png")
+	check(tex != null and tex.get_image() != null and tex.get_image().has_mipmaps(), "la texture importata ha le mipmap")
+	return done()

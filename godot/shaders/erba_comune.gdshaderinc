@@ -7,11 +7,14 @@ uniform vec3 scura : source_color = vec3(0.169, 0.450, 0.000);
 uniform vec3 chiara_bordo : source_color = vec3(0.208, 0.527, 0.000);
 uniform vec3 scura_bordo : source_color = vec3(0.162, 0.431, 0.000);
 uniform int taglio = 0;            // ordine di NOMI in scripts/tagli_campo.gd
-uniform sampler2D grana : filter_linear_mipmap_anisotropic, repeat_enable;
-uniform sampler2D ciuffi_tex : filter_linear_mipmap_anisotropic, repeat_enable; // grana fitta (ciuffi), da campo.gd
+// Campionatori SENZA anisotropia (filter_linear_mipmap): sull'iPhone (Metal) i materiali con
+// il filtro anisotropico non si disegnano proprio (erba, cartelloni led e rete spariti nelle foto di Luis,
+// si vedeva il terreno piatto sotto). tests/test_campo.gd controlla che qui non torni.
+uniform sampler2D grana : filter_linear_mipmap, repeat_enable;
+uniform sampler2D ciuffi_tex : filter_linear_mipmap, repeat_enable; // grana fitta (ciuffi), da campo.gd
 uniform float forza_grana = 0.55;  // era 0,3: Luis "deve sembrare ci sia un pochino di erba"
 // fili d'erba visti dall'alto (tools/genera_texture.gd): rg = normale, b = altezza (0 buco scuro, 1 punta; media 0,5)
-uniform sampler2D fili : filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D fili : filter_linear_mipmap, repeat_enable;
 uniform float forza_fili = 0.42;   // micro-ombre: buchi tra i fili più scuri, punte più chiare (media invariata)
 uniform float forza_dettaglio = 0.7; // rilievo dei fili alla luce del sole
 uniform float piega_fili = 0.06;   // fili piegati dal taglio: nelle fasce alterne pendono in versi opposti

@@ -1374,3 +1374,20 @@ Dettagli in `godot/README.md`, "Capelli e barbe".
 - **FPS** (`prova_vista --senza-vsync --scala3d=2 --qualita=3 --esci-dopo=12`, PC carico): prima GPU 0,401 ms,
   601 FPS, 47 disegni; dopo GPU 0,400 ms, 632 FPS, 49 disegni. Vicino (`--vicino=5`): prima 0,536 ms, dopo 0,519 ms.
 - **Da provare sull'iPhone**: barbe e forme degli occhi nell'editor e in partita, grandezza dell'iride, attaccatura.
+
+## 2026-11-22 — Godot: erba piatta sull'iPhone, causa trovata (filtro anisotropico)
+- **Causa**: sull'iPhone l'erba **non si disegnava proprio**: si vedeva il terreno sotto (`TerrenoFuori` di
+  `campo.gd`, un `StandardMaterial3D` #2c6428). Prove dalle due foto di Luis: il prato è un colore solo da cima a fondo
+  (70,115,64 e 75,122,67 a ogni punto campionato: niente strisce, grana, fili, cambi con la distanza), con il blu
+  ≈ 0,84 × il rosso in lineare come #2c6428, mentre l'erba ha blu 0. Nelle stesse foto mancano anche i **cartelloni a
+  led** (solo il telaio blu scuro, sul PC si vedono gli sponsor) e la **rete delle porte** (pali e sostegni sì, la rete
+  no). Erba, led e rete sono gli unici materiali con campionatori `filter_linear_mipmap_anisotropic`; tutti quelli che
+  sull'iPhone si vedono (giocatori, capelli, pubblico, righe, bandierine) non li usano. Anche le righe "che non si
+  vedevano" dentro lo shader dell'erba e l'erba "piatta da sempre" vengono da qui. Il meccanismo dentro Godot/Metal
+  non si può vedere dal PC (niente Mac); la coincidenza dei tre materiali è la prova.
+- **Correzione**: `erba_comune.gdshaderinc` usa `filter_linear_mipmap` (senza anisotropia) per grana, ciuffi e fili;
+  `erba_fili.png` ora si importa con le mipmap (il filtro a mipmap non aveva livelli: da lontano i fili sfarfallavano
+  invece di spegnersi). Test: `test_campo.gd` (niente anisotropico negli shader dell'erba, fili con mipmap).
+- **Da fare (non erba)**: `led.gdshader` e `rete.gdshader` hanno lo stesso filtro: stessa correzione per far tornare
+  sponsor e rete sull'iPhone.
+- **Da provare sull'iPhone**: strisce del manto, grana e fili in partita; colore uguale alle schermate del PC.
