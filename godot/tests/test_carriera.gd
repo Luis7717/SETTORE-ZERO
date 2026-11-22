@@ -22,6 +22,12 @@ func _fixture() -> Dictionary:
 
 
 ## stesso valore del JS (numeri: 1 e 1.0 uguali); al primo errore scrive il percorso della differenza
+# i confronti col JS del web: niente colori particolari (solo Godot, Aspetto.conParticolari). Non si rimettono qui
+# (l'oggetto del test prima si libera dopo che è nato il successivo): chi li prova li accende da sé
+func _init() -> void:
+	Asp.particolari_attivi = false
+
+
 func same(got: Variant, want: Variant, msg: String) -> bool:
 	var d := JS.diff(senza_campi_godot(got), want, msg)
 	return check(d == "", d)

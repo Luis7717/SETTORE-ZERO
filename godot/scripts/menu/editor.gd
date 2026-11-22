@@ -75,7 +75,7 @@ func _titoli() -> void:
 func _apri_nuova(club: String, kit: int) -> void:
 	var seme := D.hash32([club, kit, Time.get_ticks_usec()])
 	d = {"club": club, "kit": kit, "crest": D.crest_from_seed(seme), "style": D.normalize_kit_style(null),
-		"look": D.look_from_seed(seme), "name": D.random_name(seme), "pos": "A", "num": 9, "esultanza": Esultanze.PREDEFINITA,
+		"look": D.look_casuale(seme), "name": D.random_name(seme), "pos": "A", "num": 9, "esultanza": Esultanze.PREDEFINITA,
 		"altezza": Fisico.PREDEFINITO.altezza, "corporatura": Fisico.PREDEFINITO.corporatura}
 	mode = "crest"
 	tab = "shape"
@@ -607,7 +607,7 @@ func _casuale() -> void:
 		d.merge(Fisico.daSeme(seme, d.get("pos", "A")), true)
 	else:
 		# "Casuale" cambia solo la scheda aperta, il resto resta com'è
-		var nuovo := D.look_from_seed(seme)
+		var nuovo := D.look_casuale(seme)
 		var l: Dictionary = d.look.duplicate()
 		if tab == "hair":
 			l.hair = nuovo.hair

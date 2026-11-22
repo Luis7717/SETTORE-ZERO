@@ -108,6 +108,41 @@ static func lookFromSeed(seed_value: Variant) -> Dictionary:
 	return out
 
 
+# colori particolari nei giocatori casuali (2026-11-22, solo Godot: lookFromSeed resta uguale al web). Dopo la
+# generazione, con un seme a parte: ogni tanto capelli particolari o sfumati, occhi viola o rossi, eterocromia più rara.
+const P_CAPELLI_PARTICOLARI := 0.04
+const P_OCCHI_PARTICOLARI := 0.03
+const P_ETEROCROMIA := 0.008
+const OCCHI_PARTICOLARI := [8, 9]
+const OCCHI_ETEROCROMIA := [10, 11]
+## false nei test di confronto col web
+static var particolari_attivi := true
+
+
+## look da un seme coi colori particolari rari (giocatori casuali di Godot: avversari, rosa, "Casuale" dell'editor)
+static func lookCasuale(seed_value: Variant) -> Dictionary:
+	return conParticolari(lookFromSeed(seed_value), seed_value)
+
+
+## copia del look con, a volte, colori particolari (stesso seme = stesso risultato)
+static func conParticolari(look: Dictionary, seed_value: Variant) -> Dictionary:
+	var out := look.duplicate()
+	if not particolari_attivi:
+		return out
+	var r := seeded(hash32("particolari", seed_value))
+	var uc: float = r.call()
+	var uh: int = ipick(r, HAIR_COLORS.size() - HAIR_PARTICOLARI)
+	var ue: float = r.call()
+	var ui: int = ipick(r, 2)
+	if uc < P_CAPELLI_PARTICOLARI:
+		out["hairColor"] = HAIR_PARTICOLARI + uh
+	if ue < P_ETEROCROMIA:
+		out["eyeColor"] = OCCHI_ETEROCROMIA[ui]
+	elif ue < P_ETEROCROMIA + P_OCCHI_PARTICOLARI:
+		out["eyeColor"] = OCCHI_PARTICOLARI[ui]
+	return out
+
+
 ## completa e corregge un look (campi mancanti o fuori elenco → valori validi, senza toccare l'originale)
 static func normalizeLook(l: Variant, fallback: Variant = null) -> Dictionary:
 	var base: Dictionary = fallback if fallback is Dictionary else DEFAULT_LOOK
@@ -124,7 +159,7 @@ static func lookOf(p: Variant) -> Dictionary:
 		return lookFromSeed(0)
 	var nome: Variant = p.get("name", "")
 	var id: Variant = p.get("id") if p.has("id") else "undefined" # String(undefined) del JS
-	var auto := lookFromSeed(hash32(id, nome if nome != null and nome != "" else ""))
+	var auto := lookCasuale(hash32(id, nome if nome != null and nome != "" else ""))
 	var look: Variant = p.get("look")
 	return normalizeLook(look, auto) if look is Dictionary else auto
 

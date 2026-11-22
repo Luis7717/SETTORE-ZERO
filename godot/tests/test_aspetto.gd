@@ -77,10 +77,12 @@ func test_vista_come_il_web() -> bool:
 	var fx := _fixture()
 	if not check(not fx.is_empty(), "manca %s (node test/export-aspetto.mjs)" % FIX):
 		return done()
+	A.particolari_attivi = false   # i colori particolari rari sono solo di Godot
 	for c: Array in fx.lookOf:
 		var l := A.lookOf(c[0])
 		l.erase("beardColor")   # campo solo di Godot (2026-11-22), il web non ce l'ha
 		check(l == _interi(c[1]), "lookOf(%s) = %s, atteso %s" % [c[0], l, c[1]])
+	A.particolari_attivi = true
 	for c: Array in fx.kitStyle:
 		var st := A.kitStyleFromSeed(A.hash32(str(c[0])))
 		check(st == _interi(c[1]), "stile della squadra %s = %s, atteso %s" % [c[0], st, c[1]])
@@ -134,4 +136,37 @@ func test_colori_nuovi_e_salvataggi_vecchi() -> bool:
 	var bionda := A.parametri_figura({"skin": 0, "hairColor": 0, "beard": 6, "beardColor": 3})
 	var nera := A.parametri_figura({"skin": 0, "hairColor": 0, "beard": 6, "beardColor": 1})
 	check(A.luminanza(bionda.barba) > A.luminanza(nera.barba) + 0.15, "barba bionda più chiara della nera coi capelli neri")
+	return done()
+
+
+# giocatori casuali (2026-11-22): colori particolari rari, eterocromia ancora più rara, sempre uguali col seme;
+# lookFromSeed resta quello del web
+func test_colori_particolari_rari_nei_giocatori_casuali() -> bool:
+	A.particolari_attivi = true
+	var n := 4000
+	var cap := 0
+	var occ := 0
+	var etero := 0
+	for i in n:
+		var l := A.lookCasuale(A.hash32("prova", i))
+		if l.hairColor >= A.HAIR_PARTICOLARI:
+			cap += 1
+		if l.eyeColor in A.OCCHI_PARTICOLARI:
+			occ += 1
+		if l.eyeColor in A.OCCHI_ETEROCROMIA:
+			etero += 1
+	var fc := float(cap) / n
+	var fo := float(occ + etero) / n
+	var fe := float(etero) / n
+	check(fc > 0.025 and fc < 0.06, "capelli particolari %.1f%% (circa 4%%)" % (fc * 100.0))
+	check(fo > 0.025 and fo < 0.06, "occhi particolari %.1f%% (circa 3,8%%)" % (fo * 100.0))
+	check(fe > 0.002 and fe < fo * 0.5, "eterocromia %.2f%%, più rara" % (fe * 100.0))
+	eq(A.lookCasuale(123), A.lookCasuale(123), "stesso seme, stesso look")
+	var l := A.lookFromSeed(99)
+	for k: String in l:
+		if k != "hairColor" and k != "eyeColor":
+			eq(A.lookCasuale(99)[k], l[k], "lookCasuale cambia solo i colori (%s)" % k)
+	A.particolari_attivi = false
+	eq(A.lookCasuale(99), A.lookFromSeed(99), "senza particolari: come il web")
+	A.particolari_attivi = true
 	return done()

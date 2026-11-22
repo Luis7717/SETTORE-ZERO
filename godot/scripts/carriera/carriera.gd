@@ -732,7 +732,7 @@ func aiMatchTeam(t: Dictionary) -> Dictionary:
 		players.append(genPlayer(r, F[i][0], float(t.rating), -i - 1))
 	# aspetto e numero degli avversari: dal seme della squadra, senza consumare i numeri casuali di r
 	for i in players.size():
-		players[i]["look"] = Asp.lookFromSeed(Asp.hash32(t.seed, i))
+		players[i]["look"] = Asp.lookCasuale(Asp.hash32(t.seed, i))
 		players[i]["num"] = i + 1
 	var same: bool = t.kit == s.kit or absi(colorDist(KITS[t.kit][1], KITS[s.kit][1])) < 110
 	var kit := kitOf(t.kit, same)

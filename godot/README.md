@@ -394,7 +394,8 @@ come nel web (`faceLayers`, `paintBeard`, `paintStubble`, `paintEyeTile` di `src
   punte, `punte` in `capelli.gdshader`), occhi 12 (particolari ed eterocromia), barba col suo colore (campo nuovo
   `beardColor`, 0 = come i capelli: i salvataggi vecchi non cambiano). Con capelli particolari le sopracciglia restano
   castane (`sopracciglia`). `divisa.gdshader` usa 16 instance uniform: è il massimo, non se ne possono aggiungere.
-  Nell'editor oltre 9 colori la riga dei pallini scorre. I giocatori casuali (`lookFromSeed`) restano come il web.
+  Nell'editor oltre 9 colori la riga dei pallini scorre. `lookFromSeed` resta come il web; i giocatori casuali di Godot (avversari, rosa, "Casuale" dell'editor) passano da
+  `Aspetto.lookCasuale`: col seme, capelli particolari ~4%, occhi viola o rossi ~3%, eterocromia ~0,8%.
 - Colletto: bordi dello scollo morbidi con `fwidth` (prima gradini netti, a scalini sul telefono).
 - Mento: testa e collo si riconoscono dall'osso dominante (CUSTOM0.w / CUSTOM1.w), non più dall'altezza: sotto il
   mento niente colore del bordino.

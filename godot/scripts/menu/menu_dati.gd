@@ -123,6 +123,11 @@ static func look_from_seed(seed_value: int) -> Dictionary:
 	return Asp.lookFromSeed(seed_value)
 
 
+## look casuale coi colori particolari rari (editor: "Casuale" e campione nuovo)
+static func look_casuale(seed_value: int) -> Dictionary:
+	return Asp.lookCasuale(seed_value)
+
+
 static func normalize_look(l: Variant, fallback: Variant = null) -> Dictionary:
 	return Asp.normalizeLook(l, fallback)
 
