@@ -9,6 +9,7 @@ extends SceneTree
 
 const H := preload("harness.gd")
 const C := preload("../sim/core.gd")
+const TT := preload("test_testa.gd")
 
 
 func _init() -> void:
@@ -25,10 +26,27 @@ func _init() -> void:
 		tot[k] = [0, 0]
 	for sd in range(1, semi + 1):
 		var ultimo := {"k": "", "t": -1, "tocco": ""}
-		var crossato := {"p": null}
+		var crossato := {"p": null, "cross": false}
 		var conta := func(m: SimMatch) -> void:
 			if cross:
 				_cross(m, crossato)
+			if crossato.cross and not m.events.is_empty():
+				# primo tocco dopo il cross: chi e a che altezza (portiere, difensore, compagno), o fuori
+				for e: Dictionary in m.events:
+					if e.type == "kick" and e.p.team == 0 and e.kind == "loft" and m.ball.kick != null and m.ball.kick.kicker == e.p:
+						continue
+					var chi := ""
+					if e.type in ["control", "punch", "save", "aerial", "head_win"] and e.has("p"):
+						chi = e.type + ":" + ("portiere" if e.p.pos == "P" else ("compagno" if e.p.team == 0 else "difensore"))
+					elif e.type == "kick" and e.has("p"):
+						chi = "kick-" + String(e.kind) + ":" + ("portiere" if e.p.pos == "P" else ("compagno" if e.p.team == 0 else "difensore"))
+					elif e.type == "out":
+						chi = "fuori-" + String(e.kind)
+					if chi != "":
+						var key: String = "cross>" + chi + (" h%.0f" % m.ball.h if e.type != "out" else "")
+						esiti[key] = esiti.get(key, 0) + 1
+						crossato.cross = false
+						break
 			for e: Dictionary in m.events:
 				match e.type:
 					"kick":
@@ -84,18 +102,20 @@ static var _curva := 0.0
 static func _cross(m: SimMatch, fatto: Dictionary) -> void:
 	var c = m.ctrl[0]
 	var b = m.ball
+	if fatto.p != null and b.owner != null and b.owner != fatto.p:
+		fatto.p = null # nuovo possesso: si può crossare di nuovo
 	if c == null or b.owner != c or m.phase != "play" or fatto.p == c:
 		return
 	if absf(c.x) < 14.0 or c.y < C.HL - 28.0:
 		return
-	for q in m.team(0):
-		if q != c and not q.off and q.pos != "P" and absf(q.x) < 12.0 and q.y > C.HL - 16.0:
-			fatto.p = c
-			var tx: float = q.x + q.vx * 0.6
-			var ty: float = q.y + q.vy * 0.6
-			if _curva == 0.0:
-				m.userKick(0, {"type": "auto", "tx": tx, "ty": ty})
-			else: # tratto curvo (a effetto e alto): curvatura = _curva × lunghezza, gobba verso la porta
-				var D: float = C.hyp(tx - b.x, ty - b.y)
-				m.userKick(0, {"type": "auto", "tx": tx, "ty": ty, "curve": _curva * D * signf(c.x), "tratto": true})
-			return
+	var q = TT._bersaglio(m, c)
+	if q == null:
+		return
+	fatto.p = c
+	var tx: float = q.x + q.vx * 0.6
+	var ty: float = q.y + q.vy * 0.6
+	if _curva == 0.0:
+		m.userKick(0, {"type": "auto", "tx": tx, "ty": ty})
+	else: # tratto curvo (a effetto e alto): curvatura di _curva metri, come test_testa.gd
+		m.userKick(0, {"type": "auto", "tx": tx, "ty": ty, "curve": _curva * signf(c.x), "tratto": true})
+	fatto.cross = true

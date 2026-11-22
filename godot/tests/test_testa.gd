@@ -2,6 +2,8 @@
 extends "test_base.gd"
 
 const FT := preload("res://scripts/partita/fermatempo_testa.gd")
+const SimRngScript := preload("res://sim/rng.gd")
+const CROSS_ZONA := 14.0 # umano simulato: crossa a un compagno entro tanti metri dal centro della porta
 
 
 ## cross dalla destra verso l'attaccante p in area; difesa parcheggiata tranne il portiere avversario.
@@ -220,10 +222,69 @@ func test_fermatempo_dura_tre_secondi_veri() -> bool:
 	return done()
 
 
-# umano simulato (harness: disegna la linea verso la porta) che crossa dalla fascia: colpi di testa verso la porta
+# Luis 2026-11-22: i cross ben fatti verso un compagno in area devono dare occasioni vere di colpo di testa e il
+# portiere non le annulla (esce solo se arriva prima dell'attaccante: regola dei calci d'angolo). 24 cross curvi dalla
+# fascia (tratto curvo = pallone alto) a un attaccante a 8-12 m dalla porta marcato da un difensore, con un secondo
+# difensore sul secondo palo e il portiere.
+# La persona disegna la linea verso la porta appena si apre il fermatempo.
+func test_cross_ben_fatti_danno_occasioni_vere() -> bool:
+	var n := cross_in_area(8.0, 12.0)
+	note("cross curvi ben fatti: %d, fermatempi %d, colpi di testa %d (in porta %d), presi dal portiere %d" % [n.cross, n.fermi, n.colpi, n.porta, n.portiere])
+	check(n.fermi >= n.cross * 0.6, "fermatempi su cross ben fatti: %d su %d" % [n.fermi, n.cross])
+	check(n.colpi >= n.cross * 0.4, "colpi di testa: %d su %d" % [n.colpi, n.cross])
+	check(n.portiere <= n.cross * 0.25, "il portiere non annulla i colpi di testa: ne prende %d su %d" % [n.portiere, n.cross])
+	return done()
+
+
+## 24 cross curvi verso un attaccante a da..a metri dalla linea di porta (vedi sopra); conteggi
+func cross_in_area(da: float, a_: float) -> Dictionary:
+	var n := {"cross": 0, "fermi": 0, "colpi": 0, "portiere": 0, "porta": 0}
+	for sd in range(1, 25):
+		var m := H.scene(300 + sd, [true, false])
+		m.headCtl = true
+		var rg := SimRngScript.new(sd)
+		var lato: float = 1.0 if sd % 2 else -1.0
+		var p: R.Player = m.team(0)[9]
+		var k: R.Player = m.team(0)[7]
+		var d1: R.Player = m.team(1)[4]
+		var d2: R.Player = m.team(1)[3]
+		H.wake(p, (rg.next() - 0.5) * 8.0, C.HL - da - rg.next() * (a_ - da))
+		H.wake(d1, p.x + (rg.next() - 0.5) * 2.0, p.y + 1.0 + rg.next() * 1.0) # marcatore tra lui e la porta
+		H.wake(d2, -lato * 6.0, C.HL - 6.0)
+		H.wake(m.gk(1), 0.0, C.HL - 0.8)
+		H.wake(k, lato * (20.0 + rg.next() * 8.0), C.HL - 10.0 - rg.next() * 10.0)
+		H.give(m, k)
+		m.ctrl[0] = k
+		m.userKick(0, {"type": "auto", "tx": p.x, "ty": p.y, "curve": 6.0 * lato, "tratto": true})
+		m.events.clear()
+		n.cross += 1
+		for i in 240:
+			if m.headFor(0):
+				var g := m.gk(1)
+				m.userHeader(0, {"goal": true, "tx": (-1.0 if g.x > 0.0 else 1.0) * 2.5, "th": 1.0})
+			m.step(DT)
+			for e: Dictionary in m.events:
+				if e.type == "head_win":
+					n.fermi += 1
+				elif e.type == "kick" and e.get("guidato", false):
+					n.colpi += 1
+					if m.ball.shot != null and m.ball.shot.on:
+						n.porta += 1
+				elif e.type in ["control", "punch"] and e.p == m.gk(1) and n.colpi == 0:
+					n.portiere += 1
+			m.events.clear()
+			if m.ball.owner != null or m.phase != "play":
+				break
+		m.dispose()
+	return n
+
+
+# umano simulato (harness: disegna la linea verso la porta) che crossa dalla fascia con un tratto curvo (= pallone alto,
+# come lo disegnerebbe Luis): i cross ben fatti danno occasioni vere di colpo di testa. 4 partite da 2×150 s: con 3
+# partite da 2×90 s i cross erano così pochi che il numero dipendeva da un paio di episodi.
 func test_frequenza_con_umano_simulato() -> bool:
 	var tot := {"win": 0, "testa": 0, "gol": 0}
-	for sd in range(1, 4):
+	for sd in range(1, 5):
 		var crossato := {"p": null}
 		var ultimo := {"testa": false}
 		var conta := func(m: SimMatchScript) -> void:
@@ -237,10 +298,10 @@ func test_frequenza_con_umano_simulato() -> bool:
 						tot.testa += 1
 				elif e.type == "goal" and e.team == 0 and ultimo.testa:
 					tot.gol += 1
-		var res := H.playMatch({"seed": sd, "mode": "bot", "halfLen": 90.0, "testa": true}, conta)
+		var res := H.playMatch({"seed": sd, "mode": "bot", "halfLen": 150.0, "testa": true}, conta)
 		res.m.dispose()
-	note("3 partite da 2×90 s: %d fermatempi, %d colpi di testa guidati verso la porta, %d gol di testa" % [tot.win, tot.testa, tot.gol])
-	check(tot.win >= 3, "fermatempi del colpo di testa: %d" % tot.win)
+	note("4 partite da 2×150 s: %d fermatempi, %d colpi di testa guidati verso la porta, %d gol di testa" % [tot.win, tot.testa, tot.gol])
+	check(tot.win >= 4, "fermatempi del colpo di testa: %d" % tot.win)
 	check(tot.testa >= 2, "colpi di testa guidati verso la porta: %d" % tot.testa)
 	return done()
 
@@ -249,13 +310,30 @@ func test_frequenza_con_umano_simulato() -> bool:
 static func _cross(m: SimMatchScript, fatto: Dictionary) -> void:
 	var c: R.Player = m.ctrl[0]
 	var b := m.ball
+	if fatto.p != null and b.owner != null and b.owner != fatto.p:
+		fatto.p = null # nuovo possesso: si può crossare di nuovo
 	if c == null or b.owner != c or m.phase != "play" or fatto.p == c:
 		return
 	if absf(c.x) < 14.0 or c.y < C.HL - 28.0:
 		return
+	# cross ben fatto: al compagno in area più vicino alla porta, dentro la zona del colpo di testa (sotto i 14 m dal
+	# centro della porta). Prima andava anche a chi stava al limite dell'area, troppo lontano per colpire di testa
+	var q := _bersaglio(m, c)
+	if q == null:
+		return
+	fatto.p = c
+	# linea curva (il cross alto si disegna curvo: forma del tratto, Luis 2026-11-22)
+	m.userKick(0, {"type": "auto", "tx": q.x + q.vx * 0.6, "ty": q.y + q.vy * 0.6, "curve": 6.0 * signf(c.x), "tratto": true})
+
+
+static func _bersaglio(m: SimMatchScript, c: R.Player) -> R.Player:
+	var best: R.Player = null
+	var bd := CROSS_ZONA
 	for q: R.Player in m.team(0):
-		if q != c and not q.off and q.pos != "P" and absf(q.x) < 12.0 and q.y > C.HL - 16.0:
-			fatto.p = c
-			# linea curva (il cross alto si disegna curvo: forma del tratto, Luis 2026-11-22)
-			m.userKick(0, {"type": "auto", "tx": q.x + q.vx * 0.6, "ty": q.y + q.vy * 0.6, "curve": 6.0 * signf(c.x), "tratto": true})
-			return
+		if q == c or q.off or q.pos == "P":
+			continue
+		var d := C.hyp(q.x, q.y - C.HL)
+		if d < bd:
+			bd = d
+			best = q
+	return best
