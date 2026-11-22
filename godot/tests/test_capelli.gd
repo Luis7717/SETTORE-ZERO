@@ -157,3 +157,75 @@ func test_shader_della_divisa_ha_maschere_e_misure() -> bool:
 		check(absf(somme[k] - somme[k - 1]) > 0.5, "barba %d diversa dalla %d" % [k + 1, k])
 	f.free()
 	return done()
+
+
+# barba visibile (2026-11-22, Luis: "in alcuni casi non si vede proprio"): il colore della barba si stacca sempre dalla
+# pelle, per ogni pelle, colore dei capelli e colore scelto della barba
+func test_la_barba_si_stacca_sempre_dalla_pelle() -> bool:
+	var peggio := 1.0
+	var dove := ""
+	for s in Asp.SKINS.size():
+		for h in Asp.HAIR_COLORS.size():
+			for b in Asp.BEARD_COLORS.size():
+				var p := Asp.parametri_figura({"skin": s, "hairColor": h, "beard": 6, "beardColor": b})
+				var d := absf(Asp.luminanza(p.barba) - Asp.luminanza(p.pelle))
+				if d < peggio:
+					peggio = d
+					dove = "pelle %d, capelli %d, barba %d" % [s, h, b]
+	check(peggio >= 0.1, "stacco minimo barba-pelle %.3f (%s)" % [peggio, dove])
+	return done()
+
+
+# "pixel del viso" senza grafica: per ogni barba 1..6 la maschera, letta nei punti del viso veri (vertici della testa
+# proiettati come fa lo shader), copre una parte del viso; per ogni pelle e colore dei capelli il cambio di colore che
+# ne viene (copertura × stacco) non è mai trascurabile. Corta più rada e meno estesa della piena.
+func test_ogni_barba_cambia_i_pixel_del_viso() -> bool:
+	var f := nuova()
+	var a := Giocatore._mesh_divisa.surface_get_arrays(0)
+	var v: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
+	var c0: PackedFloat32Array = a[Mesh.ARRAY_CUSTOM0]
+	var pr: Vector4 = Viso.dati.proiezione
+	var img: Image = (Giocatore._materiale.get_shader_parameter("viso_maschere") as Texture2D).get_image()
+	if img.is_compressed():
+		img.decompress()
+	var cop: Array = []
+	for b in range(1, 7):
+		var s := 0.0
+		var n := 0
+		for i in v.size():
+			if c0[i * 4 + 3] < 0.5 or v[i].z < Viso.dati.occhio.z - 0.04:
+				continue   # solo la testa, davanti
+			var uv := Vector2(320.0 + (v[i].x - pr.x) * pr.z, 222.0 + (pr.y - v[i].y) * pr.w) - Vector2(200, 150)
+			if uv.x < 0 or uv.y < 0 or uv.x >= 240 or uv.y >= 260:
+				continue
+			n += 1
+			s += img.get_pixel(((b - 1) % 4) * 240 + int(uv.x), ((b - 1) / 4) * 260 + int(uv.y)).r
+		cop.append(s / maxf(1.0, n))
+	for b in 6:
+		check(cop[b] > 0.01, "barba %d (%s): copre il %.1f%% del viso" % [b + 1, Asp.BEARDS[b + 1], cop[b] * 100.0])
+	check(cop[5] > cop[4] * 1.3, "barba piena più estesa della corta (%.3f contro %.3f)" % [cop[5], cop[4]])
+	for s in Asp.SKINS.size():
+		for h in Asp.HAIR_COLORS.size():
+			var p := Asp.parametri_figura({"skin": s, "hairColor": h})
+			var stacco := absf(Asp.luminanza(p.barba) - Asp.luminanza(p.pelle))
+			for b in 6:
+				if cop[b] * stacco < 0.001:
+					check(false, "barba %d invisibile con pelle %d e capelli %d" % [b + 1, s, h])
+	f.free()
+	return done()
+
+
+func test_corta_piu_rada_della_piena_nello_shader() -> bool:
+	var src: String = (load("res://shaders/divisa.gdshader") as Shader).code
+	var i := src.find("const vec2 BARBA_PELO[6]")
+	check(i >= 0, "tabella dei peli delle barbe nello shader")
+	var riga := src.substr(i, src.find(";", i) - i)
+	var nums: Array = []
+	var re := RegEx.create_from_string(r"vec2\(([0-9.]+), ([0-9.]+)\)")
+	for m in re.search_all(riga):
+		nums.append(Vector2(float(m.get_string(1)), float(m.get_string(2))))
+	eq(nums.size(), 6, "6 barbe")
+	if nums.size() == 6:
+		check(nums[4].x < nums[5].x and nums[4].y < nums[5].y, "corta: meno peli e meno coperta della piena")
+		check(nums[0].x < nums[4].x, "ombra ancora più rada della corta")
+	return done()

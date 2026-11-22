@@ -22,9 +22,28 @@ func _fixture() -> Dictionary:
 
 
 ## stesso valore del JS (numeri: 1 e 1.0 uguali); al primo errore scrive il percorso della differenza
+# i confronti col JS del web: niente colori particolari (solo Godot, Aspetto.conParticolari). Non si rimettono qui
+# (l'oggetto del test prima si libera dopo che è nato il successivo): chi li prova li accende da sé
+func _init() -> void:
+	Asp.particolari_attivi = false
+
+
 func same(got: Variant, want: Variant, msg: String) -> bool:
-	var d := JS.diff(got, want, msg)
+	var d := JS.diff(senza_campi_godot(got), want, msg)
 	return check(d == "", d)
+
+
+## toglie (in copia) il colore della barba dei look, campo solo di Godot (2026-11-22) che il web non ha
+static func senza_campi_godot(v: Variant) -> Variant:
+	if v is Dictionary:
+		var o := {}
+		for k: Variant in v:
+			if k != "beardColor":
+				o[k] = senza_campi_godot(v[k])
+		return o
+	if v is Array:
+		return (v as Array).map(func(x: Variant) -> Variant: return senza_campi_godot(x))
+	return v
 
 
 ## stato della carriera senza quello che il web non ha: impostazioni music e vibra, chiavi della fase B

@@ -16,17 +16,30 @@ const JS := preload("res://scripts/carriera/js.gd")
 const SimRng := preload("res://sim/rng.gd")
 
 const SKINS := [["Chiarissima", "#f6d5bc"], ["Chiara", "#eec09c"], ["Rosata", "#e3ad8a"], ["Olivastra", "#d29b6c"], ["Ambrata", "#b67c50"], ["Bruna", "#93603b"], ["Scura", "#6e432a"], ["Molto scura", "#4b2d1e"]]
-const HAIR_COLORS := [["Nero", "#17110e"], ["Castano scuro", "#3a2417"], ["Castano", "#5f3b22"], ["Castano chiaro", "#8b5b33"], ["Biondo scuro", "#a97c46"], ["Biondo", "#d7b26b"], ["Platino", "#eadfba"], ["Rosso", "#9e3c1b"], ["Ramato", "#c2692d"], ["Grigio", "#8e8e8e"], ["Bianco", "#e6e6e6"]]
+# colori dei capelli: i primi 11 come il web; dal 2026-11-22 altri naturali, particolari e sfumati (terzo campo = colore
+# delle punte). Mai cambiare l'ordine: nei salvataggi c'è l'indice.
+const HAIR_COLORS := [["Nero", "#17110e"], ["Castano scuro", "#3a2417"], ["Castano", "#5f3b22"], ["Castano chiaro", "#8b5b33"], ["Biondo scuro", "#a97c46"], ["Biondo", "#d7b26b"], ["Biondo platino", "#eadfba"], ["Rosso", "#9e3c1b"], ["Rosso ramato", "#c2692d"], ["Grigio", "#8e8e8e"], ["Bianco", "#e6e6e6"],
+	["Nero corvino", "#0a0c14"], ["Biondo cenere", "#b5a587"],
+	["Blu", "#2456c8"], ["Verde", "#2f9a4a"], ["Rosa", "#e87cb4"], ["Viola", "#7a3fb8"], ["Rosso acceso", "#d8162a"], ["Argento", "#c3c8d2"],
+	["Nero con punte blu", "#17110e", "#2f86e8"], ["Castano con punte bionde", "#4a2d1a", "#e3c37c"], ["Biondo con punte rosa", "#d7b26b", "#ee6fb0"]]
+const HAIR_PARTICOLARI := 13     # da qui in poi colori particolari (rari nei giocatori casuali)
 const HAIR_STYLES := ["Calvo", "Rasato", "Corti", "Spazzola", "Ciuffo", "Riga di lato", "Cresta", "A punte", "Ricci", "Afro", "Caschetto", "Lunghi", "Coda", "Chignon", "Treccine", "Frangia", "All'indietro"]
 const EYE_SHAPES := ["Tondi", "A mandorla", "Sottili", "Grandi", "Allungati", "Assonnati"]
-const EYE_COLORS := [["Marrone scuro", "#3b2517"], ["Marrone", "#6c4424"], ["Nocciola", "#8f6b33"], ["Verde", "#4e7b3a"], ["Azzurro", "#4a90ca"], ["Grigio", "#7c8995"], ["Ambra", "#b27b1f"]]
+# colori degli occhi: i primi 7 come il web; dal 2026-11-22 blu, particolari ed eterocromia (terzo campo = colore
+# dell'occhio sinistro del giocatore, il secondo campo vale per il destro)
+const EYE_COLORS := [["Marrone scuro", "#3b2517"], ["Marrone", "#6c4424"], ["Nocciola", "#8f6b33"], ["Verde", "#4e7b3a"], ["Azzurro", "#4a90ca"], ["Grigio", "#7c8995"], ["Ambra", "#b27b1f"],
+	["Blu", "#2350b8"], ["Viola", "#7d4bc0"], ["Rosso", "#b0202a"],
+	["Eterocromia azzurro e marrone", "#4a90ca", "#6c4424"], ["Eterocromia verde e nocciola", "#4e7b3a", "#8f6b33"]]
+const EYE_PARTICOLARI := 8       # da qui in poi colori particolari
+# colore della barba (campo beardColor, 2026-11-22): 0 = come i capelli (il colore lo calcola colore_barba)
+const BEARD_COLORS := [["Come i capelli", ""], ["Nera", "#1a1310"], ["Castana", "#4e3120"], ["Bionda", "#b8904f"], ["Rossa", "#9a4220"], ["Grigia", "#8a8a8a"], ["Bianca", "#e4e4e4"]]
 const BROWS := ["Naturali", "Sottili", "Folte", "Arcuate", "Dritte", "Decise"]
 const BEARDS := ["Nessuna", "Ombra", "Pizzetto", "Baffi", "Baffi e pizzetto", "Barba corta", "Barba piena"]
 const BOOTS := [["Nere", "#17171b"], ["Bianche", "#efefef"], ["Rosse", "#d4202c"], ["Gialle", "#f2d21b"], ["Azzurre", "#2fa6e8"], ["Arancio", "#ff7a1a"]]
 
 # numero di opzioni per ogni campo del look (per normalizzare e per l'editor)
-const LOOK_N := {"skin": 8, "hair": 17, "hairColor": 11, "eyes": 6, "eyeColor": 7, "brows": 6, "beard": 7, "boots": 6}
-const LOOK_KEYS := ["skin", "hair", "hairColor", "eyes", "eyeColor", "brows", "beard", "boots"]
+const LOOK_N := {"skin": 8, "hair": 17, "hairColor": 22, "eyes": 6, "eyeColor": 12, "brows": 6, "beard": 7, "boots": 6, "beardColor": 7}
+const LOOK_KEYS := ["skin", "hair", "hairColor", "eyes", "eyeColor", "brows", "beard", "boots", "beardColor"]
 
 const KIT_OPTS := {
 	"fit": ["Aderente", "Larga"],
@@ -38,7 +51,7 @@ const KIT_OPTS := {
 }
 const KIT_KEYS := ["fit", "sleeves", "collar", "pattern", "shorts", "socks"]
 const DEFAULT_KIT_STYLE := {"fit": 0, "sleeves": 0, "collar": 0, "pattern": 0, "shorts": 0, "socks": 0}
-const DEFAULT_LOOK := {"skin": 1, "hair": 2, "hairColor": 2, "eyes": 0, "eyeColor": 1, "brows": 0, "beard": 0, "boots": 0}
+const DEFAULT_LOOK := {"skin": 1, "hair": 2, "hairColor": 2, "eyes": 0, "eyeColor": 1, "brows": 0, "beard": 0, "boots": 0, "beardColor": 0}
 
 # numeri di maglia preferiti per ruolo
 const PREF := {"P": [1, 12, 22], "D": [2, 3, 4, 5, 6, 13, 14, 15], "C": [8, 10, 7, 16, 17, 18, 20], "A": [9, 11, 19, 21, 23]}
@@ -95,12 +108,47 @@ static func lookFromSeed(seed_value: Variant) -> Dictionary:
 	return out
 
 
+# colori particolari nei giocatori casuali (2026-11-22, solo Godot: lookFromSeed resta uguale al web). Dopo la
+# generazione, con un seme a parte: ogni tanto capelli particolari o sfumati, occhi viola o rossi, eterocromia più rara.
+const P_CAPELLI_PARTICOLARI := 0.04
+const P_OCCHI_PARTICOLARI := 0.03
+const P_ETEROCROMIA := 0.008
+const OCCHI_PARTICOLARI := [8, 9]
+const OCCHI_ETEROCROMIA := [10, 11]
+## false nei test di confronto col web
+static var particolari_attivi := true
+
+
+## look da un seme coi colori particolari rari (giocatori casuali di Godot: avversari, rosa, "Casuale" dell'editor)
+static func lookCasuale(seed_value: Variant) -> Dictionary:
+	return conParticolari(lookFromSeed(seed_value), seed_value)
+
+
+## copia del look con, a volte, colori particolari (stesso seme = stesso risultato)
+static func conParticolari(look: Dictionary, seed_value: Variant) -> Dictionary:
+	var out := look.duplicate()
+	if not particolari_attivi:
+		return out
+	var r := seeded(hash32("particolari", seed_value))
+	var uc: float = r.call()
+	var uh: int = ipick(r, HAIR_COLORS.size() - HAIR_PARTICOLARI)
+	var ue: float = r.call()
+	var ui: int = ipick(r, 2)
+	if uc < P_CAPELLI_PARTICOLARI:
+		out["hairColor"] = HAIR_PARTICOLARI + uh
+	if ue < P_ETEROCROMIA:
+		out["eyeColor"] = OCCHI_ETEROCROMIA[ui]
+	elif ue < P_ETEROCROMIA + P_OCCHI_PARTICOLARI:
+		out["eyeColor"] = OCCHI_PARTICOLARI[ui]
+	return out
+
+
 ## completa e corregge un look (campi mancanti o fuori elenco → valori validi, senza toccare l'originale)
 static func normalizeLook(l: Variant, fallback: Variant = null) -> Dictionary:
 	var base: Dictionary = fallback if fallback is Dictionary else DEFAULT_LOOK
 	var out := {}
 	for k: String in LOOK_KEYS:
-		var v: Variant = l[k] if l is Dictionary and l.has(k) and JS.is_integer(l[k]) else base[k]
+		var v: Variant = l[k] if l is Dictionary and l.has(k) and JS.is_integer(l[k]) else base.get(k, DEFAULT_LOOK[k])
 		out[k] = posmod(int(v), LOOK_N[k])
 	return out
 
@@ -111,7 +159,7 @@ static func lookOf(p: Variant) -> Dictionary:
 		return lookFromSeed(0)
 	var nome: Variant = p.get("name", "")
 	var id: Variant = p.get("id") if p.has("id") else "undefined" # String(undefined) del JS
-	var auto := lookFromSeed(hash32(id, nome if nome != null and nome != "" else ""))
+	var auto := lookCasuale(hash32(id, nome if nome != null and nome != "" else ""))
 	var look: Variant = p.get("look")
 	return normalizeLook(look, auto) if look is Dictionary else auto
 
@@ -122,11 +170,55 @@ static func lookOf(p: Variant) -> Dictionary:
 static func parametri_figura(look: Variant, stile_divisa: Variant = null) -> Dictionary:
 	var l := normalizeLook(look)
 	var st := normalizeKitStyle(stile_divisa)
+	var hc: Array = HAIR_COLORS[l.hairColor]
+	var ec: Array = EYE_COLORS[l.eyeColor]
+	var pelle := Color(SKINS[l.skin][1])
+	var bc: Array = BEARD_COLORS[l.beardColor]
 	return {
-		"pelle": Color(SKINS[l.skin][1]), "capelli": Color(HAIR_COLORS[l.hairColor][1]),
-		"iride": Color(EYE_COLORS[l.eyeColor][1]), "scarpe": Color(BOOTS[l.boots][1]),
+		"pelle": pelle, "capelli": Color(hc[1]),
+		"iride": Color(ec[1]), "scarpe": Color(BOOTS[l.boots][1]),
 		"stile2": Vector4(l.hair, l.beard, l.brows, st.shorts), "occhi_forma": float(l.eyes),
+		"barba": colore_barba(pelle, Color(hc[1]) if bc[1] == "" else Color(bc[1]), bc[1] != ""),
+		# a = 1: c'è (occhio sinistro diverso, punte colorate); a = 0: niente
+		"iride2": Color(ec[2]) if ec.size() > 2 else Color(0, 0, 0, 0),
+		"punte": Color(hc[2]) if hc.size() > 2 else Color(0, 0, 0, 0),
+		# capelli di colore particolare (blu, verde...): sopracciglia di un castano naturale, non blu
+		"sopracciglia": Color(SOPRACCIGLIA_NATURALI) if particolare_capelli(l.hairColor) else Color(0, 0, 0, 0),
 	}
+
+
+const SOPRACCIGLIA_NATURALI := "#3a2417"
+
+
+## vero per i colori dei capelli non naturali (blu, verde, rosa, viola, rosso acceso, argento); gli sfumati hanno la
+## base naturale
+static func particolare_capelli(i: int) -> bool:
+	return i >= HAIR_PARTICOLARI and HAIR_COLORS[i].size() < 3
+
+
+# barba (2026-11-22): col colore dei capelli puro la barba spariva (biondo e platino su pelle chiara, nero su pelle
+# molto scura). Ora: barba chiara solo se i capelli sono molto più chiari della pelle (grigio, bianco su pelle scura);
+# altrimenti stessa tinta dei capelli ma scura almeno quanto BARBA_SCURA × la pelle (luminanza in sRGB).
+const BARBA_SCURA := 0.55
+const BARBA_CHIARA := 0.3        # di quanto i capelli devono essere più chiari della pelle per una barba chiara
+const BARBA_STACCO := 0.12      # almeno tanto più scura della pelle (luminanza)
+const BARBA_MIN := 0.035         # luminanza minima (niente nero puro: si vede ancora il pelo nella luce)
+
+
+static func luminanza(c: Color) -> float:
+	return c.r * 0.299 + c.g * 0.587 + c.b * 0.114
+
+
+## colore della barba (sRGB) per pelle e capelli (o il colore scelto per la barba: scelto = true, si scurisce solo
+## quanto basta a staccarsi dalla pelle, BARBA_STACCO): si stacca sempre dalla pelle
+static func colore_barba(pelle: Color, capelli: Color, scelto := false) -> Color:
+	var lp := luminanza(pelle)
+	var lc := maxf(luminanza(capelli), 0.001)
+	if lc > lp + BARBA_CHIARA:
+		return Color(capelli.r * 0.88, capelli.g * 0.88, capelli.b * 0.88)
+	var meta := maxf(BARBA_MIN, minf(lc * 0.9, lp - BARBA_STACCO if scelto else minf(lp - BARBA_STACCO, lp * BARBA_SCURA)))
+	var k := meta / lc
+	return Color(minf(1.0, capelli.r * k), minf(1.0, capelli.g * k), minf(1.0, capelli.b * k))
 
 
 ## parametro `stile` dello shader per uno stile della divisa: (maniche, colletto, motivo, calzettoni)

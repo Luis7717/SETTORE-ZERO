@@ -112,8 +112,18 @@ static func _beard(kind: int, c: String) -> String:
 static func _interno(lk: Variant, shirt: String, collar: String) -> String:
 	var l := D.normalize_look(lk)
 	var skin: String = D.SKINS[l.skin][1]
-	var hair: String = D.HAIR_COLORS[l.hairColor][1]
+	var hc: Array = D.HAIR_COLORS[l.hairColor]
+	var hair: String = hc[1]
 	var parts := _hair_parts(l.hair, hair)
+	if hc.size() > 2 and parts[1] != "":   # sfumati: punte colorate sul davanti dei capelli
+		parts[1] = '<defs><linearGradient id="pu" x1="0" y1="0" x2="0" y2="1"><stop offset=".35" stop-color="%s"/><stop offset="1" stop-color="%s"/></linearGradient></defs>' % [hair, hc[2]] \
+			+ parts[1].replace('fill="%s"' % hair, 'fill="url(#pu)"')
+	# barba del colore scelto (beardColor 0 = come i capelli, come prima); occhi colorati solo per i colori nuovi
+	# (i primi 7 restano i puntini scuri del web)
+	var barba: String = hair if l.beardColor == 0 else str(D.BEARD_COLORS[l.beardColor][1])
+	var ec: Array = D.EYE_COLORS[l.eyeColor]
+	var occhio_d := "#1a1412" if l.eyeColor < 7 else str(ec[1])
+	var occhio_s := occhio_d if ec.size() < 3 else str(ec[2])
 	var dark := shade(skin, 0.82)
 	return parts[0] \
 		+ '<path d="M3.5 40C4.5 32 11 29.2 20 29.2S35.5 32 36.5 40Z" fill="%s"/>' % shirt \
@@ -121,8 +131,8 @@ static func _interno(lk: Variant, shirt: String, collar: String) -> String:
 		+ '<path d="M16.6 23.5h6.8v6.6Q20 32 16.6 30.1Z" fill="%s"/>' % dark \
 		+ '<ellipse cx="11.4" cy="18.6" rx="1.7" ry="2.5" fill="%s"/><ellipse cx="28.6" cy="18.6" rx="1.7" ry="2.5" fill="%s"/>' % [dark, dark] \
 		+ '<ellipse cx="20" cy="17" rx="8.6" ry="10.2" fill="%s"/>' % skin \
-		+ _beard(l.beard, hair) \
-		+ '<circle cx="16.6" cy="17.8" r="1.05" fill="#1a1412"/><circle cx="23.4" cy="17.8" r="1.05" fill="#1a1412"/>' \
+		+ _beard(l.beard, barba) \
+		+ '<circle cx="16.6" cy="17.8" r="1.05" fill="%s"/><circle cx="23.4" cy="17.8" r="1.05" fill="%s"/>' % [occhio_d, occhio_s] \
 		+ '<path d="M15 15.4h3.2M21.8 15.4H25" stroke="%s" stroke-width="1" stroke-linecap="round"/>' % hair \
 		+ '<path d="M18 23.6Q20 24.6 22 23.6" fill="none" stroke="%s" stroke-width=".8" stroke-linecap="round"/>' % shade(skin, 0.6) \
 		+ parts[1]
