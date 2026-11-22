@@ -59,3 +59,29 @@ func test_prove_da_riga_di_comando_e_app() -> bool:
 	eq(Meteo.testo({"meteo": "pioggia", "ora": "notte"}), "Notte · Pioggia", "testo")
 	eq(Meteo.testo({"meteo": "sereno", "ora": "giorno"}), "Pomeriggio · Sereno", "testo di giorno")
 	return done()
+
+
+func test_di_notte_si_accendono_tutti_e_4_i_fari() -> bool:
+	# prima gli aloni cercavano i nodi per nome ("FaroLampade*"): con 4 nodi dallo stesso nome Godot rinomina gli altri
+	# (@MeshInstance3D@n) e se ne accendeva uno solo
+	const Stadio := preload("res://scripts/stadio.gd")
+	var s: Node3D = Stadio.new()
+	s._ready()
+	eq(s.lampade_fari.size(), 4, "4 torri faro")
+	var notte: Node3D = Meteo.new()
+	notte._stadio(s, true)
+	eq(notte.aloni.size(), 4, "4 aloni di notte")
+	var posti := {}
+	for i in notte.aloni.size():
+		var al: MeshInstance3D = notte.aloni[i]
+		near(al.position.distance_to(s.lampade_fari[i].position), 0.0, 0.01, "alone sul suo faro %d" % i)
+		posti[Vector2i(signi(int(al.position.x)), signi(int(al.position.z)))] = true
+	eq(posti.size(), 4, "un alone per angolo")
+	eq((s.lampade_fari[0].material_override as StandardMaterial3D).emission_energy_multiplier, Meteo.NOTTE_LAMPADE, "lampade forti")
+	var giorno: Node3D = Meteo.new()
+	giorno._stadio(s, false)
+	eq(giorno.aloni.size(), 0, "di giorno niente aloni")
+	notte.free()
+	giorno.free()
+	s.free()
+	return done()

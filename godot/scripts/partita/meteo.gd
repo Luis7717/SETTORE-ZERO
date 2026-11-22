@@ -213,14 +213,15 @@ func _ambiente(env: Environment, ora: Dictionary, fx: Dictionary, notte: bool) -
 	env.fog_density = float(fx.nebbia)
 
 
-# di notte le lampade delle torri si accendono forte, con un alone finto (niente luci vere in più)
+# di notte le lampade delle torri si accendono forte, con un alone finto (niente luci vere in più).
+# I pannelli arrivano da stadio.lampade_fari (riferimenti diretti: per nome se ne trovava uno solo su quattro).
 func _stadio(stadio: Node, notte: bool) -> void:
 	if stadio == null or not notte:
 		return
-	for c in stadio.get_children():
-		if not (c is MeshInstance3D and String(c.name).begins_with("FaroLampade")):
-			continue
-		var mi := c as MeshInstance3D
+	var lampade: Variant = stadio.get("lampade_fari")
+	if not lampade is Array:
+		return
+	for mi: MeshInstance3D in lampade:
 		if mi.material_override is StandardMaterial3D:
 			(mi.material_override as StandardMaterial3D).emission_energy_multiplier = NOTTE_LAMPADE
 		var alone := MeshInstance3D.new()
@@ -230,10 +231,12 @@ func _stadio(stadio: Node, notte: bool) -> void:
 		alone.mesh = q
 		alone.material_override = _materiale_alone()
 		alone.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		alone.position = mi.position
+		alone.position = (stadio as Node3D).transform * mi.position if stadio is Node3D else mi.position
 		add_child(alone)
+		aloni.append(alone)
 
 
+var aloni: Array[MeshInstance3D] = []   # un alone per torre faro accesa (di notte 4)
 var _mat_alone: StandardMaterial3D = null
 
 

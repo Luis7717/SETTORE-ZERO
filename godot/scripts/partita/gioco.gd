@@ -64,6 +64,7 @@ const Replay := preload("res://scripts/partita/replay.gd")
 const Cronaca := preload("res://scripts/partita/cronaca.gd")
 const CronacaVista := preload("res://scripts/partita/cronaca_vista.gd")
 const Meteo := preload("res://scripts/partita/meteo.gd")
+const TifoEventi := preload("res://scripts/partita/tifo_eventi.gd")
 const SCENA_VISTA := "res://scenes/vista_partita.tscn"
 
 # velocità del tempo (rallenty), come src/main.js
@@ -100,6 +101,7 @@ var esultanza: EsultanzaRegia = null  # esultanza del campione dopo un suo gol (
 var replay: Replay = null     # replay del gol (null in allenamento o con --senza-replay)
 var cronaca: Cronaca = null   # cronaca scritta (null in allenamento)
 var cronaca_vista: CronacaVista = null
+var tifo_eventi := TifoEventi.new()   # fatti del motore → pubblico 3D e cori (occasione, parata, palo, fischio)
 var _festa_finita := false    # il motore ha finito la festa del gol ed è trattenuto (aspetta esultanza e replay)
 var _esultanza_in_corso := false
 
@@ -366,6 +368,7 @@ func _eventi() -> void:
 			adv = true
 	for e: Dictionary in m.events:
 		_evento(e, adv)
+		tifo_eventi.applica(e, vista, audio)
 		if cronaca != null:
 			cronaca_vista.mostra(cronaca.leggi(e, Time.get_ticks_msec() / 1000.0), e.type == "goal")
 	m.events.clear()

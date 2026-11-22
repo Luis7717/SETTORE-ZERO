@@ -45,6 +45,9 @@ var _tribune: Array = []               # per il pubblico 3D: {a0, b0, a1, b1, ti
 var pubblico: Node3D
 var cartelloni: Node3D
 var maxischermo: Node3D
+# pannelli delle lampade delle 4 torri faro (meteo.gd li accende di notte): riferimenti diretti, perché fuori
+# dall'albero o con nomi doppi Godot rinomina i nodi (@MeshInstance3D@n) e cercarli per nome ne trova uno solo
+var lampade_fari: Array[MeshInstance3D] = []
 
 
 func _ready() -> void:
@@ -334,6 +337,7 @@ func _faro(sx: float, sy: float) -> void:
 	lampade.rotation.x = deg_to_rad(-25.0)
 	lampade.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(lampade)
+	lampade_fari.append(lampade)
 
 
 # pannello delle lampade: 8 × 4 fari tondi accesi su una griglia scura (col bagliore si accendono)

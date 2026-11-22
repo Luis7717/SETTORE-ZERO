@@ -38,6 +38,7 @@ const SimRng := preload("res://sim/rng.gd")
 const DT := 1.0 / 60.0
 const SLOW := 0.22             # rallenty (come l'area di tiro del gioco web)
 const FiguraMocap := preload("figura_mocap.gd")
+const TifoEventi := preload("tifo_eventi.gd")
 
 var vista: PartitaVista
 var m: SimMatch
@@ -54,7 +55,7 @@ var _n := 0
 var _gpu_ms := 0.0             # tempo della scheda video e del disegno sul processore (misurati da Godot)
 var _cpu_ms := 0.0
 var _n_misure := 0
-var _ultimo_tiro := 0          # squadra dell'ultimo tiro (il palo non dice di chi era)
+var _tifo := TifoEventi.new()  # fatti del motore → tifo (come in partita vera)
 var _segui: Object = null      # giocatore da guardare da vicino (scene mocap)
 
 
@@ -173,18 +174,8 @@ func _eventi() -> void:
 		match e.type:
 			"dribble": # lo Scatto (evento 'burst') non ha giochetto
 				vista.trick(e.p)
-			"kick":
-				if e.get("kind") == "shot" and e.p != null:
-					_ultimo_tiro = e.p.team
-					vista.tifo("occasione", e.p.team)
-			"post":
-				vista.tifo("palo", _ultimo_tiro)
-			"save":
-				if e.p != null:
-					vista.tifo("parata", e.p.team)
-			"foul":
-				if e.get("by") != null:
-					vista.tifo("fischio", e.by.team)
+			_:
+				_tifo.applica(e, vista)
 	m.events.clear()
 
 

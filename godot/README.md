@@ -555,7 +555,8 @@ dopo la vista) e mostra "Notte · Pioggia" sotto il titolo all'inizio.
   - tramonto: sole basso e caldo da ovest, ombre lunghe;
   - notte: nessuna luce in più (le ombre multiple costano sull'iPhone). La luce principale diventa quella dei fari
     (alta, bianca), l'ambiente un colore blu tenue, lo stadio passa su uno strato che la luce non illumina (tribune
-    scure, campo illuminato; cartelloni e maxischermi esclusi), lampade delle torri più forti con un alone finto;
+    scure, campo illuminato; cartelloni e maxischermi esclusi), lampade delle torri più forti con un alone finto (tutte e 4: i pannelli arrivano da
+    `stadio.lampade_fari`, non per nome; foto da lontano: `$G --path godot -s res://tests/foto_fari.gd -- --file=shots/fari.png`);
   - il pubblico 3D (uniform `luce`) si scurisce di notte, al tramonto e col brutto tempo;
   - pioggia (900 righe) e neve (700 fiocchi): `GPUParticles3D` in una scatola che segue la telecamera (solo la
     posizione, così cadono dritte); nel rallenty rallentano (`ts` di `gioco.gd`);
@@ -737,7 +738,7 @@ Contratto di `PartitaVista` (`scripts/partita/vista.gd`, radice di `scenes/vista
 | `show_path(points, kind, end_h := 0.0, recv := null)` / `clear_path()` | linea a nastro: "run", "pass" (anello verde sul compagno entro 5 m), "shot" (gialla col mirino), "def" |
 | `show_preview(points, offside_y := NAN)` | puntini del volo e linea del fuorigioco (facoltativo: nel gioco li fa l'interfaccia) |
 | `trick(p, r := -1.0) -> Dictionary` | giochetto del dribbling per p (solo grafica): {id, name, dur} |
-| `tifo(tipo: String, squadra: int)` | reazione del pubblico: "gol", "occasione" (tiro), "parata", "palo", "fischio"; squadra = chi segna / tira / para / prende il palo / subisce il fischio. Il gol la vista lo vede da sola dal punteggio (festa una volta per gol: tifosi, maxischermo, coriandoli) |
+| `tifo(tipo: String, squadra: int)` | reazione del pubblico: "gol", "occasione" (tiro), "parata", "palo", "fischio"; squadra = chi segna / tira / para / prende il palo / subisce il fischio. Il gol la vista lo vede da sola dal punteggio (festa una volta per gol: tifosi, maxischermo, coriandoli). In partita vera la chiama `gioco.gd` (`_eventi`) tramite `scripts/partita/tifo_eventi.gd`: tiro (anche di testa o al volo) = occasione, parata, palo, fallo; sul tiro salgono anche i cori (`audio.occasione()`) |
 | `set_rallenty(k: float)` | facoltativa: 0..1 quanto è "rallenty" (profondità di campo); < 0 = la vista lo ricava da `dt_game / dt_real` |
 | `set_qualita(l: int)` | livello grafico 3 alto, 2 medio, 1 basso, 0 minimo; `qualita_auto` (vero) lo abbassa da sola sotto 58 fps, `livello_qualita` dice quello in uso |
 | `dispose()` | via figure e riferimenti; va bene anche da `_exit_tree` del padre |
