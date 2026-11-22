@@ -42,8 +42,11 @@ ogni cambio al motore si fa in tutte e due, con le fixture rigenerate.
 - **13. Allenamento libero**: tiri, punizioni, rigori con punteggio.
 
 ## Tenute da parte (da provare più avanti)
-- 2. Tiro caricato col dito fermo (più forza, meno precisione).
-- 3. Passaggio di prima (disegnare il gesto successivo mentre il pallone viaggia).
+- 2. Tiro caricato col dito fermo: **scartato** (Luis 2026-11-22). Al suo posto la **forma del tratto**: dritto =
+  rasoterra, curvo = a effetto e alto, con la potenza giusta per arrivare dove finisce la linea (fatto, da provare
+  sull'iPhone). Insieme: col pallone ogni linea è un passaggio o un tiro, niente più strada da correre; nell'allenamento
+  guidato le lezioni Passaggio rasoterra, Passaggio a effetto, Tiro rasoterra e Tiro a giro con la linea guida da seguire.
+- 3. Passaggio di prima (disegnare il gesto successivo mentre il pallone viaggia): **fatto** (2026-11-22, da provare sull'iPhone).
 
 ## Fuori dalle fasi
 - **Altezza e corporatura** dei giocatori (2026-11-22, fatta, da provare sull'iPhone): basso/medio/alto e

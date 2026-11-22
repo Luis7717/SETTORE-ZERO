@@ -65,7 +65,24 @@
   predefinito `C:/Program Files/Google/Chrome/Application/chrome.exe`. Debug in pagina: `window.__G`, `__career`, `__view`, `__ui`, `__start`.
 
 ## Gesti (tutto a un dito)
-- Col pallone, fuori dal duello: disegna dal giocatore = **strada da correre** (con tanta strada davanti scatta); linea che finisce in porta = tiro.
+- **Col pallone ogni linea è un calcio** (Luis 2026-11-22), in ogni zona del campo e non solo nei rallenty: si disegna
+  dal pallone (o dal portatore); linea che finisce in porta = **tiro**, ogni altra = **passaggio** (a un compagno entro 5 m
+  dalla fine o nello spazio). Niente più strada da correre né scatto lungo disegnato: il portatore si muove da solo (IA,
+  `ai.gd`); col pallone il tocco e il dito tenuto non lo guidano. Restano i tasti Scatto e Dribbling dei rallenty.
+- **Forma del tratto** (`sim/match.gd`, `spec.tratto`): curvatura = quanto la linea si allontana dalla corda inizio-fine.
+  Sotto `max(CURVE_MIN_M 1,2 m, CURVE_MIN_FRAC 15% della lunghezza)` è **dritta** = **rasoterra** (passaggio rasoterra che
+  arriva al compagno a `GROUND_ARRIVE` 5 m/s o si ferma dove finisce la linea nello spazio; tiro rasoterra che rotola
+  fino al punto della porta). Sopra è **curva** = **a effetto e alta**: gira dal lato della curva disegnata (la pancia del
+  volo è quella della linea) e si alza scavalcando chi sta in mezzo, di più con più curva (`CURVE_T_MIN`,
+  `CURVE_T_EXTRA`; tiro a giro con punto più alto `CURL_APEX_MIN..MAX`, entra all'altezza dove finisce la linea). Anche il
+  cross: dritto rasoterra, curvo alto (apre il fermatempo del colpo di testa); `isCross` tolto. L'IA (senza `tratto`)
+  resta come prima. Il tiro caricato è stato scartato (Luis 2026-11-22): la potenza la sceglie il gioco.
+- **Di prima** (2026-11-22): mentre un nostro passaggio viaggia, dito sul compagno che lo riceverà (entro 6 m dal volo
+  previsto, `PRIMA_VOLO_M`) = si disegna già il calcio dopo (passaggio o tiro, stessa forma del tratto); a dito alzato la
+  linea resta **tratteggiata** (verde, gialla se tiro) sul compagno finché arriva il pallone, poi lui calcia **subito,
+  senza stop** (`userQueue` / `fireQueued`, un po' meno preciso: `FIRST_SIG` + `FIRST_SIG_STAT` per punto che manca a
+  100). Se il pallone lo prende un altro, cambia volo o il gioco si ferma, il calcio si annulla. Se il pallone arriva
+  mentre si disegna ancora, la linea continua come un calcio normale.
 - **Duello** (portatore a 7 m da un difensore davanti, anche "per linee": vedi Scatto): visuale bassa, tempo all'8%. Si
   passa a qualunque compagno **solo disegnando** fino al compagno (il tocco sul compagno non passa più, 2026-11-20);
   oppure tasto **Dribbling** in basso. Il tasto **prenota** il dribbling (2026-11-21): sparisce, il tempo torna normale e
@@ -75,7 +92,7 @@
   da quel lato (`e.side`) e il portatore gli passa accanto senza attraversarlo. Se il duello finisce prima (palla persa,
   passaggio, difensore lontano) la prenotazione si annulla. L'IA dribbla subito, a 3,2 m, come prima.
 - **Area di tiro** (ultimi 20 m prima della porta avversaria, col pallone): tempo al 22%; linea in porta = tiro,
-  ogni altra linea = passaggio (fino a un compagno entro 5 m, o nello spazio): nei rallenty niente corsa disegnata (2026-11-21). Anche sulle rimesse il passaggio si disegna.
+  ogni altra linea = passaggio (fino a un compagno entro 5 m, o nello spazio). Anche sulle rimesse il passaggio si disegna.
 - **Visuale girata col dito** (duello e area di tiro, pallone nostro): trascinare di lato partendo lontano dal portatore
   gira la telecamera intorno a lui (si afferra il campo: 150° per schermo, al massimo ±100°, `src/camuser.js`); niente
   più rotazione automatica. Il tocco breve sul campo o su un compagno lì non fa niente. Resta finché dura il rallenty

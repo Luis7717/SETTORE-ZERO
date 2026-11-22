@@ -1,7 +1,8 @@
 # "Dito finto" per le prove senza persona (gioco.gd --bot): gioca la squadra 0 SOLO coi gesti veri, cioè posizioni
-# sullo schermo passate a scripts/partita/gesti.gd come farebbe un dito (giù, trascina, su). Disegna strade, passaggi,
-# tiri, linee di difesa e tuffi del portiere, tiene premuto per muovere il controllato, preme Dribbling nel duello e Scatto
-# nella fuga (avversario alla pari o dietro), disegna il colpo di testa nel suo fermatempo e gira la visuale nel rallenty. Non è un giocatore bravo: serve a far passare una partita intera da tutti i gesti.
+# sullo schermo passate a scripts/partita/gesti.gd come farebbe un dito (giù, trascina, su). Disegna passaggi e tiri
+# (dritti = rasoterra, curvi = alti a effetto), linee di difesa e tuffi del portiere, tiene premuto per muovere il controllato
+# (senza pallone), preme Dribbling nel duello e Scatto nella fuga (avversario alla pari o dietro), disegna il colpo di testa
+# nel suo fermatempo e gira la visuale nel rallenty. Non è un giocatore bravo: serve a far passare una partita intera da tutti i gesti.
 extends RefCounted
 
 const SimRng := preload("res://sim/rng.gd")
@@ -14,7 +15,7 @@ const ATTESA_MIN := 6          # fotogrammi tra un gesto e l'altro (più un po' 
 const ATTESA_CASO := 10
 
 var r: SimRng
-var conti := {"strada": 0, "passaggio": 0, "tiro": 0, "difesa": 0, "tuffo": 0, "dribbling": 0, "scatto": 0, "visuale": 0, "tieni": 0, "testa": 0, "saltati": 0}
+var conti := {"passaggio": 0, "curvo": 0, "tiro": 0, "difesa": 0, "tuffo": 0, "dribbling": 0, "scatto": 0, "visuale": 0, "tieni": 0, "testa": 0, "saltati": 0}
 var _gesto: Array[Vector2] = []
 var _fine_mondo: Variant = null  # Vector3(x, y, h) del campo dove deve finire la linea (si riproietta al rilascio)
 var _attesa := 0
@@ -127,10 +128,8 @@ func _attacca(g, now: int, c: R.Player, dir: float) -> void:
 			_linea(g, now, _sch(g, m.ball.x, m.ball.y, 0.3), _sch(g, porta.x, porta.y, porta.z), "tiro", porta)
 		else:
 			_passa(g, now, c)
-	else:
-		var tx := clampf(c.x + (r.next() - 0.5) * 16.0, -C.HW + 3.0, C.HW - 3.0)
-		var ty := clampf(c.y + dir * (8.0 + r.next() * 10.0), -C.HL + 3.0, C.HL - 3.0)
-		_linea(g, now, _sch(g, m.ball.x, m.ball.y, 0.3), _sch(g, tx, ty, 0.0), "strada")
+	elif tiro < 0.25: # il portatore corre da solo (IA): ogni tanto un passaggio
+		_passa(g, now, c)
 
 
 # passaggio disegnato dal pallone al compagno più avanti tra i tre più vicini
@@ -148,7 +147,12 @@ func _passa(g, now: int, c: R.Player) -> void:
 			punti = v
 			best = p
 	if best != null:
-		_linea(g, now, _sch(g, m.ball.x, m.ball.y, 0.3), _sch(g, best.x, best.y, 0.0), "passaggio")
+		var a := _sch(g, m.ball.x, m.ball.y, 0.3)
+		var b := _sch(g, best.x, best.y, 0.0)
+		if r.next() < 0.3:
+			_curva(g, now, a, b, 0.3 * (1.0 if r.next() < 0.5 else -1.0), "curvo")
+		else:
+			_linea(g, now, a, b, "passaggio")
 
 
 func _piu_vicino(m, me: int, x: float, y: float) -> R.Player:
@@ -184,6 +188,23 @@ func _linea(g, now: int, a: Vector3, b: Vector3, tipo: String, fine_mondo: Varia
 	_gesto.clear()
 	for i in range(1, PUNTI_LINEA + 1):
 		_gesto.append(pa.lerp(pb, float(i) / PUNTI_LINEA))
+	conti[tipo] += 1
+
+
+## linea curva da a a b sullo schermo: pancia = frazione della lunghezza (col segno del lato), arco di parabola
+func _curva(g, now: int, a: Vector3, b: Vector3, pancia: float, tipo: String, fine_mondo: Variant = null) -> void:
+	if not _dentro(g, a) or not _dentro(g, b):
+		conti.saltati += 1
+		return
+	_fine_mondo = fine_mondo
+	var pa := Vector2(a.x, a.y)
+	var pb := Vector2(b.x, b.y)
+	var n := (pb - pa).orthogonal() * pancia
+	g.gesti.down(pa, now, 0)
+	_gesto.clear()
+	for i in range(1, PUNTI_LINEA + 1):
+		var u := float(i) / PUNTI_LINEA
+		_gesto.append(pa.lerp(pb, u) + n * 4.0 * u * (1.0 - u))
 	conti[tipo] += 1
 
 

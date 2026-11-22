@@ -34,6 +34,9 @@ const TUFFO_MIN_PX := 22.0      # linea del portiere più corta = niente tuffo
 const PRESA_PORTATORE := [64.0, 0.085]  # raggio di presa attorno al pallone o al portatore: max(px, frazione dell'altezza)
 const PRESA_PROPRIO := [50.0, 0.065]    # raggio di presa di un proprio giocatore (linea di difesa)
 const PRESA_COMPAGNO := [46.0, 0.06]    # raggio di presa di un compagno (tocco per comandarlo)
+# Di prima: mentre il nostro passaggio viaggia, dito sul compagno che lo riceve = si disegna già il calcio dopo
+const PRIMA_VOLO_M := 6.0       # vale per un compagno entro tanti metri dal volo previsto del pallone
+const PRIMA_VOLO_SEC := 3.0     # volo previsto per tanti secondi
 
 
 ## Ordini al motore (le funzioni `out` di src/main.js)
@@ -67,6 +70,9 @@ class ComandiPartita:
 	func run(i: int, punti: Array) -> void:
 		m.userRun(tm, m.team(tm)[i], punti)
 
+	func queue(i: int, spec: Dictionary) -> void:
+		m.userQueue(tm, m.team(tm)[i], spec)
+
 	func header(spec: Dictionary) -> void:
 		m.userHeader(tm, spec)
 
@@ -94,11 +100,15 @@ var cam_used := false            # la persona ha già girato la visuale almeno u
 var runner: R.Player = null      # giocatore della linea di difesa
 ## anteprima del calcio che si sta disegnando, per l'HUD: punti del volo {x, y, h}, linea del fuorigioco, ricevitore
 var anteprima := {"punti": [], "fuorigioco": NAN, "ricevitore": null}
+var prima_p: R.Player = null     # di prima: compagno da cui parte la linea che si sta disegnando
+## di prima: calcio già preparato che aspetta il pallone {p, punti [{x, y, h}], tiro}; {} = nessuno (vedi attesa_viva)
+var attesa := {}
 
 
 func set_match(m: SimMatchScript, tm: int) -> void:
 	partita = m
 	team = tm
+	attesa = {}
 	cancel()
 
 
@@ -107,6 +117,7 @@ func cancel() -> void:
 	dito = -1
 	drawing = false
 	pts = []
+	prima_p = null
 	end_cam()
 	_pulisci_anteprima()
 	if vista != null:
@@ -171,6 +182,15 @@ func down(p: Vector2, now_ms: int, indice: int = 0) -> void:
 		cam_on = false
 		yaw0 = vista.user_yaw
 		return
+	# di prima: il nostro passaggio viaggia e il dito è sul compagno che lo riceve = si disegna già il calcio dopo
+	if hint == "loose":
+		var rp := _ricevente(x, y)
+		if rp != null:
+			mode = "prima"
+			drawing = true
+			prima_p = rp
+			pts = [{"x": rp.x, "y": rp.y, "h": 0.0, "sx": x, "sy": y}]
+			return
 	# difesa: dito su un proprio giocatore = linea da fargli seguire (tutti tranne il portiere)
 	if hint == "defend" or hint == "loose":
 		var r := near_own(x, y)
@@ -235,18 +255,10 @@ func mate_at(px: float, py: float, Rr: float = PASS_SNAP) -> R.Player:
 	return best
 
 
-## la linea è una strada da correre? No se finisce in porta, in rimessa e in ogni rallenty (duello, fuga, area di tiro):
-## lì ogni linea è un passaggio (Luis 2026-11-21: durante il rallenty niente corsa disegnata)
+## la linea è una strada da correre? Mai più (Luis 2026-11-22): col pallone ogni linea è un passaggio o un tiro,
+## il portatore si muove da solo. Resta per chi la chiede ancora (gioco.gd: rallenty del disegno).
 func run_path() -> bool:
-	var m := partita
-	if pts.is_empty():
-		return false
-	var e: Dictionary = pts[-1]
-	if e.get("goal", false):
-		return false
-	if m.phase == "restart":
-		return false
-	return not m.passFor(team)
+	return false
 
 
 ## punto del campo sotto il dito; null se guarda il cielo
@@ -286,7 +298,7 @@ func move_ev(p: Vector2, indice: int = 0) -> void:
 	moved += Vector2(p.x - x, p.y - y).length()
 	x = p.x
 	y = p.y
-	if mode == "draw" or mode == "head":
+	if mode == "draw" or mode == "head" or mode == "prima":
 		var last: Dictionary = pts[-1]
 		if Vector2(x - last.sx, y - last.sy).length() >= PUNTO_OGNI_PX:
 			var q: Variant = pick(x, y)
@@ -298,6 +310,8 @@ func move_ev(p: Vector2, indice: int = 0) -> void:
 					pts.remove_at(1)
 			if mode == "head":
 				show_head()
+			elif mode == "prima":
+				_mostra_prima()
 			else:
 				show_path()
 	elif mode == "dpath":
@@ -352,10 +366,6 @@ func show_path() -> void:
 	pts[0].x = b.x
 	pts[0].y = b.y
 	var e: Dictionary = pts[-1]
-	if run_path(): # strada da correre
-		vista.show_path(_xy(pts), "run")
-		_pulisci_anteprima()
-		return
 	var recv: R.Player = null
 	if not e.get("goal", false):
 		recv = mate_at(e.x, e.y)
@@ -393,11 +403,13 @@ func head_spec() -> Dictionary:
 
 
 func spec() -> Dictionary:
-	var b := partita.ball
+	return spec_da(partita.ball.x, partita.ball.y)
+
+
+## calcio della linea pts partendo da (bx, by): il pallone, o il compagno che lo riceverà (di prima)
+func spec_da(bx: float, by: float) -> Dictionary:
 	var e: Dictionary = pts[-1]
 	var gy := goal_y()
-	var bx := b.x
-	var by := b.y
 	var tx: float = e.x
 	var ty: float = e.y
 	var type := "auto"
@@ -420,7 +432,8 @@ func spec() -> Dictionary:
 		var d: float = (q.x - bx) * nx + (q.y - by) * ny
 		if absf(d) > absf(curve):
 			curve = d
-	return {"type": type, "tx": tx, "ty": ty, "th": th, "curve": curve}
+	# tratto: il motore sceglie il colpo dalla forma della linea (dritta = rasoterra, curva = a effetto e alta)
+	return {"type": type, "tx": tx, "ty": ty, "th": th, "curve": curve, "tratto": true}
 
 
 ## punto della propria porta sotto il dito (la telecamera è dietro la porta mentre si para): {x, h} o null
@@ -472,16 +485,13 @@ func up(_p: Vector2, now_ms: int, indice: int = 0, annullato: bool = false) -> v
 	mode = ""
 	if m == null:
 		return
+	if md == "prima":
+		_alza_prima()
+		return
 	if md == "draw":
 		drawing = false
 		if pts.size() >= 2 and _lunghezza_px(pts) > LINEA_MIN_PX:
-			if run_path():
-				var strada: Array = []
-				for q: Dictionary in pts.slice(1):
-					strada.append({"x": q.x, "y": q.y})
-				out.path(strada)
-			else:
-				out.kick(spec())
+			out.kick(spec())
 		pts = []
 		_pulisci_anteprima()
 		vista.clear_path()
@@ -519,6 +529,8 @@ func up(_p: Vector2, now_ms: int, indice: int = 0, annullato: bool = false) -> v
 	if md != "move":
 		return
 	var hint: String = m.hint(T)
+	if hint == "attack":
+		return # col pallone il portatore si muove da solo (IA): tocco e dito tenuto non lo guidano (Luis 2026-11-22)
 	if dist < TOCCO_PX and dt < TOCCO_MS:
 		var mate := near_mate(x, y)
 		if mate != null:
@@ -543,7 +555,18 @@ static func _lunghezza_px(linea: Array) -> float:
 # ---------------------------------------------------------------- a ogni fotogramma
 ## tenendo premuto il giocatore segue il dito; mentre si disegna si aggiorna l'anteprima
 func update(now_ms: int) -> void:
-	if mode == "move" and dito >= 0 and (now_ms - t0 > TENUTO_MS or moved > TENUTO_PX):
+	attesa_viva()
+	if mode == "prima" and partita != null:
+		var bp := partita.ball
+		if bp.owner != null and bp.owner == prima_p and partita.ctrl[team] == prima_p:
+			mode = "draw" # il pallone è già arrivato: la linea continua come un calcio normale
+			prima_p = null
+		elif not _volo_nostro():
+			cancel()
+			return
+		else:
+			_mostra_prima() # la linea parte sempre dal compagno, anche mentre corre incontro al pallone
+	if mode == "move" and dito >= 0 and (now_ms - t0 > TENUTO_MS or moved > TENUTO_PX) and not _portatore_nostro():
 		var gv: Variant = _campo(x, y)
 		if gv != null:
 			var g: Vector2 = gv
@@ -561,6 +584,70 @@ func update(now_ms: int) -> void:
 		mode = "move"
 	if mode == "head" and partita != null and not partita.headFor(team):
 		cancel() # il pallone è arrivato (o è andato via) prima della fine della linea
+
+
+# ---------------------------------------------------------------- di prima
+## il pallone ce l'ha il nostro giocatore controllato, in gioco (si muove da solo)
+func _portatore_nostro() -> bool:
+	return partita != null and partita.hint(team) == "attack"
+
+
+## il pallone è un nostro passaggio in volo?
+func _volo_nostro() -> bool:
+	var b := partita.ball
+	return partita.phase == "play" and b.owner == null and b.kick != null and b.kick.team == team and b.kick.type != "shot"
+
+
+## compagno sotto il dito che può ricevere il nostro passaggio in volo (vicino al volo previsto del pallone)
+func _ricevente(px: float, py: float) -> R.Player:
+	if not _volo_nostro():
+		return null
+	var r := near_own(px, py)
+	if r == null or r == partita.ball.kick.kicker:
+		return null
+	var s := partita.ball.physCopy()
+	var dt := 1.0 / 30.0
+	var best := C.hyp(s.x - r.x, s.y - r.y)
+	for i in int(PRIMA_VOLO_SEC / dt):
+		C.ballPhys(s, dt, partita.roll)
+		best = minf(best, C.hyp(s.x - r.x, s.y - r.y))
+	return r if best < PRIMA_VOLO_M else null
+
+
+func _mostra_prima() -> void:
+	if pts.size() < 2 or prima_p == null:
+		return
+	pts[0].x = prima_p.x
+	pts[0].y = prima_p.y
+	vista.show_path(_xy(pts), "shot" if pts[-1].get("goal", false) else "pass")
+
+
+## dito alzato dopo aver disegnato dal compagno che riceve: il calcio aspetta il pallone (userQueue)
+func _alza_prima() -> void:
+	drawing = false
+	var r := prima_p
+	prima_p = null
+	vista.clear_path()
+	if r != null and pts.size() >= 2 and _lunghezza_px(pts) > LINEA_MIN_PX:
+		pts[0].x = r.x
+		pts[0].y = r.y
+		var sp := spec_da(r.x, r.y)
+		var punti: Array = []
+		for q: Dictionary in pts:
+			punti.append({"x": q.x, "y": q.y, "h": q.h})
+		attesa = {"p": r, "punti": punti, "tiro": sp.type == "shot"}
+		out.queue(r.i, sp)
+	pts = []
+
+
+## calcio di prima ancora in attesa (per l'HUD): {} se è partito o si è annullato
+func attesa_viva() -> Dictionary:
+	if attesa.is_empty():
+		return attesa
+	var q: Variant = partita.queued[team] if partita != null else null
+	if q == null or q.p != attesa.p:
+		attesa = {}
+	return attesa
 
 
 # ---------------------------------------------------------------- piano della porta senza screen_to_goal

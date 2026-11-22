@@ -198,8 +198,8 @@ $G --headless --path godot -s res://tests/prova_partita.gd
 Ciclo come `src/main.js`: a ogni fotogramma **gesti** (`gesti.update`) → **motore** a passi di al massimo 1/60 s
 col tempo scalato → **eventi** (suoni, scritte) → **vista** (`update_view(dt_game, dt_real)`, con
 `dt_game = dt · max(velocità del tempo, 0,25)` e `dt_real = dt`, come `view.update` e `view.rdt` del web).
-Rallenty con le costanti di `src/main.js`: duello 0,08, fuga 0,08, area di tiro 0,1, disegno di passaggio o tiro 0,04, di strada
-0,25, di linea di difesa 0,13, parata 0,1; il tempo passa dolcemente da una velocità all'altra (14/s).
+Rallenty con le costanti di `src/main.js`: duello 0,08, fuga 0,08, area di tiro 0,1, disegno di passaggio o tiro 0,04 (anche
+fuori dai rallenty: col pallone ogni linea è un calcio), di linea di difesa 0,13, parata 0,1; il tempo passa dolcemente da una velocità all'altra (14/s).
 Tempo di un tempo: 150 s (come il web). Squadra della persona: la 0 (Virtus Borgoalto), contro Aurora Portosole (IA).
 
 **Contratto della vista** (la vista vera è `class_name PartitaVista`, scena `scenes/vista_partita.tscn`; se manca si
@@ -213,18 +213,19 @@ usa `scripts/partita/vista_finta.gd`, che ha le stesse firme):
 | `gioco.gd` | `dispose()` | uscendo dalla scena (anche "Nuova partita") |
 | `gesti.gd` | `world_to_screen(x, y, h)` → `Vector3(x_px, y_px, visibile)` | presa di pallone, portatore, giocatori; omografia della porta |
 | `gesti.gd` | `screen_to_field(p)` → `Vector2` (non finito = cielo) | punti di strade, linee di difesa, "tieni premuto" |
-| `gesti.gd` | `show_path(punti, kind)` / `clear_path()` | mentre si disegna: `run`, `pass`, `shot` (anche il tuffo), `def` (già tagliata a 14 m) |
+| `gesti.gd` | `show_path(punti, kind)` / `clear_path()` | mentre si disegna: `pass`, `shot` (anche il tuffo), `def` (già tagliata a 14 m) |
 | `gesti.gd` | `user_yaw`, `cam_drag` | visuale girata col dito (la vista la usa e la riporta a 0 fuori dal rallenty) |
 | `anteprima.gd` | `world_to_screen` | puntini del volo, linea del fuorigioco, cerchio su chi riceve (2D sopra la vista) |
 | facoltativi | `screen_to_goal(p, gy)` → `Vector3(x, h, 1/0)`, `set_zoom(z)` | se ci sono si usano; senza, la porta si trova con un'omografia da 4 punti di `world_to_screen` (pali e traversa) e lo zoom non si cambia |
 
 `visibile` = il punto è **davanti** alla telecamera (non "dentro lo schermo"): serve all'omografia.
 
-Gesti (porting di `src/input.js`, costanti con nome in cima a `gesti.gd`): strada dal portatore (con tanta strada
-scatta), linea in porta = tiro, linea fino a un compagno = passaggio (**il tocco su un compagno col pallone non passa
-mai**), duello (avversario davanti "per linee") col tasto Dribbling, fuga (avversario alla pari o dietro entro 4 m)
-col tasto Scatto, e in ogni rallenty (duello, fuga, area di tiro) niente corsa disegnata: ogni linea è un passaggio
-(al compagno o nello spazio) o un tiro se finisce in porta (Luis 2026-11-21), linee di
+Gesti (porting di `src/input.js`, costanti con nome in cima a `gesti.gd`): col pallone ogni linea dal pallone è un
+calcio, ovunque (Luis 2026-11-22, niente più strada da correre: il portatore si muove da solo): linea in porta = tiro,
+ogni altra = passaggio (al compagno o nello spazio; **il tocco su un compagno col pallone non passa mai**); tratto
+dritto = rasoterra, curvo = a effetto e alto (soglie `CURVE_*` in `sim/match.gd`); di prima: mentre il nostro passaggio
+viaggia, linea dal compagno che riceve, che calcia appena tocca il pallone (`userQueue`); duello (avversario davanti
+"per linee") col tasto Dribbling, fuga (avversario alla pari o dietro entro 4 m) col tasto Scatto, linee di
 difesa da ogni proprio giocatore tranne il portiere (si vedono già tagliate a 14 m), tieni premuto = muovi il
 controllato (lontano = scatto), tocco su un proprio giocatore in difesa = comandarlo, portiere (linea dal portiere al
 punto della porta, tuffo al rilascio), rimesse (si disegna da ovunque, tranne nel calcio d'angolo: solo vicino al

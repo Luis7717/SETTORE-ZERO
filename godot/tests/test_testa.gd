@@ -156,16 +156,37 @@ func test_sponda_verso_il_compagno() -> bool:
 	return done()
 
 
-func test_cross_disegnato_dalla_fascia_e_alto() -> bool:
+# Luis 2026-11-22: anche il cross lo decide la forma del tratto (dritto = rasoterra, curvo = alto a effetto)
+func test_cross_disegnato_lo_decide_la_forma_del_tratto() -> bool:
 	var m := H.scene(2, [true, false])
 	var k: R.Player = m.team(0)[7]
 	H.wake(k, 25.0, C.HL - 10.0)
 	H.give(m, k)
-	eq(m.launch(k, {"type": "auto", "tx": 1.0, "ty": C.HL - 8.0}, false).type, "loft", "cross verso l'area = pallone alto")
-	eq(m.launch(k, {"type": "auto", "tx": 22.0, "ty": C.HL - 20.0}, false).type, "ground", "passaggio corto sulla fascia = rasoterra")
-	H.wake(k, 25.0, 0.0)
-	H.give(m, k)
-	eq(m.launch(k, {"type": "auto", "tx": 10.0, "ty": 12.0}, false).type, "ground", "a centrocampo resta rasoterra")
+	eq(m.launch(k, {"type": "auto", "tx": 1.0, "ty": C.HL - 8.0, "curve": 0.5, "tratto": true}, false).type, "ground", "cross dritto = rasoterra")
+	eq(m.launch(k, {"type": "auto", "tx": 1.0, "ty": C.HL - 8.0, "curve": 6.0, "tratto": true}, false).type, "loft", "cross curvo = pallone alto")
+	return done()
+
+
+func test_cross_curvo_disegnato_apre_il_fermatempo() -> bool:
+	var aperti := 0
+	for sd in range(1, 5):
+		var a := cross(sd)
+		var m: SimMatchScript = a[0]
+		var p: R.Player = a[1]
+		var k: R.Player = a[2]
+		# rifà il cross come lo disegna la persona: linea curva dalla fascia all'attaccante
+		H.give(m, k)
+		m.ball.kick = null
+		m.ball.x = k.x
+		m.ball.y = k.y + 0.6
+		m.ball.h = 0.0
+		m.ball.vh = 0.0
+		k.stun = 0.0
+		check(m.userKick(0, {"type": "auto", "tx": p.x - 1.5, "ty": p.y + 1.0, "curve": -5.0, "tratto": true}), "seme %d: cross partito" % sd)
+		m.events.clear()
+		if fino_a(m, "head_win", 3.0) != null:
+			aperti += 1
+	check(aperti >= 3, "il cross curvo apre il fermatempo del colpo di testa (%d su 4)" % aperti)
 	return done()
 
 
@@ -235,5 +256,6 @@ static func _cross(m: SimMatchScript, fatto: Dictionary) -> void:
 	for q: R.Player in m.team(0):
 		if q != c and not q.off and q.pos != "P" and absf(q.x) < 12.0 and q.y > C.HL - 16.0:
 			fatto.p = c
-			m.userKick(0, {"type": "auto", "tx": q.x + q.vx * 0.6, "ty": q.y + q.vy * 0.6})
+			# linea curva (il cross alto si disegna curvo: forma del tratto, Luis 2026-11-22)
+			m.userKick(0, {"type": "auto", "tx": q.x + q.vx * 0.6, "ty": q.y + q.vy * 0.6, "curve": 6.0 * signf(c.x), "tratto": true})
 			return

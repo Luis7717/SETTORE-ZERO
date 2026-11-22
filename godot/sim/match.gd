@@ -15,9 +15,21 @@ const RAIN_STUN := 1.25  # pioggia: chi perde un contrasto resta fermo ×1,25 (s
 const SNOW_ROLL := 1.35  # neve: attrito del rotolamento ×1,35 = palla più lenta
 const ENERGY_MIN := 0.2 # energia più bassa possibile (come il calo in partita, motion.gd)
 const PREVIEW_SEC := 2.4 # durata massima dell'anteprima della traiettoria (s)
-const CROSS_X := 14.0 # cross: si calcia da più in fuori di così dal centro (m) ...
-const CROSS_DEPTH := 30.0 # ... e da meno di così dalla linea di fondo avversaria (m)
 const SHOT_V0 := 22.0 # velocità base del tiro (m/s), più la bravura del tiratore
+# Forma del tratto disegnato (spec.tratto, Luis 2026-11-22): dritto = rasoterra, curvo = a effetto e alto.
+# Curvatura = quanto la linea si allontana dalla corda tra inizio e fine (spec.curve, m, col segno del lato).
+const CURVE_MIN_M := 1.2      # sotto tanti metri di curvatura il tratto è dritto (un passaggio di 2-3 m un po' storto resta rasoterra) ...
+const CURVE_MIN_FRAC := 0.15  # ... e anche sotto il 15% della lunghezza
+const CURVE_FULL_FRAC := 0.3  # curvatura pari al 30% della lunghezza = effetto pieno (k = 1)
+const CURVE_T_MIN := 1.25     # passaggio curvo: volo di almeno tanti secondi (punta oltre 2 m: scavalca chi sta in mezzo) ...
+const CURVE_T_EXTRA := 0.5    # ... più tanti secondi a effetto pieno (più alto)
+const CURL_APEX_MIN := 1.4    # tiro a giro: punto più alto del volo (m) con poco effetto ...
+const CURL_APEX_MAX := 2.6    # ... e con effetto pieno
+const GROUND_ARRIVE := 5.0    # passaggio rasoterra: velocità con cui arriva al compagno (m/s)
+const GROUND_ARRIVE_SPACE := 1.0 # ... e nello spazio, dove si deve quasi fermare (m/s)
+const MATE_AT_END := 5.0      # c'è un compagno entro tanti metri dalla fine della linea = passaggio a lui (m)
+const FIRST_SIG := 1.15      # di prima (spec.first): errore di mira ×1,15 ...
+const FIRST_SIG_STAT := 0.008 # ... più 0,008 per ogni punto che manca a 100 (tiro per i tiri, passaggio per il resto)
 const GK_REACT := 0.42 # tempo di reazione base del portiere del computer (s), meno la sua bravura
 const WALL_RANGE := 30.0 # punizione entro questa distanza dalla porta: barriera (m)
 const WALL_DIST := 9.15 # distanza della barriera dal pallone (m)
@@ -32,6 +44,7 @@ const PATH_TTL := 20.0   # durata massima di una strada disegnata (s)
 const PATH_LOOK := 3.0   # il giocatore punta a un punto della strada almeno così avanti: un punto troppo vicino lo frenava e lo scatto non si vedeva (m)
 const RUN_MAX_LEN := 14.0 # lunghezza massima di una linea di difesa, misurata dal giocatore: il resto si taglia (m)
 const SPRINT_DIST := 6.0 # dito più lontano di così dal giocatore controllato (m) = scatto
+var queued: Array = [null, null] # di prima: calcio preparato per squadra {p, spec, kick} (userQueue / fireQueued)
 const CORNER_ATT := [[-3.0, 7.0], [3.0, 8.5], [0.0, 11.5], [-6.0, 10.0], [6.0, 12.5], [-2.0, 19.0], [9.0, 22.0], [-10.0, 46.0], [8.0, 50.0], [0.0, 44.0]]
 const CORNER_DEF := [[-2.6, 5.5], [2.6, 5.5], [0.0, 8.0], [-5.0, 8.5], [5.0, 9.5], [0.0, 13.0], [-3.0, 3.0], [-7.0, 20.0], [8.0, 21.0], [0.0, 38.0]]
 
@@ -389,8 +402,17 @@ func launch(p: R.Player, spec: Dictionary, noise: bool) -> Dictionary:
 		dx = p.fx
 		dy = p.fy
 		D = 1.0
+	var tratto: bool = spec.get("tratto", false)
+	var c: float = C.clamp_(float(spec.get("curve", 0.0)), -D * 0.3, D * 0.3)
+	var curved := tratto and curveIsCurved(D, c)
+	var k := curveK(D, c) if curved else 0.0
+	if tratto and not curved:
+		c = 0.0 # tratto dritto: dritto anche il pallone
 	if type == "auto":
-		type = "loft" if (D > 30.0 or blocked(sx, sy, spec.tx, spec.ty, tm) or isCross(sx, sy, spec.tx, spec.ty, tm)) else "ground"
+		if tratto:
+			type = "loft" if curved else "ground"
+		else:
+			type = "loft" if (D > 30.0 or blocked(sx, sy, spec.tx, spec.ty, tm)) else "ground"
 	var press: float = nearOpp(p.x, p.y, tm)
 	var sig: float
 	if type == "shot":
@@ -399,6 +421,8 @@ func launch(p: R.Player, spec: Dictionary, noise: bool) -> Dictionary:
 		sig = (0.3 + (100.0 - p.st.pas) * 0.025) * (1.4 if type == "loft" else 1.0)
 	if spec.get("human", false):
 		sig *= 0.75
+	if spec.get("first", false):
+		sig *= FIRST_SIG + (100.0 - (p.st.tir if type == "shot" else p.st.pas)) * FIRST_SIG_STAT
 	var a: float = (gauss() if noise else 0.0) * sig * PI / 180.0
 	var ca: float = F.cos_(a)
 	var sa: float = F.sin_(a)
@@ -415,12 +439,17 @@ func launch(p: R.Player, spec: Dictionary, noise: bool) -> Dictionary:
 	var vh: float = 0.0
 	if type == "ground":
 		var rl: float = roll
-		v0 = minf(17.0 + p.st.pas * 0.13, sqrt(25.0 + 2.0 * rollKick * D))
+		var arrive: float = GROUND_ARRIVE
+		if tratto and mateNear(tm, p, spec.tx, spec.ty, MATE_AT_END) == null:
+			arrive = GROUND_ARRIVE_SPACE
+		v0 = minf(17.0 + p.st.pas * 0.13, sqrt(arrive * arrive + 2.0 * rollKick * D))
 		var disc: float = v0 * v0 - 2.0 * rl * D
 		Tt = (v0 - sqrt(disc)) / rl if disc > 0.0 else v0 / rl
 	elif type == "loft":
 		var vm: float = 15.0 + p.st.pas * 0.11
 		Tt = C.clamp_(D / 14.0, 0.75, 2.6)
+		if curved:
+			Tt = C.clamp_(D / 14.0, CURVE_T_MIN, 2.6) + CURVE_T_EXTRA * k
 		if D / Tt > vm:
 			D = vm * Tt
 		v0 = D / Tt
@@ -430,18 +459,45 @@ func launch(p: R.Player, spec: Dictionary, noise: bool) -> Dictionary:
 		Tt = D / v0
 		th = maxf(0.05, th + (gauss() if noise else 0.0) * sig * 0.017 * D)
 		vh = (th + 0.5 * G * Tt * Tt) / Tt
+		if tratto and not curved:
+			# tiro rasoterra: rotola fino alla porta (stessa velocità, niente salita)
+			var disc2: float = v0 * v0 - 2.0 * roll * D
+			Tt = (v0 - sqrt(disc2)) / roll if disc2 > 0.0 else v0 / roll
+			th = 0.0
+			vh = 0.0
+		elif curved:
+			# tiro a giro: sale fino a un punto più alto se l'effetto è forte e arriva in porta all'altezza mirata
+			var apex: float = maxf(lerpf(CURL_APEX_MIN, CURL_APEX_MAX, k), th + 0.3)
+			var vu: float = sqrt(2.0 * G * apex)
+			var T2: float = (vu + sqrt(maxf(0.0, vu * vu - 2.0 * G * th))) / G
+			if D / T2 < v0:
+				v0 = D / T2
+				Tt = T2
+				vh = vu
 	Tt = maxf(Tt, 0.15)
-	var c: float = C.clamp_(float(spec.get("curve", 0.0)), -D * 0.3, D * 0.3)
 	var ac: float = C.clamp_(-8.0 * c / (Tt * Tt), -14.0, 14.0)
 	var lv: float = -ac * Tt / 2.0
-	return {"type": type, "sx": sx, "sy": sy, "v0": v0, "vx": ux * v0 + nx * lv, "vy": uy * v0 + ny * lv, "vh": vh, "cax": nx * ac, "cay": ny * ac, "ct": Tt if ac != 0.0 else 0.0}
+	return {"type": type, "sx": sx, "sy": sy, "v0": v0, "vx": ux * v0 + nx * lv, "vy": uy * v0 + ny * lv, "vh": vh, "cax": nx * ac, "cay": ny * ac, "ct": Tt if ac != 0.0 else 0.0, "curved": curved}
 
 
-# Cross: dalla fascia, vicino alla porta avversaria, verso l'area. La linea disegnata dalla persona ("auto") qui diventa
-# sempre un pallone alto (prima, senza avversari sulla linea, partiva rasoterra e nessuno poteva colpire di testa).
-func isCross(sx: float, sy: float, tx: float, ty: float, tm: int) -> bool:
-	var dir: float = -1.0 if tm else 1.0
-	return absf(sx) > CROSS_X and sy * dir > HL - CROSS_DEPTH and absf(tx) < BOX_W / 2.0 + 2.0 and ty * dir > HL - BOX_D - 3.0 and C.hyp(tx - sx, ty - sy) > 10.0
+## il tratto (curvatura c su lunghezza D, in m) è curvo? Sotto la soglia conta come dritto
+static func curveIsCurved(D: float, c: float) -> bool:
+	return absf(c) >= maxf(CURVE_MIN_M, CURVE_MIN_FRAC * D)
+
+
+## forza dell'effetto 0..1 (0 alla soglia, 1 con curvatura pari a CURVE_FULL_FRAC della lunghezza)
+static func curveK(D: float, c: float) -> float:
+	var lo := maxf(CURVE_MIN_M, CURVE_MIN_FRAC * D)
+	var hi := maxf(lo + 0.5, CURVE_FULL_FRAC * D)
+	return C.clamp_((absf(c) - lo) / (hi - lo), 0.0, 1.0)
+
+
+## compagno di p (non p) entro r metri dal punto (x, y)
+func mateNear(tm: int, p: R.Player, x: float, y: float, r: float) -> R.Player:
+	for m: R.Player in players:
+		if m.team == tm and m != p and not m.off and C.hyp(m.x - x, m.y - y) < r:
+			return m
+	return null
 
 
 # Anteprima del volo del pallone per il calcio `spec`, senza errore di mira e senza cambiare la partita.
@@ -522,7 +578,7 @@ func kick(p: R.Player, spec: Dictionary) -> void:
 	predT = 0.0
 	if type == "shot":
 		useAdvantage(tm)
-	ev("kick", {"p": p, "kind": type, "v": Lc.v0})
+	ev("kick", {"p": p, "kind": type, "v": Lc.v0, "curvo": Lc.curved, "prima": bool(spec.get("first", false))})
 
 
 func detectShot() -> void:
@@ -715,6 +771,7 @@ func step(dt: float) -> void:
 		r.t += dt
 		if (r.t >= r.wait) if not human[r.team] else (r.t > 14.0):
 			aiRestart()
+	fireQueued()
 	updateCtrl(dt)
 
 
@@ -844,6 +901,40 @@ func userKick(tm: int, spec: Dictionary) -> bool:
 	move[tm] = null
 	kick(p, spec)
 	return true
+
+
+# Di prima: mentre un passaggio della squadra tm viaggia, la persona prepara il calcio successivo (spec, come userKick)
+# per il compagno p. Appena p controlla il pallone lo calcia subito, senza stop (fireQueued, a ogni passo).
+# Il calcio in attesa si annulla se il pallone lo prende un altro, cambia volo (deviazione, colpo di testa) o il gioco si ferma.
+func userQueue(tm: int, p: R.Player, spec: Dictionary) -> bool:
+	var b := ball
+	var k := b.kick
+	if phase != "play" or not human[tm] or p == null or p.team != tm or p.off or b.owner != null:
+		return false
+	if k == null or k.team != tm or k.type == "shot" or k.kicker == p:
+		return false
+	queued[tm] = {"p": p, "spec": spec, "kick": k}
+	return true
+
+
+func fireQueued() -> void:
+	var b := ball
+	for tm in 2:
+		var q: Variant = queued[tm]
+		if q == null:
+			continue
+		if phase != "play":
+			queued[tm] = null
+		elif b.owner == q.p:
+			queued[tm] = null
+			var spec: Dictionary = q.spec.duplicate()
+			spec.human = true
+			spec.first = true
+			ctrl[tm] = q.p
+			move[tm] = null
+			kick(q.p, spec)
+		elif b.owner != null or b.kick != q.kick:
+			queued[tm] = null
 
 
 # punti della linea disegnata, nel campo e a distanza PATH_STEP l'uno dall'altro; l'ultimo punto c'è sempre
@@ -1092,6 +1183,7 @@ func substitute(tm: int, idx: int, src: Dictionary) -> bool:
 # Fine partita: rompe i riferimenti circolari tra giocatori (supC, beatBy) che il conteggio dei riferimenti
 # di Godot non libera da solo. Da chiamare quando la partita non serve più (in JS ci pensa il garbage collector).
 func dispose() -> void:
+	queued = [null, null]
 	for p: R.Player in players:
 		p.supC = null
 		p.beatBy = null

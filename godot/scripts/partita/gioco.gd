@@ -13,7 +13,7 @@
 #   --veloce=K          tempo fisso di K/60 s a fotogramma (prove senza schermo: la partita va più veloce del vero)
 #   --bot               un "dito finto" gioca la squadra 0 coi gesti veri (scripts/partita/bot_dito.gd)
 #   --esci-a-fine       a fine partita stampa il riassunto ed esce (codice 0)
-#   --scena=area|duello|fuga|angolo|rinvio|rilancio|pausa|gol   mette la partita in una situazione da fotografare (gol: tiro a
+#   --scena=area|duello|fuga|angolo|rinvio|rilancio|pausa|gol|curva|prima   mette la partita in una situazione da fotografare (gol: tiro a
 #                       porta vuota, per vedere cronaca e replay)
 #   --esultanza=ID      con --scena=gol chi segna è il campione e fa quell'esultanza (id in esultanze.gd)
 #   --senza-replay      dopo il gol niente replay (si va subito al calcio d'inizio)
@@ -69,7 +69,6 @@ const FermatempoTesta := preload("res://scripts/partita/fermatempo_testa.gd")
 const SCENA_VISTA := "res://scenes/vista_partita.tscn"
 
 # velocità del tempo (rallenty), come src/main.js
-const RUN_DRAW_SLOW := 0.25   # mentre si disegna la strada da correre
 const GK_SLOW := 0.1          # mentre si para
 const DEF_DRAW_SLOW := 0.13   # mentre si disegna una linea di difesa
 const PASS_DRAW_SLOW := 0.04  # mentre si disegna un passaggio o un tiro
@@ -336,7 +335,7 @@ func velocita_voluta() -> float:
 	if gesti.mode == "dpath":
 		return DEF_DRAW_SLOW
 	if gesti.drawing:
-		return RUN_DRAW_SLOW if gesti.run_path() else PASS_DRAW_SLOW
+		return PASS_DRAW_SLOW # col pallone ogni linea è un passaggio o un tiro (niente più strada da correre)
 	if dive:
 		return GK_SLOW
 	if duel:
@@ -852,6 +851,25 @@ func _prepara_scena(nome: String) -> void:
 				gesti.down(Vector2(a.x, a.y), Time.get_ticks_msec())
 				for i in range(1, 13):
 					gesti.move_ev(Vector2(a.x, a.y).lerp(Vector2(b.x, b.y), i / 12.0))
+		"curva", "prima": # curva: passaggio curvo disegnato e tenuto (volo alto a effetto); prima: calcio di prima in attesa
+			_metti_in_gioco()
+			var dy := 1.0 if me == 0 else -1.0
+			var cm: R.Player = m.team(me)[10]
+			_sposta(att, 4.0, dy * 20.0)
+			_sposta(cm, -8.0, dy * 34.0)
+			_sposta(m.team(1 - me)[3], -2.0, dy * 27.0)
+			m.ball.owner = att
+			m.ball.last = att
+			m.ball.x = att.x
+			m.ball.y = att.y + 0.6 * dy
+			m.ctrl[me] = att
+			await get_tree().create_timer(0.3).timeout
+			if nome == "curva":
+				_linea_curva_di_prova(Vector3(m.ball.x, m.ball.y, 0.3), Vector3(cm.x, cm.y, 0.0), 0.3, false)
+			else:
+				m.userKick(me, {"type": "auto", "tx": cm.x, "ty": cm.y, "curve": 6.0, "tratto": true})
+				await get_tree().create_timer(0.15).timeout
+				_linea_curva_di_prova(Vector3(cm.x, cm.y, 0.9), Vector3(2.5, dy * C.HL, 1.2), 0.0, true)
 		"angolo":
 			m.setRestart("corner", me, C.HW, C.HL)
 		"rinvio": # rinvio dal fondo del nostro portiere (posa rilassata dietro il pallone)
@@ -899,6 +917,23 @@ func _disegno_di_prova(a: R.Player) -> void:
 		await get_tree().process_frame
 
 
+## linea di prova dal punto a al punto b del campo (pancia = frazione della lunghezza sullo schermo); alza = dito su alla fine
+func _linea_curva_di_prova(a: Vector3, b: Vector3, pancia: float, alza: bool) -> void:
+	var s0: Vector3 = vista.world_to_screen(a.x, a.y, a.z)
+	gesti.down(Vector2(s0.x, s0.y), Time.get_ticks_msec())
+	var ultimo := Vector2(s0.x, s0.y)
+	for i in range(1, 21):
+		var k := float(i) / 20.0
+		var s1: Vector3 = vista.world_to_screen(b.x, b.y, b.z)
+		var p0 := Vector2(s0.x, s0.y)
+		var p1 := Vector2(s1.x, s1.y)
+		ultimo = p0.lerp(p1, k) + (p1 - p0).orthogonal() * pancia * 4.0 * k * (1.0 - k)
+		gesti.move_ev(ultimo)
+		await get_tree().process_frame
+	if alza:
+		gesti.up(ultimo, Time.get_ticks_msec())
+
+
 func _metti_in_gioco() -> void:
 	m.phase = "play"
 	m.restart = null
@@ -940,6 +975,7 @@ func _avvia_allenamento() -> void:
 	_all_hud.finito.connect(func() -> void: hud.big("Allenamento finito!", "g", 2400, "Ora sei pronto per il campionato"))
 	# creato per ultimo: la sua prima scheda ferma la partita
 	allenamento = Allenamento.new(m, _all_hud)
+	_all_hud.collega(vista, allenamento) # linea guida di passaggi e tiri
 	_vai_alla_lezione.call_deferred()
 
 

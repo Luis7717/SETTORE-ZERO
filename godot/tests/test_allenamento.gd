@@ -42,28 +42,15 @@ func comanda(m: SimMatchScript, t: Allenamento) -> void:
 	var c: R.Player = m.ctrl[0]
 	var b := m.ball
 	match t.lesson().title:
-		"Passaggio": # il passaggio si fa solo nel duello (come in gesti.gd); prima si corre verso il difensore
+		"Passaggio rasoterra", "Passaggio a effetto": # linea dalla palla al compagno: dritta o curva
 			var q: R.Player = m.players[9]
-			var o: R.Player = m.players[16]
-			if c == null or b.owner != c:
-				return
-			if m.duelFor(0):
-				m.userKick(0, {"type": "auto", "tx": q.x, "ty": q.y, "curve": 0.0})
-			else:
-				m.userMove(0, o.x, o.y, true)
-		"Tiro":
 			if c != null and b.owner == c:
-				m.userKick(0, {"type": "shot", "tx": 2.0, "ty": 50.0, "th": 1.0, "curve": 0.0})
-		"Corsa e scatto": # strada disegnata dal giocatore (una volta per prova)
-			if c == null or m.move[0] != null or b.owner != c:
-				return
-			var pts: Array = []
-			for i in range(1, 17):
-				if t.k == 1:
-					pts.append({"x": c.x + i, "y": c.y + i * 0.3})
-				else:
-					pts.append({"x": c.x, "y": c.y + i * (1.5 if t.k == 2 else 1.0)})
-			m.userPath(0, pts)
+				var curva := 6.0 if t.lesson().id == "passaggio_alto" else 0.0
+				m.userKick(0, {"type": "auto", "tx": q.x, "ty": q.y, "curve": curva, "tratto": true})
+		"Tiro rasoterra", "Tiro a giro":
+			if c != null and b.owner == c:
+				var giro: bool = t.lesson().id == "tiro_giro"
+				m.userKick(0, {"type": "shot", "tx": 2.0, "ty": 50.0, "th": 1.2 if giro else 0.5, "curve": 4.0 if giro else 0.0, "tratto": true})
 		"Recupera palla": # linea dal proprio giocatore fino al portatore avversario
 			if c != null and b.owner != null and b.owner.team == 1 and m.runOf(c) == null:
 				m.userRun(0, c, [{"x": (c.x + b.x) / 2.0, "y": (c.y + b.y) / 2.0}, {"x": b.x, "y": b.y}])
@@ -114,7 +101,7 @@ func test_ogni_meccanica_ha_una_scheda_e_tre_prove_superate() -> bool:
 		if x[1] == Allenamento.BRAVO:
 			bravo += 1
 	eq(bravo, t.lessons.size() * REPS, "tre riuscite per lezione")
-	eq(t.lessons.size(), 7, "sette lezioni (il motore sa fare dribbling e scatto)")
+	eq(t.lessons.size(), 8, "otto lezioni (passaggi e tiri dritti e curvi; il motore sa fare dribbling e scatto)")
 	note("lezioni superate (fotogrammi di Bravo!): %s · %d fotogrammi" % [passed, guard])
 	H.disposeAll()
 	return done()
@@ -155,18 +142,45 @@ func test_se_la_prova_non_riesce_entro_il_tempo_si_rimette_a_posto() -> bool:
 	return done()
 
 
-func test_passaggio_il_difensore_parte_lontano_e_il_duello_si_apre_dopo() -> bool:
-	for k in REPS:
-		var m := nuova_partita()
-		var t := Allenamento.new(m, Registro.new())
+func test_passaggi_e_tiri_hanno_la_linea_guida_dritta_o_curva() -> bool:
+	var m := nuova_partita()
+	var t := Allenamento.new(m, Registro.new())
+	for titolo: String in ["Passaggio rasoterra", "Passaggio a effetto", "Tiro rasoterra", "Tiro a giro"]:
+		a_lezione(t, titolo)
+		check(t.guida().is_empty(), "%s: scheda aperta, niente guida" % titolo)
 		t.go()
-		t.k = k
-		t.reset()
-		var c: R.Player = m.ball.owner
-		var o: R.Player = m.players[16]
-		check(dist(o, c) > 9.0, "prova %d: difensore a %.1f m" % [k, dist(o, c)])
+		var g: Array = t.guida()
+		check(g.size() > 2, "%s: linea guida" % titolo)
+		if g.size() < 3:
+			continue
+		var a: Vector3 = g[0]
+		var b: Vector3 = g[-1]
+		var meta: Vector3 = g[g.size() / 2]
+		var corda := Vector2(b.x - a.x, b.y - a.y)
+		var pancia: float = absf(corda.normalized().cross(Vector2(meta.x - a.x, meta.y - a.y)))
+		var curva: bool = t.lesson().guida == "curva"
+		check(SimMatchScript.curveIsCurved(corda.length(), pancia) == curva, "%s: guida %s (pancia %.1f m su %.1f m)" % [titolo, "curva" if curva else "dritta", pancia, corda.length()])
+	a_lezione(t, "Recupera palla")
+	t.go()
+	check(t.guida().is_empty(), "le altre lezioni non hanno la guida")
+	H.disposeAll()
+	return done()
+
+
+func test_passaggio_a_effetto_il_rasoterra_non_basta() -> bool:
+	var m := nuova_partita()
+	var t := Allenamento.new(m, Registro.new())
+	a_lezione(t, "Passaggio a effetto")
+	t.go()
+	var q: R.Player = m.players[9]
+	m.userKick(0, {"type": "auto", "tx": q.x, "ty": q.y, "curve": 0.0, "tratto": true})
+	var bravo := false
+	for i in 240:
 		fotogramma(m, t)
-		eq(m.duelFor(0), false, "prova %d: niente duello subito" % k)
+		if t.done > 0.0:
+			bravo = true
+			break
+	check(not bravo, "passaggio dritto (rasoterra) nella lezione del passaggio a effetto: non vale")
 	H.disposeAll()
 	return done()
 
