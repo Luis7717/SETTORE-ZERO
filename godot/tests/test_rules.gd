@@ -428,7 +428,7 @@ static func track(m: SimMatchScript) -> SimMatchScript:
 
 
 static func previewOpts(seed_value: int) -> Dictionary:
-	return {"seed": seed_value, "halfLen": 9999.0, "human": [true, false], "teams": [H.mkTeam("A", 60, 1), H.mkTeam("B", 60, 2)]}
+	return {"seed": seed_value, "halfLen": 9999.0, "human": [true, false], "teams": [H.mkTeam("A", 60, 1), H.mkTeam("B", 60, 2)], "portaAuto": false}
 
 
 func test_predictKick_coincide_col_volo_vero() -> bool:

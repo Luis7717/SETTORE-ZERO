@@ -30,6 +30,7 @@ const Forma := preload("res://scripts/carriera/forma.gd")
 const Dirigenza := preload("res://scripts/carriera/dirigenza.gd")
 const Esultanze := preload("res://scripts/partita/esultanze.gd")
 const Fisico := preload("res://scripts/carriera/fisico.gd")
+const Stili := preload("res://sim/stili.gd")
 
 const FORMATIONS := C.FORMATIONS
 const DIV_NAMES := ["Prima Divisione", "Seconda Divisione", "Terza Divisione"]
@@ -58,7 +59,7 @@ const MARKET_SIZE := 20
 const STAT_KEYS := ["vel", "fis", "dri", "tir", "dif", "pas", "por"]
 ## chiavi dello stato che ha solo la versione Godot (fase B): semeB = seme dei numeri casuali delle novità,
 ## forma/infortuni/progressi = per id del giocatore (testo), obiettivo = {stagione, div, tipo, posto}, rivale = id
-const CHIAVI_GODOT := ["semeB", "forma", "infortuni", "progressi", "obiettivo", "rivale"]
+const CHIAVI_GODOT := ["semeB", "forma", "infortuni", "progressi", "obiettivo", "rivale", "stileAtt", "stileDif"]
 
 ## stato della carriera (null = nessuna carriera): stesse chiavi di `career.s` nel web
 var s: Variant = null
@@ -929,6 +930,9 @@ func novita() -> void:
 	for k: String in ["forma", "infortuni", "progressi"]:
 		if not s.get(k) is Dictionary:
 			s[k] = {}
+	# stili di gioco della mia squadra (fase D): mancanti o sconosciuti = equilibrati, come prima
+	s["stileAtt"] = Stili.valido_att(s.get("stileAtt"))
+	s["stileDif"] = Stili.valido_dif(s.get("stileDif"))
 	var ids := {}
 	for p: Dictionary in s.squad:
 		ids[str(p.id)] = true
@@ -991,7 +995,11 @@ func setFisico(id: Variant, altezza: Variant, corporatura: Variant) -> bool:
 
 ## squadra del computer per la partita (al posto di aiMatchTeam): statistiche col fisico (Fisico.applicaSquadra)
 func avversarioPartita(t: Dictionary) -> Dictionary:
-	return Fisico.applicaSquadra(aiMatchTeam(t))
+	var sq: Dictionary = Fisico.applicaSquadra(aiMatchTeam(t))
+	var st := stileDi(t)
+	sq["stileAtt"] = st.att
+	sq["stileDif"] = st.dif
+	return sq
 
 
 ## numeri casuali delle novità per questa giornata (stessa carriera = stessi numeri)
@@ -1075,7 +1083,39 @@ func squadraPartita() -> Dictionary:
 		gioc.append(q)
 	t.players = gioc
 	t.bench = t.bench.filter(func(p: Dictionary) -> bool: return infortunio(p.id) <= 0).map(func(p: Dictionary) -> Dictionary: return Fisico.applica(p))
+	t["stileAtt"] = stileAtt()
+	t["stileDif"] = stileDif()
 	return t
+
+
+# ---------------------------------------------------------------- stili di gioco (fase D, sim/stili.gd)
+func stileAtt() -> String:
+	return Stili.valido_att(s.get("stileAtt"))
+
+
+func stileDif() -> String:
+	return Stili.valido_dif(s.get("stileDif"))
+
+
+## sceglie lo stile d'attacco e/o di difesa della mia squadra (null = lascia com'è) e salva
+func setStili(att: Variant, dif: Variant) -> void:
+	if att != null:
+		s["stileAtt"] = Stili.valido_att(att)
+	if dif != null:
+		s["stileDif"] = Stili.valido_dif(dif)
+	save()
+
+
+## formazione della squadra del computer in questa stagione (la stessa che sceglie aiMatchTeam)
+func formazioneDi(t: Dictionary) -> String:
+	var r := JS.rng32(int(t.get("seed", 0)) + int(s.season) * 977)
+	var fs: Array = FORMATIONS.keys()
+	return fs[int(floor(r.call() * fs.size()))]
+
+
+## stile della squadra del computer {att, dif}: fisso per squadra e stagione (seme, nome, forza, formazione)
+func stileDi(t: Dictionary) -> Dictionary:
+	return Stili.perSquadra(int(t.get("seed", 0)), str(t.get("name", "")), float(t.get("rating", 55)), formazioneDi(t))
 
 
 func rivale() -> Variant:

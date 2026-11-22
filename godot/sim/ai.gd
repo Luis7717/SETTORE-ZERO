@@ -47,6 +47,24 @@ const CHASE_N := 36
 const GK_CLAIM_R := 12.0      # punto di presa entro questa distanza dal centro della propria porta (m)
 const GK_CLAIM_MARGIN := 0.3  # ... raggiunto almeno così prima del primo avversario che può colpirlo di testa (s)
 const GK_CROSS_OUT := 1.2     # cross avversario in volo e portiere che non esce: al massimo così fuori dalla linea (m)
+# Portatore della squadra umana che si muove da solo (humanCarrierAuto, opzione "portaAuto" della partita)
+const AUTO_THINK := 0.25      # ogni quanto sceglie la direzione (s)
+const AUTO_LOOK := 5.0        # distanza dei punti provati (m)
+const AUTO_RUN := 10.0        # distanza del punto di arrivo (m)
+const AUTO_EDGE := 2.0        # resta almeno così dentro le linee (m)
+const AUTO_SPACE := 5.0       # spazio libero oltre il quale non conta di più (m)
+const AUTO_BUMP := 2.5        # punto più vicino di così a un avversario = da evitare (m)
+const AUTO_LANES := 0.35      # premio per ogni compagno con la linea di passaggio libera dal punto
+const AUTO_BOX := 1.5         # premio per i punti dentro l'area avversaria, se c'è spazio
+const AUTO_MATES := 2         # meno compagni di così davanti al portatore: rallenta per aspettarli
+const AUTO_SPD := 0.85        # andatura normale (frazione della velocità massima)
+const AUTO_SPD_POSS := 0.6    # possesso: avanza piano
+const AUTO_SPD_LANCI := 0.4   # lanci lunghi: quasi fermo, testa alta
+const AUTO_SPD_CROSS := 0.45  # fasce, arrivato sul fondo: aspetta il cross
+const AUTO_SPD_WAIT := 0.55   # pochi compagni davanti: aspetta
+const AUTO_SPD_SHIELD := 0.6  # pressato: protegge palla
+const AUTO_CROSS_Y := 16.0    # fasce: a questi metri dalla linea di fondo si smette di salire sulla fascia
+const AUTO_TRY := [-2.4, -1.8, -1.2, -0.7, -0.35, 0.0, 0.35, 0.7, 1.2, 1.8, 2.4, 3.14159]
 
 
 # side: -1/1 = palo scelto; se manca (0), lato opposto al portiere (con un po' di casualità)
@@ -96,7 +114,8 @@ func clear(p: R.Player) -> void:
 # ritorna la migliore tra `best` e questa
 func _consider(best: Variant, p: R.Player, tm: int, dir: float, gy: float, sk: float, ox: float, oy: float, m: R.Player, tx: float, ty: float, through: bool) -> Variant:
 	var d: float = C.hyp(tx - ox, ty - oy)
-	if d < 4.0 or d > 44.0:
+	var sa: Stili.Att = stA[tm]
+	if d < 4.0 or d > (Stili.LANCI_MAX if sa.lanci else 44.0):
 		return best
 	var vp: float = minf(17.0 + p.st.pas * 0.13, sqrt(25.0 + 2.0 * rollKick * d)) * 0.8
 	var safe: float = lane(ox, oy, tx, ty, tm, vp)
@@ -107,7 +126,7 @@ func _consider(best: Variant, p: R.Player, tm: int, dir: float, gy: float, sk: f
 		if open < dm + 1.5:
 			return best
 		safe = minf(safe, (open - dm - 1.5) / 3.0)
-	elif safe < 0.3 and d > 16.0:
+	elif (safe < 0.3 and d > 16.0) or (sa.lanci and safe < Stili.LANCI_SAFE and d > Stili.LANCI_MIN):
 		# pallonetto solo se nessun avversario può arrivare sul punto di caduta prima della palla
 		var Tl: float = C.clamp_(d / 14.0, 0.75, 2.6)
 		var mar: float = 9.0
@@ -115,6 +134,8 @@ func _consider(best: Variant, p: R.Player, tm: int, dir: float, gy: float, sk: f
 			if o.team != tm and not o.off:
 				mar = minf(mar, C.hyp(o.x - tx, o.y - ty) - (0.9 + vmax(o) * maxf(0.0, Tl - 0.35)))
 		var s2: float = minf(mar / 3.0, 0.8) - LOFT_RISK
+		if sa.lanci:
+			s2 += Stili.LANCI_RISK
 		if s2 > safe:
 			safe = s2
 			type = "loft"
@@ -126,6 +147,8 @@ func _consider(best: Variant, p: R.Player, tm: int, dir: float, gy: float, sk: f
 	if m.pos == "P":
 		sc -= 1.0
 	sc += (rnd() - 0.5) * 0.6 * (1.0 - sk)
+	if sa.on:
+		sc += _styleScore(sa, tm, d, gain, safe, type, through)
 	if best == null or sc > best.sc:
 		return {"m": m, "tx": tx, "ty": ty, "type": type, "sc": sc, "safe": safe, "d": d, "gain": gain, "through": through}
 	return best
@@ -143,6 +166,7 @@ func passOptions(p: R.Player, exempt: bool = false) -> Variant:
 	var ox: float = b.x if b.owner == p else p.x
 	var oy: float = b.y if b.owner == p else p.y
 	var best: Variant = null
+	var fz: bool = stA[tm].fasce
 	for m: R.Player in players:
 		if m.team != tm or m == p or m.off:
 			continue
@@ -152,8 +176,10 @@ func passOptions(p: R.Player, exempt: bool = false) -> Variant:
 		if not exempt and mf > line + 0.2 and mf > b.y * dir and mf > 0.0:
 			continue
 		best = _consider(best, p, tm, dir, gy, sk, ox, oy, m, m.x + m.vx * 0.5, m.y + m.vy * 0.5, false)
-		if absf(ox) > 14.0 and oy * dir > HL - 24.0 and m.pos != "D" and absf(m.x) < 11.0 and m.y * dir > HL - 17.0 and nearOpp(m.x, m.y, tm) > CROSS_FREE:
+		if absf(ox) > (14.0 - Stili.FASCE_CROSS_X if fz else 14.0) and oy * dir > HL - (24.0 + Stili.FASCE_CROSS_Y if fz else 24.0) and m.pos != "D" and absf(m.x) < 11.0 and m.y * dir > HL - 17.0 and nearOpp(m.x, m.y, tm) > (Stili.FASCE_CROSS_FREE if fz else CROSS_FREE):
 			var sc: float = 1.1 + (rnd() - 0.5) * 0.5 - C.hyp(m.x, m.y - gy) * 0.03
+			if fz:
+				sc += Stili.FASCE_CROSS_SC
 			if best == null or sc > best.sc:
 				best = {"m": m, "tx": m.x + m.vx * 0.6, "ty": m.y + m.vy * 0.6, "type": "loft", "sc": sc, "safe": 0.5, "d": C.hyp(m.x - ox, m.y - oy), "gain": 8.0, "cross": true}
 		if m.pos != "D" and m.pos != "P" and mf > oy * dir - 3.0 and mf > -10.0:
@@ -175,6 +201,7 @@ func carrierAI(p: R.Player) -> void:
 	var gy: float = dir * HL
 	var dg: float = C.hyp(p.x, p.y - gy)
 	var press: float = nearOpp(b.x, b.y, tm)
+	var sa: Stili.Att = stA[tm]
 	p.aiT -= dtT
 	# avversario in arrivo: si decide subito (prima che arrivi il contrasto)
 	var react: float = PRESS_REACT_T + 0.1 * (1.0 - sk)
@@ -182,6 +209,8 @@ func carrierAI(p: R.Player) -> void:
 		p.aiT = react
 	if p.aiT <= 0.0 and p.stun <= 0.0:
 		p.aiT = 0.42 - 0.2 * sk + rnd() * 0.15
+		if sa.contro and counter(tm):
+			p.aiT *= Stili.CONTRO_THINK
 		if dg < SHOT_RANGE:
 			var ang: float = absf(F.atan2_(p.x, maxf(0.1, HL - p.y * dir)))
 			# dentro l'area si tira quasi sempre; da fuori solo da buona posizione (i tiri da lontano li para quasi tutti)
@@ -192,7 +221,10 @@ func carrierAI(p: R.Player) -> void:
 				q *= SHOT_BLOCKED
 			if dg < 10.0:
 				q += 0.5
-			if q > SHOT_BAR + rnd() * 0.3 - (0.12 if press < 2.5 else 0.0):
+			var bar: float = SHOT_BAR + rnd() * 0.3 - (0.12 if press < 2.5 else 0.0)
+			if sa.poss and dg > BOX_SHOT:
+				bar += Stili.POSS_SHOT
+			if q > bar:
 				aiShoot(p, false, side)
 				return
 		# pressato vicino alla propria porta e senza passaggi sicuri: spazzata lunga verso la fascia
@@ -227,6 +259,8 @@ func carrierAI(p: R.Player) -> void:
 					want = 0.6
 				elif p.holdN > 5:
 					want = 0.3
+			if sa.on:
+				want = _styleWant(sa, p, pass_, want, press)
 			if rnd() < want:
 				kick(p, {"type": pass_.type if pass_.safe > 0.0 else "loft", "tx": pass_.tx, "ty": pass_.ty})
 				return
@@ -234,6 +268,8 @@ func carrierAI(p: R.Player) -> void:
 		if front < 5.0 and aiDribble(p):
 			return
 		var base: float = F.atan2_(gy - p.y, (p.x * 0.7 if dg > 30.0 else 0.0) - p.x)
+		if sa.fasce and absf(p.x) > Stili.FASCE_RUN_X and dg > Stili.FASCE_RUN_DG:
+			base = F.atan2_(gy - p.y, C.sign_(p.x) * (HW - 5.0) - p.x) # corsa sulla fascia
 		var bs: float = -1e9
 		var ba: float = base
 		for o: float in RUN_TRY:
@@ -250,6 +286,8 @@ func carrierAI(p: R.Player) -> void:
 		p.dy = p.y + F.sin_(ba) * 10.0
 	p.tx = C.clamp_(p.dx, -HW + 1.0, HW - 1.0)
 	p.ty = C.clamp_(p.dy, -HL + 1.0, HL - 1.0)
+	if sa.contro and counter(tm):
+		p.sprint = true
 
 
 func aiRestart() -> void:
@@ -301,6 +339,10 @@ func aiRestart() -> void:
 func computeLines() -> void:
 	for tm in 2:
 		offLine[tm] = maxf(0.0, lineOf(tm))
+		if stD[tm].uomo:
+			_computeMarks(tm)
+		elif stD[tm].fuorigioco:
+			offLineD[tm] = _defLine(tm)
 
 
 func computeChasers() -> void:
@@ -316,6 +358,10 @@ func computeChasers() -> void:
 					bd = d
 					bp = p
 		presser[tm] = bp
+	presser2 = [null, null]
+	for tm in 2:
+		if stD[tm].pressing:
+			presser2[tm] = _second(tm, presser[tm])
 	helpers = [[], []]
 	if b.owner != null:
 		var c := b.owner
@@ -325,7 +371,7 @@ func computeChasers() -> void:
 			if q.team == c.team and q != c and not q.off and q.pos != "P" and q.state == "play":
 				near.append(q)
 		near = stableSort(near, func(q: R.Player) -> float: return C.hyp(q.x - c.x, q.y - c.y) - (HELP_KEEP if was.has(q) else 0.0))
-		helpers[c.team] = near.slice(0, HELPERS)
+		helpers[c.team] = near.slice(0, HELPERS + (Stili.POSS_HELPERS if stA[c.team].poss else 0))
 		helpWas = helpers[c.team]
 	# squadra umana in difesa: chi va sul portatore (i più vicini al pallone, senza linea disegnata)
 	var wasP: Array = hPress if hPress != null else [[], []]
@@ -341,7 +387,12 @@ func computeChasers() -> void:
 			if p.team == tm and not p.off and p.pos != "P" and p.state == "play" and runOf(p) == null:
 				cand.append(p)
 		cand = stableSort(cand, func(q: R.Player) -> float: return C.hyp(q.x - c.x, q.y - c.y) - (HUM_PRESS_KEEP if wasT.has(q) else 0.0))
-		hPress[tm] = cand.slice(0, 2 if deep else 1)
+		var nPress: int = 2 if deep else 1
+		if stD[tm].pressing:
+			nPress += Stili.PRESS_HUM
+		elif stD[tm].catenaccio and c.y * dir > -HL + Stili.CAT_ZONE:
+			nPress = 0
+		hPress[tm] = cand.slice(0, nPress)
 	cover = [null, null]
 	if b.owner != null:
 		var c := b.owner
@@ -481,6 +532,11 @@ func think(dt: float) -> void:
 	var b := ball
 	dtT = dt
 	att = b.owner.team if b.owner != null else (b.kick.team if b.kick != null else (restart.team if phase == "restart" else -1))
+	# pallone rubato all'avversario (contropiede, stili.gd); non cambia niente per gli altri stili
+	if b.owner != null and phase == "play" and b.owner.team != possWho:
+		if possWho >= 0:
+			possT0[b.owner.team] = time
+		possWho = b.owner.team
 	predT -= dt
 	if predT <= 0.0:
 		predT = 0.1
@@ -548,6 +604,8 @@ func assign(p: R.Player) -> void:
 			if mv != null:
 				p.tx = mv.x
 				p.ty = mv.y
+			elif portaAuto:
+				humanCarrierAuto(p)
 			else:
 				p.tx = p.x * 0.9
 				p.ty = C.clamp_(p.y + dir * 8.0, -HL + 3.0, HL - 3.0)
@@ -662,6 +720,10 @@ func humanDefend(p: R.Player) -> void:
 	if p.pos == "C":
 		var k: float = C.clamp_((ty - own) / C.orf(b.y - own, 1.0), 0.0, 1.0)
 		tx += (b.x * k - tx) * HUM_MID_LANE
+	if stD[tm].on:
+		var sp := _styleDefPos(p, ax, ay, tx, ty)
+		tx = sp[0]
+		ty = sp[1]
 	# chi non pressa non va addosso al portatore: resta in copertura a qualche metro
 	if c != null:
 		var ux2: float = tx - c.x
@@ -734,7 +796,7 @@ func offerSupport(p: R.Player, c: R.Player) -> void:
 		# squadra umana: il secondo d'appoggio si offre più lontano (linee di passaggio a distanze diverse), lontano dai compagni
 		var hum: bool = human[tm]
 		var far: bool = hum and helpers[tm].size() > 1 and helpers[tm][1] == p
-		for r: float in (SUPPORT_FAR if far else SUPPORT_NEAR):
+		for r: float in (SUPPORT_FAR if far else (Stili.POSS_SUPPORT if stA[tm].poss else SUPPORT_NEAR)):
 			for k in range(-5, 6):
 				var a: float = F.atan2_(dir, 0.0) + k * 0.5
 				var qx: float = c.x + F.cos_(a) * r
@@ -821,10 +883,22 @@ func defend(p: R.Player) -> void:
 				var n: float = C.orf(C.hyp(ux, uy), 1.0)
 				p.tx = c.x + ux / n * 2.6
 				p.ty = c.y + uy / n * 2.6
+			elif stD[tm].catenaccio and c.y * dir > -HL + Stili.CAT_ZONE:
+				# catenaccio: lontano dalla nostra area non si va addosso, si resta davanti al portatore
+				var ux4: float = -c.x * 0.3
+				var uy4: float = own - c.y
+				var n4: float = C.orf(C.hyp(ux4, uy4), 1.0)
+				p.tx = c.x + ux4 / n4 * Stili.CAT_HOLD
+				p.ty = c.y + uy4 / n4 * Stili.CAT_HOLD
 			else:
 				# niente scivolate (tolte anche all'IA il 2026-11-20): il pressatore ruba palla solo col contatto
 				p.tx = b.x + c.vx * 0.25
 				p.ty = b.y + c.vy * 0.25
+			return
+		if not hum and presser2[tm] == p and c.y * dir > Stili.PRESS_FROM:
+			# pressing alto: il secondo pressatore va anche lui sul portatore
+			p.tx = b.x + c.vx * 0.25
+			p.ty = b.y + c.vy * 0.25
 			return
 		if cover[tm] == p:
 			var ux2: float = -c.x * 0.6
@@ -847,8 +921,227 @@ func defend(p: R.Player) -> void:
 		var n3: float = C.orf(C.hyp(ux3, uy3), 1.0)
 		tx = ax * 0.35 + (mo.x + ux3 / n3 * 1.6) * 0.65
 		ty = ay * 0.35 + (mo.y + uy3 / n3 * 1.6) * 0.65
+	if stD[tm].on:
+		var sp := _styleDefPos(p, ax, ay, tx, ty)
+		tx = sp[0]
+		ty = sp[1]
 	p.tx = tx
 	p.ty = ty
+
+
+# ------------------------------------------------------------ stili di gioco (stili.gd)
+# la squadra T ha rubato il pallone da poco e ce l'ha ancora (finestra del contropiede)
+func counter(tm: int) -> bool:
+	return ball.owner != null and ball.owner.team == tm and time - float(possT0[tm]) < Stili.CONTRO_WIN
+
+
+# preferenza in più per un passaggio secondo lo stile d'attacco
+func _styleScore(sa: Stili.Att, tm: int, d: float, gain: float, safe: float, type: String, through: bool) -> float:
+	if sa.contro:
+		return (gain * Stili.CONTRO_GAIN + (Stili.CONTRO_THROUGH if through else 0.0)) if counter(tm) else 0.0
+	if sa.poss:
+		return gain * Stili.POSS_GAIN - maxf(0.0, d - Stili.POSS_LEN0) * Stili.POSS_LEN + C.clamp_(safe, -1.0, 1.0) * Stili.POSS_SAFE - (Stili.POSS_NO_LOFT if type == "loft" else 0.0)
+	if sa.lanci:
+		return maxf(0.0, d - Stili.LANCI_LEN0) * Stili.LANCI_LEN + (Stili.LANCI_SC if type == "loft" else 0.0)
+	return 0.0
+
+
+# voglia di passare del portatore secondo lo stile d'attacco
+func _styleWant(sa: Stili.Att, p: R.Player, pass_: Dictionary, want: float, press: float) -> float:
+	if sa.poss and press >= PRESS_NEAR and pass_.safe > 0.15 and p.holdN > Stili.POSS_HOLD:
+		return maxf(want, Stili.POSS_HOLD_WANT)
+	if sa.contro and counter(p.team) and pass_.safe > 0.0 and pass_.gain > 6.0:
+		return maxf(want, 0.9)
+	if sa.lanci and pass_.type == "loft" and pass_.safe > 0.0 and pass_.d > 22.0:
+		return maxf(want, Stili.LANCI_WANT)
+	if sa.fasce and pass_.get("cross", false) and pass_.safe > 0.0:
+		return maxf(want, 0.8)
+	return want
+
+
+# il secondo giocatore più vicino al pallone (pressing alto)
+func _second(tm: int, first: R.Player) -> R.Player:
+	var b := ball
+	var bp: R.Player = null
+	var bd: float = 1e9
+	for p: R.Player in players:
+		if p.team == tm and p != first and not p.off and p.pos != "P" and p.state == "play":
+			var d: float = C.hyp(p.x - b.x, p.y - b.y)
+			if d < bd:
+				bd = d
+				bp = p
+	return bp
+
+
+# marcatura a uomo: ogni difensore e centrocampista ha il suo avversario (dai posti della formazione, i più arretrati
+# scelgono per primi); si rifà solo se manca o se qualcuno è uscito
+func _computeMarks(tm: int) -> void:
+	var mk: Dictionary = marks[tm]
+	var ok: bool = not mk.is_empty()
+	for k: int in mk:
+		if players[k].off or players[mk[k]].off:
+			ok = false
+	if ok:
+		return
+	mk.clear()
+	var dir: float = -1.0 if tm else 1.0
+	var mine: Array = []
+	for p: R.Player in players:
+		if p.team == tm and not p.off and (p.pos == "D" or p.pos == "C"):
+			mine.append(p)
+	mine = stableSort(mine, func(q: R.Player) -> float: return q.by)
+	var taken := {}
+	for p: R.Player in mine:
+		var px: float = p.bx * HW
+		var py: float = (p.by - 0.5) * L * dir
+		var bo: int = -1
+		var bd: float = 1e9
+		for o: R.Player in players:
+			var k: int = o.team * 11 + o.i
+			if o.team == tm or o.off or o.pos == "P" or taken.has(k):
+				continue
+			var d: float = C.hyp(o.bx * HW - px, (o.by - 0.5) * L * -dir - py)
+			if d < bd:
+				bd = d
+				bo = k
+		if bo >= 0:
+			taken[bo] = true
+			mk[p.team * 11 + p.i] = bo
+
+
+# fuorigioco: linea comune dei difensori = il posto più alto tra i loro, sempre dietro al pallone
+func _defLine(tm: int) -> float:
+	var dir: float = -1.0 if tm else 1.0
+	var hi: float = -HL
+	for p: R.Player in players:
+		if p.team == tm and not p.off and p.pos == "D":
+			hi = maxf(hi, anchor(p)[1] * dir)
+	return C.clamp_(minf(hi, ball.y * dir - Stili.OFF_BALL), -HL + 6.0, 0.0)
+
+
+# posizione difensiva secondo lo stile di difesa (giocatore senza pressing né copertura): (tx, ty) corretti
+func _styleDefPos(p: R.Player, ax: float, ay: float, tx: float, ty: float) -> PackedFloat64Array:
+	var tm := p.team
+	var sd: Stili.Dif = stD[tm]
+	var dir: float = -1.0 if tm else 1.0
+	var key: int = tm * 11 + p.i
+	if sd.uomo and marks[tm].has(key):
+		var o: R.Player = players[marks[tm][key]]
+		if not o.off and o != ball.owner:
+			var ux: float = -o.x
+			var uy: float = -dir * HL - o.y
+			var n: float = C.orf(C.hyp(ux, uy), 1.0)
+			tx = ax * (1.0 - Stili.UOMO_K) + (o.x + ux / n * Stili.UOMO_GAP) * Stili.UOMO_K
+			ty = ay * (1.0 - Stili.UOMO_K) + (o.y + uy / n * Stili.UOMO_GAP) * Stili.UOMO_K
+	elif sd.fuorigioco and p.pos == "D" and att != tm:
+		ty = float(offLineD[tm]) * dir
+	return PackedFloat64Array([tx, ty])
+
+
+# ------------------------------------------------------------ portatore umano senza strada (Luis 2026-11-22)
+# Con l'opzione "portaAuto" della partita (predefinita: sì; i test confrontati col JS la spengono) il portatore della squadra
+# umana senza strada disegnata (o a strada finita) si muove da solo: avanza nello spazio libero, protegge palla se
+# pressato, si allarga o si accentra, rallenta per aspettare i compagni, gira intorno ai difensori e resta in campo,
+# secondo lo stile d'attacco. Non passa e non tira mai: quelle scelte restano al dito. Niente numeri casuali.
+# Nel duello e nella fuga (rallenty col tasto) fa come prima: avanza piano e dritto, decide la persona.
+func humanCarrierAuto(p: R.Player) -> void:
+	var tm := p.team
+	var dir: float = -1.0 if tm else 1.0
+	if duelFor(tm) or fleeFor(tm):
+		p.tx = p.x * 0.9
+		p.ty = C.clamp_(p.y + dir * 8.0, -HL + 3.0, HL - 3.0)
+		p.spdF = 0.7
+		return
+	p.aiT -= dtT
+	if p.aiT <= 0.0 or p.supC != p:
+		p.aiT = AUTO_THINK
+		p.supC = p # segna che dx/dy sono della guida automatica (supC del portatore non serve all'appoggio)
+		_autoDecide(p)
+	p.tx = C.clamp_(p.dx, -HW + AUTO_EDGE, HW - AUTO_EDGE)
+	p.ty = C.clamp_(p.dy, -HL + AUTO_EDGE, HL - AUTO_EDGE)
+	p.spdF = float(autoSpd[tm])
+	p.sprint = bool(autoSpr[tm])
+
+
+# sceglie verso e andatura del portatore umano automatico (ogni AUTO_THINK s)
+func _autoDecide(p: R.Player) -> void:
+	var tm := p.team
+	var sa: Stili.Att = stA[tm]
+	var dir: float = -1.0 if tm else 1.0
+	var gy: float = dir * HL
+	var dg: float = C.hyp(p.x, p.y - gy)
+	var press: float = nearOpp(p.x, p.y, tm)
+	var fwd: float = p.y * dir
+	# punto verso cui andare
+	var gx: float = p.x * 0.7 if dg > 30.0 else 0.0
+	var ty: float = gy
+	var spd: float = AUTO_SPD
+	var spr: bool = false
+	if sa.contro:
+		gx = p.x * 0.4 if dg > 30.0 else 0.0
+		spd = 1.0
+	elif sa.poss:
+		spd = AUTO_SPD_POSS
+	elif sa.fasce:
+		if fwd < HL - AUTO_CROSS_Y:
+			gx = C.sign_(p.x if absf(p.x) > 1.0 else (1.0 if p.i % 2 else -1.0)) * (HW - 4.0)
+		else: # arrivato in fondo: si stringe un po' verso l'area e aspetta il cross del dito
+			gx = C.sign_(p.x) * (BOX_W / 2.0 + 3.0)
+			ty = dir * (HL - 6.0)
+			spd = AUTO_SPD_CROSS
+	elif sa.lanci:
+		spd = AUTO_SPD_LANCI
+	# compagni davanti: senza appoggi in avanti si rallenta per aspettarli (non nel contropiede)
+	var ahead := 0
+	for q: R.Player in players:
+		if q.team == tm and q != p and not q.off and q.pos != "P" and q.y * dir > fwd - 2.0:
+			ahead += 1
+	if ahead < AUTO_MATES and not sa.contro:
+		spd = minf(spd, AUTO_SPD_WAIT)
+	var pressed: bool = press < PRESS_NEAR
+	if pressed:
+		spd = AUTO_SPD_SHIELD # protegge palla: va dove c'è spazio, anche di lato o indietro
+	var base: float = F.atan2_(ty - p.y, gx - p.x)
+	var bs: float = -1e9
+	var ba: float = base
+	var dgt: float = C.hyp(gx - p.x, ty - p.y)
+	for k in AUTO_TRY.size():
+		var o: float = AUTO_TRY[k]
+		if not pressed and absf(o) > 1.3:
+			continue
+		var a: float = base + o
+		var qx: float = p.x + F.cos_(a) * AUTO_LOOK
+		var qy: float = p.y + F.sin_(a) * AUTO_LOOK
+		var s2: float = (dgt - C.hyp(gx - qx, ty - qy)) * (0.6 if pressed else 1.5) + minf(nearOpp(qx, qy, tm), AUTO_SPACE) * (3.0 if pressed else 1.2) - absf(o) * 0.3
+		# niente corsa addosso a un difensore: punto a meno di 2,5 m da un avversario = da evitare
+		if nearOpp(qx, qy, tm) < AUTO_BUMP:
+			s2 -= 4.0
+		if absf(qx) > HW - AUTO_EDGE - 1.0 or absf(qy) > HL - AUTO_EDGE - 0.5:
+			s2 -= 8.0
+		if not pressed:
+			# linee di passaggio libere dal punto (così il dito ha sempre a chi passare) e ingresso in area se c'è spazio
+			s2 += _autoLanes(p, qx, qy) * AUTO_LANES
+			if absf(qx) < BOX_W / 2.0 and qy * dir > HL - BOX_D and nearOpp(qx, qy, tm) > AUTO_BUMP:
+				s2 += AUTO_BOX
+		if s2 > bs:
+			bs = s2
+			ba = a
+	var run: float = AUTO_RUN if spd >= AUTO_SPD else AUTO_RUN * 0.6
+	p.dx = p.x + F.cos_(ba) * run
+	p.dy = p.y + F.sin_(ba) * run
+	if sa.contro and not pressed and nearOpp(p.dx, p.dy, tm) > AUTO_SPACE:
+		spr = true # strada libera verso la porta: di corsa
+	autoSpd[tm] = spd
+	autoSpr[tm] = spr
+
+
+# compagni (portiere escluso) raggiungibili da (x, y) con un passaggio rasoterra a linea libera
+func _autoLanes(p: R.Player, x: float, y: float) -> int:
+	var n := 0
+	for m: R.Player in players:
+		if m.team == p.team and m != p and not m.off and m.pos != "P" and C.hyp(m.x - x, m.y - y) < 30.0 and lane(x, y, m.x, m.y, p.team, 16.0) > 0.0:
+			n += 1
+	return n
 
 
 func gkAI(p: R.Player) -> void:

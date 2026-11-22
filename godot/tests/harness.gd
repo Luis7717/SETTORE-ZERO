@@ -34,10 +34,13 @@ static var live: Array = []
 
 
 ## meteo (facoltativo, "" = nessuno): campo meteo delle opzioni della partita ("pioggia", "neve", ...)
-static func newMatch(seed_value: int, halfLen: float, human: Array, teamA: Dictionary, teamB: Dictionary, meteo := "") -> SimMatchScript:
-	var o := {"seed": seed_value, "halfLen": halfLen, "human": human, "teams": [teamA, teamB]}
+## I test partono col portatore umano "come prima" (portaAuto false, così le partite restano uguali al JS);
+## extra = altre opzioni della partita, es. {"portaAuto": true} per provare il portatore che si muove da solo.
+static func newMatch(seed_value: int, halfLen: float, human: Array, teamA: Dictionary, teamB: Dictionary, meteo := "", extra := {}) -> SimMatchScript:
+	var o := {"seed": seed_value, "halfLen": halfLen, "human": human, "teams": [teamA, teamB], "portaAuto": false}
 	if meteo != "":
 		o["meteo"] = meteo
+	o.merge(extra, true)
 	var m := SimMatchScript.new(o)
 	live.append(m)
 	return m

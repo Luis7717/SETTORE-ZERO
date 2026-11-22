@@ -4,19 +4,25 @@
 # Tocchi (MenuRosa.pick_card): uno sceglie, un secondo giocatore scambiabile apre il confronto, toccarlo ancora
 # (o "Scambia") li scambia; i badge verdi/rossi dicono quanto cambia la squadra con lo scambio.
 # Forma e infortuni (solo Godot): carte con croce rossa e barretta della forma; un infortunato non entra in campo.
+# Stili di gioco (fase D): il tasto "Stile" apre in alto il pannello con i due selettori (attacco e difesa, sim/stili.gd),
+# ognuno con la riga di spiegazione; la scelta si salva subito nella carriera (setStili). arg {"stili": true} lo apre già.
 extends MenuSchermata
 
 const Rosa := preload("res://scripts/menu/rosa_logica.gd")
 const Carta := preload("res://scripts/menu/carta_giocatore.gd")
 const C := preload("res://sim/core.gd")
 const Fisico := preload("res://scripts/carriera/fisico.gd")
+const Stili := preload("res://sim/stili.gd")
 const ALTEZZA_SOPRA := 150.0       # .sqtop
+const ALTEZZA_STILI := 352.0       # pannello degli stili di gioco (due selettori con la spiegazione)
+const ALTEZZA_CHIP_STILE := 36.0
 const RIGA_CAMPO := Color(1, 1, 1, 0.11)
 
 var sel: Variant = null
 var tgt: Variant = null
 var just: Variant = null
 var _vendi_ok: Variant = null      # id del giocatore con "Conferma vendita" già mostrato
+var _stili := false                # pannello degli stili di gioco aperto
 var _campo: Control
 var _carte_campo: Array = []
 var _panchina: ScrollContainer
@@ -32,6 +38,7 @@ func prepara() -> void:
 	if arg is Dictionary:
 		sel = arg.get("sel")
 		tgt = arg.get("tgt")
+		_stili = bool(arg.get("stili", false))
 
 
 func costruisci() -> void:
@@ -50,13 +57,16 @@ func costruisci() -> void:
 	corpo.add_theme_constant_override("separation", 8)
 
 	var sopra := Control.new()
-	sopra.custom_minimum_size.y = ALTEZZA_SOPRA
+	var con_stili := _stili and sp == null
+	sopra.custom_minimum_size.y = ALTEZZA_STILI if con_stili else ALTEZZA_SOPRA
 	sopra.mouse_filter = Control.MOUSE_FILTER_PASS
 	var pannello: Control
 	if tp != null:
 		pannello = _confronto(sp, tp, F)
 	elif sp != null:
 		pannello = _pannello_giocatore(sp, F)
+	elif con_stili:
+		pannello = _pannello_stili()
 	else:
 		pannello = _controlli()
 	pannello.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -219,6 +229,7 @@ func _tocca(id: Variant) -> void:
 	tgt = nuovo.tgt
 	just = nuovo.just
 	_vendi_ok = null
+	_stili = false
 	_aggiorna()
 
 
@@ -284,14 +295,79 @@ func _controlli() -> Control:
 	var info := U.hbox(10)
 	var forza := U.bb("[font_size=13]Forza squadra [/font_size][font_size=20][color=#ffd93d][b]%d[/b][/color][/font_size]" % int(carriera().myRating()), 13, T.DIM)
 	forza.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	forza.autowrap_mode = TextServer.AUTOWRAP_OFF
 	info.add_child(forza)
+	info.add_child(U.riempi())
 	var best := U.bottone("Migliori 11", "Chip", _migliori)
 	best.custom_minimum_size.x = 112
+	best.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
 	best.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	best.add_theme_stylebox_override("normal", T.stile(T.PANEL2, 999, T.LINE2, 1, Vector4(16, 10, 16, 10)))
+	best.add_theme_stylebox_override("normal", T.stile(T.PANEL2, 999, T.LINE2, 1, Vector4(12, 10, 12, 10)))
 	info.add_child(best)
+	var stile := U.bottone("Stile", "ChipOn", _apri_stili)
+	stile.custom_minimum_size.x = 70
+	stile.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
+	stile.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	info.add_child(stile)
 	v.add_child(info)
-	v.add_child(U.paragrafo("Tocca un giocatore per vederlo, poi un altro per confrontarli e scambiarli.", 12.5))
+	var c := carriera()
+	v.add_child(U.bb("Gioco: [color=#ffd93d][b]%s[/b][/color]" % U.esc(Stili.testo(c.stileAtt(), c.stileDif())), 12.5, T.DIM))
+	v.add_child(U.paragrafo("Tocca un giocatore per vederlo, poi un altro per scambiarli.", 12.5))
+	return v
+
+
+# ---------------------------------------------------------------- stili di gioco (fase D)
+func _apri_stili() -> void:
+	_stili = true
+	_chiudi()
+
+
+func _chiudi_stili() -> void:
+	_stili = false
+	_aggiorna()
+
+
+func _scegli_stile(att: Variant, dif: Variant) -> void:
+	carriera().setStili(att, dif)
+	_aggiorna()
+
+
+func _pannello_stili() -> Control:
+	var c := carriera()
+	var pann := U.pannello("PannelloRosa")
+	var v := U.vbox(6)
+	pann.add_child(v)
+	var testa := U.hbox(8)
+	var tit := U.testo("COME GIOCA LA SQUADRA", 13, T.TXT, T.PESO_NERO)
+	tit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tit.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	testa.add_child(tit)
+	var x := U.bottone("×", "Chiudi", _chiudi_stili, 34)
+	x.custom_minimum_size.x = 34
+	testa.add_child(x)
+	v.add_child(testa)
+	v.add_child(_selettore("Attacco", Stili.ATTACCO, c.stileAtt(), true))
+	v.add_child(U.spazio(2))
+	v.add_child(_selettore("Difesa", Stili.DIFESA, c.stileDif(), false))
+	return pann
+
+
+# un selettore: titolo, pulsanti (tre per riga) e la spiegazione dello stile scelto
+func _selettore(titolo_sel: String, lista: Array, scelto: String, attacco: bool) -> Control:
+	var v := U.vbox(5)
+	v.add_child(U.testo(titolo_sel.to_upper(), 11.5, T.DIM, T.PESO_NERO))
+	var g := U.griglia(3, 6, 6)
+	for nome: String in lista:
+		var cb := _scegli_stile.bind(nome, null) if attacco else _scegli_stile.bind(null, nome)
+		var b := U.chip(Stili.CORTI[nome], nome == scelto, cb)
+		b.custom_minimum_size.y = ALTEZZA_CHIP_STILE
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.add_theme_font_size_override("font_size", 13)
+		g.add_child(b)
+	v.add_child(g)
+	var sp := U.paragrafo(Stili.SPIEGA[scelto], 12.5, T.NOTE)
+	sp.custom_minimum_size.y = 34
+	v.add_child(sp)
 	return v
 
 
