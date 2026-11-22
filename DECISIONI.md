@@ -1374,3 +1374,19 @@ Dettagli in `godot/README.md`, "Capelli e barbe".
 - **FPS** (`prova_vista --senza-vsync --scala3d=2 --qualita=3 --esci-dopo=12`, PC carico): prima GPU 0,401 ms,
   601 FPS, 47 disegni; dopo GPU 0,400 ms, 632 FPS, 49 disegni. Vicino (`--vicino=5`): prima 0,536 ms, dopo 0,519 ms.
 - **Da provare sull'iPhone**: barbe e forme degli occhi nell'editor e in partita, grandezza dell'iride, attaccatura.
+
+## Divisa: colletti diversi e maglia larga vera (Godot) — 2026-11-22
+
+- **Perché il colletto "non cambiava"**: il parametro arrivava allo shader (`stile.y`), ma i tre colletti erano quasi
+  uguali. La V era tagliata dal cilindro del collo (`min(..., radiale)`): restava una V di 1-2 cm; la polo era solo
+  una riga di 1,6 cm sul petto. Ora: girocollo = bordino tondo un po' più largo; a V = la pelle scende 10 cm sul petto
+  (`V_FONDO`) come in `src/body/busto.js`, bordino largo uguale lungo i lati; polo = colletto rialzato sul collo
+  (dipinto e staccato di 1,1 cm spostando i vertici, `POLO_RIALZO`), due risvolti sul petto con l'ombra,
+  abbottonatura con due bottoni. Il mento resta color pelle: la testa non si sposta e non si dipinge col colletto.
+- **Larga contro aderente**: prima la larga era solo +7 mm lungo la normale (= corpo più grosso, muscoli compresi).
+  Ora `scripts/partita/vestibilita.gd` misura una volta le "valli" del corpo (levigatura, `CUSTOM2.x`): la larga le
+  riempie, si svasa verso l'orlo, l'orlo scende 6 cm sopra i pantaloncini (con l'ombra), maniche più lunghe e ampie,
+  pieghe (spariscono da lontano), stoffa opaca. L'aderente non si stacca, valli un filo più scure e stoffa più lucida.
+  Scelte a occhio senza foto (la sera del 22 niente finestre sul PC): numeri da regolare guardando le foto.
+- **Da provare**: foto dell'editor (`--app-schermate`, 6 nuove `editor_divisa_*`), partita da lontano
+  (`prova_vista --divisa=C,M`), FPS prima/dopo, poi sull'iPhone.
