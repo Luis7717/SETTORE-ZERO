@@ -1423,3 +1423,20 @@ Dettagli in `godot/README.md`, "Capelli e barbe".
   Scelte a occhio senza foto (la sera del 22 niente finestre sul PC): numeri da regolare guardando le foto.
 - **Da provare**: foto dell'editor (`--app-schermate`, 6 nuove `editor_divisa_*`), partita da lontano
   (`prova_vista --divisa=C,M`), FPS prima/dopo, poi sull'iPhone.
+
+## Tribune che sparivano, bandiere e cori (Godot) — 2026-11-22
+
+- **Tribune**: dalle foto di Luis la gradinata dipinta non c'era proprio. Si vedevano i tifosi 3D sospesi davanti al
+  muro di fondo, e quando la telecamera è più vicina alla tribuna (centrocampo) si vedeva il terreno verde sotto la
+  gradinata (da dietro la porta la linea di vista finisce sul muro, e per questo la seconda foto sembrava a posto).
+  Muretto e muro di fondo, che sono senza texture, invece si vedevano. **Causa**: il materiale della gradinata aveva il
+  filtro anisotropico (più una texture RGB8 fatta a codice). Sull'iPhone i materiali col filtro anisotropico non si
+  disegnano: era già successo al pallone il 2026-11-21, e lo stesso giorno l'ha visto l'agente dell'erba su erba, led
+  e rete. Sul PC si vedono. **Cambiato**: filtro lineare con mipmap, texture RGBA8, più una rampa di riserva a tinta
+  unita sotto (sull'iPhone la GPU scarta le superfici coperte, quindi quasi non costa). Un test vieta il filtro
+  anisotropico in tutto `scripts/` e `shaders/`; erba, led e rete sono sistemati su altri rami e il test li salta
+  finché non arriva il merge (`ANISO_ALTRI_RAMI`). Lo stadio è uguale per tutti i semi (cambia solo l'erba), quindi
+  il difetto era in ogni stadio.
+- **Bandiere**: 62 in un MultiMesh (150 vertici l'una, una chiamata di disegno), movimento nel vertex shader.
+- **Cori**: sintetizzati da noi (niente file scaricati, quindi nessun dubbio sulla licenza). Non ho potuto ascoltarli
+  (niente finestre né audio sul PC durante il lavoro): i volumi `CORI_*` sono stimati e vanno sentiti sull'iPhone.

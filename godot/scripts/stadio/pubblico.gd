@@ -8,10 +8,13 @@
 # quindi la tribuna si sfoltisce in modo uniforme).
 # Derby (`derby = true`, partita contro la rivale in carriera): più tifosi in piedi e un coro ogni tanto (tutti su
 # con le braccia alzate per qualche secondo).
+# Bandiere coi colori delle squadre tra i tifosi (scripts/stadio/bandiere.gd, figlio di questo nodo); senza con
+# `--senza-bandiere` sulla riga di comando (per misurare quanto costano).
 extends Node3D
 
 const Coord := preload("res://scripts/coord.gd")
 const SHADER := preload("res://shaders/pubblico.gdshader")
+const Bandiere := preload("res://scripts/stadio/bandiere.gd")
 
 const POSTO := 0.68            # distanza tra due tifosi lungo la fila (m)
 const FILA := 1.02             # distanza tra due file lungo la pendenza (m)
@@ -50,6 +53,7 @@ var _densita := 1.0
 var _coro_t := 4.0             # s al prossimo coro (derby)
 var derby := false
 var n_tifosi := 0
+var bandiere: MultiMeshInstance3D = null
 
 
 func _init() -> void:
@@ -65,6 +69,10 @@ func _init() -> void:
 func costruisci(tribune: Array) -> void:
 	for t: Dictionary in tribune:
 		_tribuna(t)
+	if not OS.get_cmdline_user_args().has("--senza-bandiere"):
+		bandiere = Bandiere.new()
+		add_child(bandiere)
+		bandiere.costruisci(tribune)
 	_applica_colori()
 
 
@@ -77,6 +85,8 @@ func imposta_colori(casa: Array, ospiti: Array) -> void:
 			var cd := mm.get_instance_custom_data(i)
 			var c := mm.get_instance_color(i)
 			mm.set_instance_color(i, _maglia(cd.r, cd.g, c.a))
+	if bandiere != null:
+		bandiere.imposta_colori(casa, ospiti)
 	_applica_colori()
 
 
@@ -123,6 +133,8 @@ func aggiorna(dt: float) -> void:
 	_mat.set_shader_parameter("stato_casa", _stato[0])
 	_mat.set_shader_parameter("stato_ospiti", _stato[1])
 	_mat.set_shader_parameter("tempo", _t)
+	if bandiere != null:
+		bandiere.aggiorna(_stato[0], _stato[1], _t)
 
 
 ## quanti tifosi mostrare (0..1): 0 = nessuno (si vede il pubblico dipinto delle tribune)
@@ -132,6 +144,8 @@ func set_densita(k: float) -> void:
 	for mmi in _pezzi:
 		var mm := mmi.multimesh
 		mm.visible_instance_count = int(mm.instance_count * _densita) if _densita < 1.0 else -1
+	if bandiere != null:
+		bandiere.set_densita(_densita)
 
 
 func densita() -> float:
