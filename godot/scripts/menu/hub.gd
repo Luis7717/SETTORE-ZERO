@@ -9,6 +9,7 @@ const I := preload("res://scripts/menu/icone.gd")
 const Dirigenza := preload("res://scripts/carriera/dirigenza.gd")
 const Meteo := preload("res://scripts/partita/meteo.gd")
 const SceltaModo := preload("res://scripts/menu/scelta_modo.gd")
+const Stili := preload("res://sim/stili.gd")
 const GIORNATE := 18
 const PULSA := 2.4                 # s: un respiro del pulsante GIOCA (uiPulse)
 
@@ -124,6 +125,10 @@ func _carta_prossima(nm: Dictionary, me: Dictionary, k1: Color) -> Control:
 	var opp: Dictionary = nm.opp
 	vs.add_child(_lato_vs(opp, str(opp.name), int(opp.rating)))
 	v.add_child(vs)
+	# stile di gioco dell'avversario (fase D): lo stesso che userà in partita (Carriera.avversarioPartita)
+	var sa: Dictionary = c.stileDi(opp)
+	v.add_child(U.spazio(8))
+	v.add_child(U.bb("[center]Loro: [color=#eef3fb][b]%s[/b][/color][/center]" % U.esc(Stili.testo(sa.att, sa.dif)), 12, T.DIM))
 	v.add_child(U.spazio(18))
 	v.add_child(U.barra((float(nm.day) - 1.0) / GIORNATE, 5.0))
 	v.add_child(U.spazio(12))

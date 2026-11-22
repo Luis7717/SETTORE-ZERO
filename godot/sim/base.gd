@@ -9,6 +9,7 @@ const R := preload("records.gd")
 const C := preload("core.gd")
 const SimRngScript := preload("rng.gd")
 const F := preload("fmath.gd") # sin, cos, atan2 identici a V8
+const Stili := preload("stili.gd")
 
 const HW := C.HW
 const HL := C.HL
@@ -47,6 +48,7 @@ var switchCd: Array = [0.0, 0.0]
 var runs: Array = [[], []]
 var chase: Array = [null, null]
 var presser: Array = [null, null]
+var presser2: Array = [null, null] # pressing alto (stili.gd): il secondo che va sul portatore
 var cover: Array = [null, null]
 var offLine: Array = [HL, HL]
 var autoDef: Array = [true, true] # squadra umana senza palla: false = chi non ha linea né dito resta fermo (allenamento "Recupera palla")
@@ -78,6 +80,18 @@ var goalT: float = 0.0
 var headCtl: bool = false
 var headWin: R.HeadWin = null
 var nextKick: int = 0
+# stili di gioco (campi facoltativi "stileAtt" / "stileDif" della squadra, stili.gd): con .on = false il motore
+# non entra in nessun ramo degli stili ed è identico a prima
+var stA: Array = [Stili.att(null), Stili.att(null)]
+var stD: Array = [Stili.dif(null), Stili.dif(null)]
+var possT0: Array = [-99.0, -99.0] # istante in cui la squadra ha preso il pallone all'avversario (contropiede)
+var possWho: int = -1              # ultima squadra col pallone in possesso
+var marks: Array = [{}, {}]        # marcatura a uomo: indice del giocatore -> indice dell'avversario da seguire
+var offLineD: Array = [0.0, 0.0]
+# portatore della squadra umana che si muove da solo senza strada disegnata (opzione "portaAuto", ai.gd humanCarrierAuto)
+var portaAuto: bool = true
+var autoSpd: Array = [1.0, 1.0]
+var autoSpr: Array = [false, false]   # fuorigioco: linea comune dei difensori (y nel verso d'attacco della squadra)
 
 
 # numero casuale in [0, 1) dal generatore con seme della partita (this.rnd() in JS)
@@ -184,6 +198,25 @@ func anchor(p: R.Player) -> PackedFloat64Array:
 	else:
 		ay = p.by * 0.55 + bf * 0.36 - 0.03
 		ax = p.bx * 0.7 + bx * 0.28
+	if stA[p.team].on or stD[p.team].on:
+		var sa: Stili.Att = stA[p.team]
+		var sd: Stili.Dif = stD[p.team]
+		if att == p.team:
+			if sa.contro:
+				ay += Stili.CONTRO_DEEP if p.pos == "A" else (Stili.CONTRO_LOW if p.pos != "P" else 0.0)
+			elif sa.lanci and p.pos == "A":
+				ay += Stili.LANCI_DEEP
+			elif sa.fasce and not wide and p.pos == "C" and absf(p.bx) > Stili.FASCE_WIDE_C:
+				wide = true
+				ax = C.sign_(p.bx)
+		elif p.pos != "P":
+			if sd.pressing:
+				ay += Stili.PRESS_LINE
+			elif sd.fuorigioco:
+				ay += Stili.OFF_LINE
+			elif sd.catenaccio:
+				ay += Stili.CAT_LINE
+				ax *= Stili.CAT_NARROW
 	return PackedFloat64Array([ax * (HW - WIDE_GAP) if wide else C.clamp_(ax, -0.95, 0.95) * HW * 0.94, (C.clamp_(ay, 0.04, 0.96) - 0.5) * L * dir])
 
 

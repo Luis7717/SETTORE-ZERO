@@ -27,10 +27,16 @@ ogni cambio al motore si fa in tutte e due, con le fixture rigenerate.
 - **14. Statistiche a fine partita**: possesso, tiri, mappa dei tiri, voto a ogni giocatore.
 - **10. Meteo e ora del giorno**: pioggia (palla più veloce, scivolate più lunghe), notte coi fari, neve rara.
 
-## Fase D — come gioca la squadra
+## Fase D — come gioca la squadra (fatta il 2026-11-22, da provare sull'iPhone)
 - **4. Stili di gioco**: nella schermata della Rosa si sceglie come gioca e si muove la squadra: **contropiede**,
   **possesso palla** (tanti passaggi corti), **gioco sulle fasce**, e altri (es. pressing alto, lanci lunghi).
   Vale per i compagni guidati dalla CPU e per le squadre avversarie (ognuna col suo stile).
+  Fatto: nella Rosa tasto **Stile** con due selettori (attacco: equilibrato, contropiede, possesso, fasce, lanci lunghi;
+  difesa: equilibrata, pressing alto, catenaccio, a uomo, fuorigioco), una riga di spiegazione ciascuno; ogni squadra
+  della CPU ha il suo stile (fisso, dal seme e dall'identità), mostrato nell'hub prima della partita. Numeri in `DECISIONI.md`.
+- **Portatore che si muove da solo** (aggiunta di Luis, 2026-11-22): senza strada il portatore della squadra umana avanza
+  da solo secondo lo stile d'attacco (spazio libero, linee di passaggio, area, protezione palla, resta in campo); passaggi,
+  tiri, Dribbling e Scatto restano al dito. La strada disegnata la toglie l'agente dei gesti.
 
 ## Fase E — modi di gioco nuovi
 - **5. Momenti chiave** (fatta il 2026-11-22, da provare sull'iPhone; si sceglie sopra GIOCA, nell'amichevole e in

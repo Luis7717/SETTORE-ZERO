@@ -2,6 +2,9 @@
 # Uso: var m := SimMatch.new({"seed": 1, "halfLen": 150, "human": [true, false], "teams": [squadraA, squadraB]})
 #      m.step(1.0 / 60.0) a ogni fotogramma; m.events = eventi del passo (da svuotare dopo averli letti).
 # Squadra: {"name", "formation", "skill", "players": [11 giocatori {name, pos, vel, tir, pas, dri, dif, fis, por, tes?}]}.
+#          Facoltativi: "stileAtt" e "stileDif" = stile di gioco (stili.gd); senza, motore identico a prima.
+# Opzione "portaAuto" (predefinita true): il portatore della squadra umana senza strada si muove da solo (ai.gd
+# humanCarrierAuto); false = come prima (avanza piano e dritto), lo usano i test confrontati col JS.
 class_name SimMatch
 extends "ai.gd"
 
@@ -109,6 +112,7 @@ func _init(o: Dictionary) -> void:
 	halfLen = hl if hl != 0.0 else 180.0
 	human = o.get("human", [true, false])
 	autoGk = o.get("autoGk", [false, false])
+	portaAuto = bool(o.get("portaAuto", true))
 	teams = o.teams
 	var wx := weatherFx(o.get("meteo"))
 	var mt: Variant = o.get("meteo")
@@ -125,6 +129,8 @@ func _init(o: Dictionary) -> void:
 		var F: Array = C.FORMATIONS.get(tmd.get("formation", ""), C.FORMATIONS["4-4-2"])
 		if not tmd.has("skill"):
 			tmd.skill = 0.5
+		stA[tt] = Stili.att(tmd.get("stileAtt"))
+		stD[tt] = Stili.dif(tmd.get("stileDif"))
 		for i in 11:
 			players.append(mk(tt, i, tmd.players[i], F[i]))
 	ball = R.Ball.new()
