@@ -20,7 +20,8 @@ const DONE_PAUSE := 1.3       # secondi di "Bravo!" prima della prova successiva
 const FREEZE := 0.2           # stordimento rinnovato a ogni fotogramma per tenere fermi i giocatori fuori dalla prova
 const REPS := 3               # prove per ogni meccanica
 const GUIDA_PUNTI := 16       # punti della linea guida dei passaggi e dei tiri
-const GUIDA_PANCIA := 0.25    # linea guida curva: pancia pari a tanta parte della lunghezza (sopra la soglia CURVE_*)
+const GUIDA_PANCIA := 0.25    # linea guida curva: pancia pari a tanta parte della lunghezza (sopra la soglia CURVE_*) ...
+const GUIDA_PANCIA_TIRO := 0.2 # ... e nei tiri, più lunghi (così resta sullo schermo)
 const DRIB_DEF_DIF := 15.0    # lezione Dribbling: difesa del difensore, così il dribbling riesce quasi sempre (è una lezione)
 const HALF_LEN := 99999.0     # in allenamento il tempo non finisce mai
 const BRAVO := "Bravo!"
@@ -359,6 +360,7 @@ func guida() -> Array:
 	var a := Vector3(m.ball.x, m.ball.y, 0.0)
 	var b: Vector3
 	var lato := 1.0
+	var pancia := GUIDA_PANCIA
 	if st.has("mate"):
 		var q: R.Player = st.mate
 		b = Vector3(q.x, q.y, 0.0)
@@ -367,8 +369,9 @@ func guida() -> Array:
 		var px := -2.2 if c.x >= 0.0 else 2.2 # palo lontano
 		b = Vector3(px, C.HL, 1.3 if tipo == "curva" else 0.0)
 		lato = -signf(px)
+		pancia = GUIDA_PANCIA_TIRO
 	var punti: Array = []
-	var n := Vector2(-(b.y - a.y), b.x - a.x).normalized() * Vector2(b.x - a.x, b.y - a.y).length() * GUIDA_PANCIA * lato
+	var n := Vector2(-(b.y - a.y), b.x - a.x).normalized() * Vector2(b.x - a.x, b.y - a.y).length() * pancia * lato
 	for i in GUIDA_PUNTI + 1:
 		var u := float(i) / GUIDA_PUNTI
 		var p := a.lerp(b, u)

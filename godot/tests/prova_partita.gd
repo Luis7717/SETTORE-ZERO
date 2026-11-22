@@ -200,7 +200,8 @@ func _tuffo_dopo() -> void:
 	var di_lato := Vector2(testa.x - piedi.x, testa.z - piedi.z).length()
 	print("tuffo: testa prima %s, adesso %s (piedi %s): di lato %.2f m, altezza %.2f m" % [testa_prima, testa, piedi, di_lato, testa.y])
 	_foto("8_tuffo")
-	check(di_lato > 0.6 or testa.y < testa_prima.y - 0.5, "la figura del portiere si tuffa (testa di lato %.2f m, altezza %.2f → %.2f)" % [di_lato, testa_prima.y, testa.y])
+	# tiro alto e centrale: il portiere salta verso la traversa (testa più su) invece di buttarsi di lato
+	check(di_lato > 0.6 or testa.y < testa_prima.y - 0.5 or testa.y > testa_prima.y + 0.25, "la figura del portiere si tuffa (testa di lato %.2f m, altezza %.2f → %.2f)" % [di_lato, testa_prima.y, testa.y])
 	# 3. amichevole vera
 	g.queue_free()
 	g = (load("res://scenes/partita.tscn") as PackedScene).instantiate()
