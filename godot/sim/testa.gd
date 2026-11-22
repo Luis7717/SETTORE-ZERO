@@ -16,6 +16,10 @@ const HEAD_REACH := 0.95    # distanza dal pallone a cui il giocatore lo colpisc
 const HEAD_LOOK := 1.6      # previsione del volo fino a questo tempo (s)
 const HEAD_STEP := 3        # ... controllando un punto ogni tanti passi da 1/60 s
 const HEAD_PASS_V0 := 8.0   # sponda di testa: velocità base (m/s), più la bravura
+const HEAD_DEF_MARGIN := 0.2 # niente fermatempo se un avversario (portiere compreso) arriva sul punto prima di tanto (s):
+                            # quel pallone è suo, non è un'occasione vera
+const HEAD_DUEL_EDGE := 0.2 # contrasto aereo: chi colpisce con la linea già disegnata è in anticipo (probabilità in più)
+const HEAD_DUEL_R := 2.0    # un difensore arriva sul pallone e chi deve colpire è entro tanto: salto conteso (m)
 const HEAD_HUMAN_SIG := 0.9 # la linea disegnata è un po' più precisa del colpo automatico
 
 
@@ -88,15 +92,18 @@ func headFind(tm: int) -> R.HeadWin:
 	var s := b.physCopy()
 	var n: int = int(HEAD_LOOK * 60.0)
 	var k: int = 0
+	var oppT: float = 1e9 # primo momento in cui un avversario può prendere il pallone (s)
 	while k < n:
 		for j in HEAD_STEP:
 			C.ballPhys(s, 1.0 / 60.0, roll)
 		k += HEAD_STEP
+		var tk: float = k / 60.0
+		if oppT > 1e8 and headOppReach(tm, s, tk):
+			oppT = tk
 		if s.h < HEAD_LO or s.h > HEAD_HI or C.hyp(s.x, s.y - dir * HL) > AIR_SHOT_RANGE - 0.5:
 			if s.h < VOLLEY_LO and s.vh < 0.0:
 				return null # caduto senza passare ad altezza di testa in zona
 			continue
-		var tk: float = k / 60.0
 		var best: R.Player = null
 		var bd: float = 1e9
 		for p: R.Player in players:
@@ -106,16 +113,90 @@ func headFind(tm: int) -> R.HeadWin:
 			if d - HEAD_REACH <= vmax(p) * maxf(0.0, tk - 0.12) and d < bd:
 				bd = d
 				best = p
-		if best != null:
-			var w := R.HeadWin.new()
-			w.team = tm
-			w.p = best
-			w.x = s.x
-			w.y = s.y
-			w.h = s.h
-			w.tc = tk
-			return w
+		if best == null:
+			continue
+		# un avversario prende il pallone prima (più indietro sul volo) o arriva sul punto chiaramente prima del nostro:
+		# il pallone è suo, non un'occasione vera
+		if oppT < tk - HEAD_DEF_MARGIN or headOppETA(tm, s) < 0.12 + maxf(0.0, bd - HEAD_REACH) / vmax(best) - HEAD_DEF_MARGIN:
+			return null
+		var w := R.HeadWin.new()
+		w.team = tm
+		w.p = best
+		w.x = s.x
+		w.y = s.y
+		w.h = s.h
+		w.tc = tk
+		return w
 	return null
+
+
+## primo avversario della squadra T che arriva a toccare il pallone `s` (fermo lì): tempo di corsa (s), 1e9 se nessuno
+func headOppETA(tm: int, s: R.Ball) -> float:
+	var best: float = 1e9
+	for o: R.Player in players:
+		var lr := _oppLimReach(tm, o, s)
+		if lr.is_empty() or s.h > lr[0]:
+			continue
+		best = minf(best, 0.12 + maxf(0.0, C.hyp(o.x - s.x, o.y - s.y) - lr[1]) / vmax(o))
+	return best
+
+
+## [altezza massima, raggio] a cui l'avversario o tocca il pallone `s`; vuoto se non conta (fermo, portiere fuori area).
+## Portiere nella sua area con le mani (fino a GK_HAND_HI), difensore di testa vicino alla sua porta (fino a HEAD_HI),
+## altrimenti fino a 1,7 m; il raggio è quello vero del contatto (sui passaggi avversari il raggio difensivo)
+func _oppLimReach(tm: int, o: R.Player, s: R.Ball) -> Array:
+	if o.team == tm or o.off or o.state != "play" or o.stun > 0.0:
+		return []
+	if o.pos == "P":
+		return [C.GK_HAND_HI, GK_BOX_REACH] if inOwnBox(o) else []
+	var dirO: float = 1.0 if tm else -1.0 # verso d'attacco degli avversari
+	return [HEAD_HI if C.hyp(s.x, s.y + dirO * HL) < HEAD_CLEAR_ZONE else 1.7, reachOf(o)]
+
+
+## un avversario della squadra T può toccare il pallone `s` al tempo tk? Il portiere nella sua area con le mani
+## (fino a GK_HAND_HI), un difensore di testa vicino alla sua porta (fino a HEAD_HI), altrimenti fino a 1,7 m
+func headOppReach(tm: int, s: R.Ball, tk: float) -> bool:
+	for o: R.Player in players:
+		var lr := _oppLimReach(tm, o, s)
+		if lr.is_empty() or s.h > lr[0]:
+			continue
+		if C.hyp(o.x - s.x, o.y - s.y) - lr[1] <= vmax(o) * maxf(0.0, tk - 0.12):
+			return true
+	return false
+
+
+## l'avversario p sta per toccare il pallone alto mentre per noi c'è il fermatempo e chi deve colpire è vicino?
+func headContestable(p: R.Player) -> bool:
+	var hw := headWin
+	if hw == null or p.team == hw.team or p.pos == "P" or ball.h < HEAD_LO:
+		return false
+	var q := hw.p
+	return q.state == "play" and q.stun <= 0.0 and C.hyp(q.x - ball.x, q.y - ball.y) < HEAD_DUEL_R
+
+
+## salto conteso tra l'avversario p e chi deve colpire: come aerialDuel (colpi di testa, distanza) più il vantaggio
+## di chi ha la linea già disegnata. Ritorna il vincitore
+func headContest(p: R.Player) -> R.Player:
+	var b := ball
+	var q := headWin.p
+	var dq: float = C.hyp(q.x - b.x, q.y - b.y)
+	var dp: float = C.hyp(p.x - b.x, p.y - b.y)
+	var win: float = C.clamp_(0.5 + AIR_TES_K * (q.st.tes - p.st.tes) / 100.0 + (dp - dq) * AIR_DIST_K + headDuelEdge(q, p), AIR_WIN_MIN, AIR_WIN_MAX)
+	var w: R.Player = q if rnd() < win else p
+	ev("aerial", {"p": w, "o": p if w == q else q})
+	return w
+
+
+## contrasto aereo tra p (il più vicino) e o: vantaggio per chi colpisce con la linea già disegnata
+func headDuelEdge(p: R.Player, o: R.Player) -> float:
+	var hw := headWin
+	if hw == null or not hw.aimed:
+		return 0.0
+	if p == hw.p:
+		return HEAD_DUEL_EDGE
+	if o == hw.p:
+		return -HEAD_DUEL_EDGE
+	return 0.0
 
 
 ## la persona ha disegnato la linea: spec {goal: true, tx, th} = in porta, oppure {tx, ty} = sponda nel campo.

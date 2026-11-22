@@ -17,12 +17,14 @@ func _init() -> void:
 	var durata: float = float(args[1]) if args.size() > 1 else 150.0
 	var modo: String = args[2] if args.size() > 2 else "bot"
 	var testa: bool = args.size() > 3 and args[3] == "1"
-	var cross: bool = args.size() > 4 and args[4] == "1"
+	var cross: bool = args.size() > 4 and args[4] != "0"
+	_curva = float(args[5]) if args.size() > 5 else 0.0
+	var esiti := {}
 	var tot := {}
 	for k in ["loft", "lofti", "header", "volley", "clear", "aerial", "golTesta", "gol", "fermi", "diretti"]:
 		tot[k] = [0, 0]
 	for sd in range(1, semi + 1):
-		var ultimo := {"k": "", "t": -1}
+		var ultimo := {"k": "", "t": -1, "tocco": ""}
 		var crossato := {"p": null}
 		var conta := func(m: SimMatch) -> void:
 			if cross:
@@ -46,10 +48,19 @@ func _init() -> void:
 						tot.aerial[e.p.team] += 1
 					"head_win":
 						tot.fermi[e.team] += 1
+					"head_aim":
+						esiti["linea"] = esiti.get("linea", 0) + 1
+					"head_end":
+						var key: String = String(e.reason) + (":" + String(ultimo.tocco) if e.reason == "toccato" else "")
+						esiti[key] = esiti.get(key, 0) + 1
 					"goal":
 						tot.gol[e.team] += 1
 						if ultimo.k == "header" and ultimo.t == e.team:
 							tot.golTesta[e.team] += 1
+				if e.type in ["control", "punch", "save", "block", "tackle", "kick", "aerial"] and e.has("p"):
+					ultimo.tocco = ("portiere" if e.p.pos == "P" else ("compagno" if e.p.team == 0 else "difensore")) + "-" + e.type + String(e.get("kind", ""))
+				elif e.type == "out" or e.type == "restart":
+					ultimo.tocco = "fuori/" + String(e.get("kind", ""))
 			# lancio alto di una squadra che scende in zona di colpo di testa vicino alla porta avversaria
 			var b = m.ball
 			if b.kick != null and b.kick.type == "loft" and not b.kick.get_meta("contato", false) and b.owner == null:
@@ -60,12 +71,16 @@ func _init() -> void:
 		var res := H.playMatch({"seed": sd, "mode": modo, "halfLen": durata, "testa": testa}, conta)
 		res.m.dispose()
 	print("partite %d × 2 × %.0f s, modo %s, testa %s, cross %s" % [semi, durata, modo, testa, cross])
+	print("  esiti dei fermatempi: %s" % str(esiti))
 	for k: String in tot:
 		print("  %-9s squadra0 %4d   squadra1 %4d" % [k, tot[k][0], tot[k][1]])
 	quit()
 
 
 # persona simulata che crossa: portatore della squadra 0 sulla fascia negli ultimi 28 m, compagno in area = linea a lui
+static var _curva := 0.0
+
+
 static func _cross(m: SimMatch, fatto: Dictionary) -> void:
 	var c = m.ctrl[0]
 	var b = m.ball
@@ -76,5 +91,11 @@ static func _cross(m: SimMatch, fatto: Dictionary) -> void:
 	for q in m.team(0):
 		if q != c and not q.off and q.pos != "P" and absf(q.x) < 12.0 and q.y > C.HL - 16.0:
 			fatto.p = c
-			m.userKick(0, {"type": "auto", "tx": q.x + q.vx * 0.6, "ty": q.y + q.vy * 0.6})
+			var tx: float = q.x + q.vx * 0.6
+			var ty: float = q.y + q.vy * 0.6
+			if _curva == 0.0:
+				m.userKick(0, {"type": "auto", "tx": tx, "ty": ty})
+			else: # tratto curvo (a effetto e alto): curvatura = _curva × lunghezza, gobba verso la porta
+				var D: float = C.hyp(tx - b.x, ty - b.y)
+				m.userKick(0, {"type": "auto", "tx": tx, "ty": ty, "curve": _curva * D * signf(c.x), "tratto": true})
 			return

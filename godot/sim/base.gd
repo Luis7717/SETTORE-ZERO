@@ -347,3 +347,15 @@ func endHead(_reason: String) -> void:
 
 func headStrike(_p: R.Player, _kind: String) -> void:
 	pass # testa.gd
+
+
+func headDuelEdge(_p: R.Player, _o: R.Player) -> float:
+	return 0.0 # testa.gd
+
+
+func headContestable(_p: R.Player) -> bool:
+	return false # testa.gd
+
+
+func headContest(p: R.Player) -> R.Player:
+	return p # testa.gd

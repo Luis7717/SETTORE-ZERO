@@ -327,7 +327,7 @@ func aerialDuel(p: R.Player) -> R.Player:
 			o = q
 	if o == null:
 		return p
-	var win: float = C.clamp_(0.5 + AIR_TES_K * (p.st.tes - o.st.tes) / 100.0 + (dO - dp) * AIR_DIST_K, AIR_WIN_MIN, AIR_WIN_MAX)
+	var win: float = C.clamp_(0.5 + AIR_TES_K * (p.st.tes - o.st.tes) / 100.0 + (dO - dp) * AIR_DIST_K + headDuelEdge(p, o), AIR_WIN_MIN, AIR_WIN_MAX)
 	var w: R.Player = p
 	var l: R.Player = o
 	if not (rnd() < win):
@@ -583,6 +583,14 @@ func contacts(dt: float) -> void:
 	if gc != null:
 		best = gc
 		bestAir = ""
+	elif headContestable(best):
+		# colpo di testa controllato (testa.gd): l'avversario che arriva sul pallone se lo contende con chi deve colpire
+		var hw := headWin
+		if headContest(best) == hw.p:
+			if not hw.aimed:
+				return # vinto il salto ma senza linea: nessuno tocca il pallone
+			best = hw.p
+			bestAir = "header" if b.h >= HEAD_LO else "volley"
 	elif b.h >= HEAD_LO and not (best.pos == "P" and inOwnBox(best)):
 		var w := aerialDuel(best)
 		if w != best:
@@ -590,6 +598,10 @@ func contacts(dt: float) -> void:
 			bestAir = airPlay(w)
 			if bestAir == "" and b.h >= 1.7:
 				return
+	# colpo di testa controllato con la linea già disegnata (testa.gd): chi colpisce calcia anche se il pallone gli
+	# arriva un po' più basso del previsto (al volo), invece di stopparlo
+	if bestAir == "" and headWin != null and headWin.aimed and headWin.p == best:
+		bestAir = "header" if b.h >= HEAD_LO else "volley"
 	if bestAir != "":
 		airHit(best, bestAir)
 		return
