@@ -39,7 +39,8 @@ const Giochetti := preload("mosse/giochetti.gd")
 const Effetti := preload("effetti.gd")
 const Qualita := preload("qualita.gd")
 
-const BALL_R := 0.21           # raggio del pallone a schermo (più grande del vero, per leggerlo da lontano)
+const BALL_R := Figura.PALLA_R  # raggio del pallone a schermo (0,16: un po' più del vero, per leggerlo da lontano)
+const BALL_SH_SIZE := BALL_R * 2.85     # lato del disegno dell'ombra del pallone (0,6 m col raggio vecchio di 0,21)
 const PASS_RECV := 5.0         # linea "pass": compagno entro questa distanza dalla fine = riceve (anello verde)
 const RING_K := 1.9            # anello del controllato: scala, pulsa di ±0,12 a 6 rad/s
 const MARKER_H := 2.75         # segnalino sopra il controllato (m)
@@ -432,14 +433,14 @@ func _posa(i: int, p: Object, dt: float) -> void:
 	f.posa(p, dt, _ctx)
 
 
-# [mocap] figura che tiene il pallone tra le mani (rimessa laterale, figura_mocap.gd): Vector4(x, y, z, peso) nel
+# [mocap] figura che tiene il pallone tra le mani (rimessa laterale, figura_mocap.gd; rilancio del portiere, figura.gd): Vector4(x, y, z, peso) nel
 # mondo; continua a guardare la stessa figura dopo il lancio, finché il pallone non è tornato su quello vero
 func _pallone_in_mano(b: Object) -> Vector4:
 	if b.owner != null:
 		_mano_i = m.players.find(b.owner)
 	if _mano_i < 0 or _mano_i >= _figs.size() or not is_instance_valid(_figs[_mano_i]) or _figs[_mano_i].mocap == null:
 		return Vector4.ZERO
-	var v: Vector4 = _figs[_mano_i].mocap.pallone_in_mano()
+	var v: Vector4 = _figs[_mano_i].pallone_in_mano()   # rimessa (mocap) o rilancio del portiere dalle mani
 	if v.w <= 0.0 and b.owner == null:
 		_mano_i = -1
 	return v
@@ -549,7 +550,7 @@ func _crea_pallone() -> void:
 	_ball.material_override = mat
 	add_child(_ball)
 	var q := PlaneMesh.new()
-	q.size = Vector2(0.6, 0.6)
+	q.size = Vector2(BALL_SH_SIZE, BALL_SH_SIZE)
 	_ball_sh_mat = TV.materiale_segno(TV.ombra(64, 0.6), Color.WHITE, 1, false)
 	_ball_sh_mat.no_depth_test = false
 	_ball_sh = MeshInstance3D.new()

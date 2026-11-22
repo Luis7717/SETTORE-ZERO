@@ -13,7 +13,7 @@
 #   --veloce=K          tempo fisso di K/60 s a fotogramma (prove senza schermo: la partita va più veloce del vero)
 #   --bot               un "dito finto" gioca la squadra 0 coi gesti veri (scripts/partita/bot_dito.gd)
 #   --esci-a-fine       a fine partita stampa il riassunto ed esce (codice 0)
-#   --scena=area|duello|fuga|angolo|pausa|gol   mette la partita in una situazione da fotografare (gol: tiro a
+#   --scena=area|duello|fuga|angolo|rinvio|rilancio|pausa|gol   mette la partita in una situazione da fotografare (gol: tiro a
 #                       porta vuota, per vedere cronaca e replay)
 #   --esultanza=ID      con --scena=gol chi segna è il campione e fa quell'esultanza (id in esultanze.gd)
 #   --senza-replay      dopo il gol niente replay (si va subito al calcio d'inizio)
@@ -83,22 +83,6 @@ const FINE_DOPO_MS := 1500    # dal fischio finale alla schermata di fine partit
 const TEMPO_PREDEFINITO := 150.0
 const FOLLA_BASE := 0.16
 const TITOLO := "Amichevole"
-
-const HINTS := {
-	"attack": "Disegna la strada dal giocatore per correre · linea in porta = tiro",
-	"defend": "Difende la CPU: disegna una linea da un tuo giocatore per guidarlo tu",
-	"loose": "Palla libera: disegna una linea da un tuo giocatore per andarci",
-	"dive": "PARA! Tira una linea dal portiere al punto della porta",
-	"duel": "Disegna fino a un compagno per passare · oppure tocca Dribbling",
-	"flee": "Disegna fino a un compagno per passare · oppure tocca Scatto",
-	"zone": "Area di tiro: linea in porta = tiro · fino a un compagno = passaggio",
-}
-const RHINT := {
-	"kickoff": "Calcio d'inizio: disegna il passaggio", "throw": "Rimessa: disegna il passaggio",
-	"corner": "Calcio d'angolo: disegna il cross", "goalkick": "Rinvio: disegna il passaggio",
-	"freekick": "Punizione: disegna il passaggio o il tiro", "penalty": "RIGORE: disegna il tiro in porta",
-	"gk": "Rilancio del portiere: disegna il passaggio",
-}
 
 var m: SimMatchScript = null
 var me := 0
@@ -369,12 +353,8 @@ func _aggiorna_hud() -> void:
 		_cam_tip_visto = true
 	var on: bool = allenamento == null and not paused and not gesti.drawing and VD.user_cam_on(m, me)
 	hud.aiuto_visuale(("arr" if _cam_tip_visto else "tip") if on else "")
-	var h: String = "duel" if (m.duelFor(me) and not m.dribBooked(me)) else ("flee" if m.fleeFor(me) else ("zone" if m.inZone(me) else m.hint(me)))
-	var txt: String = RHINT.get(m.restart.type, "") if h == "restart" else HINTS.get(h, "")
-	var caldo := h == "dive" or (h == "restart" and m.restart.type == "penalty")
-	if allenamento != null:
-		txt = "" # in allenamento parla il riquadro in alto
-	hud.suggerimento(txt, caldo)
+	# niente suggerimenti in basso (Luis 2026-11-22: "la telecronaca è ok, togli i suggerimenti in basso"): in partita
+	# parla la cronaca in alto, in allenamento il riquadro in alto con la spiegazione di ogni lezione
 
 
 # ---------------------------------------------------------------- eventi del motore (events() di src/main.js)
@@ -806,6 +786,15 @@ func _prepara_scena(nome: String) -> void:
 				_disegno_di_prova(m.team(me)[10])
 		"angolo":
 			m.setRestart("corner", me, C.HW, C.HL)
+		"rinvio": # rinvio dal fondo del nostro portiere (posa rilassata dietro il pallone)
+			m.setRestart("goalkick", me, 5.0, -C.HL if me == 0 else C.HL)
+		"rilancio": # il nostro portiere ha preso il pallone in area: rilancio dalle mani (pallone tra le mani)
+			_metti_in_gioco()
+			var por: R.Player = m.gk(me)
+			_sposta(por, 2.0, (-C.HL + 7.0) * (1.0 if me == 0 else -1.0))
+			m.ball.x = por.x
+			m.ball.y = por.y + (0.6 if me == 0 else -0.6)
+			m.setRestart("gk", me, por.x, por.y, por)
 		"gol": # corsa verso la porta col portiere fuori dai pali, poi tiro: gol quasi sicuro (cronaca e replay)
 			_metti_in_gioco()
 			var dir := 1.0 if me == 0 else -1.0

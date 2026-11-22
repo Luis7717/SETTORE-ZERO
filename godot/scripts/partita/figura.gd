@@ -31,6 +31,19 @@ const HEAD_H := 1.3            # palla sopra questa altezza al momento del colpo
 const IDLE_FIX_LEGS := 0.12    # rad: nel clip "fermo" si chiudono un po' le gambe...
 const IDLE_FIX_ARMS := -0.05   # ... e si aprono appena le braccia
 const TRICK_BLEND := 0.12      # s: entrata e uscita dal movimento calcolato del giochetto
+# raggio del pallone a schermo (m del gioco; vista.gd BALL_R). 2026-11-22: da 0,21 a 0,16 (Luis: "palla leggermente
+# troppo grande rispetto ai giocatori", alti 2,3 m a schermo). I giochetti restano misurati col pallone del web (0,21,
+# mosse/giochetti.gd MATCH_R: stesse pose del JS), cambia solo quanto è grande quello disegnato
+const PALLA_R := 0.16
+# portiere "pronto" (gambe piegate, braccia avanti e aperte) a gioco fermo solo se difende su questi calci da fermo
+const GK_PRONTO_SU := ["penalty", "corner", "freekick"]
+# rilancio dalle mani (ripresa "gk" del motore): il portiere tiene il pallone davanti al petto (metri del modello,
+# riferimento del corpo: +X sinistra, +Y su, +Z avanti); polsi ai lati del pallone, gomiti in basso, fuori e indietro
+const MANO_PALLA := Vector3(0, 1.12, 0.3)
+const MANO_POLSO := Vector3(0.05, -0.03, -0.05)    # polso rispetto al lato del pallone (x verso fuori)
+const MANO_GOMITO := Vector3(0.6, -0.6, -0.5)      # verso dei gomiti (x verso fuori)
+const MANO_ENTRA := 0.2        # s: il pallone arriva nelle mani
+const MANO_ESCE := 0.3         # s: dopo il rilancio torna sul pallone vero
 const AX_X := 0
 const AX_Y := 1
 const AX_Z := 2
@@ -70,6 +83,8 @@ var _stile2 := Vector4(2, 0, 0, 0)   # taglio, barba, sopracciglia, calzoncini (
 var _corsa := 0.0              # ultimo valore di "corsa" dato allo shader (la maglia ondeggia)
 ## clip mocap di questa figura (figura_mocap.gd); null solo prima di prepara()
 var mocap: FiguraMocap
+## pallone tra le mani del portiere nel rilancio dalle mani (0..1, entra ed esce dolce)
+var mano_gk := 0.0
 ## esultanza del campione in corso: null, oppure {fr, corsa, vel, corpo, braccia} di mosse/esultanza.gd posa() più
 ## w (peso 0..1, entrata e uscita). La mette chi la guida (esultanza_regia.gd in partita, l'anteprima nell'editor)
 ## prima di posa(): finché c'è, comanda lei (niente clip mocap né pose del motore)
@@ -181,6 +196,9 @@ func posa(p: Object, dt: float, ctx: Dictionary) -> void:
 	var near_ball: bool = b != null and Vector2(b.x - p.x, b.y - p.y).length() < 2.2
 	var header: bool = p.kickAnim > 0.0 and near_ball and b.h > HEAD_H
 	var trick: Variant = ctx.get("trick")
+	var m: Object = ctx.get("m")
+	var in_mano := palla_in_mano(p, m)
+	mano_gk = move_toward(mano_gk, 1.0 if in_mano else 0.0, dt / (MANO_ENTRA if in_mano else MANO_ESCE)) if dt > 0.0 else (1.0 if in_mano else mano_gk)
 	if st == "slide" or st == "down" or (st == "dive" and p.dive != null):
 		w_idle = 1.0
 		w_run = 0.0
@@ -237,7 +255,9 @@ func posa(p: Object, dt: float, ctx: Dictionary) -> void:
 		_rot("calf_r", AX_X, 1.1 * (1.0 - q))
 		_rot("spine_02", AX_X, -0.18)
 		_rot("upperarm_l", AX_Z, 0.8); _rot("upperarm_r", AX_X, -0.7)
-	elif p.pos == "P" and v < 1.2:
+	elif in_mano:
+		pass   # braccia col pallone, dopo _applica_rot (_tieni_palla)
+	elif v < 1.2 and portiere_pronto(p, m, String(ctx.phase), b):
 		# portiere pronto: gambe piegate, braccia avanti e aperte
 		py = -0.06
 		_rot("spine_02", AX_X, 0.25)
@@ -253,6 +273,49 @@ func posa(p: Object, dt: float, ctx: Dictionary) -> void:
 	_applica_rot()
 	if trick != null and st == "play" and not cele and mc <= 0.0:
 		_giochetto(trick)
+	if mano_gk > 0.0 and mc <= 0.0:
+		_tieni_palla(mano_gk)
+
+
+## portiere col pallone in mano: rilancio dalle mani (ripresa "gk" del motore) finché non calcia
+static func palla_in_mano(p: Object, m: Object) -> bool:
+	if m == null or m.phase != "restart" or m.restart == null:
+		return false
+	return m.restart.type == "gk" and m.restart.taker == p and p.kickAnim <= 0.0
+
+
+## portiere in posa "pronto" (gambe piegate, braccia avanti e aperte): solo quando può arrivare un tiro. A gioco fermo
+## (rinvio dal fondo, rimesse, calcio d'inizio, gol, intervallo) sta dritto e rilassato come gli altri, tranne quello
+## che difende su rigore, angolo o punizione; col pallone tra i piedi mai. Senza partita (m = null) conta solo la fase.
+static func portiere_pronto(p: Object, m: Object, fase: String, ball: Object) -> bool:
+	if p.pos != "P" or (ball != null and ball.owner == p):
+		return false
+	if fase == "play":
+		return true
+	if fase != "restart" or m == null or m.restart == null:
+		return false
+	return m.restart.team != p.team and GK_PRONTO_SU.has(m.restart.type)
+
+
+## pallone tra le mani: Vector4(x, y, z del mondo, peso 0..1), peso 0 = il pallone resta dov'è. Rimessa laterale
+## (clip mocap) o rilancio del portiere dalle mani (mano_gk)
+func pallone_in_mano() -> Vector4:
+	if mano_gk <= 0.0:
+		return mocap.pallone_in_mano() if mocap != null else Vector4.ZERO
+	_gcache.clear()
+	var c := (pos_corpo("hand_l") + pos_corpo("hand_r")) * 0.5 + Vector3(0, -MANO_POLSO.y, -MANO_POLSO.z)
+	var w: Transform3D = global_transform if is_inside_tree() else transform
+	var g := w * (corpo.transform * c)
+	return Vector4(g.x, g.y, g.z, mano_gk)
+
+
+# polsi ai lati del pallone davanti al petto (IK delle braccia), peso w
+func _tieni_palla(w: float) -> void:
+	var r := PALLA_R / Coord.SCALE   # raggio del pallone a schermo nelle misure del modello
+	for s: String in ["l", "r"]:
+		var x := 1.0 if s == "l" else -1.0
+		var polso := MANO_PALLA + Vector3(x * (r + MANO_POLSO.x), MANO_POLSO.y, MANO_POLSO.z)
+		_arto(_limbs["arm_" + s], polso, Vector3(x * MANO_GOMITO.x, MANO_GOMITO.y, MANO_GOMITO.z), null, w)
 
 
 # pesi e velocità dei clip (Athlete3D.blend): sopra SPRINT_FROM lo scatto prende il posto della corsa
