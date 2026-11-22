@@ -142,7 +142,6 @@ func test_volume_dei_cori() -> bool:
 
 # sull'iPhone (Metal) i materiali col filtro anisotropico non si disegnano (pallone il 2026-11-21, tribune, erba, led e
 # rete il 2026-11-22): nessuno script o shader deve usarlo (le righe di commento non contano)
-const ANISO_ALTRI_RAMI := ["shaders/erba_comune.gdshaderinc", "shaders/led.gdshader", "shaders/rete.gdshader"]
 
 
 static func _file_sorgente(cartella: String, out: Array[String]) -> void:
@@ -158,7 +157,6 @@ func test_nessun_filtro_anisotropico() -> bool:
 	_file_sorgente("res://scripts/", file)
 	_file_sorgente("res://shaders/", file)
 	check(file.size() > 20, "trovati gli script (%d)" % file.size())
-	var saltati := 0
 	for f in file:
 		var rel := f.trim_prefix("res://")
 		var righe := FileAccess.get_file_as_string(f).split("\n")
@@ -167,11 +165,5 @@ func test_nessun_filtro_anisotropico() -> bool:
 			if r.begins_with("#") or r.begins_with("//"):
 				continue
 			if r.to_lower().contains("anisotropic"):
-				# corretti su un altro ramo (erba, led, rete): si tolgono da qui al merge
-				if rel in ANISO_ALTRI_RAMI:
-					saltati += 1
-					continue
 				failures.append("%s:%d usa un filtro anisotropico" % [rel, i + 1])
-	if saltati > 0:
-		note("%d righe saltate in %s (sistemate su altri rami)" % [saltati, str(ANISO_ALTRI_RAMI)])
 	return done()
