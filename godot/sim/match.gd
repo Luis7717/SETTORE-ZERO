@@ -15,6 +15,8 @@ const RAIN_STUN := 1.25  # pioggia: chi perde un contrasto resta fermo ×1,25 (s
 const SNOW_ROLL := 1.35  # neve: attrito del rotolamento ×1,35 = palla più lenta
 const ENERGY_MIN := 0.2 # energia più bassa possibile (come il calo in partita, motion.gd)
 const PREVIEW_SEC := 2.4 # durata massima dell'anteprima della traiettoria (s)
+const CROSS_X := 14.0 # cross: si calcia da più in fuori di così dal centro (m) ...
+const CROSS_DEPTH := 30.0 # ... e da meno di così dalla linea di fondo avversaria (m)
 const SHOT_V0 := 22.0 # velocità base del tiro (m/s), più la bravura del tiratore
 const GK_REACT := 0.42 # tempo di reazione base del portiere del computer (s), meno la sua bravura
 const WALL_RANGE := 30.0 # punizione entro questa distanza dalla porta: barriera (m)
@@ -98,6 +100,7 @@ func _init(o: Dictionary) -> void:
 	var wx := weatherFx(o.get("meteo"))
 	var mt: Variant = o.get("meteo")
 	meteo = mt if mt is String else ""
+	headCtl = bool(o.get("testa", false))
 	roll = wx.roll
 	slideK = wx.slide
 	stunK = wx.stun
@@ -180,6 +183,7 @@ func setRestart(type: String, tm: int, x: float, y: float, taker: R.Player = nul
 	b.dblT = 0.0
 	endDuel("gioco fermo")
 	endFlee("gioco fermo")
+	endHead("gioco fermo")
 	phase = "restart"
 	move = [null, null]
 	runs = [[], []]
@@ -386,7 +390,7 @@ func launch(p: R.Player, spec: Dictionary, noise: bool) -> Dictionary:
 		dy = p.fy
 		D = 1.0
 	if type == "auto":
-		type = "loft" if (D > 30.0 or blocked(sx, sy, spec.tx, spec.ty, tm)) else "ground"
+		type = "loft" if (D > 30.0 or blocked(sx, sy, spec.tx, spec.ty, tm) or isCross(sx, sy, spec.tx, spec.ty, tm)) else "ground"
 	var press: float = nearOpp(p.x, p.y, tm)
 	var sig: float
 	if type == "shot":
@@ -431,6 +435,13 @@ func launch(p: R.Player, spec: Dictionary, noise: bool) -> Dictionary:
 	var ac: float = C.clamp_(-8.0 * c / (Tt * Tt), -14.0, 14.0)
 	var lv: float = -ac * Tt / 2.0
 	return {"type": type, "sx": sx, "sy": sy, "v0": v0, "vx": ux * v0 + nx * lv, "vy": uy * v0 + ny * lv, "vh": vh, "cax": nx * ac, "cay": ny * ac, "ct": Tt if ac != 0.0 else 0.0}
+
+
+# Cross: dalla fascia, vicino alla porta avversaria, verso l'area. La linea disegnata dalla persona ("auto") qui diventa
+# sempre un pallone alto (prima, senza avversari sulla linea, partiva rasoterra e nessuno poteva colpire di testa).
+func isCross(sx: float, sy: float, tx: float, ty: float, tm: int) -> bool:
+	var dir: float = -1.0 if tm else 1.0
+	return absf(sx) > CROSS_X and sy * dir > HL - CROSS_DEPTH and absf(tx) < BOX_W / 2.0 + 2.0 and ty * dir > HL - BOX_D - 3.0 and C.hyp(tx - sx, ty - sy) > 10.0
 
 
 # Anteprima del volo del pallone per il calcio `spec`, senza errore di mira e senza cambiare la partita.
@@ -642,6 +653,7 @@ func goal(forT: int) -> void:
 	goalsLog.append({"team": forT, "name": scorer.name if scorer != null else "Autogol", "minute": mnt, "scorer": scorer.src if scorer != null else null, "assist": assist.src if assist != null else null})
 	endDuel("gioco fermo")
 	endFlee("gioco fermo")
+	endHead("gioco fermo")
 	advantage = null
 	phase = "goal"
 	goalT = 3.2
@@ -687,6 +699,7 @@ func step(dt: float) -> void:
 	updateBall(dt)
 	updateDuel(dt)
 	updateFlee(dt)
+	updateHead(dt)
 	if phase == "play":
 		contacts(dt)
 		if phase == "play":
@@ -790,6 +803,8 @@ func updateCtrl(_dt: float, force: bool = false) -> void:
 			c = null
 		if b.owner != null and b.owner.team == tm:
 			c = b.owner
+		elif headWin != null and headWin.team == tm:
+			c = headWin.p # colpo di testa controllato: comanda chi deve colpire
 		elif phase == "restart" or phase == "goal":
 			if c == null or c.pos == "P" or force:
 				c = _nearestCtrl(tm)

@@ -1,7 +1,7 @@
 # "Dito finto" per le prove senza persona (gioco.gd --bot): gioca la squadra 0 SOLO coi gesti veri, cioè posizioni
 # sullo schermo passate a scripts/partita/gesti.gd come farebbe un dito (giù, trascina, su). Disegna strade, passaggi,
 # tiri, linee di difesa e tuffi del portiere, tiene premuto per muovere il controllato, preme Dribbling nel duello e Scatto
-# nella fuga (avversario alla pari o dietro) e gira la visuale nel rallenty. Non è un giocatore bravo: serve a far passare una partita intera da tutti i gesti.
+# nella fuga (avversario alla pari o dietro), disegna il colpo di testa nel suo fermatempo e gira la visuale nel rallenty. Non è un giocatore bravo: serve a far passare una partita intera da tutti i gesti.
 extends RefCounted
 
 const SimRng := preload("res://sim/rng.gd")
@@ -14,7 +14,7 @@ const ATTESA_MIN := 6          # fotogrammi tra un gesto e l'altro (più un po' 
 const ATTESA_CASO := 10
 
 var r: SimRng
-var conti := {"strada": 0, "passaggio": 0, "tiro": 0, "difesa": 0, "tuffo": 0, "dribbling": 0, "scatto": 0, "visuale": 0, "tieni": 0, "saltati": 0}
+var conti := {"strada": 0, "passaggio": 0, "tiro": 0, "difesa": 0, "tuffo": 0, "dribbling": 0, "scatto": 0, "visuale": 0, "tieni": 0, "testa": 0, "saltati": 0}
 var _gesto: Array[Vector2] = []
 var _fine_mondo: Variant = null  # Vector3(x, y, h) del campo dove deve finire la linea (si riproietta al rilascio)
 var _attesa := 0
@@ -66,6 +66,11 @@ func _decidi(g, now: int) -> void:
 	var c: R.Player = m.ctrl[me]
 	var b: R.Ball = m.ball
 	var dir := 1.0 if me == 0 else -1.0
+	if m.headFor(me): # colpo di testa controllato: linea dal giocatore verso un punto della porta
+		var hp: R.Player = m.headWin.p
+		var porta := Vector3((r.next() - 0.5) * 5.0, dir * C.HL, 0.4 + r.next() * 1.6)
+		_linea(g, now, _sch(g, hp.x, hp.y, 1.0), _sch(g, porta.x, porta.y, porta.z), "testa", porta)
+		return
 	match m.hint(me):
 		"dive":
 			var s: R.Shot = b.shot

@@ -1,5 +1,5 @@
 # IA: tiro, passaggi, portatore, rimesse, posizioni in attacco e difesa, portiere (porting di src/sim/ai.js).
-extends "motion.gd"
+extends "testa.gd"
 
 # Regolazioni dell'IA (misurate con test/balance.mjs e test/diag-flow.mjs)
 const CLEAR_ZONE := 30.0     # metri dalla propria linea di fondo in cui un difensore pressato può spazzare
@@ -474,6 +474,8 @@ func assign(p: R.Player) -> void:
 	if phase == "restart" and p.wall != null:
 		p.tx = p.wall.x
 		p.ty = p.wall.y
+		return
+	if headWin != null and headRun(p):
 		return
 	var mv: R.Move = move[tm] if (hum and ctrl[tm] == p) else null
 	if mv != null and mv.path != null:

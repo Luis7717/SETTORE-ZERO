@@ -74,7 +74,7 @@ func _evento(e: Dictionary) -> void:
 			_chiudi_tiro("respinto" if e.get("clear", false) else "fuori")
 			if e.get("clear", false):
 				_passaggio = null
-			elif TIRI.has(e.get("kind", "")):
+			elif TIRI.has(e.get("kind", "")) and not e.get("sponda", false): # la sponda di testa è un passaggio
 				_somma(p, "tiri")
 				_tiro = p
 				_passaggio = null

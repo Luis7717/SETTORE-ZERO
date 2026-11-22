@@ -232,6 +232,10 @@ func airHit(p: R.Player, kind: String) -> void:
 	b.noT = 0.3
 	predT = 0.0
 	p.kickAnim = 0.35
+	# colpo di testa controllato con la linea già disegnata (testa.gd)
+	if kind != "clear" and headWin != null and headWin.aimed and headWin.p == p:
+		headStrike(p, kind)
+		return
 	if kind == "clear":
 		# respinta: lontano dalla propria porta, alta, verso l'esterno
 		var a0: float = F.atan2_(dir, (1.0 if b.x > 0.0 else -1.0) * (0.3 + rnd() * 0.5))
@@ -294,7 +298,7 @@ func aerialDuel(p: R.Player) -> R.Player:
 	var o: R.Player = null
 	var dO: float = 0.95
 	for q: R.Player in players:
-		if q.team == p.team or q.off or q.state != "play" or q.stun > 0.0 or (b.noP == q and b.noT > 0.0) or dblBan(q) or q.pos == "P":
+		if q.team == p.team or q.off or q.state != "play" or q.stun > 0.0 or (b.noP == q and b.noT > 0.0) or dblBan(q) or q.pos == "P" or headSkip(q):
 			continue
 		var d: float = C.hyp(q.x - b.x, q.y - b.y)
 		if d < dO and (airPlay(q) != "" or b.h < 1.7):
@@ -525,7 +529,7 @@ func contacts(dt: float) -> void:
 	var bd: float = 9.0
 	var bestAir := ""
 	for p: R.Player in players:
-		if p.off or p.state != "play" or p.stun > 0.0 or (b.noP == p and b.noT > 0.0) or dblBan(p):
+		if p.off or p.state != "play" or p.stun > 0.0 or (b.noP == p and b.noT > 0.0) or dblBan(p) or headSkip(p):
 			continue
 		var isGk: bool = p.pos == "P" and inOwnBox(p)
 		var d: float = C.hyp(p.x - b.x, p.y - b.y)

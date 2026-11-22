@@ -141,7 +141,7 @@ static func e_tiro(e: Dictionary) -> bool:
 	var k: String = e.get("kind", "")
 	if k == "shot":
 		return true
-	if (k != "header" and k != "volley") or e.get("clear", false):
+	if (k != "header" and k != "volley") or e.get("clear", false) or e.get("sponda", false):
 		return false
 	var p: Object = e.get("p")
 	if p == null:
