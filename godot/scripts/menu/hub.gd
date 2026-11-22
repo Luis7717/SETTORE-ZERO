@@ -2,7 +2,7 @@
 # obiettivo della dirigenza (verde se oggi è raggiunto), prossima partita (giornata, casa/trasferta, DERBY contro
 # la rivale, le due squadre con la forza, avanzamento, scelta partita intera / momenti chiave, GIOCA che pulsa),
 # ultimo risultato e le otto caselle (Rosa, Mercato, Classifica, Calendario, Amichevole, 1 contro 1,
-# Come si gioca, Impostazioni).
+# Come si gioca, Impostazioni), più quella larga dell'allenamento libero.
 extends MenuSchermata
 
 const I := preload("res://scripts/menu/icone.gd")
@@ -76,6 +76,8 @@ func costruisci() -> void:
 	m.add_theme_constant_override("margin_top", 4)
 	m.add_child(g)
 	corpo.add_child(m)
+	# allenamento libero (tiri, punizioni, rigori a punti): casella larga sotto le otto
+	corpo.add_child(_casella("goal", "Allenamento libero", "Tiri, punizioni, rigori: batti il record", "allenamento_libero", cs[0]))
 
 
 func stemma_squadra(t: Dictionary, misura: Vector2) -> MenuStemma:
