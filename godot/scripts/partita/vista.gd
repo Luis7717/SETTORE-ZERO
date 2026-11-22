@@ -29,6 +29,7 @@ extends Node3D
 
 const Coord := preload("res://scripts/coord.gd")
 const Figura := preload("figura.gd")
+const Fisico := preload("res://scripts/carriera/fisico.gd")
 const PALLA_HD := "res://assets/textures/pallone.png"
 const Asp := preload("res://scripts/carriera/aspetto.gd") # porting di src/looks.js (classe Aspetto)
 const Schiene := preload("schiene.gd")
@@ -397,7 +398,7 @@ func figura_di(p: Object) -> Node3D:
 func _figura(p: Object) -> Node3D:
 	var f := Figura.new()
 	f.name = "G%d_%d" % [p.team, p.i]
-	f.scale = Vector3.ONE * Coord.SCALE
+	f.scale = Coord.SCALE * Fisico.scala(Fisico.di(_src_di(p)))   # altezza e corporatura (fisico.gd)
 	_giocatori.add_child(f)
 	f.prepara(_kit_di(p), _aspetto_di(p), _rng.randf() * 2.0, _tex_warn)
 	return f
@@ -495,9 +496,13 @@ static func _secondo_colore(maglia: Color, calzoncini: Color) -> Color:
 
 # aspetto (src/looks.js): il `look` del giocatore se c'è (completato), sennò dal suo id e nome come lookOf del web
 func _aspetto_di(p: Object) -> Dictionary:
+	return Asp.parametri_figura(Asp.lookOf(_src_di(p)), _stile_squadra(p.team))
+
+
+# dati del giocatore sorgente (carriera), o id e nome se la partita non li ha
+func _src_di(p: Object) -> Dictionary:
 	var src: Dictionary = p.src if p.src is Dictionary else {}
-	var l := Asp.lookOf(src if not src.is_empty() else {"id": "%d_%d" % [p.team, p.i], "name": str(p.name)})
-	return Asp.parametri_figura(l, _stile_squadra(p.team))
+	return src if not src.is_empty() else {"id": "%d_%d" % [p.team, p.i], "name": str(p.name), "pos": str(p.pos)}
 
 
 # cognomi e numeri di chi è in campo (numero: src.num, sennò il posto in squadra + 1, come figFor del web)

@@ -44,3 +44,8 @@ ogni cambio al motore si fa in tutte e due, con le fixture rigenerate.
 ## Tenute da parte (da provare più avanti)
 - 2. Tiro caricato col dito fermo (più forza, meno precisione).
 - 3. Passaggio di prima (disegnare il gesto successivo mentre il pallone viaggia).
+
+## Fuori dalle fasi
+- **Altezza e corporatura** dei giocatori (2026-11-22, fatta, da provare sull'iPhone): basso/medio/alto e
+  snello/normale/robusto, si vedono sulla figura e cambiano le statistiche in partita; il campione li sceglie
+  nell'editor. Numeri in `DECISIONI.md`.

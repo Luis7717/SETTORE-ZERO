@@ -130,7 +130,7 @@ func gioca_campionato() -> void:
 	var titolo := ("Derby · " if derby else "") + "Giornata %d · %s" % [nm.day, CarrieraScript.DIV_NAMES[nm.div]]
 	# stadio (taglio e manto dell'erba) della squadra di casa: in casa il mio, fuori quello dell'avversario
 	var stadio: Variant = carriera.s.get("seed") if nm.home else nm.opp.get("seed")
-	_partita("campionato", carriera.aiMatchTeam(nm.opp), titolo, float(carriera.s.settings.half), stadio, derby,
+	_partita("campionato", carriera.avversarioPartita(nm.opp), titolo, float(carriera.s.settings.half), stadio, derby,
 		Meteo.per_giornata(int(carriera.s.get("seed", 0)), int(carriera.s.get("season", 1)), int(nm.day)))
 
 
@@ -144,7 +144,7 @@ func gioca_amichevole(avversario: Variant = null) -> void:
 	else:
 		var lvl: float = float(avversario) if (avversario is int or avversario is float) else float(carriera.myRating())
 		t = {"name": "Amichevole", "short": "AMI", "kit": _kit_avversario(), "rating": lvl, "seed": randi() % 1000000000}
-	_partita("amichevole", carriera.aiMatchTeam(t), "Amichevole", float(carriera.s.settings.half))
+	_partita("amichevole", carriera.avversarioPartita(t), "Amichevole", float(carriera.s.settings.half))
 
 
 func allenamento() -> void:
@@ -152,7 +152,7 @@ func allenamento() -> void:
 		return
 	var t := AVVERSARIO_ALLENAMENTO.duplicate()
 	t["kit"] = _kit_avversario()
-	_partita("allenamento", carriera.aiMatchTeam(t), "Allenamento guidato", ALLENAMENTO_TEMPO)
+	_partita("allenamento", carriera.avversarioPartita(t), "Allenamento guidato", ALLENAMENTO_TEMPO)
 
 
 func _kit_avversario() -> int:

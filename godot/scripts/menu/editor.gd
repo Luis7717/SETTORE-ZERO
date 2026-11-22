@@ -6,12 +6,16 @@
 # mezzo le scelte che scorrono, in fondo Casuale e Avanti / Salva.
 # Il campione ha anche la scheda Esultanza (nella creazione e poi in "look" se il giocatore è il campione): si sceglie
 # tra le 15 di scripts/partita/esultanze.gd e il modellino la fa vedere (MenuAnteprima.mostra_esultanza).
+# Fisico del campione (altezza e corporatura, scripts/carriera/fisico.gd): nella creazione sta nella scheda Nome,
+# in "look" (solo il campione) nella scheda Fisico; il modellino cambia subito altezza e larghezza.
 extends MenuSchermata
 
 const Asp := preload("res://scripts/carriera/aspetto.gd")
 const Esultanze := preload("res://scripts/partita/esultanze.gd")
 const CarrieraScript := preload("res://scripts/carriera/carriera.gd")
+const Fisico := preload("res://scripts/carriera/fisico.gd")
 const SCHEDA_ESULTANZA := ["cele", "Esultanza"]
+const SCHEDA_FISICO := ["body", "Fisico"]
 const KIT_LABELS := {"fit": "Maglia", "sleeves": "Maniche", "collar": "Colletto", "pattern": "Motivo", "shorts": "Pantaloncini", "socks": "Calzettoni"}
 const SCHEDE := {
 	"crest": [["shape", "Forma"], ["pattern", "Motivo"], ["icon", "Simbolo"]],
@@ -71,7 +75,8 @@ func _titoli() -> void:
 func _apri_nuova(club: String, kit: int) -> void:
 	var seme := D.hash32([club, kit, Time.get_ticks_usec()])
 	d = {"club": club, "kit": kit, "crest": D.crest_from_seed(seme), "style": D.normalize_kit_style(null),
-		"look": D.look_from_seed(seme), "name": D.random_name(seme), "pos": "A", "num": 9, "esultanza": Esultanze.PREDEFINITA}
+		"look": D.look_from_seed(seme), "name": D.random_name(seme), "pos": "A", "num": 9, "esultanza": Esultanze.PREDEFINITA,
+		"altezza": Fisico.PREDEFINITO.altezza, "corporatura": Fisico.PREDEFINITO.corporatura}
 	mode = "crest"
 	tab = "shape"
 
@@ -86,6 +91,7 @@ func _apri_aspetto(id: Variant) -> bool:
 	var s := stato()
 	d = {"id": id, "kit": s.kit, "crest": c.crest(), "style": c.kitStyle(), "look": D.look_of(p), "name": p.name, "pos": p.pos, "num": p.get("num", 0),
 		"champ": p.get("champ", false), "esultanza": CarrieraScript.esultanza_di(p)}
+	d.merge(Fisico.di(p))
 	return true
 
 
@@ -100,6 +106,7 @@ func _apri_divisa() -> void:
 	mode = "kit"
 	tab = "kit"
 	d = {"kit": s.kit, "crest": c.crest(), "style": c.kitStyle(), "look": D.look_of(p), "name": p.name, "pos": "A", "num": p.get("num", 0)}
+	d.merge(Fisico.di(p))
 
 
 func _apri_stemma() -> void:
@@ -154,11 +161,12 @@ func costruisci() -> void:
 	fisso_sotto.add_child(_barra())
 
 
-## schede del modo attuale: in "look" il campione ha anche l'Esultanza
+## schede del modo attuale: in "look" il campione ha anche l'Esultanza e il Fisico
 func schede_del_modo() -> Array:
 	var schede: Array = SCHEDE[mode].duplicate()
 	if mode == "look" and d.get("champ", false):
 		schede.append(SCHEDA_ESULTANZA)
+		schede.append(SCHEDA_FISICO)
 	return schede
 
 
@@ -256,6 +264,7 @@ func _aggiorna_palco() -> void:
 	_cartellino.text = "%s · %s" % [d.name, str(d.num) if int(d.num) > 0 else ""]
 	_anteprima.vicino = tab == "face" or tab == "hair"
 	_anteprima.mostra_esultanza(str(d.get("esultanza", "")) if tab == "cele" else "")
+	_anteprima.metti_fisico(_fisico_scelto())
 	_anteprima.metti(_kit_figura(), _aspetto_figura())
 	_faccia.look = d.look
 	var gk: bool = d.pos == "P"
@@ -380,6 +389,10 @@ func _pannello() -> void:
 				_tinte("look.boots", D.BOOTS, l.boots)
 		"me":
 			_pannello_nome()
+			if mode == "champ":
+				_pannello_fisico()
+		"body":
+			_pannello_fisico()
 		"cele":
 			_pannello_esultanza()
 
@@ -460,6 +473,20 @@ func _pannello_nome() -> void:
 	corpo.add_child(U.paragrafo("Il campione entra in rosa come un giovane forte della Terza Divisione (%s), con l'aspetto che hai scelto." % D.pos_name(d.pos), 13.5))
 
 
+## altezza e corporatura scelte (fisico.gd)
+func _fisico_scelto() -> Dictionary:
+	return Fisico.di({"champ": true, "altezza": d.get("altezza"), "corporatura": d.get("corporatura")})
+
+
+func _pannello_fisico() -> void:
+	var f := _fisico_scelto()
+	_riga("Altezza", Fisico.ALTEZZE[f.altezza])
+	_chips("altezza", Fisico.ALTEZZE, f.altezza)
+	_riga("Corporatura", Fisico.CORPORATURE[f.corporatura])
+	_chips("corporatura", Fisico.CORPORATURE, f.corporatura)
+	corpo.add_child(U.paragrafo("In partita: %s. Alto = più forte di testa (e il portiere copre di più), meno agile; basso = più agile nel dribbling, meno forte di testa e nei contrasti; robusto = più forte nei contrasti, meno veloce; snello = più veloce e resistente, meno forte." % Fisico.testo_effetto(f), 13.5))
+
+
 func _pannello_esultanza() -> void:
 	corpo.add_child(U.paragrafo("Dopo ogni suo gol il campione esulta così, con la telecamera su di lui. Tocca una scelta per vederla; in partita un tocco la salta.", 13.5))
 	var cur := Esultanze.valida(d.get("esultanza"))
@@ -535,6 +562,8 @@ func _casuale() -> void:
 	elif tab == "cele":
 		var ids := Esultanze.ids()
 		d.esultanza = ids[seme % ids.size()]
+	elif tab == "body":
+		d.merge(Fisico.daSeme(seme, d.get("pos", "A")), true)
 	else:
 		# "Casuale" cambia solo la scheda aperta, il resto resta com'è
 		var nuovo := D.look_from_seed(seme)
@@ -568,6 +597,7 @@ func _conferma() -> void:
 			c.setKitStyle(d.style)
 			var champ: Dictionary = c.addChampion({"name": d.name, "pos": d.pos, "look": d.look, "num": d.num})
 			c.setEsultanza(champ.id, d.get("esultanza", Esultanze.PREDEFINITA))
+			c.setFisico(champ.id, d.get("altezza"), d.get("corporatura"))
 			gioca("allenamento")
 		"crest":
 			c.setCrest(d.crest)
@@ -579,6 +609,7 @@ func _conferma() -> void:
 			c.setLook(d.id, d.look)
 			if d.get("champ", false):
 				c.setEsultanza(d.id, d.get("esultanza"))
+				c.setFisico(d.id, d.get("altezza"), d.get("corporatura"))
 			_esci("Aspetto salvato")
 
 

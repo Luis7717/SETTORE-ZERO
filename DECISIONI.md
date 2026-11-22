@@ -1374,3 +1374,39 @@ Dettagli in `godot/README.md`, "Capelli e barbe".
 - **FPS** (`prova_vista --senza-vsync --scala3d=2 --qualita=3 --esci-dopo=12`, PC carico): prima GPU 0,401 ms,
   601 FPS, 47 disegni; dopo GPU 0,400 ms, 632 FPS, 49 disegni. Vicino (`--vicino=5`): prima 0,536 ms, dopo 0,519 ms.
 - **Da provare sull'iPhone**: barbe e forme degli occhi nell'editor e in partita, grandezza dell'iride, attaccatura.
+
+## 2026-11-22 — Godot: altezza e corporatura dei giocatori (Luis: "deve avere un peso sulle statistiche")
+Dettagli in `godot/README.md`, "Altezza e corporatura". File nuovo `godot/scripts/carriera/fisico.gd`.
+- **Motore invariato**: il fisico cambia le statistiche *sorgente* sulle copie dei giocatori quando si costruisce la
+  squadra per la partita (`squadraPartita`, `avversarioPartita` = `aiMatchTeam` + fisico). Niente cambi in `src/sim`
+  né in `godot/sim`, golden e tracce uguali. Statistiche salvate, valutazione e valore = quelle di base (le funzioni
+  portate dal JS restano identiche; `addChampion` non scrive i campi, li scrive `setFisico` dall'editor).
+- **Punti** (sommati, limiti 1..99; nel motore: VEL velocità massima, RES (`fis`) accelerazione e resistenza, DRI
+  dribbling/controllo/tenuta nei contrasti, DIF contrasti e intercetti, TES colpi di testa e duelli aerei, POR parate):
+  | | VEL | RES | DRI | DIF | TES | POR |
+  |---|---|---|---|---|---|---|
+  | Basso | +1 | | +3 | −3 | −8 | −5 |
+  | Alto | −1 | | −2 | +2 | +8 | +5 |
+  | Snello | +2 | +1 | | −3 | −2 | |
+  | Robusto | −2 | −2 | | +4 | +2 | |
+  Medio e normale: niente. Il motore non ha una "forza" a parte: la forza nei contrasti è DIF (raggio e vittoria del
+  contrasto); la tenuta del portatore è DRI, per questo il basso (baricentro basso) ha DRI in più e il robusto no.
+- **Equilibrio**: senza contare testa e parate, la somma dei punti di ogni combinazione sta tra −1 e +1 (test). La
+  testa conta poco nel motore (i duelli aerei sono rari: ~4 in 24 partite brevi IA contro IA), quindi l'alto ha un
+  punto in meno sul resto. Prova (24 partite IA contro IA da 2×90 s, squadra tutta con un fisico contro la stessa
+  squadra media/normale; prima di abbassare RES dello snello da +2 a +1): medio 9-7 · alto 6-7 · basso 7-4 ·
+  robusto 7-14 · snello 8-6 · alto robusto 6-7 · basso snello 6-8. Con così pochi gol è tutto dentro il rumore
+  (medio contro sé stesso 9-7): nessun fisico vince da solo. Una prova prima (alto con DRI −3, VEL −2, RES −2) dava
+  6-13 in 16 partite: tolto un po' di svantaggio all'alto.
+- **Distribuzione** (dal seme di id, nome e ruolo; su 1000): alti P 655, D 449, A 280, C 200; robusti D 428, P 310,
+  A 246, C 157. Il campione senza campi (salvataggio vecchio) è medio/normale; gli altri giocatori dei salvataggi
+  vecchi prendono il fisico dal seme (sono generati anche loro), senza scrivere niente nel file.
+- **Figura**: scala del nodo della figura: altezza 0,94 / 1 / 1,06 su tutti gli assi (i più alti sono anche un po'
+  più grossi, come nella realtà), corporatura 0,92 / 1 / 1,09 solo in X e Z (simmetrica: girando non si deforma).
+  Origine ai piedi: piedi a terra (test). Scelta la scala del nodo invece delle ossa: le animazioni riscrivono le
+  pose, e capelli, barba, divisa, IK e mocap seguono senza cambiare niente. Limite: un braccio alzato si allarga e
+  si allunga col fattore della larghezza (al massimo 9%), non si nota.
+- **Non fatto**: lo sfondo del menu (campione che palleggia) resta in scala normale (inquadratura fissa tarata);
+  gli avversari non si scelgono il fisico.
+- **Da provare sull'iPhone**: se la differenza di altezza (±6%) e di corporatura si vede in partita, se il robusto
+  sembra grasso o solo grosso, se i numeri nella Rosa ("TES+10") sono chiari.

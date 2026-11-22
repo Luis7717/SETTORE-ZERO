@@ -11,6 +11,7 @@ const Figura := preload("res://scripts/partita/figura.gd")
 const TV := preload("res://scripts/partita/texture_vista.gd")
 const Esult := preload("res://scripts/partita/mosse/esultanza.gd")
 const Coord := preload("res://scripts/coord.gd")
+const Fisico := preload("res://scripts/carriera/fisico.gd")
 
 const SPIN := 0.45               # rad/s: rotazione lenta (come il web)
 const TRASCINA := 0.012          # rad per px di dito
@@ -46,6 +47,7 @@ var _es_id := ""                 # esultanza in mostra ("" = nessuna)
 var _es_t := 0.0
 var _segui := Vector3.ZERO       # punto seguito dalla telecamera sul prato (bacino durante l'esultanza)
 var _ctx := {"t": 0.0, "phase": "menu", "flip": 1.0, "yaw": 0.0, "ball": null, "trick": null}
+var _fisico: Dictionary = Fisico.PREDEFINITO   # altezza e corporatura mostrate (metti_fisico)
 
 
 ## giocatore fermo per la posa (STILL del web): i campi che Figura.posa legge
@@ -136,7 +138,7 @@ func _misura() -> void:
 func metti(kit: Dictionary, aspetto: Dictionary) -> void:
 	if _fig == null:
 		_fig = Figura.new()
-		_fig.scale = Vector3.ONE * Coord.SCALE
+		_fig.scale = Coord.SCALE * Fisico.scala(_fisico)
 		_vp.add_child(_fig)
 		_fig.prepara(kit, aspetto, 0.0, TV.avviso())
 		_mesh = _fig.get("_mesh") as MeshInstance3D
@@ -145,6 +147,18 @@ func metti(kit: Dictionary, aspetto: Dictionary) -> void:
 	for k: String in kit:
 		_mesh.set_instance_shader_parameter(k, kit[k])
 	_fig.metti_aspetto(aspetto)   # colori e mesh di capelli e barba
+
+
+## altezza e corporatura ({altezza, corporatura}, fisico.gd): il modellino cambia subito (scala della figura)
+func metti_fisico(f: Dictionary) -> void:
+	_fisico = {"altezza": int(f.get("altezza", 1)), "corporatura": int(f.get("corporatura", 1))}
+	if _fig != null:
+		_fig.scale = Coord.SCALE * Fisico.scala(_fisico)
+
+
+## scala attuale della figura (per le prove)
+func scala_figura() -> Vector3:
+	return _fig.scale if _fig != null else Coord.SCALE * Fisico.scala(_fisico)
 
 
 ## esultanza da mostrare ("" = nessuna, il giocatore torna fermo); un id nuovo riparte da capo
