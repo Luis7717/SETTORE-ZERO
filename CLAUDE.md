@@ -139,7 +139,10 @@
   verso la porta = colpo di testa lì (precisione secondo `tes`), verso un compagno o il campo = sponda; disegnata la
   linea il tempo torna normale e il colpo parte appena arriva il pallone. **Senza linea il pallone è perso** (nessun
   compagno lo tocca: passa sopra, lo prende la difesa o il portiere). Senza fermatempo i colpi di testa restano
-  automatici come prima. Il cross disegnato dalla fascia verso l'area è sempre un pallone alto (`isCross`).
+  automatici come prima. Il cross alto si disegna col tratto curvo. Il fermatempo si apre solo se nessun avversario
+  (portiere compreso) arriva sul pallone chiaramente prima; il difensore che arriva insieme se lo contende in salto
+  (chi ha già disegnato la linea ha un piccolo vantaggio, `HEAD_DUEL_EDGE`); con la linea il colpo parte anche se il
+  pallone arriva un po' più basso (al volo).
   Nel motore vale solo con l'opzione `"testa": true` (la mette il gioco; i confronti col JS restano identici).
 - Portiere: sul tiro la visuale va dietro la propria porta e il tempo rallenta; linea dal portiere al punto della porta,
   il tuffo parte quando si alza il dito.
