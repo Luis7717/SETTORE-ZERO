@@ -81,6 +81,12 @@ static var _cache := {}                    # taglio → ArrayMesh (null per calv
 static var _materiale: ShaderMaterial
 
 
+## a fine programma (App._exit_tree): lascia le risorse condivise prima che si spenga il server grafico
+static func libera_condivisi() -> void:
+	_cache = {}
+	_materiale = null
+
+
 # ---------------------------------------------------------------- riferimento della testa e base radiale
 ## misura la testa (una volta): a = surface_get_arrays del corpo, testa_w = peso dell'osso Head per vertice.
 ## Ritorna {c (media dei punti della testa), occhio_l, occhio_r} per le misure del viso.

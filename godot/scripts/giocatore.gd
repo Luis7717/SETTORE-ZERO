@@ -28,6 +28,13 @@ static var _yaw_modello := 0.0
 ## peso dell'osso della testa per vertice della mesh del corpo (riferimento dei capelli, misure del viso)
 static var _peso_testa := PackedFloat32Array()
 
+
+## a fine programma (App._exit_tree): lascia le risorse condivise prima che si spenga il server grafico
+static func libera_condivisi() -> void:
+	_mesh_divisa = null
+	_materiale = null
+	_albero = null
+
 var _modello: Node3D
 var _mesh: MeshInstance3D
 var _albero_anim: AnimationTree

@@ -303,6 +303,10 @@ func _exit_tree() -> void:
 		if p != null:
 			p.stop()
 			p.stream = null
+	# e si lasciano le risorse grafiche condivise (variabili static): sul Mac della build, senza, a fine programma
+	# uno shader risultava "leaked" (2026-11-22) e la prova della build falliva
+	load("res://scripts/giocatore.gd").libera_condivisi()
+	load("res://scripts/partita/capelli.gd").libera_condivisi()
 
 
 # l'app va in sottofondo o si chiude: si salva subito
