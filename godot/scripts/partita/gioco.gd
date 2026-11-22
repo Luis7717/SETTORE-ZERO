@@ -234,7 +234,8 @@ func _crea_partita() -> void:
 	var auto_gk: bool = _avvio.get("autoGk", false)
 	meteo = Meteo.per_partita(_avvio, _opzioni, seme, tipo() == "allenamento" or tipo() == "prove")
 	m = SimMatchScript.new({"seed": seme, "halfLen": tempo, "human": [me == 0, me == 1],
-		"autoGk": [auto_gk and me == 0, auto_gk and me == 1], "teams": squadre, "meteo": meteo.meteo, "testa": true})
+		"autoGk": [auto_gk and me == 0, auto_gk and me == 1], "teams": squadre, "meteo": meteo.meteo, "testa": true,
+		"portaAuto": tipo() != "allenamento" and tipo() != "prove"}) # lezioni e prove di tiro: il tiratore non parte da solo
 	if tipo() == "allenamento":
 		tempo = Allenamento.HALF_LEN
 		if not avviata_da_app():
