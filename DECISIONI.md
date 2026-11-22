@@ -1476,3 +1476,59 @@ Dettagli in `godot/README.md`, "Altezza e corporatura". File nuovo `godot/script
   gli avversari non si scelgono il fisico.
 - **Da provare sull'iPhone**: se la differenza di altezza (±6%) e di corporatura si vede in partita, se il robusto
   sembra grasso o solo grosso, se i numeri nella Rosa ("TES+10") sono chiari.
+
+## 2026-11-22 — Stili di gioco (Fase D) e portatore umano che si muove da solo (solo versione Godot)
+- **Dove**: `godot/sim/stili.gd` (parametri con nome, nomi, spiegazioni, scelta per le squadre della CPU), agganci in
+  `base.gd` (`anchor`), `ai.gd` (passaggi, cross, portatore, pressing, marcature, linea), `match.gd` (lettura dei campi
+  `stileAtt`/`stileDif` della squadra). Ogni aggancio è dentro un `if` dello stile: senza stile (o equilibrato, o valore
+  sconosciuto) il motore è identico bit per bit (tracce del JS uguali, `test_stili.gd` confronta 50 s passo per passo).
+  Solo Godot: il JS non ha gli stili, resta il riferimento del comportamento predefinito.
+- **Cosa fanno**: contropiede = squadra più bassa in attacco (−7% del campo) e punte più alte; per 7 s dopo il recupero
+  il passaggio in avanti e il filtrante valgono di più, il portatore decide più in fretta e scatta. Possesso = appoggi
+  più vicini (6,5-9,5 m) e uno in più, passaggi lunghi e lanci penalizzati, più voglia di passare. Fasce = mezzali larghe
+  come le ali, cross già da 34 m e con meno spazio, il portatore corre sulla fascia. Lanci lunghi = il lancio alto si
+  valuta anche con la linea rasoterra sicura, passaggi fino a 52 m, premio ai passaggi lunghi, punte più alte.
+  Pressing = linea +6%, secondo pressatore sul portatore da 12 m prima della metà campo (squadra umana: un pressatore in
+  più). Catenaccio = blocco −11% e più stretto (×0,8), si pressa solo entro 38 m dalla propria porta, più lontano il più
+  vicino resta 5 m davanti al portatore. A uomo = difensori e centrocampisti con un avversario fisso (dai posti della
+  formazione), lo seguono a 1,3 m dal lato della porta. Fuorigioco = difensori sulla stessa linea (il posto più alto tra
+  loro, +2%), sempre 6 m dietro il pallone.
+- **Misura** (`tools/misura_stili.gd`, 60 partite IA contro IA da 2×150 s, forza 65 contro 65, la squadra con lo stile
+  contro una equilibrata, metà in casa e metà fuori; numeri della squadra con lo stile, a partita):
+
+  | Stile | pass./azione | lanci alti | pass. >25 m | cross | linea (m) | recuperi alti | tiri | gol fatti | gol subiti | punti |
+  |---|---|---|---|---|---|---|---|---|---|---|
+  | Equilibrato (base) | 7,0 | 8% | 1,9 | 1,4 | 25,5 | 3,8 | 4,9 | 0,50 | 0,43 | 1,32 |
+  | Contropiede | 3,6 | 11% | 3,4 | 1,3 | 24,0 | 3,6 | 4,5 | 0,77 | 0,63 | 1,42 |
+  | Possesso | 11,1 | 3% | 0,9 | 0,7 | 25,2 | 2,3 | 1,9 | 0,20 | 0,35 | 1,07 |
+  | Fasce | 7,4 | 8% | 1,8 | 2,4 | 25,5 | 3,8 | 4,5 | 0,32 | 0,38 | 1,17 |
+  | Lanci lunghi | 6,4 | 22% | 9,2 | 4,3 | 25,8 | 4,2 | 3,9 | 0,47 | 0,48 | 1,20 |
+  | Pressing | 6,3 | 8% | 2,1 | 1,5 | 29,6 | 4,0 | 4,6 | 0,33 | 0,25 | 1,28 |
+  | Catenaccio | 7,7 | 8% | 2,0 | 1,0 | 14,9 | 2,1 | 2,9 | 0,38 | 0,33 | 1,27 |
+  | A uomo | 6,4 | 6% | 2,1 | 2,1 | 37,0 | 7,4 | 6,8 | 0,63 | 0,42 | 1,37 |
+  | Fuorigioco | 6,8 | 7% | 2,2 | 1,1 | 29,0 | 3,5 | 4,0 | 0,30 | 0,17 | 1,28 |
+
+  "Linea" = difensore più arretrato quando si difende, metri dalla propria linea di fondo; "recuperi alti" = palloni
+  presi nella metà campo avversaria. Punti: tutti tra 1,07 e 1,42 (la base contro sé stessa 1,32; con 60 partite il
+  rumore è circa ±0,15): nessuno stile vince da solo. Prima della taratura il fuorigioco (linea +9%, 3 m dal pallone)
+  faceva 2,13 punti con 1 gol subito in 40 partite e il pressing (secondo pressatore da −25 m) 1,80: abbassati. Il
+  possesso con la soglia del tiro più alta non tirava quasi più (0,3 tiri a partita): tolta (`POSS_SHOT` = 0).
+  Il fuorigioco fischiato resta rarissimo anche con la linea alta: gli attaccanti dell'IA stanno già sulla linea.
+- **Squadre della CPU**: `Stili.perSquadra(seme, nome, forza, formazione)`, pesi dal prefisso del nome (Atletico =
+  contropiede e pressing, Real = possesso e fuorigioco, Fortitudo = catenaccio e lanci, ...), dalla forza (forti:
+  possesso e pressing; deboli: catenaccio, contropiede, lanci) e dalla formazione della stagione (4-3-3 = fasce, ...).
+  Fisso per squadra nella stagione (cambia solo se cambia la formazione). Si vede nell'hub ("Loro: ...") ed è lo stesso
+  della partita (`avversarioPartita`). Allenamento guidato: niente stili.
+- **Salvataggio**: chiavi `stileAtt`/`stileDif` (tra le `CHIAVI_GODOT`), riempite da `novita()` con i predefiniti nei
+  salvataggi vecchi; valori sconosciuti = predefiniti.
+- **Portatore umano automatico** (`humanCarrierAuto`, opzione `portaAuto` del Match, predefinita sì; i test confrontati
+  col JS la spengono): ogni 0,25 s prova 12 direzioni a 5 m e sceglie per avvicinamento al punto voluto, spazio dagli
+  avversari, linee di passaggio libere verso i compagni (+0,35 l'una), ingresso in area con spazio (+1,5); punti a meno
+  di 2,5 m da un avversario o vicini alle linee scartati. Pressato (avversario a meno di 2,6 m) protegge palla
+  (andatura 0,6, anche di lato o indietro); con meno di 2 compagni davanti rallenta (0,55). Andatura per stile:
+  equilibrato 0,85, contropiede 1 e scatto con strada libera, possesso 0,6, fasce verso la linea laterale e sul fondo
+  (16 m) si stringe e aspetta il cross (0,45), lanci lunghi 0,4 a testa alta. In 2,5 s da metà campo: equilibrato
+  avanza 12 m, contropiede 17,5, possesso 9, lanci 6; le fasce si allargano di 2,7 m. Mai passaggi né tiri da solo.
+  Nel duello e nella fuga resta il movimento di prima (piano e dritto): i rallenty partono come prima (test).
+- **Da provare sull'iPhone**: se gli stili si riconoscono guardando la partita (soprattutto contropiede e fasce), se il
+  portatore automatico è comodo o va dove non si vuole, se il pannello Stile nella Rosa è chiaro.

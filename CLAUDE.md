@@ -66,6 +66,18 @@
 
 ## Gesti (tutto a un dito)
 - Col pallone, fuori dal duello: disegna dal giocatore = **strada da correre** (con tanta strada davanti scatta); linea che finisce in porta = tiro.
+- **Portatore che si muove da solo** (versione Godot, Luis 2026-11-22): il portatore della squadra umana si muove
+  sempre da solo (`humanCarrierAuto` in `godot/sim/ai.gd`, opzione `portaAuto` del Match, predefinita sì; i test
+  confrontati col JS la spengono): avanza nello spazio libero cercando linee di passaggio libere, entra in area se può,
+  protegge palla se pressato, rallenta se non ha compagni davanti, gira intorno ai difensori e resta in campo, secondo
+  lo **stile d'attacco** (contropiede punta la porta di corsa, possesso avanza piano, fasce va sulla linea laterale e in
+  fondo aspetta il cross, lanci lunghi resta quasi fermo a testa alta). **Non passa e non tira mai da solo**: il dito
+  sceglie passaggi e tiri, e i tasti Dribbling e Scatto nei rallenty (nel duello e nella fuga avanza piano e dritto
+  come prima). Se il motore riceve ancora una strada (`userPath`) quella ha la precedenza.
+- **Stili di gioco** (Fase D, `godot/sim/stili.gd`): nella Rosa, tasto **Stile**: attacco (Equilibrato, Contropiede,
+  Possesso, Fasce, Lanci lunghi) e difesa (Equilibrata, Pressing, Catenaccio, A uomo, Fuorigioco). Valgono per i
+  compagni della CPU e per gli avversari (stile fisso per squadra, mostrato nell'hub). Campi `stileAtt`/`stileDif`
+  della squadra del Match e del salvataggio; senza, motore identico a prima.
 - **Duello** (portatore a 7 m da un difensore davanti, anche "per linee": vedi Scatto): visuale bassa, tempo all'8%. Si
   passa a qualunque compagno **solo disegnando** fino al compagno (il tocco sul compagno non passa più, 2026-11-20);
   oppure tasto **Dribbling** in basso. Il tasto **prenota** il dribbling (2026-11-21): sparisce, il tempo torna normale e

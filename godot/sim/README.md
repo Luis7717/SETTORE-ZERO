@@ -22,6 +22,7 @@ lo stato (pallone e 22 giocatori) è identico al JS a ogni passo, con stessi eve
 | `src/sim/ai.js` | `ai.gd` | IA: tiro, passaggi, portatore, difesa, appoggi, portiere |
 | `src/sim/match.js` | `match.gd` (`SimMatch`) | `Match`: calci, pallone, ripartenze, regole, comandi del giocatore (`user*`) |
 | `src/sim.js` | — | in GDScript si usa direttamente `match.gd` |
+| — | `stili.gd` (solo Godot) | stili di gioco (attacco/difesa): parametri, nomi, stile delle squadre della CPU |
 
 Uso dal gioco: `var m := SimMatch.new({"seed": 7, "halfLen": 150.0, "human": [true, false], "teams": [a, b]})`,
 poi `m.step(dt)` a ogni fotogramma, `m.events` da leggere e svuotare, i comandi `m.userPath(...)`, `m.userKick(...)`, ….

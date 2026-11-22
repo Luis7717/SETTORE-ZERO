@@ -177,6 +177,10 @@ func _partita(tipo: String, avversario: Dictionary, titolo: String, durata: floa
 	var opz := {"squadra_a": carriera.squadraPartita(), "squadra_b": avversario, "me": 0, "tipo": tipo,
 		"durata_tempo": durata, "seme": randi() % 1000000000, "titolo": titolo, "autoGk": bool(s.settings.autoGk),
 		"derby": derby}
+	if tipo == "allenamento": # lezioni guidate: squadre senza stile di gioco, come sempre
+		for k: String in ["squadra_a", "squadra_b"]:
+			(opz[k] as Dictionary).erase("stileAtt")
+			(opz[k] as Dictionary).erase("stileDif")
 	if stadio_seme is int or stadio_seme is float:
 		opz["stadio_seme"] = int(stadio_seme)
 	opz.merge(meteo)
