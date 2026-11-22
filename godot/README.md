@@ -486,6 +486,21 @@ cambia: tutto si raccoglie lato grafica dagli eventi.
   `tests/controlli_menu.gd` (tasto, pagella con un solo migliore, ritorno), schermate 25-26 di `prova_menu.gd` e
   `--app-schermate` (statistiche, mappa, pagella della partita appena giocata).
 
+## Momenti chiave (fase E, punto 5, solo Godot)
+
+Modo di gioco da provare: si giocano ~10 azioni (9-11 col seme), il resto della partita lo simula un modello semplice
+e si legge come cronaca tra un'azione e l'altra. Si sceglie sopra GIOCA (casa della carriera), nell'amichevole e in
+Impostazioni (`settings.momenti`, predefinito false: i salvataggi vecchi restano a "partita intera").
+- `scripts/partita/momenti.gd`: solo logica (prove in `tests/test_momenti.gd`). Piano delle azioni secondo la forza
+  (minimo 3 d'attacco, 2 in difesa), partenza a centrocampo col pallone a chi attacca e un paio di avversari già
+  saltati, fine dell'azione dagli eventi del motore, resto simulato minuto per minuto col seme (gol nel punteggio e nei
+  marcatori del motore, tiri/angoli/falli/parate/possesso nelle statistiche, tiri nei conteggi e nella mappa).
+- `momenti_regia.gd`: la crea `gioco.gd` (avvio `momenti: true` o `--momenti`); ferma la partita tra le azioni,
+  orologio lento (`Momenti.HALF_LEN`), fischio finale dopo il 90' simulato. `momenti_vista.gd`: la schermata tra le
+  azioni (risultato, minuto, esito, cronaca, prossima azione, tocco per continuare).
+- Prove: `$G --path godot -- --momenti --bot --veloce=6` (il dito finto tocca "continua" da solo);
+  `--esci-a-fine` stampa piano ed esiti. Numeri e scelte in `DECISIONI.md`.
+
 ## Replay del gol e cronaca scritta (fase C)
 
 Solo grafica: il motore (`sim/*`) non cambia e non vede mai i valori del replay.
