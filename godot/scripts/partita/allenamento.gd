@@ -19,7 +19,8 @@ const STEP_TIMEOUT := 16.0    # secondi prima di rimettere a posto la prova
 const DONE_PAUSE := 1.3       # secondi di "Bravo!" prima della prova successiva
 const FREEZE := 0.2           # stordimento rinnovato a ogni fotogramma per tenere fermi i giocatori fuori dalla prova
 const REPS := 3               # prove per ogni meccanica
-const PASS_DEF_DIST := 11.0   # lezione Passaggio: distanza iniziale del difensore davanti al portatore (m)
+const GUIDA_PUNTI := 16       # punti della linea guida dei passaggi e dei tiri
+const GUIDA_PANCIA := 0.25    # linea guida curva: pancia pari a tanta parte della lunghezza (sopra la soglia CURVE_*)
 const DRIB_DEF_DIF := 15.0    # lezione Dribbling: difesa del difensore, così il dribbling riesce quasi sempre (è una lezione)
 const HALF_LEN := 99999.0     # in allenamento il tempo non finisce mai
 const BRAVO := "Bravo!"
@@ -27,23 +28,31 @@ const BRAVO := "Bravo!"
 # Ogni lezione: titolo, testi, chi resta fermo (freeze), `needs` = metodo del motore senza il quale si salta.
 # Situazioni (setup), riuscita (check sugli eventi, poll sullo stato) sono i metodi _setup_*, _check_*, _poll_* sotto.
 const LESSONS := [
+	# Passaggi e tiri (Luis 2026-11-22): col pallone ogni linea è un calcio; la forma del tratto decide il colpo.
+	# guida = linea da seguire mostrata in campo (guida() sotto, disegnata da allenamento_hud.gd)
 	{
-		"id": "passaggio", "title": "Passaggio",
-		"short": "Corri verso il difensore; quando il tempo rallenta disegna dalla palla fino a un compagno.",
-		"text": "Si passa quando ti avvicini a un difensore (la visuale si abbassa e il tempo rallenta) e negli ultimi 20 metri prima della porta. Allora <b>disegna dalla palla fino a un compagno</b>, chiunque sia: il passaggio si disegna sempre, toccare il compagno non basta. I puntini azzurri mostrano dove andrà davvero la palla.",
-		"freeze": "opp-but-o",
+		"id": "passaggio", "title": "Passaggio rasoterra",
+		"short": "Linea <b>dritta</b> dalla palla al compagno: rasoterra.",
+		"text": "Col pallone il tuo giocatore corre da solo: tu <b>disegni dalla palla</b>. Una linea <b>dritta</b> fino a un compagno è un passaggio <b>rasoterra</b>, forte quanto basta per arrivare dove finisce la linea. Funziona in ogni zona del campo. Segui la linea tratteggiata.",
+		"freeze": "opp", "guida": "dritta",
 	},
 	{
-		"id": "tiro", "title": "Tiro",
-		"short": "Disegna una linea che finisce in porta.",
-		"text": "Disegna una linea che <b>finisce dentro la porta</b>: più in alto la finisci, più alto va il tiro. <b>Curvala</b> per tirare a giro attorno al portiere.",
-		"freeze": "opp-but-gk",
+		"id": "passaggio_alto", "title": "Passaggio a effetto",
+		"short": "Linea <b>curva</b> dalla palla al compagno: la palla si alza e scavalca il difensore.",
+		"text": "Se in mezzo c'è un avversario <b>curva la linea</b>: la palla gira dal lato della curva e <b>si alza</b>, scavalcando chi sta in mezzo. Più curvi, più va alta. Una linea appena storta resta un passaggio rasoterra.",
+		"freeze": "opp", "guida": "curva",
 	},
 	{
-		"id": "corsa", "title": "Corsa e scatto",
-		"text": "Col pallone, <b>disegna la strada</b> partendo dal tuo giocatore: lui la segue. Con tanta strada davanti <b>scatta</b> (ma si stanca prima). Se la linea finisce dentro la porta è un tiro.",
-		"hint": ["Disegna una strada in avanti di una decina di metri.", "Ora disegna una strada che curva verso una fascia.", "Ora una strada lunga: il giocatore <b>scatta</b>."],
-		"freeze": "opp",
+		"id": "tiro", "title": "Tiro rasoterra",
+		"short": "Linea <b>dritta</b> che finisce dentro la porta: tiro rasoterra.",
+		"text": "Una linea che <b>finisce dentro la porta</b> è un tiro. Se è <b>dritta</b> il tiro è <b>rasoterra</b>, forte e teso verso il punto dove l'hai finita.",
+		"freeze": "opp-but-gk", "guida": "dritta",
+	},
+	{
+		"id": "tiro_giro", "title": "Tiro a giro",
+		"short": "Linea <b>curva</b> che finisce in porta: tiro a giro.",
+		"text": "<b>Curva la linea</b> che finisce in porta: il pallone gira attorno al portiere e <b>si alza</b>, ed entra all'altezza dove finisce la linea. Più curvi, più gira.",
+		"freeze": "opp-but-gk", "guida": "curva",
 	},
 	{
 		"id": "recupera", "title": "Recupera palla",
@@ -131,6 +140,8 @@ func carrier(idx: int, x: float, y: float) -> R.Player:
 	put(c, x, y)
 	var b: R.Ball = m.ball
 	b.owner = c
+	b.x = c.x + c.fx * 0.6 # pallone già ai piedi (prima arrivava solo al primo passo del motore)
+	b.y = c.y + c.fy * 0.6
 	b.kick = null
 	b.shot = null
 	b.h = 0.0
@@ -285,18 +296,36 @@ func after(dt: float) -> void:
 func _setup_passaggio(kk: int) -> Dictionary:
 	var c := carrier(7, [0.0, -6.0, 4.0][kk], [0.0, -4.0, 6.0][kk])
 	clear_opp()
-	# difensore a una decina di metri: prima ci si avvicina, poi parte il duello (DUEL_R = 7 m)
-	var o: R.Player = m.players[16]
-	put(o, c.x + [0.0, 1.5, -1.5][kk], c.y + PASS_DEF_DIST)
-	o.fx = 0.0
-	o.fy = -1.0
-	var mate: Array = [[9.0, 18.0], [-22.0, 10.0], [17.0, 6.0]][kk]
+	var mate: Array = [[9.0, 18.0], [-16.0, 10.0], [14.0, 8.0]][kk]
 	put(m.players[9], mate[0], mate[1])
-	return {"c": c, "o": o}
+	return {"c": c, "mate": m.players[9]}
+
+
+## passaggio riuscito: un compagno controlla un nostro passaggio del tipo voluto (ground o loft)
+func _passaggio_ok(e: Dictionary, kind: String) -> bool:
+	if e.type == "kick" and (e.p as R.Player).team == 0:
+		st.kind = e.kind
+	return e.type == "control" and (e.p as R.Player).team == 0 and e.p != st.c and st.get("kind", "") == kind
 
 
 func _check_passaggio(e: Dictionary) -> bool:
-	return e.type == "control" and (e.p as R.Player).team == 0 and e.p != st.c
+	return _passaggio_ok(e, "ground")
+
+
+func _setup_passaggio_alto(kk: int) -> Dictionary:
+	var c := carrier(7, [0.0, -6.0, 4.0][kk], [0.0, -4.0, 6.0][kk])
+	clear_opp()
+	var mate: Array = [[4.0, 20.0], [-14.0, 14.0], [16.0, 18.0]][kk]
+	put(m.players[9], mate[0], mate[1])
+	# difensore a metà strada: un passaggio rasoterra lo prenderebbe
+	var o: R.Player = m.players[16]
+	put(o, (c.x + mate[0]) / 2.0, (c.y + mate[1]) / 2.0)
+	o.fy = -1.0
+	return {"c": c, "o": o, "mate": m.players[9]}
+
+
+func _check_passaggio_alto(e: Dictionary) -> bool:
+	return _passaggio_ok(e, "loft")
 
 
 func _setup_tiro(kk: int) -> Dictionary:
@@ -307,24 +336,46 @@ func _setup_tiro(kk: int) -> Dictionary:
 
 
 func _check_tiro(e: Dictionary) -> bool:
-	return e.type == "kick" and (e.p as R.Player).team == 0 and e.kind == "shot"
+	return e.type == "kick" and (e.p as R.Player).team == 0 and e.kind == "shot" and not e.get("curvo", false)
 
 
-func _setup_corsa(kk: int) -> Dictionary:
-	var c := carrier(7, [0.0, -10.0, 8.0][kk], [-14.0, -6.0, -20.0][kk])
-	clear_opp()
-	return {"c": c, "x0": c.x, "y0": c.y, "k": kk}
+func _setup_tiro_giro(kk: int) -> Dictionary:
+	return _setup_tiro(kk)
 
 
-func _poll_corsa() -> bool:
-	var c: R.Player = st.c
-	if m.ball.owner != c:
-		return false
-	if st.k == 0:
-		return c.y - float(st.y0) > 12.0                       # avanti
-	if st.k == 1:
-		return absf(c.x - float(st.x0)) > 10.0                 # verso la fascia
-	return c.sprint and C.hyp(c.x - float(st.x0), c.y - float(st.y0)) > 12.0   # scatto
+func _check_tiro_giro(e: Dictionary) -> bool:
+	return e.type == "kick" and (e.p as R.Player).team == 0 and e.kind == "shot" and e.get("curvo", false)
+
+
+## linea guida della lezione (passaggi e tiri): punti del campo Vector3(x, y, h) dal pallone a dove finire,
+## dritta o curva come va disegnata; [] se la lezione non ne ha o il pallone non è del portatore della prova
+func guida() -> Array:
+	if finished or card or done > 0.0 or li < 0:
+		return []
+	var tipo: String = lesson().get("guida", "")
+	var c: R.Player = st.get("c")
+	if tipo == "" or c == null or m.ball.owner != c:
+		return []
+	var a := Vector3(m.ball.x, m.ball.y, 0.0)
+	var b: Vector3
+	var lato := 1.0
+	if st.has("mate"):
+		var q: R.Player = st.mate
+		b = Vector3(q.x, q.y, 0.0)
+		lato = 1.0 if q.x <= c.x else -1.0
+	else:
+		var px := -2.2 if c.x >= 0.0 else 2.2 # palo lontano
+		b = Vector3(px, C.HL, 1.3 if tipo == "curva" else 0.0)
+		lato = -signf(px)
+	var punti: Array = []
+	var n := Vector2(-(b.y - a.y), b.x - a.x).normalized() * Vector2(b.x - a.x, b.y - a.y).length() * GUIDA_PANCIA * lato
+	for i in GUIDA_PUNTI + 1:
+		var u := float(i) / GUIDA_PUNTI
+		var p := a.lerp(b, u)
+		if tipo == "curva":
+			p += Vector3(n.x, n.y, 0.0) * 4.0 * u * (1.0 - u)
+		punti.append(p)
+	return punti
 
 
 func _setup_recupera(kk: int) -> Dictionary:

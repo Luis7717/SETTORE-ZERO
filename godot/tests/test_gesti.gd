@@ -92,6 +92,11 @@ class Registro:
 		if inoltra != null:
 			inoltra.run(i, punti)
 
+	func queue(i: int, spec: Dictionary) -> void:
+		calls.append(["queue", i, spec.duplicate()])
+		if inoltra != null:
+			inoltra.queue(i, spec)
+
 	func nomi() -> Array:
 		return calls.map(func(c: Array) -> String: return c[0])
 
@@ -171,39 +176,39 @@ func lunghezza(x0: float, y0: float, punti: Array) -> float:
 	return tot
 
 
-# ---------------------------------------------------------------- strada da correre
-func test_strada_dal_portatore_diventa_corsa() -> bool:
+# ---------------------------------------------------------------- col pallone ogni linea è un calcio (niente più strada)
+func test_linea_nello_spazio_fuori_dal_rallenty_e_un_passaggio() -> bool:
 	prepara()
 	trascina(linea(sch(m.ball.x, m.ball.y, 0.3), sch(5.0, 12.0)))
-	eq(reg.nomi(), ["path"], "un solo ordine: strada")
-	var strada: Array = reg.calls[0][1]
-	near(strada[-1].x, 5.0, 0.3, "fine strada x")
-	near(strada[-1].y, 12.0, 0.3, "fine strada y")
-	var mv: R.Move = m.move[0]
-	check(mv != null and mv.path != null, "il motore ha la strada")
+	eq(reg.nomi(), ["kick"], "un solo ordine: passaggio (non più una strada da correre)")
+	var sp: Dictionary = reg.calls[0][1]
+	near(sp.tx, 5.0, 0.3, "fine linea x")
+	near(sp.ty, 12.0, 0.3, "fine linea y")
+	check(sp.get("tratto", false), "il motore sceglie il colpo dalla forma del tratto")
+	check(m.ball.owner == null and m.ball.kick != null, "il pallone è partito")
 	eq(v.kind, "", "linea tolta a dito alzato")
 	return done()
 
 
-func test_strada_lunga_fa_scattare() -> bool:
-	prepara()
-	trascina(linea(sch(m.ball.x, m.ball.y, 0.3), sch(0.0, 30.0)))
-	m.step(DT)
-	var mv: R.Move = m.move[0]
-	check(mv != null and mv.sprint, "con tanta strada davanti scatta")
-	return done()
-
-
-func test_mentre_si_disegna_la_strada_si_vede_e_rallenta() -> bool:
+func test_mentre_si_disegna_col_pallone_si_vede_un_passaggio() -> bool:
 	prepara()
 	g.down(sch(m.ball.x, m.ball.y, 0.3), 1000)
 	for p in linea(sch(m.ball.x, m.ball.y, 0.3), sch(4.0, 10.0)).slice(1):
 		g.move_ev(p)
 	check(g.drawing, "si sta disegnando")
-	eq(v.kind, "run", "la vista mostra una strada")
-	check(g.run_path(), "è una strada da correre (rallenty RUN_DRAW_SLOW)")
+	eq(v.kind, "pass", "la vista mostra un passaggio")
+	check(not g.run_path(), "mai una strada da correre")
 	g.up(sch(4.0, 10.0), 1400)
 	check(not g.drawing, "dito alzato: non si disegna più")
+	return done()
+
+
+func test_col_pallone_tenere_premuto_non_guida_il_portatore() -> bool:
+	prepara()
+	g.down(sch(-10.0, 15.0), 1000)
+	g.update(1300)
+	g.up(sch(-10.0, 15.0), 1400)
+	eq(reg.calls.size(), 0, "il portatore si muove da solo: nessun ordine di corsa")
 	return done()
 
 
@@ -557,5 +562,78 @@ func test_fuga_ogni_linea_e_un_passaggio() -> bool:
 	eq(reg.nomi(), ["kick"], "anche nello spazio = passaggio")
 	prepara()
 	trascina(linea(sch(m.ball.x, m.ball.y, 0.3), sch(6.0, 10.0)))
-	eq(reg.nomi(), ["path"], "fuori dal rallenty = strada da correre")
+	eq(reg.nomi(), ["kick"], "anche fuori dal rallenty = passaggio (Luis 2026-11-22)")
+	return done()
+
+
+# ---------------------------------------------------------------- di prima (passaggio che viaggia)
+## passaggio di c al compagno mate già partito (il pallone viaggia, nessuno lo tiene)
+func _passaggio_in_volo() -> void:
+	prepara()
+	H.wake(mate, 0.0, 18.0)
+	m.userKick(0, {"type": "ground", "tx": mate.x, "ty": mate.y})
+	m.step(DT)
+	m.ctrl[0] = mate
+	m.events.clear()
+
+
+func test_di_prima_linea_dal_compagno_che_riceve_aspetta_il_pallone() -> bool:
+	_passaggio_in_volo()
+	eq(m.hint(0), "loose", "pallone in volo")
+	g.down(sch(mate.x, mate.y, 0.9), 1000)
+	eq(g.mode, "prima", "dito sul compagno che riceve = si disegna il calcio dopo")
+	check(g.drawing, "si sta disegnando")
+	for p in linea(sch(mate.x, mate.y, 0.9), sch(-12.0, 30.0)).slice(1):
+		g.move_ev(p)
+	eq(v.kind, "pass", "la linea si vede mentre si disegna")
+	g.up(sch(-12.0, 30.0), 1300)
+	eq(reg.nomi(), ["queue"], "un ordine: calcio in attesa")
+	eq(reg.calls[0][1], mate.i, "per il compagno che riceve")
+	check(m.queued[0] != null, "il motore lo tiene in attesa")
+	check(not g.attesa_viva().is_empty(), "l'HUD mostra la linea in attesa")
+	var calci := []
+	for i in 240:
+		m.step(DT)
+		g.update(1300 + i * 16)
+		for e: Dictionary in m.events:
+			if e.type == "kick":
+				calci.append(e)
+		m.events.clear()
+		if not calci.is_empty():
+			break
+	eq(calci.size(), 1, "appena arriva il pallone il compagno calcia")
+	if calci.size() == 1:
+		check(calci[0].p == mate and calci[0].prima, "di prima, dal compagno")
+	check(g.attesa_viva().is_empty(), "linea in attesa tolta")
+	return done()
+
+
+func test_di_prima_dito_lontano_dal_volo_resta_linea_di_difesa() -> bool:
+	_passaggio_in_volo()
+	var altro: R.Player = m.team(0)[5]
+	H.wake(altro, -25.0, -10.0)
+	g.down(sch(altro.x, altro.y, 0.9), 1000)
+	eq(g.mode, "dpath", "compagno lontano dal volo del pallone: linea da correre come prima")
+	return done()
+
+
+func test_di_prima_si_annulla_se_il_pallone_lo_prende_un_avversario() -> bool:
+	_passaggio_in_volo()
+	g.down(sch(mate.x, mate.y, 0.9), 1000)
+	for p in linea(sch(mate.x, mate.y, 0.9), sch(-12.0, 30.0)).slice(1):
+		g.move_ev(p)
+	g.up(sch(-12.0, 30.0), 1300)
+	check(m.queued[0] != null, "in attesa")
+	H.wake(opp, m.ball.x, m.ball.y + 2.0)
+	var preso := false
+	for i in 120:
+		m.step(DT)
+		g.update(1300 + i * 16)
+		m.events.clear()
+		if m.ball.owner == opp:
+			preso = true
+			break
+	check(preso, "l'avversario intercetta")
+	check(m.queued[0] == null, "calcio di prima annullato")
+	check(g.attesa_viva().is_empty(), "linea in attesa tolta")
 	return done()

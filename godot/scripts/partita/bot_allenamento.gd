@@ -1,15 +1,15 @@
 # "Dito finto" dell'allenamento guidato (gioco.gd --allenamento --bot): supera ogni lezione SOLO coi gesti veri,
 # cioè posizioni sullo schermo passate a gesti.gd come farebbe un dito (giù, trascina, su), più il tasto Dribbling / Scatto e
 # "Prova (3 volte)" sulla scheda. Usa gli aiuti di bot_dito.gd (linee disegnate nel tempo di più fotogrammi).
-#   Passaggio: strada verso il difensore, poi nel rallenty (duello o fuga) linea dal pallone al compagno
-#   Tiro: linea dal pallone dentro la porta · Corsa e scatto: strada in avanti, verso la fascia, lunga
-#   Recupera palla: linea dal proprio giocatore al portatore · Dribbling: strada verso il difensore, poi il tasto
+#   Passaggio rasoterra / a effetto: linea dritta / curva dal pallone al compagno
+#   Tiro rasoterra / a giro: linea dritta / curva dal pallone dentro la porta
+#   Recupera palla: linea dal proprio giocatore al portatore · Dribbling: aspetta il duello (il difensore viene incontro), poi il tasto
 #   Scatto: con l'avversario alle spalle si apre la fuga, poi il tasto
 #   Portiere: linea dal portiere al punto della porta dove arriva il tiro
 extends "res://scripts/partita/bot_dito.gd"
 
 const DRIB_ATTESA := 0.5      # s veri di duello (o di fuga) prima di toccare il tasto (come una persona)
-const CORSA_K := [Vector2(0, 16), Vector2(14, 6), Vector2(0, 22)]   # strade della lezione Corsa (dx, dy) per prova
+const PANCIA := 0.3           # linee curve: pancia pari a tanta parte della lunghezza sullo schermo
 const PORTA_H := 1.0          # altezza a cui finisce la linea del tiro (m)
 const PROFONDITA_MIN := 0.05  # m davanti alla telecamera sotto cui un punto non si proietta
 
@@ -32,21 +32,24 @@ func _decidi(g, now: int) -> void:
 	if not m.duelFor(0) and not m.fleeFor(0):
 		_duello_ms = 0
 	match titolo:
-		"Passaggio":
-			if c == null or b.owner != c:
-				return
-			if m.passFor(0): # duello o fuga (difensore arrivato alla pari): il tempo rallenta, si passa
-				var q: R.Player = m.players[9]
-				_linea(g, now, _sch(g, b.x, b.y, 0.3), _sch(g, q.x, q.y, 0.0), "passaggio")
-			else:
-				_verso(g, now, c, t.st.o)
-		"Tiro":
+		"Passaggio rasoterra", "Passaggio a effetto":
 			if c != null and b.owner == c:
-				_linea(g, now, _sch(g, b.x, b.y, 0.3), _sch(g, 1.5, C.HL, PORTA_H), "tiro", Vector3(1.5, C.HL, PORTA_H))
-		"Corsa e scatto":
-			if c != null and b.owner == c and m.move[0] == null:
-				var d: Vector2 = CORSA_K[t.k]
-				_linea(g, now, _sch(g, b.x, b.y, 0.3), _sch(g, c.x + d.x, c.y + d.y, 0.0), "strada")
+				var q: R.Player = m.players[9]
+				var a := _sch(g, b.x, b.y, 0.3)
+				var z := _sch(g, q.x, q.y, 0.0)
+				if t.lesson().id == "passaggio_alto":
+					_curva(g, now, a, z, PANCIA, "curvo")
+				else:
+					_linea(g, now, a, z, "passaggio")
+		"Tiro rasoterra", "Tiro a giro":
+			if c != null and b.owner == c:
+				var porta := Vector3(1.5, C.HL, PORTA_H)
+				var a := _sch(g, b.x, b.y, 0.3)
+				var z := _sch(g, porta.x, porta.y, porta.z)
+				if t.lesson().id == "tiro_giro":
+					_curva(g, now, a, z, PANCIA, "tiro", porta)
+				else:
+					_linea(g, now, a, z, "tiro", porta)
 		"Recupera palla":
 			if c != null and b.owner != null and b.owner.team == 1 and m.runOf(c) == null:
 				_linea(g, now, _sch(g, c.x, c.y, 0.9), _sch(g, b.x, b.y, 0.0), "difesa")
@@ -55,8 +58,6 @@ func _decidi(g, now: int) -> void:
 				return
 			if m.duelFor(0):
 				_tasto_dopo_attesa(g, now)
-			else:
-				_verso(g, now, c, t.st.o)
 		"Scatto": # l'avversario è già alle spalle: la fuga si apre da sola
 			if c != null and b.owner == c and m.fleeFor(0):
 				_tasto_dopo_attesa(g, now)
@@ -69,15 +70,6 @@ func _tasto_dopo_attesa(g, now: int) -> void:
 	elif now - _duello_ms > DRIB_ATTESA * 1000.0:
 		tocca_tasto(g)
 		_duello_ms = now + 100000 # una volta per duello
-
-
-# strada dal portatore verso un avversario (fino a 2 m prima)
-func _verso(g, now: int, c: R.Player, o: R.Player) -> void:
-	var dx := o.x - c.x
-	var dy := o.y - c.y
-	var d := maxf(0.1, sqrt(dx * dx + dy * dy))
-	var k := maxf(0.0, d - 2.0) / d
-	_linea(g, now, _sch(g, g.m.ball.x, g.m.ball.y, 0.3), _sch(g, c.x + dx * k, c.y + dy * k, 0.0), "strada")
 
 
 # come bot_dito, ma un punto alla stessa profondità della telecamera (o dietro) non si proietta: si salta il gesto

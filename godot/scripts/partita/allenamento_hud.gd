@@ -17,6 +17,7 @@ const SPAZIO_MAPPA := 96.0     # il riquadro lascia libera la minimappa a destra
 const SOTTO_PUNTEGGIO := 60.0  # punti sotto il bordo dell'area sicura
 const MARGINE := 12.0
 const FONT_GRASSETTO := 0.7
+const GuidaAllenamento := preload("res://scripts/partita/guida_allenamento.gd")
 
 var _font_forte: FontVariation
 var _riquadro: PanelContainer
@@ -25,6 +26,13 @@ var _scheda: ColorRect
 var _box: VBoxContainer
 var _sicura := Rect2()
 var _ultimo := ["", "", 0, 0, false]
+var guida: Control       # linea guida di passaggi e tiri (guida_allenamento.gd), sotto riquadro e scheda
+
+
+## da chiamare quando ci sono vista e allenamento: la linea guida li usa per disegnarsi
+func collega(vista, allenamento) -> void:
+	guida.vista = vista
+	guida.allenamento = allenamento
 
 
 func _ready() -> void:
@@ -32,6 +40,8 @@ func _ready() -> void:
 	_font_forte = FontVariation.new()
 	_font_forte.base_font = ThemeDB.fallback_font
 	_font_forte.variation_embolden = FONT_GRASSETTO
+	guida = GuidaAllenamento.new()
+	add_child(guida)
 	_riquadro = PanelContainer.new()
 	_riquadro.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_testo = _rich(14)

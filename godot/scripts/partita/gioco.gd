@@ -67,7 +67,6 @@ const Meteo := preload("res://scripts/partita/meteo.gd")
 const SCENA_VISTA := "res://scenes/vista_partita.tscn"
 
 # velocità del tempo (rallenty), come src/main.js
-const RUN_DRAW_SLOW := 0.25   # mentre si disegna la strada da correre
 const GK_SLOW := 0.1          # mentre si para
 const DEF_DRAW_SLOW := 0.13   # mentre si disegna una linea di difesa
 const PASS_DRAW_SLOW := 0.04  # mentre si disegna un passaggio o un tiro
@@ -301,7 +300,7 @@ func velocita_voluta() -> float:
 	if gesti.mode == "dpath":
 		return DEF_DRAW_SLOW
 	if gesti.drawing:
-		return RUN_DRAW_SLOW if gesti.run_path() else PASS_DRAW_SLOW
+		return PASS_DRAW_SLOW # col pallone ogni linea è un passaggio o un tiro (niente più strada da correre)
 	if dive:
 		return GK_SLOW
 	if duel:
@@ -872,6 +871,7 @@ func _avvia_allenamento() -> void:
 	_all_hud.finito.connect(func() -> void: hud.big("Allenamento finito!", "g", 2400, "Ora sei pronto per il campionato"))
 	# creato per ultimo: la sua prima scheda ferma la partita
 	allenamento = Allenamento.new(m, _all_hud)
+	_all_hud.collega(vista, allenamento) # linea guida di passaggi e tiri
 	_vai_alla_lezione.call_deferred()
 
 
