@@ -382,14 +382,25 @@ come nel web (`faceLayers`, `paintBeard`, `paintStubble`, `paintEyeTile` di `src
   Il bordo e il risvolto hanno la normale girata verso fuori e il colore del bordo (niente riga scura sulla fronte).
 - `scripts/partita/viso.gd`: misura una volta sul modello la zona viso del web (centro occhi, mento, guance, naso,
   orecchie) e la finestra visibile del bulbo dell'occhio; `divisa.gdshader` proietta il viso come la texture del web.
-- `assets/textures/viso_maschere.png`: barbe 1..6 (R), sopracciglia (G, B), labbra (cella 6); `divisa.gdshader`
-  le colora con `beardK` e la grana come il web. L'Ombra è a puntini (`paintStubble`).
-- Occhi: forme di `EYE_FORMS` (`occhi_forma` per istanza, da `Aspetto.parametri_figura`), iride col colore scelto.
-  Palpebre limitate a `PALPEBRA_MAX` e iride ×`IRIDE_K` perché la finestra misurata qui è più piccola del web.
+- `assets/textures/viso_maschere.png`: barbe 1..6 (R), sopracciglia (G, B), labbra (cella 6). Barbe ridisegnate il
+  2026-11-22 (`paintBeardNew`, sfumate molto): corta bassa e rada, piena alta con basette e sotto il mento
+  (`BEARD_UNDER_PIENA`). Lo shader mette i peli (`BARBA_PELO`: quanti e quanto coprono, più radi verso il bordo) e il
+  colore `barba` per istanza (`Aspetto.colore_barba`: si stacca sempre dalla pelle, prima biondo e platino su pelle
+  chiara o nero su pelle molto scura non si vedevano).
+- Occhi: forme di `EYE_FORMS` (`occhi_forma` per istanza, da `Aspetto.parametri_figura`), iride col colore scelto
+  (`iride2` = eterocromia, occhio sinistro). Palpebre fino a `PALPEBRA_MAX` (1,2; prima 0,9: occhi socchiusi), iride
+  ×`IRIDE_K` al centro dell'apertura (`IRIDE_SU`).
+- Colori (2026-11-22): capelli 22 (naturali, particolari dall'indice `HAIR_PARTICOLARI`, sfumati con il colore delle
+  punte, `punte` in `capelli.gdshader`), occhi 12 (particolari ed eterocromia), barba col suo colore (campo nuovo
+  `beardColor`, 0 = come i capelli: i salvataggi vecchi non cambiano). Con capelli particolari le sopracciglia restano
+  castane (`sopracciglia`). `divisa.gdshader` usa 16 instance uniform: è il massimo, non se ne possono aggiungere.
+  Nell'editor oltre 9 colori la riga dei pallini scorre. I giocatori casuali (`lookFromSeed`) restano come il web.
+- Colletto: bordi dello scollo morbidi con `fwidth` (prima gradini netti, a scalini sul telefono).
 - Mento: testa e collo si riconoscono dall'osso dominante (CUSTOM0.w / CUSTOM1.w), non più dall'altezza: sotto il
   mento niente colore del bordino.
 - Rigenerare le texture: `node tools/make-godot-tex.mjs` (Puppeteer), poi `$G --headless --path godot --import`.
-- Foto: `$G --path godot -s res://tests/foto_capelli.gd -- --cartella=shots/x [--volti | --tagli=10,11 --barbe=5]`;
+- Foto: `$G --path godot -s res://tests/foto_capelli.gd -- --cartella=shots/x [--volti | --viso | --tagli=10,11 --barbe=5]`
+  (`--viso`: sopracciglia, occhi, barbe con pelli e capelli diversi, colori nuovi, colletto; segnala le barbe invisibili);
   `--app-schermate` fotografa anche quattro volti nella scheda Viso dell'editor. Test: `tests/test_capelli.gd`.
 
 ## Carriera, fase B (solo Godot)

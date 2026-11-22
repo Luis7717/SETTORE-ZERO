@@ -7,6 +7,8 @@
 # (--tagli / --barbe: solo quei tipi, foto grandi in un foglio dettaglio.png, niente fogli normali)
 # --volti: solo volti.png (righe = combinazioni di taglio, barba, occhi e colori come nell'editor; di fronte molto
 # vicino, tre quarti, di lato)
+# --viso: fogli per sopracciglia, barbe e colletto (sopracciglia.png: righe = Caschetto e Rasato, colonne = i 6 tipi,
+# di fronte molto vicino; barbe_viso.png: le 7 barbe, di fronte e tre quarti; colletto.png: girocollo, V, polo)
 # Scrive CARTELLA/*.png (cartella relativa a quella che contiene godot/).
 extends SceneTree
 
@@ -53,6 +55,7 @@ var _ctx := {"t": 0.0, "phase": "menu", "flip": 1.0, "yaw": 0.0, "ball": null, "
 var _giro := 0
 var _dettaglio: Array = []   # [taglio, barba] da fotografare grandi
 var _volti := false
+var _viso := false
 
 
 func _initialize() -> void:
@@ -64,6 +67,7 @@ func _initialize() -> void:
 	var cartella: String = opz.get("cartella", "shots/capelli")
 	_giro = int(opz.get("giro", "0"))
 	_volti = opz.has("volti")
+	_viso = opz.has("viso")
 	if opz.has("tagli") or opz.has("barbe"):
 		TILE = Vector2i(480, 480)
 		for x in String(opz.get("tagli", "")).split(",", false):
@@ -132,8 +136,11 @@ func _testa() -> Vector3:
 	return t.origin + Vector3(0, 0.1 * Coord.SCALE, 0)
 
 
+var _mira_y := 0.0   # m: si guarda più in basso del centro della testa (--viso)
+
+
 func _scatta(vista: Array, dist: float) -> Image:
-	var c := _testa()
+	var c := _testa() - Vector3(0, _mira_y, 0)
 	var a: float = vista[0]
 	# il giocatore guarda +Z (Figura: +Z locale = avanti)
 	var o := Vector3(sin(a) * dist, vista[1], cos(a) * dist)
@@ -163,6 +170,10 @@ func _foglio(righe: Array, viste: Array, nome: String, dist: float) -> void:
 func _lavora(cartella: String) -> void:
 	var base := ProjectSettings.globalize_path("res://").path_join("..").path_join(cartella).simplify_path()
 	DirAccess.make_dir_recursive_absolute(base)
+	if _viso:
+		await _fogli_viso(base)
+		quit(0)
+		return
 	if _volti:
 		TILE = Vector2i(360, 360)
 		_vp.size = TILE
@@ -204,3 +215,107 @@ func _lavora(cartella: String) -> void:
 	lontano.save_png(base.path_join("lontano.png"))
 	print("foto → ", base.path_join("lontano.png"))
 	quit(0)
+
+
+# --viso: un look completo (Dictionary del look) in una foto; colletto = stile della divisa (0, 1, 2)
+func _foto_look(look: Dictionary, vista: Array, dist: float, colletto := 0) -> Image:
+	var asp := Asp.parametri_figura(look)
+	asp["stile"] = Asp.stile_figura({"collar": colletto})
+	asp["bordino"] = Color(0.05, 0.05, 0.06)   # bordino scuro: si vedono meglio gli scalini
+	_fig.metti_aspetto(asp)
+	for k in 3:
+		_fig.posa(_fermo, 1.0 / 30.0, _ctx)
+		await process_frame
+	return await _scatta(vista, dist)
+
+
+func _fogli_viso(base: String) -> void:
+	TILE = Vector2i(300, 300)
+	_vp.size = TILE
+	_mira_y = 0.035 * Coord.SCALE
+	var f := Image.create(TILE.x * 6, TILE.y * 2, false, Image.FORMAT_RGBA8)
+	for r in 2:
+		for b in 6:
+			var look := {"hair": [10, 1][r], "beard": 0, "eyes": 0, "eyeColor": 1, "skin": 1, "hairColor": 0, "brows": b}
+			var img: Image = await _foto_look(look, [0.0, 0.0], DIST * 0.5)
+			f.blit_rect(img, Rect2i(Vector2i.ZERO, TILE), Vector2i(b * TILE.x, r * TILE.y))
+	f.save_png(base.path_join("sopracciglia.png"))
+	# occhi da vicino: le 6 forme
+	var o := Image.create(TILE.x * 3, TILE.y * 2, false, Image.FORMAT_RGBA8)
+	for e in 6:
+		var look := {"hair": 2, "beard": 0, "eyes": e, "eyeColor": [1, 4, 3][e % 3], "skin": [1, 3, 6][e % 3], "hairColor": 0, "brows": 0}
+		_mira_y = 0.025 * Coord.SCALE
+		var img: Image = await _foto_look(look, [0.0, 0.0], DIST * 0.36)
+		o.blit_rect(img, Rect2i(Vector2i.ZERO, TILE), Vector2i((e % 3) * TILE.x, (e / 3) * TILE.y))
+	o.save_png(base.path_join("occhi.png"))
+	_mira_y = 0.035 * Coord.SCALE
+	_mira_y = 0.085 * Coord.SCALE
+	var g := Image.create(TILE.x * 7, TILE.y * 2, false, Image.FORMAT_RGBA8)
+	for b in 7:
+		for v in 2:
+			var look := {"hair": 2, "beard": b, "eyes": 0, "eyeColor": 1, "skin": [1, 3][v], "hairColor": 0, "brows": 0}
+			var img: Image = await _foto_look(look, [[0.0, -0.02], [0.6, -0.02]][v], DIST * 0.45)
+			g.blit_rect(img, Rect2i(Vector2i.ZERO, TILE), Vector2i(b * TILE.x, v * TILE.y))
+	g.save_png(base.path_join("barbe_viso.png"))
+	var h := Image.create(TILE.x * 3, TILE.y, false, Image.FORMAT_RGBA8)
+	for c in 3:
+		var look := {"hair": 2, "beard": 0, "eyes": 0, "eyeColor": 1, "skin": 1, "hairColor": 0, "brows": 0}
+		_mira_y = 0.22 * Coord.SCALE
+		var img: Image = await _foto_look(look, [0.25, 0.02], DIST * 0.6, c)
+		h.blit_rect(img, Rect2i(Vector2i.ZERO, TILE), Vector2i(c * TILE.x, 0))
+	h.save_png(base.path_join("colletto.png"))
+	# V da vicino, grande
+	TILE = Vector2i(600, 600)
+	_vp.size = TILE
+	var look2 := {"hair": 2, "beard": 0, "eyes": 0, "eyeColor": 1, "skin": 1, "hairColor": 0, "brows": 0}
+	_mira_y = 0.26 * Coord.SCALE
+	var iv: Image = await _foto_look(look2, [0.0, 0.0], DIST * 0.45, 1)
+	iv.save_png(base.path_join("colletto_v.png"))
+	# tutte le barbe con pelli e colori dei capelli diversi (righe = combinazioni [pelle, capelli, taglio])
+	TILE = Vector2i(220, 220)
+	_vp.size = TILE
+	_mira_y = 0.085 * Coord.SCALE
+	var combo := [[0, 6, 2], [1, 5, 10], [3, 0, 1], [5, 1, 8], [7, 0, 2], [6, 10, 0], [2, 7, 11], [4, 9, 15]]
+	var m := Image.create(TILE.x * 7, TILE.y * combo.size(), false, Image.FORMAT_RGBA8)
+	var muti: Array = []
+	for r in combo.size():
+		var nessuna: Image = null
+		for b in 7:
+			var look := {"hair": combo[r][2], "beard": b, "eyes": 0, "eyeColor": 1, "skin": combo[r][0], "hairColor": combo[r][1], "brows": 0}
+			var img: Image = await _foto_look(look, [0.3, -0.02], DIST * 0.5)
+			m.blit_rect(img, Rect2i(Vector2i.ZERO, TILE), Vector2i(b * TILE.x, r * TILE.y))
+			if b == 0:
+				nessuna = img
+			elif _differenza(nessuna, img) < 0.004:
+				muti.append("pelle %d capelli %d barba %d" % [combo[r][0], combo[r][1], b])
+	m.save_png(base.path_join("barbe_combinazioni.png"))
+	print("barbe che non cambiano il viso: ", muti)
+	if not muti.is_empty():
+		push_error("barbe invisibili: %s" % [muti])
+	# colori nuovi: [pelle, taglio, colore capelli, barba, colore barba, colore occhi]
+	TILE = Vector2i(260, 260)
+	_vp.size = TILE
+	_mira_y = 0.03 * Coord.SCALE
+	var colori := [[1, 4, 13, 0, 0, 7], [3, 11, 14, 5, 2, 8], [0, 10, 15, 0, 0, 9], [5, 8, 16, 6, 0, 10], [2, 2, 17, 4, 1, 11],
+		[6, 9, 18, 6, 6, 3], [1, 11, 19, 0, 0, 4], [4, 14, 20, 5, 3, 2], [0, 10, 21, 1, 4, 10], [7, 2, 11, 6, 5, 7]]
+	var fc := Image.create(TILE.x * 5, TILE.y * 2, false, Image.FORMAT_RGBA8)
+	for k in colori.size():
+		var q: Array = colori[k]
+		var look := {"skin": q[0], "hair": q[1], "hairColor": q[2], "beard": q[3], "beardColor": q[4], "eyeColor": q[5], "eyes": 0, "brows": 0}
+		var img: Image = await _foto_look(look, [0.35, 0.04], DIST * 0.75)
+		fc.blit_rect(img, Rect2i(Vector2i.ZERO, TILE), Vector2i((k % 5) * TILE.x, (k / 5) * TILE.y))
+	fc.save_png(base.path_join("colori.png"))
+	print("foto viso → ", base)
+
+
+# differenza media (0..1) tra due foto
+func _differenza(a: Image, b: Image) -> float:
+	var s := 0.0
+	var n := 0
+	for y in range(0, a.get_height(), 2):
+		for x in range(0, a.get_width(), 2):
+			var ca := a.get_pixel(x, y)
+			var cb := b.get_pixel(x, y)
+			s += absf(ca.r - cb.r) + absf(ca.g - cb.g) + absf(ca.b - cb.b)
+			n += 1
+	return s / (3.0 * n)

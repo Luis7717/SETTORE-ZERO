@@ -20,8 +20,10 @@ const CarrieraScript := preload("res://scripts/carriera/carriera.gd")
 const JS := preload("res://scripts/carriera/js.gd")
 const ATTESA_MENU := 0.6
 # volti fotografati nella scheda Viso dell'editor (--app-schermate): valori nell'ordine di CAMPI_VOLTO
-const CAMPI_VOLTO := ["hair", "beard", "eyes", "eyeColor", "skin", "hairColor", "brows"]
-const VOLTI_EDITOR := [[9, 6, 3, 0, 6, 0, 4], [12, 0, 1, 4, 0, 5, 1], [2, 5, 2, 3, 3, 2, 0], [11, 2, 5, 1, 1, 7, 5]]
+const CAMPI_VOLTO := ["hair", "beard", "eyes", "eyeColor", "skin", "hairColor", "brows", "beardColor"]
+# gli ultimi due coi colori nuovi (2026-11-22): sfumato con eterocromia e barba bianca, capelli blu con occhi viola
+const VOLTI_EDITOR := [[9, 6, 3, 0, 6, 0, 4], [12, 0, 1, 4, 0, 5, 1], [2, 5, 2, 3, 3, 2, 0], [11, 2, 5, 1, 1, 7, 5],
+	[10, 6, 0, 10, 1, 19, 0, 6], [4, 5, 3, 8, 3, 13, 2, 2]]
 const ATTESA_PARTITA := 3.0
 
 var _app: Node
@@ -255,14 +257,19 @@ func _giro_impostazioni_editor(dir: String) -> void:
 	st.sound = suono
 	_app.impostazioni()
 	var p: Dictionary = _app.carriera.s.squad[0]
-	for prova: Array in [["hair", 9, "editor_capelli"], ["boots", 13, "editor_corpo"]]:
+	for prova: Array in [["hair", 9, "editor_capelli"], ["boots", 13, "editor_corpo"], ["hair", 10, "editor_capelli_colori"]]:
 		_app.vai("editor", {"flow": "look", "id": p.id, "tab": prova[0]})
 		var ed: Node = get_tree().current_scene
 		ed.d.look = ed.d.look.duplicate()
 		ed.d.look.hair = prova[1]   # 9 afro, 13 chignon
 		ed.d.look.beard = 6
+		if prova[2] == "editor_capelli_colori":
+			ed.d.look.hairColor = 20   # sfumato: la riga dei colori scorre fino a lui
 		ed.mostra(false)
 		await _attendi(1.2)
+		if prova[2] == "editor_capelli_colori" and ed.scorri != null:
+			ed.scorri.scroll_vertical = 100000   # in fondo: la riga dei colori
+			await _attendi(0.4)
 		await _scatto(dir, prova[2])
 	# scheda Viso con combinazioni diverse di taglio, barba, occhi (forma e colore) e pelle
 	for k in VOLTI_EDITOR.size():

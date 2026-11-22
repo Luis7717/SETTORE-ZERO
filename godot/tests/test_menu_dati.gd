@@ -84,3 +84,16 @@ func test_soldi_valutazioni_e_fasce() -> bool:
 	eq(D.overall_as(p, "P"), 13, "in porta")
 	eq(D.value(p), 165, "valore")
 	return done()
+
+
+# avatar tondo coi colori nuovi (2026-11-22): barba del suo colore, occhi particolari ed eterocromia, punte sfumate
+func test_avatar_coi_colori_nuovi() -> bool:
+	var look := {"skin": 1, "hair": 4, "hairColor": 19, "eyeColor": 10, "beard": 6, "beardColor": 6}
+	var s := Faccia.svg_tondo(look, "#c8102e", "#ffffff", "#2f3a5c")
+	check(s.contains(str(D.BEARD_COLORS[6][1])), "barba bianca")
+	check(s.contains(str(D.EYE_COLORS[10][1])) and s.contains(str(D.EYE_COLORS[10][2])), "eterocromia: due colori")
+	check(s.contains("url(#pu)"), "punte sfumate")
+	var v := Image.new()
+	check(v.load_svg_from_string(s, 3.0) == OK, "l'SVG si disegna")
+	check(not Faccia.svg_tondo({"beard": 6}, "#c8102e", "#ffffff", "#2f3a5c").contains("url(#pu)"), "senza sfumato: niente punte")
+	return done()

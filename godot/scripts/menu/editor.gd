@@ -329,17 +329,47 @@ func _chips(chiave: String, nomi: Array, cur: Variant) -> void:
 	corpo.add_child(f)
 
 
+# pallini di colore; voce = [nome, colore, secondo colore facoltativo (punte, eterocromia)]. Oltre TINTE_IN_RIGA
+# pallini (capelli, occhi) una riga sola che scorre col dito, che resta dov'era quando si sceglie un colore
+const TINTE_IN_RIGA := 9
+var _scorri_tinte := {}          # chiave → posizione della riga che scorre
+
+
 func _tinte(chiave: String, lista: Array, cur: int) -> void:
-	var f := HFlowContainer.new()
-	f.add_theme_constant_override("h_separation", 10)
-	f.add_theme_constant_override("v_separation", 10)
+	var lunga := lista.size() > TINTE_IN_RIGA
+	var f: Container
+	if lunga:
+		f = U.hbox(10)
+		f.add_child(U.spazio(0, 4))
+	else:
+		f = HFlowContainer.new()
+		f.add_theme_constant_override("h_separation", 10)
+		f.add_theme_constant_override("v_separation", 10)
 	for i in lista.size():
-		f.add_child(_tinta(Color(lista[i][1]), i == cur, _imposta.bind(chiave, i)))
-	corpo.add_child(f)
+		var v: Array = lista[i]
+		var due := Color(v[2]) if v.size() > 2 else Color(0, 0, 0, 0)
+		f.add_child(_tinta(Color(v[1]), i == cur, _imposta.bind(chiave, i), due))
+	if not lunga:
+		corpo.add_child(f)
+		return
+	f.add_child(U.spazio(0, 4))
+	var sc := ScrollContainer.new()
+	sc.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	sc.custom_minimum_size.y = 56
+	sc.scroll_deadzone = 6
+	sc.mouse_filter = Control.MOUSE_FILTER_PASS
+	sc.add_child(f)
+	corpo.add_child(sc)
+	var pos: int = _scorri_tinte.get(chiave, -1)
+	if pos < 0:   # la prima volta: il colore scelto in vista
+		pos = maxi(0, cur * 56 - 120)
+	sc.set_deferred("scroll_horizontal", pos)
+	sc.get_h_scroll_bar().value_changed.connect(func(x: float) -> void: _scorri_tinte[chiave] = int(x))
 
 
-# pallino di colore (.sw del web): 46 px, bordo d'oro quando è scelto
-func _tinta(col: Color, on: bool, cb: Callable) -> Control:
+# pallino di colore (.sw del web): 46 px, bordo d'oro quando è scelto; due.a > 0: metà destra di un altro colore
+func _tinta(col: Color, on: bool, cb: Callable, due := Color(0, 0, 0, 0)) -> Control:
 	var b := U.bottone("", "Vuoto", cb, 46)
 	b.custom_minimum_size.x = 46
 	b.draw.connect(func() -> void:
@@ -348,6 +378,12 @@ func _tinta(col: Color, on: bool, cb: Callable) -> Control:
 			b.draw_circle(c, 26.0, Color(1, 0.851, 0.239, 0.2))
 		b.draw_circle(c, 23.0, T.GOLD if on else Color(1, 1, 1, 0.13))
 		b.draw_circle(c, 20.0, col)
+		if due.a > 0.0:
+			var meta := PackedVector2Array()
+			for k in 17:
+				var a := -PI * 0.5 + PI * k / 16.0
+				meta.append(c + Vector2(cos(a), sin(a)) * 20.0)
+			b.draw_colored_polygon(meta, due)
 		b.draw_circle(c + Vector2(0, 7), 13.0, Color(0, 0, 0, 0.12)))
 	if on:
 		b.scale = Vector2(1.08, 1.08)
@@ -371,6 +407,11 @@ func _pannello() -> void:
 			_chips("look.brows", D.BROWS, l.brows)
 			_riga("Barba", "")
 			_chips("look.beard", D.BEARDS, l.beard)
+			if l.beard > 0:
+				var bc: Array = D.BEARD_COLORS.duplicate(true)
+				bc[0] = [bc[0][0], D.HAIR_COLORS[l.hairColor][1]]   # "come i capelli": il pallino ha il loro colore
+				_riga("Colore della barba", D.BEARD_COLORS[l.beardColor][0])
+				_tinte("look.beardColor", bc, l.beardColor)
 		"hair":
 			_riga("Taglio", "%d di %d" % [l.hair + 1, D.HAIR_STYLES.size()])
 			_chips("look.hair", D.HAIR_STYLES, l.hair)

@@ -79,6 +79,7 @@ func test_vista_come_il_web() -> bool:
 		return done()
 	for c: Array in fx.lookOf:
 		var l := A.lookOf(c[0])
+		l.erase("beardColor")   # campo solo di Godot (2026-11-22), il web non ce l'ha
 		check(l == _interi(c[1]), "lookOf(%s) = %s, atteso %s" % [c[0], l, c[1]])
 	for c: Array in fx.kitStyle:
 		var st := A.kitStyleFromSeed(A.hash32(str(c[0])))
@@ -87,7 +88,9 @@ func test_vista_come_il_web() -> bool:
 		eq(A.backName(c[0]), c[1], "backName(%s)" % c[0])
 	var liste := {"skins": A.SKINS, "hair": A.HAIR_COLORS, "eyes": A.EYE_COLORS, "boots": A.BOOTS}
 	for k: String in liste:
-		eq(liste[k].map(func(x: Array) -> String: return x[1]), fx.colori[k], "colori %s" % k)
+		# i primi come il web; in coda i colori aggiunti in Godot (2026-11-22)
+		var n: int = fx.colori[k].size()
+		eq(liste[k].slice(0, n).map(func(x: Array) -> String: return x[1]), fx.colori[k], "colori %s" % k)
 	return done()
 
 
@@ -102,4 +105,33 @@ func test_parametri_figura() -> bool:
 	eq(p.stile2, Vector4(13, 6, 3, 1), "stile2 = taglio, barba, sopracciglia, calzoncini")
 	eq(A.parametri_figura(null).stile2, Vector4(2, 0, 0, 0), "senza look: aspetto di base")
 	eq(A.stile_figura({"sleeves": 2, "collar": 1, "pattern": 4, "socks": 2, "fit": 1}), Vector4(2, 1, 4, 2), "stile della divisa")
+	return done()
+
+
+# colori nuovi (2026-11-22): capelli naturali, particolari e sfumati; barba col suo colore; occhi particolari ed
+# eterocromia. I salvataggi vecchi (senza beardColor, indici vecchi) restano uguali.
+func test_colori_nuovi_e_salvataggi_vecchi() -> bool:
+	eq(A.HAIR_COLORS.size(), A.LOOK_N.hairColor, "capelli: elenco e numero di opzioni")
+	eq(A.EYE_COLORS.size(), A.LOOK_N.eyeColor, "occhi: elenco e numero di opzioni")
+	eq(A.BEARD_COLORS.size(), A.LOOK_N.beardColor, "barba: elenco e numero di opzioni")
+	check(A.HAIR_COLORS.size() >= 20 and A.EYE_COLORS.size() >= 12, "più colori di prima")
+	eq(A.HAIR_COLORS[6][1], "#eadfba", "indici vecchi invariati (platino)")
+	eq(A.EYE_COLORS[4][1], "#4a90ca", "indici vecchi invariati (azzurro)")
+	var visti := {}
+	for c: Array in A.HAIR_COLORS:
+		check(not visti.has(c[0]), "capelli: nome doppio %s" % c[0])
+		visti[c[0]] = true
+	var vecchio := {"skin": 2, "hair": 13, "hairColor": 7, "eyes": 1, "eyeColor": 4, "brows": 3, "beard": 6, "boots": 2}
+	var n := A.normalizeLook(vecchio)
+	eq(n.beardColor, 0, "salvataggio vecchio: barba come i capelli")
+	eq(A.normalizeLook({"beardColor": 99}).beardColor, 99 % A.BEARD_COLORS.size(), "fuori elenco: riportato dentro")
+	var p := A.parametri_figura(vecchio)
+	eq(p.iride2.a, 0.0, "niente eterocromia")
+	eq(p.punte.a, 0.0, "niente punte")
+	var et := A.parametri_figura({"eyeColor": 10, "hairColor": 19})
+	check(et.iride2.a > 0.5 and et.iride2 != et.iride, "eterocromia: due colori")
+	check(et.punte.a > 0.5, "sfumato: colore delle punte")
+	var bionda := A.parametri_figura({"skin": 0, "hairColor": 0, "beard": 6, "beardColor": 3})
+	var nera := A.parametri_figura({"skin": 0, "hairColor": 0, "beard": 6, "beardColor": 1})
+	check(A.luminanza(bionda.barba) > A.luminanza(nera.barba) + 0.15, "barba bionda più chiara della nera coi capelli neri")
 	return done()

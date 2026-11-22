@@ -6,12 +6,13 @@
 //      R = colore dei capelli, G = lucentezza (shine del web), B = pelle; il resto è nero.
 //    Funziona perché tutte le tinte di paintHairTex sono miscele di questi tre (scuro = capelli verso il nero, ecc.)
 //    e il canvas mescola i colori in modo lineare. L'elastico di coda e chignon lo colora lo shader (dipende dalla tinta).
-// 2) godot/assets/textures/viso_maschere.png: barbe (paintBeard di src/players3d.js, paintStubble di src/body/testa.js),
-//    sopracciglia (paintBrowsFine) e labbra nella zona viso del web (FACE_CROP), già sfumate come softAlpha del web.
+// 2) godot/assets/textures/viso_maschere.png: barbe (ridisegnate il 2026-11-22, non più come il web: lì erano
+//    maschere dure e corta e piena quasi uguali), sopracciglia (paintBrowsFine del web) e labbra nella zona viso del
+//    web (FACE_CROP), già sfumate come softAlpha del web.
 //    Celle k = 0..5: R = barba k + 1, G = sopracciglia k, B = quanto è scuro il pelo delle sopracciglia; cella 6: labbra
 //    (R = labbra, G = linea della bocca).
 // Uso: node tools/make-godot-tex.mjs   (poi $G --headless --path godot --import)
-// Le funzioni di disegno sono copie di quelle del web (stesse forme e numeri): se cambiano lì, vanno ricopiate qui.
+// Le funzioni di disegno (tranne le barbe) sono copie di quelle del web (stesse forme e numeri): se cambiano lì, vanno ricopiate qui.
 import { readFileSync, writeFileSync } from 'node:fs';
 import puppeteer from 'puppeteer-core';
 
@@ -96,27 +97,49 @@ function paintHairCoef(g, style, rect) {
   g.restore();
 }
 
-// ---- copia di Players3D.paintBeard (src/players3d.js), in bianco: conta solo l'alfa
-function paintBeard(g0, beard) {
-  const F = FACE, x = F.x, y = F.mouthY, col = '#ffffff', out = g0;
-  const lay = cpu(640, 440), g = lay.getContext('2d');
-  g.save(); g.fillStyle = col;
-  const jaw = () => { g.beginPath(); g.moveTo(x - 92, F.eyeY + 42); g.lineTo(x - 82, y + 34); g.quadraticCurveTo(x, y + 78, x + 82, y + 34); g.lineTo(x + 92, F.eyeY + 42); g.lineTo(x + 62, F.eyeY + 48); g.quadraticCurveTo(x + 40, y - 10, x + 24, y - 8); g.quadraticCurveTo(x, y - 18, x - 24, y - 8); g.quadraticCurveTo(x - 40, y - 10, x - 62, F.eyeY + 48); g.closePath(); };
-  const mouth = () => { g.globalCompositeOperation = 'destination-out'; g.beginPath(); g.ellipse(x, y + 2, 17, 7, 0, 0, Math.PI * 2); g.fill(); g.globalCompositeOperation = 'source-over'; };
-  if (beard === 2 || beard === 4) { g.beginPath(); g.moveTo(x - 16, y + 12); g.quadraticCurveTo(x, y + 8, x + 16, y + 12); g.lineTo(x + 12, y + 40); g.quadraticCurveTo(x, y + 48, x - 12, y + 40); g.closePath(); g.fill(); }
-  if (beard === 3 || beard === 4 || beard === 6) { g.beginPath(); g.moveTo(x - 24, y + 4); g.quadraticCurveTo(x - 20, y - 12, x, y - 9); g.quadraticCurveTo(x + 20, y - 12, x + 24, y + 4); g.quadraticCurveTo(x, y - 3, x - 24, y + 4); g.fill(); }
-  if (beard === 5) { g.globalAlpha = 0.85; jaw(); g.fill(); g.globalAlpha = 1; mouth(); }
-  if (beard === 6) { jaw(); g.fill(); g.fillRect(x - 80, y + 30, 160, 70); mouth(); }
-  g.restore();
-  out.drawImage(lay, 0, 0);
+// ---- barbe (2026-11-22, ridisegnate: non più copie del web). In bianco: conta solo l'alfa; lo shader mette il
+// colore e i peli (più radi verso il bordo). Bordi morbidi: si sfuma molto di più del web (SOFT_BARBA), niente
+// righe dritte sulla guancia. Corta = bassa sulla guancia e rada; piena = alta, basette fino ai capelli, sotto il mento.
+const SOFT_BARBA = [7, 7, 6, 7, 7, 7];   // passate di sfumatura per barba 1..6
+function moustache(g, x, y, thick) {
+  g.beginPath(); g.moveTo(x - 27, y + 5);
+  g.quadraticCurveTo(x - 22, y - 9 - thick * 0.3, x - 4, y - 9 - thick * 0.5); g.quadraticCurveTo(x, y - 7 - thick * 0.5, x + 4, y - 9 - thick * 0.5);
+  g.quadraticCurveTo(x + 22, y - 9 - thick * 0.3, x + 27, y + 5);
+  g.quadraticCurveTo(x + 14, y - 4, x, y - 4); g.quadraticCurveTo(x - 14, y - 4, x - 27, y + 5); g.closePath(); g.fill();
 }
-// ---- copia di paintStubble (src/body/testa.js)
-function paintStubble(g) {
+function goatee(g, x, y, w) {
+  g.beginPath(); g.moveTo(x - w, y + 11); g.quadraticCurveTo(x, y + 8, x + w, y + 11);
+  g.quadraticCurveTo(x + w + 2, y + 34, x + w * 0.6, y + 44); g.quadraticCurveTo(x, y + 52, x - w * 0.6, y + 44);
+  g.quadraticCurveTo(x - w - 2, y + 34, x - w, y + 11); g.closePath(); g.fill();
+}
+// barba sulle guance: top = altezza dell'attaccatura sulla guancia (y), side = basetta (y dove comincia), alpha
+function fullBeard(g, x, y, e, top, side, alpha) {
+  g.globalAlpha = alpha; g.beginPath();
+  g.moveTo(x - 86, side); g.lineTo(x - 72, side);
+  g.quadraticCurveTo(x - 68, top, x - 50, top + 8); g.quadraticCurveTo(x - 36, top + 14, x - 30, y - 6);
+  g.quadraticCurveTo(x - 14, y - 16, x, y - 14); g.quadraticCurveTo(x + 14, y - 16, x + 30, y - 6);
+  g.quadraticCurveTo(x + 36, top + 14, x + 50, top + 8); g.quadraticCurveTo(x + 68, top, x + 72, side);
+  g.lineTo(x + 86, side); g.lineTo(x + 86, y + 30); g.quadraticCurveTo(x + 60, y + 100, x, y + 104);
+  g.quadraticCurveTo(x - 60, y + 100, x - 86, y + 30); g.closePath(); g.fill();
+  g.globalAlpha = 1;
+}
+function mouthHole(g, x, y) {
+  g.globalCompositeOperation = 'destination-out'; g.globalAlpha = 1; g.beginPath(); g.ellipse(x, y + 2, 17, 6.5, 0, 0, Math.PI * 2); g.fill();
+  g.globalCompositeOperation = 'source-over';
+}
+function paintBeardNew(g, beard) {
   const x = FACE.x, y = FACE.mouthY, e = FACE.eyeY;
-  g.save(); g.fillStyle = '#ffffff'; g.globalAlpha = 0.48;
-  g.beginPath(); g.moveTo(x - 88, e + 44); g.lineTo(x - 80, y + 32); g.quadraticCurveTo(x, y + 80, x + 80, y + 32); g.lineTo(x + 88, e + 44);
-  g.lineTo(x + 58, e + 50); g.quadraticCurveTo(x + 40, y - 12, x + 22, y - 10); g.quadraticCurveTo(x, y - 20, x - 22, y - 10); g.quadraticCurveTo(x - 40, y - 12, x - 58, e + 50); g.closePath(); g.fill();
-  g.globalCompositeOperation = 'destination-out'; g.globalAlpha = 1; g.beginPath(); g.ellipse(x, y + 2, 16, 6.5, 0, 0, Math.PI * 2); g.fill();
+  g.save(); g.fillStyle = '#ffffff';
+  if (beard === 1) { fullBeard(g, x, y, e, e + 40, e + 30, 0.55); mouthHole(g, x, y); }
+  if (beard === 2) { goatee(g, x, y, 14); }
+  if (beard === 3) { moustache(g, x, y, 4); }
+  if (beard === 4) {
+    moustache(g, x, y, 3); goatee(g, x, y, 13);
+    g.lineWidth = 5; g.strokeStyle = '#ffffff'; g.lineCap = 'round';   // anello attorno alla bocca
+    for (const s of [-1, 1]) { g.beginPath(); g.moveTo(x + s * 25, y + 4); g.quadraticCurveTo(x + s * 22, y + 20, x + s * 12, y + 30); g.stroke(); }
+  }
+  if (beard === 5) { fullBeard(g, x, y, e, e + 44, e + 22, 0.75); moustache(g, x, y, 2); mouthHole(g, x, y); }
+  if (beard === 6) { fullBeard(g, x, y, e, e + 24, e - 26, 1); moustache(g, x, y, 6); mouthHole(g, x, y); }
   g.restore();
 }
 // ---- copia di paintBrowsFine (src/body/testa.js): riempimento rosso, peli scuri verdi
@@ -173,8 +196,8 @@ window.makeFace = () => {
   const put = (cell, ch, arr, k = 1) => { const ox = (cell % cols) * CW, oy = Math.floor(cell / cols) * CH; for (let y = 0; y < CH; y++) for (let x = 0; x < CW; x++) px[((oy + y) * CW * cols + ox + x) * 4 + ch] = Math.round(arr[y * CW + x] * k); };
   for (let i = 3; i < px.length; i += 4) px[i] = 255;
   for (let k = 0; k < 6; k++) {
-    const b = k + 1, L = layer(g => (b === 1 ? paintStubble(g) : paintBeard(g, b)));
-    put(k, 0, soft(L.a, CW, CH, b === 1 ? 4 : 2));
+    const b = k + 1, L = layer(g => paintBeardNew(g, b));
+    put(k, 0, soft(L.a, CW, CH, SOFT_BARBA[k]));
     const B = layer(g => paintBrows(g, k));
     put(k, 1, soft(B.a, CW, CH, 2)); put(k, 2, B.gr, 255);
   }

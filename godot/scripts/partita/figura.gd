@@ -148,7 +148,8 @@ func prepara(kit: Dictionary, aspetto: Dictionary, sfasa: float, tex_avviso: Tex
 ## richiamare per cambiare aspetto (anteprima dell'editor: il modellino cambia subito)
 func metti_aspetto(aspetto: Dictionary) -> void:
 	for k: String in aspetto:
-		_mesh.set_instance_shader_parameter(k, aspetto[k])
+		if k != "punte":   # punte: solo i capelli (sfumati)
+			_mesh.set_instance_shader_parameter(k, aspetto[k])
 	if aspetto.has("stile2"):
 		_stile2 = aspetto.stile2
 	var m := Capelli.mesh_per(int(_stile2.x + 0.5))
@@ -159,6 +160,8 @@ func metti_aspetto(aspetto: Dictionary) -> void:
 		_capelli.set_instance_shader_parameter(&"colore", aspetto.capelli)
 	if aspetto.has("pelle"):
 		_capelli.set_instance_shader_parameter(&"pelle", aspetto.pelle)
+	if aspetto.has("punte"):
+		_capelli.set_instance_shader_parameter(&"punte", aspetto.punte)
 
 
 ## peso del clip di scatto (0..1) a velocità v (m/s); sprinting = il motore dice che il giocatore sta scattando

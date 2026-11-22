@@ -43,6 +43,9 @@ instance uniform vec4 stile2 = vec4(2.0, 0.0, 0.0, 0.0);
 instance uniform vec4 numero = vec4(0.0);
 instance uniform float corsa = 0.0;
 instance uniform float occhi_forma = 0.0;
+instance uniform vec4 barba : source_color = vec4(0.0);   // colore della barba (Aspetto.colore_barba); a = 0: capelli
+instance uniform vec4 iride2 : source_color = vec4(0.0);  // eterocromia: colore dell'occhio sinistro (x > 0) se a = 1
+instance uniform vec4 sopracciglia : source_color = vec4(0.0);   // a = 1: colore delle sopracciglia (capelli particolari)
 
 // misure del corpo in posa di riposo (m), dalle ossa: le imposta scripts/giocatore.gd
 uniform float anca_y = 0.97;
@@ -83,12 +86,16 @@ const float SCHIENA = 0.4;        // m di schiena coperti da una cella (come il 
 const float NECK_FRONT = 0.03;    // gola: scollo misurato come se fosse più vicina (neckSkin di src/body/testa.js)
 const float NECK_RELAX = 0.75;
 const vec2 BEARD_UNDER = vec2(0.012, 0.034);   // m: sotto il mento la barba sfuma tra queste distanze
+const vec2 BEARD_UNDER_PIENA = vec2(0.03, 0.065); // barba piena: scende sul collo
+// barbe 1..6 (2026-11-22): x = quanti peli (1 = fitta, meno = si vede la pelle in mezzo), y = copertura massima
+const vec2 BARBA_PELO[6] = vec2[6](vec2(0.5, 0.6), vec2(1.0, 0.95), vec2(1.0, 0.95), vec2(1.0, 0.95), vec2(0.62, 0.8), vec2(1.0, 1.0));
 const vec2 LASH = vec2(0.0024, 0.75);          // linea delle ciglia: larghezza (m), intensità
 // maschere del viso (tools/make-godot-tex.mjs): zona FACE_CROP del web, celle 4 × 2
 const vec4 FACE_CROP = vec4(200.0, 150.0, 240.0, 260.0);
 const vec2 MASCHERE = vec2(960.0, 520.0);
 const float AA_MM = 0.35;
-const float PALPEBRA_MAX = 0.9;   // occhi: apertura massima sopra e sotto (frazioni della semialtezza della finestra)
+const float PALPEBRA_MAX = 1.2;   // occhi: apertura massima sopra e sotto (frazioni della semialtezza della finestra);
+                                  // 0,9 fino al 2026-11-22: occhi socchiusi, sguardo assonnato
 const float V_FONDO = 0.10;        // scollo a V: quanto scende sul petto sotto lo scollo tondo (m)
 const float V_MEZZA = 0.055;       // scollo a V: mezza larghezza in alto (m)
 const float POLO_ALTO = 0.04;      // polo: altezza del colletto rialzato dietro (davanti POLO_ALTO_DAVANTI) (m)
@@ -103,7 +110,8 @@ const float LARGA_MANICA = 0.016;  // maglia larga: manica più ampia in fondo (
 const float LARGA_VALLE = 0.015;   // maglia larga: valle più profonda che si riempie (m)
 const float LARGA_PIEGHE = 0.13;   // maglia larga: quanto scuriscono le pieghe
 const float ADERENTE_MUSCOLI = 9.0; // maglia aderente: scurimento per metro di valle (al massimo 0,2)
-const float IRIDE_K = 1.3;        // occhi: iride più grande del web (la finestra misurata qui è più piccola)         // occhi: bordo morbido delle palpebre (mm)
+const float IRIDE_K = 1.15;       // occhi: iride più grande del web (la finestra misurata qui è più piccola)
+const float IRIDE_SU = 0.1;       // occhi: iride al centro dell'apertura, un filo in alto (sguardo dritto, non in basso)
 
 // tagli (HAIR di src/hair3d.js): attaccatura, 5 nodi [|az|, el] per taglio (per rasato e cresta: la nuca rasata)
 const vec2 LINEE[85] = vec2[85](
@@ -144,6 +152,13 @@ varying float valle;   // profondità della valle del corpo (m, CUSTOM2.x)
 float sm(float a, float b, float x) {
 	float t = clamp((x - a) / (b - a), 0.0, 1.0);
 	return t * t * (3.0 - 2.0 * t);
+}
+
+// peli della barba: celle di 0,45 mm, hash senza sin (con sin a questi valori venivano righe diagonali)
+float pelo_hash(vec3 p, float semi) {
+	vec3 q = fract(floor(p * 2200.0) * 0.1031 + semi);
+	q += dot(q, q.zyx + 31.32);
+	return fract((q.x + q.y) * q.z);
 }
 
 float grana(vec3 p) {
@@ -361,14 +376,14 @@ vec3 busto(vec3 p, float zf, float pixel, float vl, inout float ruvido) {
 		c = bordino.rgb;
 	}
 	if (!braccio) {
+		// bordi dello scollo morbidi (larghi un pixel, fwidth): prima erano gradini netti, a scalini sul telefono
 		float nl = scollo(colletto, p, zf);
-		if (nl > (colletto == 0 ? -0.015 : -0.012)) {
-			c = bordino.rgb;
-		}
-		if (nl > 0.0) {
-			c = pelle.rgb;
-			ruvido = 0.62;
-		}
+		float px = max(fwidth(nl), 1e-5);
+		float soglia_b = colletto == 0 ? -0.015 : -0.012;
+		c = mix(c, bordino.rgb, sm(soglia_b - px, soglia_b + px, nl));
+		float in_pelle = sm(-px, px, nl);
+		c = mix(c, pelle.rgb, in_pelle);
+		ruvido = mix(ruvido, 0.62, in_pelle);
 		if (colletto == 2) {
 			vec4 pc = polo(p, zf);
 			c = mix(c, pc.rgb, pc.a);
@@ -477,18 +492,24 @@ vec3 viso(vec3 p, vec3 n, float dettaglio, inout float ruvido) {
 		col = mix(col, vec3(0.094, 0.063, 0.047), LASH.y * (1.0 - sm(LASH.x * 0.6, LASH.x * 1.6, de)) * sm(viso_occhio.y - 0.0015, viso_occhio.y + 0.002, p.y));
 	}
 	vec2 uv = vec2(320.0 + (p.x - viso_proiezione.x) * viso_proiezione.z, 222.0 + (viso_proiezione.y - p.y) * viso_proiezione.w);
-	// barba: anche sotto la mascella, sfumata; grana per pelo (più rada e fitta nell'ombra)
-	int barba = int(stile2.y + 0.5);
-	if (barba > 0 && l.z > -0.03) {
-		float k = sm(-0.55, -0.2, nf) * (p.y < mento ? 1.0 - sm(BEARD_UNDER.x, BEARD_UNDER.y, mento - p.y) : 1.0);
-		float a = maschera(barba - 1, uv).r * k;
-		if (a > 0.0) {
-			float g = mix(0.5, grana(p), dettaglio);
-			float pelo = barba == 1 ? 0.25 + 0.75 * g * g : 0.72 + 0.28 * g;
-			if (barba == 1) {
-				pelo = mix(0.5, pelo, dettaglio);
-			}
-			col = mix(col, hc, a * pelo);
+	// barba: anche sotto la mascella, sfumata. Peli: dove la maschera è piena tutti, verso il bordo sempre più radi
+	// (niente bordo netto); la corta e l'ombra hanno meno peli, si vede la pelle. Basette solo davanti all'orecchio.
+	int tipo_barba = clamp(int(stile2.y + 0.5), 0, 6);
+	if (tipo_barba > 0 && l.z > -0.04) {
+		vec2 sotto = tipo_barba == 6 ? BEARD_UNDER_PIENA : BEARD_UNDER;
+		float k = sm(-0.55, -0.2, nf) * (p.y < mento ? 1.0 - sm(sotto.x, sotto.y, mento - p.y) : 1.0);
+		k *= sm(-0.04, -0.015, l.z);
+		k *= mix(1.0, sm(viso_naso_orecchie.z - 0.002, viso_naso_orecchie.z + 0.012, p.z), sm(-0.06, -0.035, ey));
+		float a = maschera(tipo_barba - 1, uv).r * k;
+		if (a > 0.003) {
+			vec2 bp = BARBA_PELO[tipo_barba - 1];
+			float g = pelo_hash(p, 0.0);
+			float g2 = pelo_hash(p, 0.37);
+			float soglia = a * bp.x;
+			float peli = sm(g - 0.3, g + 0.3, soglia * 1.25);        // pelo sì / no, con passaggio morbido
+			float cop = mix(soglia, peli * (0.75 + 0.25 * g2), dettaglio) * bp.y;
+			vec3 bc = barba.a > 0.5 ? sqrt(barba.rgb) : hc;
+			col = mix(col, bc * (0.85 + 0.3 * g2 * dettaglio), clamp(cop, 0.0, 1.0));
 		}
 	}
 	// sopracciglia e labbra: solo davanti
@@ -496,6 +517,9 @@ vec3 viso(vec3 p, vec3 n, float dettaglio, inout float ruvido) {
 		float k = sm(-0.15, 0.25, nf);
 		vec4 s = maschera(clamp(int(stile2.z + 0.5), 0, 5), uv);
 		vec3 bc = hc * (dot(hc, vec3(0.299, 0.587, 0.114)) > 0.6 ? 0.58 : 0.8);
+		if (sopracciglia.a > 0.5) {
+			bc = sqrt(sopracciglia.rgb);
+		}
 		col = mix(col, mix(bc, hc * 0.55, s.b), s.g * k);
 		vec4 lb = maschera(6, uv);
 		col = mix(col, sk * vec3(0.86, 0.6, 0.6), lb.r * k);
@@ -543,10 +567,18 @@ vec3 occhio(vec3 p) {
 	float aperto = clamp(min(dU, dL) / AA_MM + 0.5, 0.0, 1.0);
 	if (aperto > 0.0) {
 		float rI = fc.x * H * IRIDE_K;
+		// centro dell'iride: a metà dell'apertura nella colonna di mezzo (prima a y = 0: con le palpebre più alte sopra
+		// che sotto l'iride finiva in basso e lo sguardo sembrava assonnato)
+		float t0 = -xi / (xo - xi);
+		float b0 = (fa.z + (fa.w - fa.z) * t0) * H;
+		float tu0 = t0 < fb.w ? 0.5 * t0 / fb.w : 0.5 + 0.5 * (t0 - fb.w) / (1.0 - fb.w);
+		float su0 = b0 + fb.x * H * pow(4.0 * tu0 * (1.0 - tu0), fb.z);
+		float giu0 = b0 - fb.y * H * pow(4.0 * t0 * (1.0 - t0), fb.z);
+		y -= (su0 + giu0) * 0.5 + IRIDE_SU * H;
 		vec3 e = mix(vec3(0.949, 0.929, 0.902), vec3(0.8, 0.745, 0.714), clamp(pow(x / (W * 1.05), 2.0) + pow(y / (H * 1.6), 2.0), 0.0, 1.0));
 		float d = length(vec2(x, y));
 		if (d < rI + 0.3) {
-			vec3 ir = sqrt(iride.rgb);
+			vec3 ir = sqrt(iride2.a > 0.5 && p.x > 0.0 ? iride2.rgb : iride.rgb);
 			float k = d / rI;
 			float vena = 0.5 + 0.5 * sin(atan(y, x) * 23.0 + k * 3.0);
 			vec3 ic = mix(ir, min(vec3(1.0), ir * 1.3 + 0.047), clamp(0.7 - k, 0.0, 1.0) * 0.8);
@@ -554,7 +586,7 @@ vec3 occhio(vec3 p) {
 			ic = k < 0.42 ? vec3(0.043, 0.031, 0.024) : (k < 0.48 ? mix(ic, vec3(0.043, 0.031, 0.024), (0.48 - k) / 0.06) : ic);
 			e = mix(e, ic, clamp((rI - d) / 0.3 + 0.5, 0.0, 1.0));
 		}
-		e = mix(e, vec3(0.275, 0.196, 0.165), 0.42 * clamp(1.0 - dU / (H * 0.45), 0.0, 1.0));   // ombra della palpebra
+		e = mix(e, vec3(0.275, 0.196, 0.165), 0.3 * clamp(1.0 - dU / (H * 0.35), 0.0, 1.0));   // ombra della palpebra
 		vec2 h = vec2(x + rI * 0.3, y - rI * 0.38);   // riflesso in alto, verso il naso
 		if (dot(h, h) < pow(rI * 0.2, 2.0)) {
 			e = mix(e, vec3(1.0), 0.9);
