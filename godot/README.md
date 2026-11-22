@@ -62,6 +62,7 @@ interfaccia dei menu, sfondo del menu e allenamento guidato, grafica.
 | `scripts/app_prove.gd` | prove automatiche del flusso: stagione intera col dito finto, giro di schermate |
 | `scripts/carriera/carriera.gd` | **`Carriera`**: porting 1:1 di `src/career.js` (stessi nomi, stato in `c.s`) |
 | `scripts/carriera/aspetto.gd`, `stemma_dati.gd` | `src/looks.js` (unico porting, usato da carriera, menu e vista; `parametri_figura` / `stile_figura` = parametri dello shader della figura; `tests/test_aspetto.gd` col JS via `node test/export-aspetto.mjs`) e la parte dati di `src/crest.js` (forme, motivi, simboli, colori) |
+| `scripts/carriera/fisico.gd` | altezza e corporatura dei giocatori (solo Godot): dati, statistiche della partita, scala della figura |
 | `scripts/carriera/salvataggio.gd`, `js.gd` | file `user://salvataggio.json` (scrittura sicura, ripiego); aiuti per rifare il JS esatto (ordinamento di V8, toFixed, …) |
 | `scenes/menu/<nome>.tscn` | **schermate dei menu** (`scripts/menu/<nome>.gd`, sotto "Menu (fase 3)"); `segnaposto.tscn` resta per un nome che non esiste |
 | `scripts/menu/` | interfaccia dei menu: tema, stemmi e visi in SVG, carte della Rosa, editor con anteprima 3D |
@@ -424,6 +425,27 @@ le novità passano da due funzioni nuove che chiama `App`:
   entra con uno scambio).
 - Prove: `tests/test_carriera_b.gd`; `--stagione-bot` stampa anche derby, crescita, infortuni e obiettivo;
   `--app-schermate` aggiunge hub, classifica, rosa (con un infortunato) e fine stagione.
+
+## Altezza e corporatura (2026-11-22, solo Godot)
+
+`scripts/carriera/fisico.gd`: **altezza** (Basso, Medio, Alto) e **corporatura** (Snello, Normale, Robusto),
+indici 0..2. Numeri e motivi in `DECISIONI.md`.
+- **Dati**: solo il campione ha i campi `altezza` e `corporatura`, scritti da `Carriera.setFisico(id, a, c)`
+  (editor; `addChampion` resta come il JS). Senza campi il campione è medio/normale (salvataggi vecchi); tutti gli
+  altri (rosa, mercato, squadre del computer) hanno il fisico dal seme di id, nome e ruolo (`Fisico.di(p)`),
+  sempre uguale, coi pesi per ruolo (`PESI_ALTEZZA`, `PESI_CORPORATURA`: portieri 65% alti, difensori 45%).
+- **Statistiche**: `Fisico.applica(p)` = copia con i punti di `MOD_ALTEZZA` + `MOD_CORPORATURA` (e i campi scritti).
+  Lo usano `Carriera.squadraPartita()` (mia squadra) e `Carriera.avversarioPartita(t)` (= `aiMatchTeam` col fisico,
+  chiamata da `App`). **Il motore non cambia**; statistiche salvate, valutazione e valore restano quelle di base.
+- **Figura**: `Fisico.scala(f)` × `Coord.SCALE` sul nodo della figura (vista della partita e modellino dell'editor):
+  altezza su tutti gli assi (0,94 / 1 / 1,06), corporatura solo in X e Z (0,92 / 1 / 1,09). L'origine è ai piedi,
+  quindi restano a terra; capelli (osso della testa), divisa e animazioni seguono da sé.
+- **Editor**: nella creazione del campione la scheda Nome ha Altezza e Corporatura; in "Aspetto" il campione ha la
+  scheda Fisico. Il modellino cambia subito (`MenuAnteprima.metti_fisico`). "Casuale" nella scheda Fisico pesca coi
+  pesi del ruolo.
+- **Menu**: nella Rosa il pannello del giocatore dice "Alto · Robusto" e sulle etichette delle statistiche il punto in
+  più o in meno della partita (verde/rosso, es. "TES+10"); nel Mercato la scheda dice il fisico.
+- Prove: `tests/test_fisico.gd`.
 
 ## Statistiche a fine partita (fase C, punto 14, solo Godot)
 

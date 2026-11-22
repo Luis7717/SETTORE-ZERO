@@ -297,6 +297,20 @@ func _giro_impostazioni_editor(dir: String) -> void:
 	_app.vai("editor", {"flow": "new", "club": "Prova", "kit": 1, "mode": "champ", "tab": "cele"})
 	await _attendi(1.2)
 	await _scatto(dir, "editor_nuovo_esultanza")
+	# fisico del campione (fisico.gd): scheda Nome della creazione, poi scheda Fisico con alto e robusto e con basso
+	# e snello (non si conferma: la carriera non cambia)
+	_app.vai("editor", {"flow": "new", "club": "Prova", "kit": 1, "mode": "champ", "tab": "me"})
+	await _attendi(1.2)
+	await _scatto(dir, "editor_nuovo_fisico")
+	if ch is Dictionary:
+		for prova: Array in [[2, 2, "editor_fisico_alto_robusto"], [0, 0, "editor_fisico_basso_snello"]]:
+			_app.vai("editor", {"flow": "look", "id": ch.id, "tab": "body"})
+			var ed3: Node = get_tree().current_scene
+			ed3.d.altezza = prova[0]
+			ed3.d.corporatura = prova[1]
+			ed3.mostra(false)
+			await _attendi(1.2)
+			await _scatto(dir, prova[2])
 	_app.vai(_app.PRINCIPALE)
 	await _attendi(ATTESA_MENU)
 

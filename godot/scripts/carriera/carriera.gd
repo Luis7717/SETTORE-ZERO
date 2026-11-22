@@ -29,6 +29,7 @@ const Crescita := preload("res://scripts/carriera/crescita.gd")
 const Forma := preload("res://scripts/carriera/forma.gd")
 const Dirigenza := preload("res://scripts/carriera/dirigenza.gd")
 const Esultanze := preload("res://scripts/partita/esultanze.gd")
+const Fisico := preload("res://scripts/carriera/fisico.gd")
 
 const FORMATIONS := C.FORMATIONS
 const DIV_NAMES := ["Prima Divisione", "Seconda Divisione", "Terza Divisione"]
@@ -974,6 +975,24 @@ func setEsultanza(id: Variant, e: Variant) -> bool:
 	return true
 
 
+## altezza e corporatura del campione (indici di Fisico.ALTEZZE / CORPORATURE; solo lui si sceglie il fisico, gli
+## altri lo hanno dal seme). Come l'esultanza: lo scrive solo l'editor, addChampion resta identico al JS.
+func setFisico(id: Variant, altezza: Variant, corporatura: Variant) -> bool:
+	var p: Variant = player(id)
+	if not p is Dictionary or not p.get("champ", false):
+		return false
+	var f := Fisico.di(p)
+	p["altezza"] = int(altezza) if Fisico.valido(altezza) else f.altezza
+	p["corporatura"] = int(corporatura) if Fisico.valido(corporatura) else f.corporatura
+	save()
+	return true
+
+
+## squadra del computer per la partita (al posto di aiMatchTeam): statistiche col fisico (Fisico.applicaSquadra)
+func avversarioPartita(t: Dictionary) -> Dictionary:
+	return Fisico.applicaSquadra(aiMatchTeam(t))
+
+
 ## numeri casuali delle novità per questa giornata (stessa carriera = stessi numeri)
 func _rng_novita(nome: String) -> Callable:
 	return JS.rng32(Asp.hash32(s.get("semeB", 0), nome, s.season, s.day))
@@ -1037,8 +1056,9 @@ func schieraSani() -> Array:
 	return cambi
 
 
-## la mia squadra per la partita (al posto di myMatchTeam): niente infortunati, e chi è giù di forma parte
-## stanco (energia iniziale `energy0` del motore). I giocatori sono copie: lo stato della carriera non cambia.
+## la mia squadra per la partita (al posto di myMatchTeam): niente infortunati, chi è giù di forma parte
+## stanco (energia iniziale `energy0` del motore) e le statistiche tengono conto del fisico (fisico.gd).
+## I giocatori sono copie: lo stato della carriera non cambia.
 func squadraPartita() -> Dictionary:
 	schieraSani()
 	var t := myMatchTeam()
@@ -1047,13 +1067,13 @@ func squadraPartita() -> Dictionary:
 		if not p is Dictionary:
 			gioc.append(p)
 			continue
-		var q: Dictionary = p.duplicate()
+		var q: Dictionary = Fisico.applica(p) # copia con le statistiche del fisico (altezza, corporatura)
 		var e := Forma.energia(forma_di(p.id))
 		if e < 1.0:
 			q["energy0"] = e
 		gioc.append(q)
 	t.players = gioc
-	t.bench = t.bench.filter(func(p: Dictionary) -> bool: return infortunio(p.id) <= 0)
+	t.bench = t.bench.filter(func(p: Dictionary) -> bool: return infortunio(p.id) <= 0).map(func(p: Dictionary) -> Dictionary: return Fisico.applica(p))
 	return t
 
 

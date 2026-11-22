@@ -9,6 +9,7 @@ extends MenuSchermata
 const Rosa := preload("res://scripts/menu/rosa_logica.gd")
 const Carta := preload("res://scripts/menu/carta_giocatore.gd")
 const C := preload("res://sim/core.gd")
+const Fisico := preload("res://scripts/carriera/fisico.gd")
 const ALTEZZA_SOPRA := 150.0       # .sqtop
 const RIGA_CAMPO := Color(1, 1, 1, 0.11)
 
@@ -306,7 +307,8 @@ func _pannello_giocatore(p: Dictionary, F: Array) -> Control:
 	var nm := U.vbox(2)
 	nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	nm.add_child(U.corto(str(p.name), 16, T.TXT, T.PESO_NERO))
-	var info := D.pos_name(p.pos)
+	var fis := Fisico.di(p)
+	var info := D.pos_name(p.pos) + " · " + Fisico.testo(fis)
 	if c.infortunio(p.id) > 0:
 		info += " · INFORTUNATO (%d)" % c.infortunio(p.id)
 	elif c.forma_di(p.id) < 100:
@@ -327,12 +329,15 @@ func _pannello_giocatore(p: Dictionary, F: Array) -> Control:
 	v.add_child(U.riempi())
 	var keys: Array = D.GK_STATS if p.pos == "P" else D.STATS
 	var g := U.griglia(keys.size(), 4, 4)
+	var mods := Fisico.modificatori(fis)   # in partita il fisico aggiunge o toglie questi punti (fisico.gd)
 	for kn: Array in keys:
 		var val := D.stat_of(p, kn[0])
 		var cella := U.pannello("StatPiccola")
 		cella.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var cv := U.vbox(0)
-		cv.add_child(U.testo(kn[1], 9.5, T.DIM, T.PESO_NERO, HORIZONTAL_ALIGNMENT_CENTER))
+		var dm := int(mods.get(kn[0], 0))
+		var etichetta: String = kn[1] if dm == 0 else "%s%s%d" % [kn[1], "+" if dm > 0 else "−", absi(dm)]
+		cv.add_child(U.testo(etichetta, 9.5, T.DIM if dm == 0 else (T.STAT.o3 if dm > 0 else Color("#ff8a80")), T.PESO_NERO, HORIZONTAL_ALIGNMENT_CENTER))
 		cv.add_child(U.testo(str(val), 15, T.STAT[D.ovr_cls(val)], 900, HORIZONTAL_ALIGNMENT_CENTER))
 		cella.add_child(cv)
 		g.add_child(cella)

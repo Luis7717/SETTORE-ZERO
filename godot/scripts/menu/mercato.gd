@@ -2,6 +2,7 @@
 # la scheda col prezzo e "Compra" (secondo tocco = conferma). Per vendere si va nella Rosa.
 extends MenuSchermata
 
+const Fisico := preload("res://scripts/carriera/fisico.gd")
 const FILTRI := [["T", "Tutti"], ["P", "POR"], ["D", "DIF"], ["C", "CEN"], ["A", "ATT"]]
 
 var filtro := "T"
@@ -102,7 +103,7 @@ static func scheda(p: Dictionary, sotto: Control) -> Control:
 	pann.add_child(v)
 	var testa := MenuUi.vbox(4)
 	testa.add_child(MenuUi.testo(str(p.name), 18, MenuTema.TXT, MenuTema.PESO_NERO))
-	var info := "%s · %d anni · valore %s" % [MenuDati.pos_name(p.pos), int(p.age), MenuDati.fmt_money(MenuDati.value(p))]
+	var info := "%s · %s · %d anni · valore %s" % [MenuDati.pos_name(p.pos), Fisico.testo(Fisico.di(p)), int(p.age), MenuDati.fmt_money(MenuDati.value(p))]
 	if p.get("num") != null:
 		info += " · n. %d" % int(p.num)
 	if int(p.get("apps", 0)) > 0:
