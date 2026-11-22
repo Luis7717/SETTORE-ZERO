@@ -113,6 +113,7 @@ func _init(o: Dictionary) -> void:
 	var wx := weatherFx(o.get("meteo"))
 	var mt: Variant = o.get("meteo")
 	meteo = mt if mt is String else ""
+	headCtl = bool(o.get("testa", false))
 	roll = wx.roll
 	slideK = wx.slide
 	stunK = wx.stun
@@ -195,6 +196,7 @@ func setRestart(type: String, tm: int, x: float, y: float, taker: R.Player = nul
 	b.dblT = 0.0
 	endDuel("gioco fermo")
 	endFlee("gioco fermo")
+	endHead("gioco fermo")
 	phase = "restart"
 	move = [null, null]
 	runs = [[], []]
@@ -707,6 +709,7 @@ func goal(forT: int) -> void:
 	goalsLog.append({"team": forT, "name": scorer.name if scorer != null else "Autogol", "minute": mnt, "scorer": scorer.src if scorer != null else null, "assist": assist.src if assist != null else null})
 	endDuel("gioco fermo")
 	endFlee("gioco fermo")
+	endHead("gioco fermo")
 	advantage = null
 	phase = "goal"
 	goalT = 3.2
@@ -752,6 +755,7 @@ func step(dt: float) -> void:
 	updateBall(dt)
 	updateDuel(dt)
 	updateFlee(dt)
+	updateHead(dt)
 	if phase == "play":
 		contacts(dt)
 		if phase == "play":
@@ -856,6 +860,8 @@ func updateCtrl(_dt: float, force: bool = false) -> void:
 			c = null
 		if b.owner != null and b.owner.team == tm:
 			c = b.owner
+		elif headWin != null and headWin.team == tm:
+			c = headWin.p # colpo di testa controllato: comanda chi deve colpire
 		elif phase == "restart" or phase == "goal":
 			if c == null or c.pos == "P" or force:
 				c = _nearestCtrl(tm)

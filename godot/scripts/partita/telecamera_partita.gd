@@ -156,12 +156,17 @@ func aggiorna(m: Object, me: int, dt: float, rdt: float, drawing: bool, cam_drag
 		fov = pose.fov
 
 
-# rallenty in attacco (duello, fuga, area di tiro, disegno col pallone): visuale larga coi compagni davanti e di fianco
+# rallenty in attacco (duello, fuga, area di tiro, disegno col pallone, colpo di testa): visuale larga coi compagni davanti e di fianco
 func _wide_step(m: Object, me: int, mine: bool, duel: bool, rdt: float, pk: float, drawing: bool, user_yaw: float) -> float:
 	var c: Object = m.ball.owner
 	var zone: bool = not duel and m.inZone(me)
 	var flee: bool = m.fleeFor(me)
 	var on: bool = mine and c != null and m.phase == "play" and (duel or zone or flee or drawing)
+	# colpo di testa controllato: visuale larga intorno a chi colpisce, con la porta avversaria in vista
+	if m.headFor(me):
+		c = m.headWin.p
+		zone = true
+		on = true
 	_wide_k += ((1.0 if on else 0.0) - _wide_k) * minf(1.0, rdt * WIDE_IN)
 	if _wide_k < 1e-3 and not on:
 		_wide_k = 0.0
