@@ -234,10 +234,16 @@ func update_view(dt_game: float, dt_real: float) -> void:
 	_aggiorna_effetti(b, dt_game, dt_real)
 
 
+const PIANO_CAMERA_M := 0.001 # sotto tanti metri dal piano della telecamera un punto non si proietta
+
+
 ## punto del gioco (x, y, altezza h) → Vector3(x_px, y_px, 1 se davanti alla telecamera / 0 se dietro).
 ## Il terzo valore NON dice se il punto sta dentro lo schermo (come vis di worldToScreen nel web)
 func world_to_screen(x: float, y: float, h: float) -> Vector3:
 	var w := Vector3(flip * x, h, -flip * y)
+	# punto sul piano della telecamera: unproject_position darebbe errore (divisione per 0); conta come dietro
+	if absf((cam.global_transform.affine_inverse() * w).z) < PIANO_CAMERA_M:
+		return Vector3(0.0, 0.0, 0.0)
 	var p := cam.unproject_position(w)
 	return Vector3(p.x, p.y, 0.0 if cam.is_position_behind(w) else 1.0)
 
