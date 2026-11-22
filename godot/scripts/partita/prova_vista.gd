@@ -19,6 +19,8 @@
 #   --esci-dopo=SEC       esce dopo SEC secondi e stampa FPS medi e tempo del fotogramma
 #   --senza-vsync         niente limite agli FPS (per misurare quanto regge il PC)
 #   --seme=N              seme della partita (predefinito 7)
+#   --divisa=C,M          stile della divisa di tutte e due le squadre: colletto (0 girocollo, 1 a V, 2 polo), maglia
+#                         (0 aderente, 1 larga)
 #   --controlla           controlla le conversioni schermo/campo/porta della vista (anche con --me=1 e girata) ed esce
 #   --me=0|1              squadra umana (1 = campo capovolto, si attacca sempre "in su")
 #   --vicino=N            telecamera fissa vicina al giocatore m.players[N] (0 = portiere di casa)
@@ -75,8 +77,15 @@ func _ready() -> void:
 	add_child(_hud)
 	_hud.get_child(1).text = "Prova della vista: computer contro computer · scena " + _scena
 	var seme := int(_opz.get("seme", "7"))
-	m = SimMatch.new({"seed": seme, "halfLen": 600.0, "human": [false, false], "kickoff": 0,
-		"teams": [squadra("Rossi", 74.0, seme * 3 + 1), squadra("Blu", 72.0, seme * 3 + 2)]})
+	var squadre := [squadra("Rossi", 74.0, seme * 3 + 1), squadra("Blu", 72.0, seme * 3 + 2)]
+	if _opz.has("divisa"):   # --divisa=COLLETTO,MAGLIA (0 girocollo, 1 a V, 2 polo; 0 aderente, 1 larga)
+		var dv: PackedStringArray = str(_opz["divisa"]).split(",")
+		for k in 2:
+			var kit: Dictionary = (PartitaVista.KIT_CASA if k == 0 else PartitaVista.KIT_OSPITI).duplicate(true)
+			kit["style"] = {"fit": int(dv[1]) if dv.size() > 1 else 0, "sleeves": 0, "collar": int(dv[0]),
+				"pattern": 0, "shorts": 0, "socks": 0}
+			squadre[k]["kit"] = kit
+	m = SimMatch.new({"seed": seme, "halfLen": 600.0, "human": [false, false], "kickoff": 0, "teams": squadre})
 	vista.setup(m, int(_opz.get("me", "0")))
 	if _opz.has("qualita"):
 		vista.qualita_auto = false

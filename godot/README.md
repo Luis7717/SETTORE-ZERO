@@ -52,7 +52,8 @@ interfaccia dei menu, sfondo del menu e allenamento guidato, grafica.
 | `shaders/erba_comune.gdshaderinc` | parte comune dell'erba: taglio calcolato per pixel (9 tagli, bordi ammorbiditi), grana, fili con micro-ombre, meteo |
 | `shaders/erba_ciuffi.gdshader` | ciuffi in rilievo (4 strati) davanti alla telecamera bassa; sopra le righe i fili sono bianchi |
 | `shaders/righe.gdshader` | righe: si allargano da lontano per restare larghe almeno 1,5 pixel |
-| `shaders/divisa.gdshader` | colori della divisa per zone del corpo, come `src/athlete3d.js` |
+| `shaders/divisa.gdshader` | colori della divisa per zone del corpo, come `src/athlete3d.js`; colletti (girocollo, a V, polo rialzata) e maglia aderente / larga |
+| `scripts/partita/vestibilita.gd` | "valli" del corpo (CUSTOM2.x): la maglia larga le riempie, l'aderente le scurisce (muscoli). Prova: `prova_vista -- --divisa=COLLETTO,MAGLIA`; test `tests/test_divisa.gd` |
 | `scripts/partita/capelli.gd`, `viso.gd`, `shaders/capelli.gdshader` | capelli come il web (mesh sull'osso della testa), misure del viso per barbe, sopracciglia e occhi dipinti (vedi "Capelli e barbe") |
 | `assets/` | modelli, suoni, icona (licenze in `CREDITI.md`) |
 | `tools/` | strumenti di sviluppo (icona, ispezione dei modelli): non finiscono nell'app |

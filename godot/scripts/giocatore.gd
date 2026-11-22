@@ -9,6 +9,7 @@ const SHADER_DIVISA := preload("res://shaders/divisa.gdshader")
 const Capelli := preload("res://scripts/partita/capelli.gd")
 const Viso := preload("res://scripts/partita/viso.gd")
 const MASCHERE_VISO := preload("res://assets/textures/viso_maschere.png")
+const Vestibilita := preload("res://scripts/partita/vestibilita.gd")
 
 const RUN_REF := 4.2       # m/s: velocità a cui il clip di corsa gira a velocità 1 (come src/athlete3d.js)
 const SPRINT_REF := 8.0    # m/s: idem per lo scatto
@@ -159,7 +160,8 @@ static func _nomi_ossa(pelle: Skin, scheletro: Skeleton3D) -> PackedStringArray:
 
 # copia della mesh con, per ogni vertice, la posizione di riposo in CUSTOM0.xyz e la normale di riposo in CUSTOM1.xyz
 # (per lo shader della divisa); CUSTOM0.w = 1 se l'osso che lo muove di più è la testa, CUSTOM1.w = 1 se è il collo
-# (come le classi dei texel del web). Riempie anche _peso_testa.
+# (come le classi dei texel del web); CUSTOM2.x = profondità della valle (Vestibilita: maglia larga / aderente).
+# Riempie anche _peso_testa.
 static func _mesh_con_riposo(src: ArrayMesh, ossa: PackedStringArray) -> ArrayMesh:
 	var out := ArrayMesh.new()
 	for s in src.get_surface_count():
@@ -202,7 +204,8 @@ static func _mesh_con_riposo(src: ArrayMesh, ossa: PackedStringArray) -> ArrayMe
 			_peso_testa = pt
 		arrays[Mesh.ARRAY_CUSTOM0] = riposo
 		arrays[Mesh.ARRAY_CUSTOM1] = nr
-		var flags := (Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT) | (Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM1_SHIFT)
+		arrays[Mesh.ARRAY_CUSTOM2] = Vestibilita.valli(vertici, normali, arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX] != null else PackedInt32Array())
+		var flags := (Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT) | (Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM1_SHIFT) 			| (Mesh.ARRAY_CUSTOM_R_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM2_SHIFT)
 		if src.surface_get_format(s) & Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS:
 			flags |= Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS
 		out.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, [], {}, flags)

@@ -11,6 +11,13 @@
 //            w = maglia larga (1) o aderente (0)
 //   corsa  = 0..1 quanto corre (la maglia ondeggia)
 //   occhi_forma = forma degli occhi (0..5 come EYE_SHAPES di src/looks.js)
+// Colletto (2026-11-22; prima i tre erano quasi uguali: la V restava dentro il cilindro del collo e la polo era solo
+// una riga): girocollo = bordino tondo; a V = la pelle scende sul petto (V_FONDO) col bordino lungo i lati; polo =
+// colletto rialzato sul collo (anche spostando i vertici, si vede di profilo), due risvolti sul petto, abbottonatura
+// con due bottoni. Vestibilità: CUSTOM2.x = profondità della "valle" del corpo (scripts/partita/vestibilita.gd).
+// Larga = la stoffa riempie le valli invece di gonfiare il corpo in proporzione, si svasa verso l'orlo, che scende
+// sopra i pantaloncini (con l'ombra), maniche più lunghe e ampie, pieghe e stoffa opaca; aderente = niente stacco,
+// valli un filo più scure e stoffa più lucida: si vedono i muscoli.
 // Testa (dal 2026-11-21, seconda versione, come il web: src/athlete3d.js e src/body/testa.js): cos'è testa, collo o
 // busto lo dice l'osso che muove di più il vertice (CUSTOM0.w = 1 se è la testa, CUSTOM1.w = 1 se è il collo), non
 // l'altezza: prima la parte sotto il mento finiva nella maglia (fascia del colore del bordino sotto il mento). Il collo
@@ -82,6 +89,20 @@ const vec4 FACE_CROP = vec4(200.0, 150.0, 240.0, 260.0);
 const vec2 MASCHERE = vec2(960.0, 520.0);
 const float AA_MM = 0.35;
 const float PALPEBRA_MAX = 0.9;   // occhi: apertura massima sopra e sotto (frazioni della semialtezza della finestra)
+const float V_FONDO = 0.10;        // scollo a V: quanto scende sul petto sotto lo scollo tondo (m)
+const float V_MEZZA = 0.055;       // scollo a V: mezza larghezza in alto (m)
+const float POLO_ALTO = 0.04;      // polo: altezza del colletto rialzato dietro (davanti POLO_ALTO_DAVANTI) (m)
+const float POLO_ALTO_DAVANTI = 0.028;
+const float POLO_RIALZO = 0.011;   // polo: di quanto il colletto si stacca dal collo (m)
+const float POLO_LISTA = 0.013;    // polo: mezza larghezza dell'abbottonatura (m)
+const float POLO_LISTA_GIU = 0.11; // polo: lunghezza dell'abbottonatura sotto lo scollo (m)
+const float LARGA_ORLO = 0.06;     // maglia larga: l'orlo scende di tanto sopra i pantaloncini (m)
+const float LARGA_BASE = 0.006;    // maglia larga: stacco minimo dal corpo (m)
+const float LARGA_SVASO = 0.024;   // maglia larga: stacco in più all'orlo (m)
+const float LARGA_MANICA = 0.016;  // maglia larga: manica più ampia in fondo (m)
+const float LARGA_VALLE = 0.015;   // maglia larga: valle più profonda che si riempie (m)
+const float LARGA_PIEGHE = 0.13;   // maglia larga: quanto scuriscono le pieghe
+const float ADERENTE_MUSCOLI = 9.0; // maglia aderente: scurimento per metro di valle (al massimo 0,2)
 const float IRIDE_K = 1.3;        // occhi: iride più grande del web (la finestra misurata qui è più piccola)         // occhi: bordo morbido delle palpebre (mm)
 
 // tagli (HAIR di src/hair3d.js): attaccatura, 5 nodi [|az|, el] per taglio (per rasato e cresta: la nuca rasata)
@@ -117,6 +138,7 @@ const vec2 OCCHI_C[6] = vec2[6](vec2(0.92, 0.0), vec2(0.86, 0.0), vec2(0.86, 0.2
 varying vec3 riposo;
 varying vec3 normale_riposo;
 varying vec2 classe;   // x = testa, y = collo (osso che muove di più il vertice)
+varying float valle;   // profondità della valle del corpo (m, CUSTOM2.x)
 
 // smoothstep che va bene anche con a > b (come smooth del web)
 float sm(float a, float b, float x) {
@@ -128,18 +150,97 @@ float grana(vec3 p) {
 	return fract(sin(dot(floor(p * 1400.0), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
 }
 
+// fondo della maglia: la larga scende sopra i pantaloncini
+float maglia_fine(float larga) {
+	return anca_y + 0.035 - larga * LARGA_ORLO;
+}
+
+// fine della manica (x di riposo): la larga è più lunga
+float manica_fine(int maniche, float larga) {
+	if (maniche == 1) {
+		return polso_x - 0.015;
+	}
+	if (maniche == 0) {
+		return spalla_x + mix(0.55, 0.72, larga) * (gomito_x - spalla_x);
+	}
+	return spalla_x - 0.035 + larga * 0.01;
+}
+
+// altezza sopra lo scollo tondo (neckline di src/athlete3d.js): dietro più alto, davanti più basso
+float scollo_y(vec3 p, float zf) {
+	float ax = abs(p.x);
+	float base = collo_y - 0.012;
+	if (zf <= collo_z) {
+		return p.y - (base + 0.004 + 4.0 * ax * ax);
+	}
+	return p.y - (base - 0.028 + 5.0 * ax * ax);
+}
+
+// scollo: > 0 dentro lo scollo (pelle), vicino a 0 il bordino
+float scollo(int collar, vec3 p, float zf) {
+	float ax = abs(p.x);
+	float radiale = SCOLLO_R - length(vec2(p.x, (zf - collo_z) * 1.15));
+	float d = min(scollo_y(p, zf), radiale);
+	if (collar == 1 && zf > collo_z) {
+		// V sul petto (neckline di src/body/busto.js): la pelle scende al centro anche fuori dal cilindro del collo;
+		// distanza perpendicolare ai lati, così il bordino è largo uguale in tutta la V
+		float fronte = collo_y - 0.04 + 5.0 * ax * ax;
+		float vy = fronte - V_FONDO * max(0.0, 1.0 - ax / V_MEZZA);
+		float dv = (p.y - vy) * V_MEZZA / length(vec2(V_MEZZA, V_FONDO));
+		d = max(d, min(dv, (V_MEZZA - ax) * 0.8));
+	}
+	return d;
+}
+
+// polo: colletto rialzato (dietro più alto), aperto davanti sopra l'abbottonatura
+float polo_alto(float zf) {
+	return mix(POLO_ALTO, POLO_ALTO_DAVANTI, sm(collo_z - 0.02, collo_z + 0.04, zf));
+}
+
+bool polo_aperto(float ax, float yb, float zf) {
+	return zf > collo_z + 0.015 && ax < 0.011 + max(yb, 0.0) * 0.5;
+}
+
+// quanto il punto è colletto rialzato della polo (0..1); m = margine (più largo per spostare i vertici)
+float polo_colletto(vec3 p, float zf, float m) {
+	float yb = scollo_y(p, zf);
+	if (polo_aperto(abs(p.x), yb, zf)) {
+		return 0.0;
+	}
+	float h = polo_alto(zf);
+	return sm(-0.003 - m, 0.001, yb) * sm(h + 0.002 + m, h - 0.002, yb);
+}
+
 void vertex() {
 	riposo = CUSTOM0.xyz;
 	normale_riposo = CUSTOM1.xyz;
 	classe = vec2(CUSTOM0.w, CUSTOM1.w);
+	valle = CUSTOM2.x;
 	vec3 p = riposo;
-	float maglia_bassa = anca_y + 0.035;
-	float ax = abs(p.x);
-	if (p.y > maglia_bassa - 0.03 && p.y < collo_y && ax < spalla_x + 0.06) {
-		// maglia: larga = un filo più gonfia; mentre corre ondeggia, di più verso l'orlo
-		float orlo = 1.0 - smoothstep(maglia_bassa, collo_y - 0.12, p.y);
-		float onda = sin(TIME * 13.0 + p.y * 38.0 + p.x * 21.0) * 0.5 + sin(TIME * 21.0 - p.y * 55.0) * 0.25;
-		VERTEX += NORMAL * (numero.w * 0.007 * (0.4 + orlo) + corsa * 0.006 * onda * (0.25 + orlo));
+	if (classe.x < 0.5) {   // la testa (e il mento) non si sposta mai
+		float larga = clamp(numero.w, 0.0, 1.0);
+		float ax = abs(p.x);
+		float zf = dot(p.xz, davanti);
+		float fine = maglia_fine(larga);
+		float mf = manica_fine(int(stile.x + 0.5), larga);
+		bool braccio = ax > spalla_x - 0.02;
+		float off = 0.0;
+		if (classe.y < 0.5 && p.y > fine - 0.03 && p.y < collo_y && ax < mf + 0.02) {
+			// maglia: larga = stacco che riempie le valli e si svasa verso l'orlo e in fondo alle maniche (lo scollo
+			// resta aderente); mentre corre ondeggia, di più verso l'orlo e se è larga
+			float orlo = 1.0 - smoothstep(fine, petto_y - 0.05, p.y);
+			float dentro = sm(fine - 0.025, fine + 0.01, p.y) * (braccio ? sm(mf + 0.02, mf - 0.03, ax) : 1.0);
+			float collo = sm(-0.005, -0.05, scollo_y(p, zf));
+			float svaso = braccio ? sm(spalla_x, mf, ax) : 0.0;
+			float riempi = braccio ? 0.0 : min(valle, LARGA_VALLE) * (1.0 - sm(spalla_x - 0.05, spalla_x - 0.01, ax));
+			float onda = sin(TIME * 13.0 + p.y * 38.0 + p.x * 21.0) * 0.5 + sin(TIME * 21.0 - p.y * 55.0) * 0.25;
+			off = dentro * collo * (larga * (LARGA_BASE + riempi + LARGA_SVASO * orlo * orlo + LARGA_MANICA * svaso)
+				+ corsa * 0.006 * onda * (0.25 + orlo) * (1.0 + larga));
+		}
+		if (int(stile.y + 0.5) == 2) {
+			off += POLO_RIALZO * polo_colletto(p, zf, 0.01);   // polo: il colletto si stacca dal collo
+		}
+		VERTEX += NORMAL * off;
 	}
 }
 
@@ -168,21 +269,45 @@ float motivo(int m, vec3 p, float zf, bool braccio) {
 	return 0.0;
 }
 
-// scollo (neckline di src/athlete3d.js): > 0 dentro lo scollo (pelle), vicino a 0 il bordino
-float scollo(int collar, vec3 p, float zf) {
+// distanza (con segno, > 0 dentro) del punto q dal lato a-b del triangolo abc
+float lato(vec2 q, vec2 a, vec2 b, vec2 c) {
+	vec2 e = b - a;
+	float d = (e.x * (q.y - a.y) - e.y * (q.x - a.x)) / length(e);
+	return e.x * (c.y - a.y) - e.y * (c.x - a.x) > 0.0 ? d : -d;
+}
+
+float triangolo(vec2 q, vec2 a, vec2 b, vec2 c) {
+	return min(min(lato(q, a, b, c), lato(q, b, c, a)), lato(q, c, a, b));
+}
+
+// polo: colletto rialzato con la piega in alto, abbottonatura con due bottoni, risvolti sul petto con l'ombra sotto.
+// rgb = colore, a = copertura
+vec4 polo(vec3 p, float zf) {
 	float ax = abs(p.x);
-	float base = collo_y - 0.012;
-	float radiale = SCOLLO_R - length(vec2(p.x, (zf - collo_z) * 1.15));
-	float y;
-	if (zf <= collo_z) {
-		y = p.y - (base + 0.004 + 4.0 * ax * ax);
-	} else if (collar == 1) {
-		float vy = base - 0.075 + min(1.0, ax / 0.05) * 0.06;
-		y = p.y - max(vy, base - 0.02 + 3.0 * ax * ax - (ax < 0.05 ? 1.0 : 0.0));
-	} else {
-		y = p.y - (base - 0.028 + 5.0 * ax * ax);
+	float yb = scollo_y(p, zf);
+	vec3 col = bordino.rgb;
+	float a = polo_colletto(p, zf, 0.0);
+	if (a > 0.0 && yb > polo_alto(zf) - 0.005) {
+		col *= 0.72;
 	}
-	return min(y, radiale);
+	if (zf > collo_z + 0.015 && yb < 0.004) {
+		if (ax < POLO_LISTA && yb > -POLO_LISTA_GIU) {
+			a = 1.0;
+			col = bordino.rgb * (ax > POLO_LISTA - 0.0025 || yb < 0.0025 - POLO_LISTA_GIU ? 0.7 : 1.0);
+			if (length(vec2(p.x, yb + 0.035)) < 0.0045 || length(vec2(p.x, yb + 0.075)) < 0.0045) {
+				col = maglia.rgb * 0.6;   // bottoni
+			}
+		}
+		float t = triangolo(vec2(ax, yb), vec2(0.009, 0.004), vec2(0.07, 0.004), vec2(0.03, -0.055));
+		if (t > 0.0) {
+			a = 1.0;
+			col = bordino.rgb * (t < 0.0025 ? 0.7 : 1.0);
+		} else if (t > -0.007 && a < 0.5) {
+			col = vec3(0.0);                      // ombra del risvolto sulla maglia
+			a = 0.35 * (1.0 + t / 0.007);
+		}
+	}
+	return vec4(col, a);
 }
 
 // collo: quanto è pelle (1) o maglia (0) (neckSkin di src/body/testa.js): il cilindro che taglia lo scollo sulle
@@ -193,37 +318,61 @@ float collo_pelle(int collar, vec3 p, float zf) {
 }
 
 // busto e maniche (pittura della maglia di src/athlete3d.js)
-vec3 busto(vec3 p, float zf, inout float ruvido) {
+// pixel = grandezza di un pixel (m): le pieghe della maglia larga spariscono da lontano (niente sfarfallio);
+// vl = profondità della valle (varying valle)
+vec3 busto(vec3 p, float zf, float pixel, float vl, inout float ruvido) {
 	float ax = abs(p.x);
 	int maniche = int(stile.x + 0.5);
 	int colletto = int(stile.y + 0.5);
 	int disegno = int(stile.z + 0.5);
-	float maglia_bassa = anca_y + 0.035;
-	float manica_fine = maniche == 1 ? polso_x - 0.015 : (maniche == 0 ? spalla_x + 0.55 * (gomito_x - spalla_x) : spalla_x - 0.035);
-	if (ax > manica_fine) {
+	float larga = clamp(numero.w, 0.0, 1.0);
+	float fine = maglia_fine(larga);
+	float mf = manica_fine(maniche, larga);
+	if (ax > mf) {
 		return pelle.rgb;                       // avambracci e mani
 	}
 	vec3 c = maglia.rgb;
-	ruvido = 0.82;
 	bool braccio = ax > spalla_x - 0.02;
 	c = mix(c, bordino.rgb, motivo(disegno, p, zf, braccio));
-	if (p.y < maglia_bassa + 0.012) {
+	if (larga > 0.5) {
+		// larga: stoffa opaca con pieghe morbide, più fitte verso l'orlo; sopra l'orlo si arriccia un poco
+		ruvido = 0.9;
+		float piega;
+		if (braccio) {
+			piega = sin(atan(p.y - petto_y - 0.04, zf) * 5.0 + ax * 45.0) * sm(spalla_x, mf, ax);
+		} else {
+			float giro = atan(p.x, zf + 0.03);
+			piega = sin(giro * 8.0 + sin(p.y * 21.0 + giro * 2.0) * 1.2) * (0.35 + 0.65 * (1.0 - sm(fine, petto_y, p.y)));
+			piega += 0.5 * sin(p.y * 150.0 + giro * 3.0) * sm(fine + 0.1, fine + 0.03, p.y) * sm(fine, fine + 0.015, p.y);
+		}
+		piega *= 1.0 - smoothstep(0.004, 0.012, pixel);
+		c *= 1.0 - LARGA_PIEGHE * max(piega, 0.0) + 0.04 * max(-piega, 0.0);
+	} else {
+		// aderente: stoffa tecnica più lucida, le valli tra i muscoli un filo più scure
+		ruvido = 0.55;
+		if (!braccio) {
+			c *= 1.0 - min(vl * ADERENTE_MUSCOLI, 0.2);
+		}
+	}
+	if (p.y < fine + 0.012 + 0.006 * larga) {
 		c *= 0.82;   // orlo
 	}
-	if (braccio && ax > manica_fine - BORDO) {
+	if (braccio && ax > mf - BORDO) {
 		c = bordino.rgb;
 	}
 	if (!braccio) {
 		float nl = scollo(colletto, p, zf);
-		if (nl > -0.012) {
+		if (nl > (colletto == 0 ? -0.015 : -0.012)) {
 			c = bordino.rgb;
 		}
 		if (nl > 0.0) {
 			c = pelle.rgb;
 			ruvido = 0.62;
 		}
-		if (colletto == 2 && zf > 0.0 && ax < 0.008 && p.y > collo_y - 0.13 && p.y < collo_y - 0.05) {
-			c = bordino.rgb;
+		if (colletto == 2) {
+			vec4 pc = polo(p, zf);
+			c = mix(c, pc.rgb, pc.a);
+			ruvido = mix(ruvido, 0.82, pc.a);
 		}
 		// cognome e numero sulla schiena (letti da dietro: il lato sinistro del giocatore è a sinistra)
 		if (numero.z > 0.5 && zf < collo_z - 0.03) {
@@ -433,7 +582,9 @@ void fragment() {
 	int colletto = int(stile.y + 0.5);
 	int calze = int(stile.w + 0.5);
 	float gamba = anca_y - caviglia_y;
-	float maglia_bassa = anca_y + 0.035;
+	float larga = clamp(numero.w, 0.0, 1.0);
+	float maglia_bassa = maglia_fine(larga);
+	float pixel = length(fwidth(p));
 	float pantaloncini_fine = anca_y - (stile2.w > 0.5 ? 0.5 : 0.36) * gamba;
 	float calzettoni_alto = anca_y - (calze == 1 ? 0.84 : (calze == 2 ? 0.66 : 0.58)) * gamba;
 	float scarpa_alto = caviglia_y + 0.035;
@@ -451,18 +602,24 @@ void fragment() {
 		c = v * v;
 	} else if (classe.y > 0.5) {
 		// collo: vicino allo scollo si dipinge come il busto, poi pelle fin sotto il mento
-		vec3 b = scollo(colletto, p, zf) < AA ? busto(p, zf, ruvido) : pelle.rgb;
+		vec3 b = scollo(colletto, p, zf) < AA ? busto(p, zf, pixel, valle, ruvido) : pelle.rgb;
 		float a = collo_pelle(colletto, p, zf);
 		c = mix(b, pelle.rgb, a);
 		ruvido = mix(ruvido, 0.62, a);
+		if (colletto == 2) {
+			vec4 pc = polo(p, zf);   // il colletto rialzato sale sul collo
+			c = mix(c, pc.rgb, pc.a);
+			ruvido = mix(ruvido, 0.82, pc.a);
+		}
 	} else if (p.y > maglia_bassa) {
-		c = busto(p, zf, ruvido);
+		c = busto(p, zf, pixel, valle, ruvido);
 	} else if (p.y > pantaloncini_fine) {
 		c = calzoncini.rgb;
 		ruvido = 0.82;
 		if (p.y < pantaloncini_fine + 0.012) {
 			c *= 0.8;
 		}
+		c *= 1.0 - 0.35 * larga * sm(maglia_bassa - 0.035, maglia_bassa, p.y);   // ombra della maglia larga
 	} else if (p.y > calzettoni_alto) {
 		c = pelle.rgb;                           // ginocchia
 	} else if (p.y > scarpa_alto) {

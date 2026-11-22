@@ -6,7 +6,8 @@
 #                             campione "Bot Campione"). Stampa anche derby, crescita del campione, infortuni e
 #                             obiettivo della dirigenza.
 #   --app-schermate=CARTELLA  schermate 390×844 del giro menu → impostazioni → editor (taglio afro e chignon,
-#                             quattro volti con barba e occhi diversi, esultanza del campione) →
+#                             quattro volti con barba e occhi diversi, divisa coi 3 colletti aderente e larga,
+#                             esultanza del campione) →
 #                             partita → fine partita → dopo partita → statistiche (numeri, mappa dei tiri,
 #                             pagella) → menu → classifica → rosa (con un infortunato
 #                             e un giocatore stanco) → fine stagione (con l'obiettivo della dirigenza)
@@ -274,6 +275,18 @@ func _giro_impostazioni_editor(dir: String) -> void:
 		ed2.mostra(false)
 		await _attendi(1.2)
 		await _scatto(dir, "editor_volto_%d" % (k + 1))
+	# scheda Divisa: i tre colletti con la maglia aderente e larga (lo stile provato non si salva)
+	for collar in 3:
+		for fit in 2:
+			_app.vai("editor", {"flow": "kit"})
+			var ed3: Node = get_tree().current_scene
+			ed3.d.style = ed3.d.style.duplicate()
+			ed3.d.style.collar = collar
+			ed3.d.style.fit = fit
+			ed3.d.style.pattern = 0
+			ed3.mostra(false)
+			await _attendi(1.2)
+			await _scatto(dir, "editor_divisa_%s_%s" % [["girocollo", "v", "polo"][collar], ["aderente", "larga"][fit]])
 	# scheda Esultanza del campione: il modellino la fa (a metà, a 1,8 s)
 	var ch: Variant = _app.carriera.campione()
 	if ch is Dictionary:
