@@ -36,6 +36,10 @@ Tutti da Freesound, **CC0 1.0**, ritagliati per il web (dettagli e tempi in `ass
 | audio/kick.mp3 | https://freesound.org/people/bittermelonheart/sounds/555042/ | bittermelonheart |
 | audio/music.mp3 | https://freesound.org/people/neko_4444/sounds/739064/ | neko_4444 |
 
+`audio/cori.wav` (2026-11-22): coro dello stadio **sintetizzato da noi** (`tools/cori_sintesi.gd`, rifatto con
+`tools/genera_cori.gd`): melodia originale, voci a dente di sega col filtro della vocale "o", battimani di rumore,
+riverbero. Nessuna registrazione esterna: è del progetto, CC0 come il resto.
+
 ## Icona
 
 `icons/icon_1024.png`: l'icona dell'app web (`App/AppIcon60x60@3x.png`, 180×180, disegno originale del progetto)

@@ -92,6 +92,8 @@ interfaccia dei menu, sfondo del menu e allenamento guidato, grafica.
 | `shaders/rete.gdshader`, `bandierina.gdshader` | rete a molle (legge `scripts/rete_molle.gd`), bandierine col vento a raffiche |
 | `scripts/rete_molle.gd` | rete di una porta con una molla per nodo (logica pura, `tests/test_rete.gd`) |
 | `scripts/stadio/pubblico.gd`, `shaders/pubblico.gdshader` | pubblico 3D: migliaia di tifosi in MultiMesh, colori delle squadre, animati nello shader |
+| `scripts/stadio/bandiere.gd`, `shaders/bandiere.gdshader` | 62 bandiere dei tifosi coi colori delle squadre (un MultiMesh, sventolano nel vertex shader); `--senza-bandiere` le toglie |
+| `tools/cori_sintesi.gd`, `tools/genera_cori.gd` | coro dello stadio sintetizzato → `assets/audio/cori.wav` (sottofondo della partita in `audio_partita.gd`) |
 | `scripts/stadio/cartelloni.gd`, `shaders/led.gdshader` | cartelloni a led con sponsor inventati che scorrono (`src/stadium-ads.js`) |
 | `scripts/stadio/maxischermo.gd` | maxischermi col risultato e "GOOOL!" (`src/stadium-screen.js`) |
 | `scripts/partita/effetti.gd` | scia del pallone, sbuffi d'erba, coriandoli |
@@ -351,6 +353,17 @@ cambia schermata. "Esci" dalla pausa: in
 campionato sconfitta 0-3 a tavolino (come il web), in amichevole si torna al menu senza conseguenze. Senza `avvia`
 la partita parte da sola con le squadre di prova (opzioni da riga di comando come prima).
 La vista colora pelle e capelli dal `look` della carriera (indici di `Aspetto`) con `Aspetto.colori`.
+
+### Tribune, bandiere e cori (2026-11-22)
+
+- **Niente filtro anisotropico** in materiali e shader: sull'iPhone (Metal) quei materiali non si disegnano (pallone,
+  gradinate, erba, led, rete). `tests/test_tribune.gd` controlla tutti gli script e gli shader.
+- Gradinate: texture RGBA8 con filtro lineare + **rampa di riserva** a tinta unita 6 cm sotto (`TribunaRiserva`).
+- **Bandiere**: tante in curva, un gruppo nel settore ospiti, qualcuna sui lati; più foga quando il pubblico si alza.
+  Seguono densità del pubblico (qualità) e luce del meteo.
+- **Cori**: secondo sottofondo in loop (`cori.wav`, 8,6 s, 378 KB): piano in gioco, più forte vicino alle porte, nei
+  cori del pubblico, dopo parate e pali (`occasione()`), forte per 8 s dopo un gol. Bus principale: muto con l'audio
+  spento. Volumi: costanti `CORI_*` in cima a `audio_partita.gd`.
 
 ### Capelli e barbe (2026-11-21, come il web)
 

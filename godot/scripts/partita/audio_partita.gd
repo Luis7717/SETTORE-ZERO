@@ -3,6 +3,9 @@
 # Pubblico di sottofondo in loop, più forte quando il pallone si avvicina a una porta e subito dopo un gol.
 # Ogni tanto un coro (il pubblico sale per qualche secondo); nel derby (`derby = true`, partita contro la rivale in
 # carriera) il pubblico è più forte e i cori sono più frequenti e più alti.
+# Cori cantati (2026-11-22, `cori.wav`, sintetizzato da tools/genera_cori.gd): un secondo sottofondo in loop, piano
+# durante il gioco, più forte vicino alle porte, durante i cori, dopo un'occasione (parata, palo) e dopo un gol.
+# Va sul bus principale come gli altri suoni: con l'audio spento nelle impostazioni è muto anche lui.
 extends Node
 
 const CARTELLA := "res://assets/audio/"
@@ -20,6 +23,14 @@ const CORO_DERBY := 0.14         # ... nel derby
 const CORO_DURATA := 3.5         # s
 const CORO_OGNI := Vector2(28.0, 45.0)        # s tra un coro e l'altro (a caso nell'intervallo)
 const CORO_OGNI_DERBY := Vector2(9.0, 15.0)
+const CORI_BASE := 0.05          # cori durante il gioco (il file è già al massimo: niente guadagno)
+const CORI_PORTA := 0.08         # in più col pallone vicino a una porta
+const CORI_CORO := 3.0           # i cori seguono il "coro" del pubblico: × il suo livello in più
+const CORI_OCCASIONE := 0.2      # dopo una parata o un palo ...
+const CORI_OCCASIONE_DURA := 3.0 # ... per tanti secondi (scende piano)
+const CORI_GOL := 0.4            # dopo un gol tutto lo stadio canta ...
+const CORI_GOL_DURA := 8.0       # ... per tanti secondi
+const CORI_TAU := 0.8            # s: i cori salgono e scendono piano
 const VOCI := 6                  # suoni brevi che possono suonare insieme
 const DB_MAX := 12.0
 
@@ -34,6 +45,11 @@ var _gol_t := -10.0              # tempo dal gol: > 0 = folla tenuta alta, 0..�
 var _coro_t := 0.0               # tempo che resta del coro in corso
 var _prossimo_coro := 12.0       # s al prossimo coro
 var _rng := RandomNumberGenerator.new()  # solo per i cori (suoni, non il motore)
+var _cori: AudioStreamPlayer
+var _cori_liv := 0.0
+var _eccitazione := 0.0
+var _occasione_t := 0.0          # s che restano dello slancio dopo un'occasione
+var _cori_gol_t := 0.0           # s che restano dei cori dopo un gol
 
 
 func _ready() -> void:
@@ -45,6 +61,8 @@ func _ready() -> void:
 		var percorso := CARTELLA + id + ".mp3"
 		if ResourceLoader.exists(percorso):
 			_flussi[id] = load(percorso)
+	if ResourceLoader.exists(CARTELLA + "cori.wav"):
+		_flussi["cori"] = load(CARTELLA + "cori.wav")
 	_flussi["post"] = _tono_palo()
 	for i in VOCI:
 		var v := AudioStreamPlayer.new()
@@ -60,16 +78,36 @@ func _ready() -> void:
 		_folla.volume_db = -80.0
 		if acceso:
 			_folla.play()
+	_cori = AudioStreamPlayer.new()
+	add_child(_cori)
+	if _flussi.has("cori"):
+		var c: AudioStream = (_flussi["cori"] as AudioStream).duplicate()
+		if c is AudioStreamWAV:   # si ripete anche se l'importazione perdesse il loop
+			var w := c as AudioStreamWAV
+			w.loop_mode = AudioStreamWAV.LOOP_FORWARD
+			w.loop_begin = 0
+			w.loop_end = int(round(w.get_length() * w.mix_rate)) - 1
+		_cori.stream = c
+		_cori.volume_db = -80.0
+		if acceso:
+			_cori.play()
 
 
 func _process(delta: float) -> void:
 	if _gol_t > -10.0:
 		_gol_t -= delta
 	var tau := FOLLA_TAU_GOL if _gol_t > -3.0 and _gol_t <= 0.0 else FOLLA_TAU
-	var meta := FOLLA_GOL if _gol_t > 0.0 else _folla_meta + _coro(delta)
+	var coro := _coro(delta)
+	var meta := FOLLA_GOL if _gol_t > 0.0 else _folla_meta + coro
 	_folla_liv += (meta - _folla_liv) * (1.0 - exp(-delta / tau))
 	if _folla.stream != null:
 		_folla.volume_db = _db(_folla_liv * CROWD_SAMPLE_GAIN if acceso else 0.0)
+	_occasione_t = maxf(0.0, _occasione_t - delta)
+	_cori_gol_t = maxf(0.0, _cori_gol_t - delta)
+	var cori_meta := livello_cori(_folla_meta, _eccitazione, coro, _occasione_t, _cori_gol_t, derby)
+	_cori_liv += (cori_meta - _cori_liv) * (1.0 - exp(-delta / CORI_TAU))
+	if _cori.stream != null:
+		_cori.volume_db = _db(_cori_liv if acceso else 0.0)
 
 
 # a fine scena (o all'uscita) si fermano tutti i suoni: un suono che sta ancora suonando resterebbe in memoria
@@ -84,10 +122,14 @@ func ferma() -> void:
 	if _folla != null:
 		_folla.stop()
 		_folla.stream = null
+	if _cori != null:
+		_cori.stop()
+		_cori.stream = null
 
 
 ## livello del pubblico (0 = zitto); eccitazione 0..1 = pallone vicino a una porta
 func folla(livello: float, eccitazione: float = 0.0) -> void:
+	_eccitazione = clampf(eccitazione, 0.0, 1.0)
 	_folla_meta = 0.0 if livello <= 0.0 else (livello + FOLLA_PORTA * clampf(eccitazione, 0.0, 1.0)) * (DERBY_FOLLA if derby else 1.0)
 
 
@@ -105,6 +147,26 @@ func _coro(delta: float) -> float:
 		return 0.0
 	_coro_t -= delta
 	return (CORO_DERBY if derby else CORO) * sin(PI * clampf(1.0 - _coro_t / CORO_DURATA, 0.0, 1.0))
+
+
+## livello dei cori (lineare, 0 = zitti). folla_meta = livello del pubblico (0 = partita ferma: zitti anche i cori),
+## eccitazione 0..1 (pallone vicino a una porta), coro = livello in più del coro del pubblico, occasione_t / gol_t =
+## secondi che restano dello slancio dopo un'occasione o un gol
+static func livello_cori(folla_meta: float, eccitazione: float, coro: float, occasione_t: float, gol_t: float, derby_on: bool) -> float:
+	if folla_meta <= 0.0:
+		return 0.0
+	var v := CORI_BASE + CORI_PORTA * clampf(eccitazione, 0.0, 1.0) + CORI_CORO * maxf(0.0, coro)
+	v += CORI_OCCASIONE * clampf(occasione_t / CORI_OCCASIONE_DURA, 0.0, 1.0)
+	if derby_on:
+		v *= DERBY_FOLLA
+	if gol_t > 0.0:
+		v = maxf(v, CORI_GOL * clampf(gol_t / 2.0, 0.0, 1.0))
+	return v
+
+
+## un'occasione (parata, palo): i cori salgono per qualche secondo
+func occasione() -> void:
+	_occasione_t = CORI_OCCASIONE_DURA
 
 
 ## eccitazione del pubblico come lo stadio del web: dagli ultimi 25 m prima di una porta fino alla linea
@@ -134,16 +196,19 @@ func whistle(lungo: bool = false) -> void:
 
 func post() -> void:
 	play("post", 0.8)
+	occasione()
 
 
 func goal() -> void:
 	play("goal", 1.0)
 	_folla_liv = FOLLA_GOL
 	_gol_t = FOLLA_GOL_TIENI
+	_cori_gol_t = CORI_GOL_DURA
 
 
 func ooh() -> void:
 	play("ooh", 0.9)
+	occasione()
 
 
 func _voce_libera() -> AudioStreamPlayer:

@@ -32,12 +32,14 @@ const SCHERMO_LARGO := 15.0      # maxischermo (m)
 const PUBBLICO := [Color("#c8102e"), Color("#c8102e"), Color("#f2f2f2"), Color("#1746a2"), Color("#1746a2"),
 	Color("#2b2b2b"), Color("#555b66"), Color("#d9c7a0"), Color("#8a5a2b"), Color("#eab308")]
 const SEDILE := Color("#2c3e63")
+const SOTTO_RAMPA := 0.06        # rampa di riserva a tinta unita, così tanto sotto quella dipinta (m)
 
 var _rng := RandomNumberGenerator.new()
 var _rip_pubblico := Vector2.ONE   # metri coperti da una ripetizione della texture del pubblico (u, v)
 var _mat_dipinto: StandardMaterial3D   # tribuna col pubblico dipinto (senza pubblico 3D)
 var _mat_sedili: StandardMaterial3D    # tribuna coi soli seggiolini (sotto il pubblico 3D)
 var _mat_lampade: StandardMaterial3D
+var _mat_riserva: StandardMaterial3D   # rampa di riserva (tinta dei seggiolini, senza texture)
 var _rampe: Array[MeshInstance3D] = []
 var _tribune: Array = []               # per il pubblico 3D: {a0, b0, a1, b1, tipo, tetto}
 var pubblico: Node3D
@@ -138,7 +140,9 @@ func _materiale_pubblico(solo_sedili: bool) -> StandardMaterial3D:
 	var posti := 64
 	var file := 16
 	var pp := 4                       # pixel per posto (larghezza) e per fila (altezza)
-	var img := Image.create(posti * pp, file * pp, false, Image.FORMAT_RGB8)
+	# RGBA8 e filtro senza anisotropico (2026-11-22): sull'iPhone la tribuna con RGB8 + anisotropico non si
+	# disegnava (si vedevano i tifosi 3D sospesi davanti al terreno e al muro di fondo, vedi DECISIONI.md)
+	var img := Image.create(posti * pp, file * pp, false, Image.FORMAT_RGBA8)
 	img.fill(Color("#1f2633"))
 	var pelle := [Color("#f1c9a5"), Color("#d9a47a"), Color("#a9744f"), Color("#6b4630")]
 	for f in file:
@@ -156,7 +160,7 @@ func _materiale_pubblico(solo_sedili: bool) -> StandardMaterial3D:
 	img.generate_mipmaps()
 	var m := StandardMaterial3D.new()
 	m.albedo_texture = ImageTexture.create_from_image(img)
-	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	m.roughness = 1.0
 	m.cull_mode = BaseMaterial3D.CULL_DISABLED
 	# UV in "ripetizioni": u lungo la tribuna, v lungo la pendenza (vedi _rampa)
@@ -184,6 +188,28 @@ func _rampa(nome: String, a0: Vector3, b0: Vector3, a1: Vector3, b1: Vector3, ma
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(mi)
 	_rampe.append(mi)
+	_rampa_riserva(a0, b0, a1, b1)
+
+
+# rampa di riserva poco sotto quella dipinta, a tinta unita e senza texture (come i muri, che sull'iPhone si vedono
+# sempre): se la rampa con la texture non venisse disegnata, i tifosi restano su una gradinata scura e non sul prato.
+# Coperta da quella dipinta, sull'iPhone (GPU che scarta le superfici nascoste) non costa quasi niente.
+func _rampa_riserva(a0: Vector3, b0: Vector3, a1: Vector3, b1: Vector3) -> void:
+	if _mat_riserva == null:
+		_mat_riserva = _materiale_semplice(SEDILE.darkened(0.35))
+	var giu := Vector3(0.0, -SOTTO_RAMPA, 0.0)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var pts := [a0 + giu, b0 + giu, b1 + giu, a1 + giu]
+	for i: int in [0, 1, 2, 0, 2, 3]:
+		st.add_vertex(pts[i])
+	st.generate_normals()
+	var mi := MeshInstance3D.new()
+	mi.name = "TribunaRiserva"
+	mi.mesh = st.commit()
+	mi.material_override = _mat_riserva
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
 
 
 # parete verticale (muretto, retro) tra i punti a e b (Godot, a terra) alta h
