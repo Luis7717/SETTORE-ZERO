@@ -646,7 +646,7 @@ func _aggiorna_segni() -> void:
 		_marker.visible = false
 		return
 	var s := flip
-	_ring.visible = true
+	_ring.visible = not m.headFor(me) # nel fermatempo del colpo di testa c'è già il cerchio che si svuota
 	_ring.position = Vector3(s * c.x, 0.04, -s * c.y)
 	var k := RING_K + sin(t * 6.0) * 0.12
 	_ring.scale = Vector3(k, 1.0, k)
