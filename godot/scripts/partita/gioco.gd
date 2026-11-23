@@ -82,6 +82,7 @@ const DUEL_SLOW := 0.08       # duello col difensore
 const FLEE_SLOW := 0.08       # fuga: avversario alla pari o alle spalle, tasto Scatto
 const ZONE_SLOW := 0.1        # area di tiro (ultimi 20 m prima della porta avversaria)
 const SCENA_VELOCE := 3.0     # scena della ripresa (sim/riprese.gd) dopo un tocco: va tanto più veloce
+const SCENA_FONDO := 2.0      # rinvio e angolo (anche col raccattapalle) vanno da soli tanto più veloci: metà del tempo (Luis 2026-11-23)
 const TEMPO_K := 14.0         # 1/s: il tempo passa dolcemente da una velocità all'altra
 const DT_MAX := 0.05          # fotogramma più lungo considerato (s)
 const PASSO_MAX := 1.0 / 60.0 # passo del motore: il tempo del fotogramma si divide in passi non più lunghi di così
@@ -389,11 +390,10 @@ func _passi_motore(dt: float) -> void:
 	else:
 		ts += (target - ts) * minf(1.0, dt * TEMPO_K)
 	var sdt := dt * ts * _velocita
-	if _scena_veloce:
-		if in_scena():
-			sdt *= SCENA_VELOCE
-		else:
-			_scena_veloce = false
+	if in_scena():
+		sdt *= velocita_scena(m.restart.type, _scena_veloce)
+	else:
+		_scena_veloce = false
 	var n := maxi(1, ceili(sdt / PASSO_MAX)) if sdt > 0.0 else 0 # tempo fermo (colpo di testa): nessun passo
 	if allenamento != null:
 		allenamento.before()
@@ -411,6 +411,12 @@ func _passi_motore(dt: float) -> void:
 		prove.after(sdt)
 	hud.rallenty(ts < RALLENTY_SOTTO)
 	audio.folla(FOLLA_BASE, AudioPartita.eccitazione(m.ball.y))
+
+
+## quanto va veloce la scena della ripresa: rinvio e angolo da soli a SCENA_FONDO, dopo un tocco a SCENA_VELOCE
+static func velocita_scena(tipo: String, toccata: bool) -> float:
+	var v := SCENA_FONDO if tipo == "goalkick" or tipo == "corner" else 1.0
+	return maxf(v, SCENA_VELOCE) if toccata else v
 
 
 ## scena della ripresa in corso (sim/riprese.gd): il battitore va a prendere il pallone, la rincorsa del calcio

@@ -287,3 +287,15 @@ func test_scena_ripetibile() -> bool:
 			uguali = false
 	check(uguali and a.ball.x == b.ball.x and a.ball.y == b.ball.y, "stesso seme, stessa scena (anche i raccattapalle)")
 	return done()
+
+
+# Luis 2026-11-23: rinvio e angolo (anche col raccattapalle) durano la metà: vanno da soli al doppio della velocità;
+# la rimessa resta normale; un tocco porta comunque a ×3
+func test_rinvio_e_angolo_a_meta_tempo() -> bool:
+	var G = load("res://scripts/partita/gioco.gd")
+	eq(G.velocita_scena("goalkick", false), 2.0, "rinvio: doppia velocità")
+	eq(G.velocita_scena("corner", false), 2.0, "angolo: doppia velocità")
+	eq(G.velocita_scena("throw", false), 1.0, "rimessa: velocità normale")
+	eq(G.velocita_scena("corner", true), 3.0, "dopo un tocco: ×3")
+	eq(G.velocita_scena("throw", true), 3.0, "rimessa dopo un tocco: ×3")
+	return done()

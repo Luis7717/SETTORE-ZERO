@@ -158,8 +158,8 @@
   rimessa la va sempre a prendere il battitore. Rinvio e angolo: appoggia il pallone, fa
   2 m indietro un po' di lato e al calcio prende la rincorsa. Gli altri vanno di corsa ai loro posti; la telecamera segue
   il pallone (l'angolo entra piano nella sua visuale). Durante la scena (`restart.scena`) non si batte; un tocco la fa
-  andare ×3 (`SCENA_VELOCE` in `gioco.gd`, vale anche per il raccattapalle). Durata tipica 2,5-4 s, 4-7 s col
-  raccattapalle (fino a ~8 s col pallone fermo lontano di lato). Prove:
+  andare ×3 (`SCENA_VELOCE` in `gioco.gd`, vale anche per il raccattapalle). Rinvio e angolo vanno da soli al doppio della velocità
+  (`SCENA_FONDO`, Luis 2026-11-23: metà del tempo): rimessa ~2,7 s, rinvio ~2,5 s, angolo e raccattapalle 2-4 s. Prove:
   `--scena=fuori_lato|fuori_fondo|fuori_fondo_vicino|fuori_rete|fuori_angolo`, sequenze con `--schermata=... --ogni=0.5 --dopo=6`.
 - Portiere: sul tiro la visuale va dietro la propria porta e il tempo rallenta; linea dal portiere al punto della porta,
   il tuffo parte quando si alza il dito.
