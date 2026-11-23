@@ -44,6 +44,8 @@ const MANO_POLSO := Vector3(0.05, -0.03, -0.05)    # polso rispetto al lato del 
 const MANO_GOMITO := Vector3(0.6, -0.6, -0.5)      # verso dei gomiti (x verso fuori)
 const MANO_ENTRA := 0.2        # s: il pallone arriva nelle mani
 const MANO_ESCE := 0.3         # s: dopo il rilancio torna sul pallone vero
+const CHINO_S := 0.18          # s: il battitore si china (raccoglie o appoggia il pallone, sim/riprese.gd) e si rialza
+const RETRO_V := 0.3           # m/s: sopra questa velocità, andando all'indietro rispetto allo sguardo, la corsa va al contrario
 const AX_X := 0
 const AX_Y := 1
 const AX_Z := 2
@@ -85,6 +87,8 @@ var _corsa := 0.0              # ultimo valore di "corsa" dato allo shader (la m
 var mocap: FiguraMocap
 ## pallone tra le mani del portiere nel rilancio dalle mani (0..1, entra ed esce dolce)
 var mano_gk := 0.0
+## battitore chinato sul pallone nella scena della ripresa (0..1)
+var chino := 0.0
 ## esultanza del campione in corso: null, oppure {fr, corsa, vel, corpo, braccia} di mosse/esultanza.gd posa() più
 ## w (peso 0..1, entrata e uscita). La mette chi la guida (esultanza_regia.gd in partita, l'anteprima nell'editor)
 ## prima di posa(): finché c'è, comanda lei (niente clip mocap né pose del motore)
@@ -202,6 +206,8 @@ func posa(p: Object, dt: float, ctx: Dictionary) -> void:
 	var m: Object = ctx.get("m")
 	var in_mano := palla_in_mano(p, m)
 	mano_gk = move_toward(mano_gk, 1.0 if in_mano else 0.0, dt / (MANO_ENTRA if in_mano else MANO_ESCE)) if dt > 0.0 else (1.0 if in_mano else mano_gk)
+	var giu := chinato(p, m)
+	chino = move_toward(chino, 1.0 if giu else 0.0, dt / CHINO_S) if dt > 0.0 else (1.0 if giu else chino)
 	if st == "slide" or st == "down" or (st == "dive" and p.dive != null):
 		w_idle = 1.0
 		w_run = 0.0
@@ -209,7 +215,7 @@ func posa(p: Object, dt: float, ctx: Dictionary) -> void:
 		w_idle = 0.0
 		w_run = 0.0
 		w_jump = 1.0
-	_mescola(w_idle, w_run, w_jump, v, cele, p.sprint)
+	_mescola(w_idle, w_run, w_jump, v, cele, p.sprint, v > RETRO_V and p.vx * p.fx + p.vy * p.fy < -0.5 * v)
 	_w_idle *= 1.0 - mc   # [mocap] le correzioni del clip "fermo" non vanno sopra la clip mocap
 	_anim.advance(dt)
 	_gcache.clear()
@@ -258,6 +264,14 @@ func posa(p: Object, dt: float, ctx: Dictionary) -> void:
 		_rot("calf_r", AX_X, 1.1 * (1.0 - q))
 		_rot("spine_02", AX_X, -0.18)
 		_rot("upperarm_l", AX_Z, 0.8); _rot("upperarm_r", AX_X, -0.7)
+	elif chino > 0.0:
+		# chinato sul pallone (raccoglie o appoggia): ginocchia piegate, busto e braccia verso il pallone
+		var w := chino
+		py = -0.3 * w / s
+		_rot("spine_01", AX_X, 0.3 * w); _rot("spine_02", AX_X, 0.7 * w)
+		_rot("thigh_l", AX_X, -1.1 * w); _rot("thigh_r", AX_X, -1.1 * w)
+		_rot("calf_l", AX_X, 1.5 * w); _rot("calf_r", AX_X, 1.5 * w)
+		_rot("upperarm_l", AX_X, -0.9 * w); _rot("upperarm_r", AX_X, -0.9 * w)
 	elif in_mano:
 		pass   # braccia col pallone, dopo _applica_rot (_tieni_palla)
 	elif v < 1.2 and portiere_pronto(p, m, String(ctx.phase), b):
@@ -284,7 +298,18 @@ func posa(p: Object, dt: float, ctx: Dictionary) -> void:
 static func palla_in_mano(p: Object, m: Object) -> bool:
 	if m == null or m.phase != "restart" or m.restart == null:
 		return false
-	return m.restart.type == "gk" and m.restart.taker == p and p.kickAnim <= 0.0
+	var r: Object = m.restart
+	if r.taker == p and (r.scena == "porta" or (r.scena == "posa" and not r.posato)):
+		return true   # scena della ripresa (sim/riprese.gd): porta il pallone al posto
+	return r.type == "gk" and r.taker == p and p.kickAnim <= 0.0
+
+
+## battitore chinato sul pallone nella scena della ripresa: lo raccoglie o lo appoggia (sim/riprese.gd)
+static func chinato(p: Object, m: Object) -> bool:
+	if m == null or m.phase != "restart" or m.restart == null or m.restart.taker != p:
+		return false
+	var r: Object = m.restart
+	return r.scena == "raccogli" or (r.scena == "posa" and r.posato)
 
 
 ## portiere in posa "pronto" (gambe piegate, braccia avanti e aperte): solo quando può arrivare un tiro. A gioco fermo
@@ -322,12 +347,12 @@ func _tieni_palla(w: float) -> void:
 
 
 # pesi e velocità dei clip (Athlete3D.blend): sopra SPRINT_FROM lo scatto prende il posto della corsa
-func _mescola(w_idle: float, w_run: float, w_jump: float, v: float, cele: bool, sprinting: bool) -> void:
+func _mescola(w_idle: float, w_run: float, w_jump: float, v: float, cele: bool, sprinting: bool, retro := false) -> void:
 	_w_idle = 0.0 if w_jump > 0.0 else w_idle
 	_param(0, P_SALTO, w_jump)
 	_param(1, P_MOTO, w_run if w_jump < 1.0 else 0.0)
 	_param(2, P_CORSA, sprint_mix(v, sprinting))
-	_param(3, P_TS_RUN, clampf(v / RUN_REF, 0.6, 1.6))
+	_param(3, P_TS_RUN, clampf(v / RUN_REF, 0.6, 1.6) * (-1.0 if retro else 1.0))   # all'indietro: passi al contrario
 	_param(4, P_TS_SPRINT, clampf(v / SPRINT_REF, 0.8, 1.3))
 	_param(5, P_TS_JUMP, 1.3 if cele else 1.6)
 

@@ -14,7 +14,7 @@ const CAM_USER_GOAL_YAW := deg_to_rad(40.0)    # area di tiro: oltre questo ango
 
 ## il pallone è fermo sulla bandierina per un calcio d'angolo (di chiunque): anche lì la visuale si gira col dito
 static func corner_cam_on(m: Object) -> bool:
-	return m != null and m.phase == "restart" and m.restart != null and m.restart.type == "corner"
+	return m != null and m.phase == "restart" and m.restart != null and m.restart.type == "corner" and m.restart.sulPosto()
 
 
 ## visuale che si può girare: calcio d'angolo, oppure rallenty (gioco, pallone a un giocatore di tm, duello, fuga o area di tiro)

@@ -16,7 +16,7 @@ const CAM_USER_GRAB := -1.0                    # −1 = si "afferra" il campo: d
 
 ## il pallone è fermo sulla bandierina per un calcio d'angolo (di chiunque): anche lì la visuale si gira col dito
 static func corner_cam_on(m: SimMatchScript) -> bool:
-	return m != null and m.phase == "restart" and m.restart != null and m.restart.type == "corner"
+	return m != null and m.phase == "restart" and m.restart != null and m.restart.type == "corner" and m.restart.sulPosto()
 
 
 ## visuale che si può girare: calcio d'angolo, oppure rallenty (in gioco, pallone a un giocatore di tm, duello, fuga o area di tiro)

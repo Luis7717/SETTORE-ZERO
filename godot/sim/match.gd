@@ -5,6 +5,8 @@
 #          Facoltativi: "stileAtt" e "stileDif" = stile di gioco (stili.gd); senza, motore identico a prima.
 # Opzione "portaAuto" (predefinita true): il portatore della squadra umana senza strada si muove da solo (ai.gd
 # humanCarrierAuto); false = come prima (avanza piano e dritto), lo usano i test confrontati col JS.
+# Opzione "riprese" (predefinita false, la accende il gioco): rimessa, rinvio dal fondo e angolo senza teletrasporto,
+# il battitore va a prendere il pallone (riprese.gd).
 class_name SimMatch
 extends "ai.gd"
 
@@ -119,6 +121,7 @@ func _init(o: Dictionary) -> void:
 	var mt: Variant = o.get("meteo")
 	meteo = mt if mt is String else ""
 	headCtl = bool(o.get("testa", false))
+	riprese = bool(o.get("riprese", false))
 	roll = wx.roll
 	slideK = wx.slide
 	stunK = wx.stun
@@ -284,6 +287,8 @@ func setRestart(type: String, tm: int, x: float, y: float, taker: R.Player = nul
 			if p.pos != "D" and p.st.pas > bp:
 				bp = p.st.pas
 				taker = p
+		if sceneNoCut: # scena (riprese.gd): batte uno bravo e vicino, che alla bandierina ci va di corsa
+			taker = sceneCornerTaker(outf, x, y)
 		var tk := taker
 		var order: Array = stableSort(outf.filter(func(p: R.Player) -> bool: return p != tk), func(p: R.Player) -> float: return float("ACD".find(p.pos)))
 		for k in order.size():
@@ -354,7 +359,7 @@ func setRestart(type: String, tm: int, x: float, y: float, taker: R.Player = nul
 	restart = rs
 	predT = 0.0
 	updateCtrl(0.0, true)
-	ev("restart", {"kind": type, "team": tm, "cut": cut})
+	ev("restart", {"kind": type, "team": tm, "cut": cut and not sceneNoCut, "scena": sceneNoCut})
 
 
 # Barriera della squadra che difende sulla punizione di `tm` dal punto (x, y): 2-5 giocatori a 9,15 m,
@@ -537,6 +542,11 @@ func predictKick(p: R.Player, spec: Dictionary, sec: float = PREVIEW_SEC) -> Arr
 
 func kick(p: R.Player, spec: Dictionary) -> void:
 	var b := ball
+	if phase == "restart" and restart.rinc and restart.pend == null and p == restart.taker:
+		# scena della ripresa: il battitore è qualche passo indietro, prima prende la rincorsa (riprese.gd)
+		restart.pend = spec.duplicate()
+		restart.st = 0.0
+		return
 	var tm := p.team
 	var dir: float = -1.0 if tm else 1.0
 	# stesso ordine di estrazione dei numeri casuali: prima la direzione, poi (solo nei tiri) l'altezza
@@ -627,6 +637,12 @@ func updateBall(dt: float) -> void:
 	if b.noT > 0.0:
 		b.noT -= dt
 	if b.owner != null:
+		if phase == "restart" and restart.posato: # scena della ripresa: pallone a terra (da raccogliere o appoggiato)
+			b.vx = 0.0
+			b.vy = 0.0
+			b.vh = 0.0
+			b.h = 0.0
+			return
 		var o := b.owner
 		b.x = o.x + o.fx * 0.6
 		b.y = o.y + o.fy * 0.6
@@ -655,6 +671,8 @@ func updateBall(dt: float) -> void:
 			b.vy *= 0.9
 			b.x = C.clamp_(b.x, -GW / 2.0 + 0.2, GW / 2.0 - 0.2)
 			b.y = C.clamp_(b.y, -HL - 1.9, HL + 1.9)
+		elif phase == "restart" and restart.scena != "":
+			sceneBall(dt)
 		return
 	if b.shot != null and b.kick != null and b.kick.age > b.shot.tc + 0.35:
 		b.shot = null
@@ -695,12 +713,24 @@ func out(x: float, y: float, h: float) -> void:
 			return
 		ev("out", {"kind": "corner" if lt == defT else "goalkick"})
 		if lt == defT:
-			setRestart("corner", 1 - defT, x, y)
+			restartFromOut("corner", 1 - defT, x, y)
 		else:
-			setRestart("goalkick", defT, x, y)
+			restartFromOut("goalkick", defT, x, y)
 	else:
 		ev("out", {"kind": "throw"})
-		setRestart("throw", 1 - lt, C.sign_(x) * HW, y)
+		restartFromOut("throw", 1 - lt, C.sign_(x) * HW, y)
+
+
+# ripresa dopo un'uscita: con l'opzione "riprese" diventa una scena (il battitore va a prendere il pallone, riprese.gd)
+func restartFromOut(type: String, tm: int, x: float, y: float) -> void:
+	if not sceneWanted(type):
+		setRestart(type, tm, x, y)
+		return
+	var snap := sceneSnap()
+	sceneNoCut = true
+	setRestart(type, tm, x, y)
+	sceneNoCut = false
+	sceneStart(snap)
 
 
 func goal(forT: int) -> void:
@@ -777,9 +807,20 @@ func step(dt: float) -> void:
 				endHalf()
 	elif phase == "restart":
 		var r := restart
-		r.t += dt
-		if (r.t >= r.wait) if not human[r.team] else (r.t > 14.0):
-			aiRestart()
+		if r.scena != "":
+			sceneStep(dt)
+		elif r.pend != null:
+			r.st += dt
+			if runupDone(): # rincorsa finita: parte il calcio chiesto
+				var spec: Dictionary = r.pend
+				r.pend = null
+				r.rinc = false
+				faceTo(r.taker, float(spec.tx), float(spec.ty))
+				kick(r.taker, spec)
+		else:
+			r.t += dt
+			if (r.t >= r.wait) if not human[r.team] else (r.t > 14.0):
+				aiRestart()
 	fireQueued()
 	updateCtrl(dt)
 
@@ -902,7 +943,7 @@ func userKick(tm: int, spec: Dictionary) -> bool:
 	if p == null or b.owner != p or p.stun > 0.0:
 		return false
 	if phase == "restart":
-		if restart.taker != p or restart.t < 0.35:
+		if restart.taker != p or restart.t < 0.35 or restart.scena != "" or restart.pend != null:
 			return false
 	elif phase != "play":
 		return false
@@ -1153,7 +1194,7 @@ func userSprint(tm: int) -> bool:
 func hint(tm: int) -> String:
 	var b := ball
 	if phase == "restart":
-		return "restart" if restart.team == tm else "wait"
+		return "restart" if restart.team == tm and restart.scena == "" and restart.pend == null else "wait"
 	if phase != "play":
 		return ""
 	if diveWin(tm):

@@ -184,8 +184,8 @@ func aggiorna(p: Object, dt: float, ctx: Dictionary) -> float:
 	_stato_prima = st
 	var ripresa_prima := _ripresa
 	_ripresa = ""
-	if m != null and m.phase == "restart" and m.restart != null and m.restart.taker == p:
-		_ripresa = m.restart.type
+	if m != null and m.phase == "restart" and m.restart != null and m.restart.taker == p and m.restart.scena == "":
+		_ripresa = m.restart.type   # (durante la scena della ripresa, sim/riprese.gd, il battitore non è ancora al posto)
 	_avanza_tempo(dt)
 	# ---- esultanza
 	if ctx.phase == "goal" and p.cele > 0 and m != null:

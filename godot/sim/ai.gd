@@ -1,5 +1,5 @@
 # IA: tiro, passaggi, portatore, rimesse, posizioni in attacco e difesa, portiere (porting di src/sim/ai.js).
-extends "testa.gd"
+extends "riprese.gd"
 
 # Regolazioni dell'IA (misurate con test/balance.mjs e test/diag-flow.mjs)
 const CLEAR_ZONE := 30.0     # metri dalla propria linea di fondo in cui un difensore pressato può spazzare
@@ -561,6 +561,8 @@ func assign(p: R.Player) -> void:
 	var tm := p.team
 	var dir: float = -1.0 if tm else 1.0
 	var hum: bool = human[tm]
+	if phase == "restart" and (restart.scena != "" or restart.pend != null) and sceneAssign(p):
+		return # scena della ripresa (riprese.gd): il battitore va a prendere il pallone, gli altri al loro posto
 	if phase == "restart" and restart.taker == p:
 		p.tx = p.x
 		p.ty = p.y
