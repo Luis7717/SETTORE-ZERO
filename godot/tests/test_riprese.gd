@@ -86,8 +86,8 @@ func test_rimessa_il_battitore_va_a_prendere_il_pallone() -> bool:
 
 
 func test_rinvio_dal_fondo_appoggia_e_rincorsa() -> bool:
-	# pallone che esce lontano dall'area piccola: lo rimanda il raccattapalle
-	var m := uscita(2, 22.0, C.HL - 3.0, 2.0, 9.0, 0)
+	# pallone che esce lontano dall'area piccola: lo va a prendere il raccattapalle e lo lancia al portiere
+	var m := uscita(2, 10.0, C.HL - 3.0, 2.0, 9.0, 0)
 	var r := fino_a_fine_scena(m, 12.0)
 	check(r.ok, "il rinvio è una scena e finisce")
 	var e: Variant = findEvent(r.eventi, "restart")
@@ -113,6 +113,106 @@ func test_rinvio_dal_fondo_appoggia_e_rincorsa() -> bool:
 	var k: Variant = findEvent(evs, "kick")
 	check(k != null and k.p == gk, "il portiere rinvia")
 	check(Vector2(gk.x, gk.y).distance_to(da) > 1.0, "dopo aver preso la rincorsa")
+	return done()
+
+
+## segue i raccattapalle passo per passo fino a fine scena (al massimo sec s): {stati del raccattapalle `k`, fuori
+## (sempre fuori dal campo e mai nella rete), salto (spostamento più grande in un passo), scena (durata), r}
+func segui_raccattapalle(m: SimMatchScript, k: int, sec: float) -> Dictionary:
+	var bb: R.Raccatta = m.raccatte[k]
+	var stati: Array = [bb.stato]
+	var fuori := true
+	var salto := 0.0
+	var prima := Vector2(bb.x, bb.y)
+	var tempo := 0.0
+	var iniziata := false
+	var portiere_in_rete := false
+	for i in int(sec * 60.0):
+		m.step(DT)
+		m.events.clear()
+		for q: R.Raccatta in m.raccatte:
+			if absf(q.y) <= C.HL or (absf(q.x) < C.GW / 2.0 and absf(q.y) < C.HL + m.NET_D):
+				fuori = false
+		var g := m.gk(1)
+		if absf(g.x) < C.GW / 2.0 - 0.3 and absf(g.y) > C.HL + 0.3 and absf(g.y) < C.HL + m.NET_D:
+			portiere_in_rete = true
+		var v := Vector2(bb.x, bb.y)
+		salto = maxf(salto, v.distance_to(prima))
+		prima = v
+		if stati.back() != bb.stato:
+			stati.append(bb.stato)
+		if m.phase == "restart" and m.restart.scena != "":
+			iniziata = true
+			tempo += DT
+		elif iniziata and bb.stato == "fermo":
+			break
+	return {"stati": stati, "fuori": fuori, "salto": salto, "scena": tempo, "portiere_in_rete": portiere_in_rete}
+
+
+func test_raccattapalle_raccoglie_lancia_e_torna() -> bool:
+	var m := uscita(2, 10.0, C.HL - 3.0, 2.0, 9.0, 0)
+	eq(m.raccatte.size(), 2, "due raccattapalle, uno dietro ogni porta")
+	var bb: R.Raccatta = m.raccatte[1]
+	var casa := Vector2(bb.x, bb.y)
+	check(casa.y > C.HL + 3.0 and absf(casa.x) < 0.01, "al suo posto dietro la porta in alto (%.1f, %.1f)" % [casa.x, casa.y])
+	var r := segui_raccattapalle(m, 1, 20.0)
+	eq(r.stati, ["fermo", "va", "raccogli", "mira", "lancia", "dopo", "torna", "fermo"], "corre, raccoglie, mira, lancia, torna")
+	check(r.fuori, "i raccattapalle restano sempre fuori dal campo e fuori dalla rete")
+	check(r.salto < 0.2, "il raccattapalle si muove senza salti (%.2f m in un passo)" % r.salto)
+	near(Vector2(bb.x, bb.y).distance_to(casa), 0.0, m.BB_ARRIVE + 0.01, "poi torna al suo posto")
+	eq(m.raccatte[0].stato, "fermo", "quello dell'altra porta non si muove")
+	check(not bb.palla, "senza pallone in mano")
+	return done()
+
+
+func test_raccattapalle_pallone_lontano_scena_entro_il_massimo() -> bool:
+	# il caso più lungo: pallone fermo lontano di lato (a ~23 m dal raccattapalle)
+	var m := uscita(2, 22.0, C.HL - 3.0, 2.0, 9.0, 0)
+	var r := fino_a_fine_scena(m, 12.0)
+	check(r.ok and hasEvent(r.eventi, "ballboy"), "lo rimanda il raccattapalle")
+	check(r.tempo < 8.5 and r.tempo < m.SCENE_MAX, "scena entro il massimo: %.1f s" % r.tempo)
+	check(r.salto < SALTO_GIOCATORE and r.salto_b < SALTO_PALLONE, "senza teletrasporti (%.2f, %.2f m)" % [r.salto, r.salto_b])
+	note("pallone lontano: %.1f s" % r.tempo)
+	return done()
+
+
+func test_pallone_dietro_la_rete_lo_prende_il_raccattapalle() -> bool:
+	# esce appena fuori dal palo e finisce dietro la rete: il portiere non attraversa la rete
+	var m := uscita(6, 4.6, C.HL - 2.0, -1.6, 9.0, 0)
+	var r := segui_raccattapalle(m, 1, 20.0)
+	check(r.stati.has("raccogli") and r.stati.has("lancia"), "lo raccoglie il raccattapalle (%s)" % str(r.stati))
+	check(r.fuori, "il raccattapalle gira intorno alla rete")
+	check(not r.portiere_in_rete, "il portiere non entra nella rete")
+	return done()
+
+
+func test_raccattapalle_fuori_dal_campo_in_partita() -> bool:
+	var m := H.newMatch(8, 120.0, [false, false], H.mkTeam("A", 65.0, 57), H.mkTeam("B", 65.0, 109), "", {"riprese": true})
+	var fuori := true
+	var lanci := 0
+	var scena := 0.0
+	var scena_max := 0.0
+	var passi := 0
+	while m.phase != "full" and passi < 60 * 60 * 10:
+		m.step(DT)
+		passi += 1
+		if m.phase == "half":
+			m.startSecondHalf()
+		for e: Dictionary in m.events:
+			if e.type == "ballboy":
+				lanci += 1
+		m.events.clear()
+		for q: R.Raccatta in m.raccatte:
+			if absf(q.y) <= C.HL or (absf(q.x) < C.GW / 2.0 and absf(q.y) < C.HL + m.NET_D):
+				fuori = false
+		if m.phase == "restart" and m.restart.scena != "":
+			scena += DT
+			scena_max = maxf(scena_max, scena)
+		else:
+			scena = 0.0
+	check(fuori, "in tutta la partita i raccattapalle restano fuori dal campo e dalla rete")
+	check(scena_max < 8.0, "nessuna scena arriva vicino al massimo (la più lunga %.1f s)" % scena_max)
+	note("partita: %d lanci del raccattapalle, scena più lunga %.1f s" % [lanci, scena_max])
 	return done()
 
 
@@ -168,6 +268,7 @@ func test_senza_opzione_come_prima() -> bool:
 			break
 	check(m.phase == "restart", "rimessa")
 	eq(m.restart.scena, "", "senza l'opzione niente scena")
+	eq(m.raccatte.size(), 0, "senza l'opzione niente raccattapalle")
 	near(absf(m.restart.taker.x), C.HW - 0.3, 0.01, "battitore subito sulla linea (come sempre)")
 	return done()
 
@@ -181,5 +282,8 @@ func test_scena_ripetibile() -> bool:
 	for k in a.players.size():
 		if a.players[k].x != b.players[k].x or a.players[k].y != b.players[k].y:
 			uguali = false
-	check(uguali and a.ball.x == b.ball.x and a.ball.y == b.ball.y, "stesso seme, stessa scena")
+	for k in a.raccatte.size():
+		if a.raccatte[k].x != b.raccatte[k].x or a.raccatte[k].y != b.raccatte[k].y or a.raccatte[k].stato != b.raccatte[k].stato:
+			uguali = false
+	check(uguali and a.ball.x == b.ball.x and a.ball.y == b.ball.y, "stesso seme, stessa scena (anche i raccattapalle)")
 	return done()

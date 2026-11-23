@@ -125,6 +125,8 @@ func _init(o: Dictionary) -> void:
 	meteo = mt if mt is String else ""
 	headCtl = bool(o.get("testa", false))
 	riprese = bool(o.get("riprese", false))
+	if riprese:
+		raccattaPrepara() # raccattapalle dietro le porte (raccatta.gd)
 	roll = wx.roll
 	slideK = wx.slide
 	stunK = wx.stun
@@ -824,6 +826,8 @@ func step(dt: float) -> void:
 			r.t += dt
 			if (r.t >= r.wait) if not human[r.team] else (r.t > 14.0):
 				aiRestart()
+	if riprese:
+		raccattaStep(dt) # raccattapalle (raccatta.gd): fuori dal campo, anche a scena finita torna al posto
 	fireQueued()
 	updateCtrl(dt)
 

@@ -39,6 +39,7 @@ const CU := preload("camuser.gd")
 const Giochetti := preload("mosse/giochetti.gd")
 const Effetti := preload("effetti.gd")
 const Qualita := preload("qualita.gd")
+const Raccattapalle := preload("raccattapalle_vista.gd")
 
 const BALL_R := Figura.PALLA_R  # raggio del pallone a schermo (0,16: un po' più del vero, per leggerlo da lontano)
 const BALL_SH_SIZE := BALL_R * 2.85     # lato del disegno dell'ombra del pallone (0,6 m col raggio vecchio di 0,21)
@@ -100,6 +101,7 @@ var livello_qualita := Qualita.ALTO
 var t_vero := 0.0              # tempo vero dall'inizio (s)
 var _qualita := Qualita.new()
 var _schiene: Node
+var _raccatta: Node3D          # i raccattapalle (raccattapalle_vista.gd), solo se la partita li ha
 var _effetti: Node3D
 var _attr: CameraAttributesPractical
 var _env: Environment
@@ -131,6 +133,9 @@ func _ready() -> void:
 	_schiene = Schiene.new()
 	_schiene.name = "Schiene"
 	add_child(_schiene)
+	_raccatta = Raccattapalle.new()
+	_raccatta.name = "Raccattapalle"
+	add_child(_raccatta)
 	_effetti = Effetti.new()
 	add_child(_effetti)
 	_attr = CameraAttributesPractical.new()
@@ -160,6 +165,7 @@ func setup(match_: SimMatch, me_: int) -> void:
 		_figs.append(_figura(m.players[i]))
 		_srcs.append(m.players[i].src)
 	_prepara_schiene()
+	_raccatta.prepara(m, _tex_warn)
 	var mm := _shadows.multimesh
 	mm.instance_count = m.players.size()
 	cam.reset(m.ball.x, m.ball.y)
@@ -194,6 +200,7 @@ func update_view(dt_game: float, dt_real: float) -> void:
 		_posa(i, p, dt_game)
 		var on: bool = not p.off
 		mm.set_instance_transform(i, Transform3D(Basis.from_scale(Vector3.ONE if on else Vector3.ZERO), Vector3(s * p.x, 0.025, -s * p.y)))
+	_raccatta.aggiorna(m, s, t, dt_game)
 	# pallone (durante un giochetto di chi lo porta, spostato per farlo vedere)
 	var bx: float = b.x
 	var by: float = b.y
@@ -412,6 +419,8 @@ func _figura(p: Object) -> Node3D:
 
 
 func _libera_figure() -> void:
+	if _raccatta != null:
+		_raccatta.libera()
 	for f: Node3D in _figs:
 		if is_instance_valid(f):
 			f.queue_free()
@@ -443,6 +452,9 @@ func _posa(i: int, p: Object, dt: float) -> void:
 # [mocap] figura che tiene il pallone tra le mani (rimessa laterale, figura_mocap.gd; rilancio del portiere, figura.gd): Vector4(x, y, z, peso) nel
 # mondo; continua a guardare la stessa figura dopo il lancio, finché il pallone non è tornato su quello vero
 func _pallone_in_mano(b: Object) -> Vector4:
+	var rc: Vector4 = _raccatta.pallone_in_mano()   # raccattapalle col pallone in mano o appena lanciato
+	if rc.w > 0.0:
+		return rc
 	if b.owner != null:
 		_mano_i = m.players.find(b.owner)
 	if _mano_i < 0 or _mano_i >= _figs.size() or not is_instance_valid(_figs[_mano_i]) or _figs[_mano_i].mocap == null:
