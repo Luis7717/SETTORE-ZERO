@@ -177,6 +177,23 @@ func test_tiro_curvo_a_giro_si_alza_e_entra_all_altezza_mirata() -> bool:
 	return done()
 
 
+# Luis 2026-11-24: il tiro a giro era troppo lento (il portiere ci arrivava): almeno CURL_V_MIN del tiro normale
+func test_tiro_a_giro_abbastanza_veloce() -> bool:
+	prepara()
+	H.wake(c, 4.0, 30.0)
+	H.give(m, c)
+	var v_tiro: float = SimMatchScript.SHOT_V0 + c.st.tir * 0.14
+	var L = m.launch(c, {"type": "shot", "tx": -2.5, "ty": C.HL, "th": 1.2, "curve": 6.0, "tratto": true}, false)
+	check(L.curved, "tiro curvo")
+	check(L.v0 >= SimMatchScript.CURL_V_MIN * v_tiro - 1e-6, "veloce almeno %.0f%% del tiro normale (%.1f m/s)" % [SimMatchScript.CURL_V_MIN * 100.0, L.v0])
+	var pts := volo({"type": "shot", "tx": -2.5, "ty": C.HL, "th": 1.2, "curve": 6.0}, 2.0)
+	var i := piu_vicino(pts, -2.5, C.HL)
+	check(i[0] < 0.5, "entra nel punto mirato (%.2f m)" % i[0])
+	near(pts[i[1]].h, 1.2, 0.4, "all'altezza mirata")
+	check(picco(pts) > 1.3, "si alza ancora sopra chi sta in mezzo (picco %.2f m)" % picco(pts))
+	return done()
+
+
 func test_senza_tratto_l_ia_resta_come_prima() -> bool:
 	prepara()
 	var L := m.launch(c, {"type": "auto", "tx": 0.0, "ty": 38.0, "curve": 0.0}, false)

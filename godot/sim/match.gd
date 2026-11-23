@@ -34,6 +34,8 @@ const CURVE_T_MIN := 1.25     # passaggio curvo: volo di almeno tanti secondi (p
 const CURVE_T_EXTRA := 0.5    # ... più tanti secondi a effetto pieno (più alto)
 const CURL_APEX_MIN := 1.4    # tiro a giro: punto più alto del volo (m) con poco effetto ...
 const CURL_APEX_MAX := 2.6    # ... e con effetto pieno
+const CURL_V_MIN := 0.75      # tiro a giro: almeno tanto della velocità del tiro normale (Luis 2026-11-24: era troppo lento,
+                              # il portiere ci arrivava); da vicino la parabola si abbassa da sola
 const GROUND_ARRIVE := 5.0    # passaggio rasoterra: velocità con cui arriva al compagno (m/s)
 const GROUND_ARRIVE_SPACE := 1.0 # ... e nello spazio, dove si deve quasi fermare (m/s)
 const TRATTO_LOFT_M := 25.0  # tratto dritto più lungo di così (o con un avversario sulla linea) = pallone alto ma dritto (Luis 2026-11-23)
@@ -497,6 +499,12 @@ func launch(p: R.Player, spec: Dictionary, noise: bool) -> Dictionary:
 				v0 = D / T2
 				Tt = T2
 				vh = vu
+			var vmin: float = CURL_V_MIN * (SHOT_V0 + p.st.tir * 0.14)
+			if v0 < vmin:
+				# troppo lento per arrivare in porta così in alto: più veloce e parabola più bassa, sempre all'altezza mirata
+				v0 = vmin
+				Tt = D / v0
+				vh = (th + 0.5 * G * Tt * Tt) / Tt
 	Tt = maxf(Tt, 0.15)
 	var ac: float = C.clamp_(-8.0 * c / (Tt * Tt), -14.0, 14.0)
 	var lv: float = -ac * Tt / 2.0
