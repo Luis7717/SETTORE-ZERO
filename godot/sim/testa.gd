@@ -25,7 +25,14 @@ const HEAD_HUMAN_SIG := 0.9 # la linea disegnata è un po' più precisa del colp
 
 ## fermatempo del colpo di testa aperto per la squadra T, in attesa della linea
 func headFor(tm: int) -> bool:
-	return headWin != null and headWin.team == tm and not headWin.aimed and phase == "play"
+	return headWin != null and headWin.team == tm and not headWin.aimed and not headWin.lost and phase == "play"
+
+
+## tempo del fermatempo finito senza linea (lo decide il gioco): non si può più disegnare, nessun compagno tocca il
+## pallone finché il momento del colpo non è passato (poi endHead "perso")
+func headExpire() -> void:
+	if headWin != null and not headWin.aimed:
+		headWin.lost = true
 
 
 ## tempo di partita che manca al colpo previsto (s)

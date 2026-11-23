@@ -23,6 +23,8 @@ static func user_cam_on(m: Object, tm: int) -> bool:
 		return true
 	if m == null or m.phase != "play":
 		return false
+	if m.headFor(tm): # colpo di testa controllato: come nel rallenty col pallone (Luis 2026-11-23)
+		return true
 	var c: Object = m.ball.owner
 	if c == null or c.team != tm:
 		return false

@@ -302,11 +302,13 @@ func _setup_passaggio(kk: int) -> Dictionary:
 	return {"c": c, "mate": m.players[9]}
 
 
-## passaggio riuscito: un compagno controlla un nostro passaggio del tipo voluto (ground o loft)
-func _passaggio_ok(e: Dictionary, kind: String) -> bool:
+## passaggio riuscito: un compagno controlla un nostro passaggio del tipo voluto (ground o loft); curvo = solo col
+## tratto curvo (il pallone alto ma dritto del tratto dritto lungo o scavalcando non vale per la lezione a effetto)
+func _passaggio_ok(e: Dictionary, kind: String, curvo: bool = false) -> bool:
 	if e.type == "kick" and (e.p as R.Player).team == 0:
 		st.kind = e.kind
-	return e.type == "control" and (e.p as R.Player).team == 0 and e.p != st.c and st.get("kind", "") == kind
+		st.curvo = bool(e.get("curvo", false))
+	return e.type == "control" and (e.p as R.Player).team == 0 and e.p != st.c and st.get("kind", "") == kind 			and (not curvo or st.get("curvo", false))
 
 
 func _check_passaggio(e: Dictionary) -> bool:
@@ -326,7 +328,7 @@ func _setup_passaggio_alto(kk: int) -> Dictionary:
 
 
 func _check_passaggio_alto(e: Dictionary) -> bool:
-	return _passaggio_ok(e, "loft")
+	return _passaggio_ok(e, "loft", true)
 
 
 func _setup_tiro(kk: int) -> Dictionary:

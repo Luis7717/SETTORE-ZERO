@@ -89,12 +89,30 @@ func test_passaggio_dritto_rasoterra_arriva_al_compagno() -> bool:
 	return done()
 
 
-func test_passaggio_dritto_lungo_resta_rasoterra() -> bool:
+# Luis 2026-11-23: il lancio lungo dall'altra parte partiva rasoterra e veniva intercettato. Tratto dritto oltre
+# TRATTO_LOFT_M (o con un avversario sulla linea) = pallone alto ma dritto, senza effetto, fino al compagno.
+func test_passaggio_dritto_lungo_si_alza_dritto() -> bool:
 	prepara()
 	H.wake(mate, 0.0, 38.0)
 	var pts := volo({"type": "auto", "tx": mate.x, "ty": mate.y, "curve": 0.0})
-	check(picco(pts) < 0.05, "anche oltre 30 m il tratto dritto è rasoterra")
-	check(piu_vicino(pts, mate.x, mate.y)[0] < 0.3, "e arriva fin lì")
+	check(picco(pts) > 2.0, "oltre %d m il tratto dritto va alto (picco %.1f m)" % [SimMatchScript.TRATTO_LOFT_M, picco(pts)])
+	var l = m.launch(c, {"type": "auto", "tx": mate.x, "ty": mate.y, "curve": 0.0, "tratto": true}, false)
+	eq(l.type, "loft", "tipo alto")
+	eq(l.curved, false, "senza effetto")
+	var giu = atterraggio(pts)
+	check(giu != null and absf(giu.x) < 0.5, "resta dritto (atterra a x %.2f)" % (giu.x if giu != null else 99.0))
+	return done()
+
+
+func test_passaggio_dritto_con_avversario_sulla_linea_si_alza() -> bool:
+	prepara()
+	H.wake(mate, 0.0, 16.0)
+	H.wake(m.team(1)[4], 0.3, 8.0)
+	eq(m.launch(c, {"type": "auto", "tx": mate.x, "ty": mate.y, "curve": 0.0, "tratto": true}, false).type, "loft",
+			"avversario in mezzo: il passaggio dritto lo scavalca")
+	H.wake(m.team(1)[4], 12.0, 8.0)
+	eq(m.launch(c, {"type": "auto", "tx": mate.x, "ty": mate.y, "curve": 0.0, "tratto": true}, false).type, "ground",
+			"linea libera: rasoterra")
 	return done()
 
 

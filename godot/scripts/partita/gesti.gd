@@ -157,11 +157,19 @@ func down(p: Vector2, now_ms: int, indice: int = 0) -> void:
 	if hint == "dive":
 		mode = "dive"
 		return
-	# colpo di testa controllato (sim/testa.gd): il dito appoggiato ovunque disegna la linea dal giocatore che colpisce
+	# colpo di testa controllato (sim/testa.gd): come col pallone nel rallenty (Luis 2026-11-23): dito vicino a chi
+	# colpisce = linea dal giocatore (tiro in porta o passaggio di testa); lontano = trascinando gira la visuale
 	if m.headFor(T):
 		var hp: R.Player = m.headWin.p
-		mode = "head"
-		pts = [{"x": hp.x, "y": hp.y, "h": 0.0, "sx": x, "sy": y}]
+		var sh := _schermo(hp.x, hp.y, 1.0)
+		var Rh := maxf(PRESA_PORTATORE[0], dim.y * PRESA_PORTATORE[1])
+		if sh.z > 0.5 and Vector2(x - sh.x, y - sh.y).length() < Rh:
+			mode = "head"
+			pts = [{"x": hp.x, "y": hp.y, "h": 0.0, "sx": x, "sy": y}]
+		else:
+			mode = "cam"
+			cam_on = false
+			yaw0 = vista.user_yaw
 		return
 	if c != null and b.owner == c and (hint == "attack" or hint == "restart"):
 		var sp := _schermo(b.x, b.y, 0.3)

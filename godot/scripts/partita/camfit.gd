@@ -38,6 +38,7 @@ const WIDE_CARRIER_PAD := 2.5 # metri d'aria a destra e a sinistra del portatore
 const WIDE_R := 35.0          # compagni entro tanti metri dal portatore...
 const WIDE_BEHIND := 5.0      # ... davanti o di fianco (al massimo tanti metri dietro)
 const WIDE_MARGIN := {"l": 0.08, "r": 0.08, "t": 0.2, "b": 0.3}
+const HEAD_AHEAD := 9.0       # colpo di testa: guarda tanti metri davanti a chi colpisce (la porta resta in alto)
 
 # Calcio d'angolo: telecamera alle spalle del battitore, girata verso il centro dell'area.
 const CORNER_BACK := 4.0       # distanza dietro la bandierina (m)
@@ -237,6 +238,15 @@ static func wide_view(carrier: Vector2, yaw: float, mates: Array, goal: bool, as
 		"m": WIDE_MARGIN, "tMin": 0.0, "tMax": WIDE_MAX_DIST - WIDE_MIN_DIST, "keep": 2 if goal else 1, "centerX": true,
 		"groups": groups,
 	})
+
+
+## Visuale del colpo di testa controllato (Luis 2026-11-23: "deve zoomarsi come il passaggio o il tiro"): stessa
+## inclinazione e distanza minima della visuale dell'area di tiro, con chi colpisce grande nella parte bassa e la porta
+## sopra. Non si allarga per i compagni. head = Vector2(x, y) di chi colpisce, yaw = visuale girata col dito (rad).
+static func head_view(head: Vector2, yaw: float, fov: float) -> Dictionary:
+	var f: Vector3 = basis(yaw, WIDE_PITCH)[0]
+	var look := Vector3(head.x + sin(yaw) * HEAD_AHEAD, 0, head.y + cos(yaw) * HEAD_AHEAD)
+	return {"pos": look - f * WIDE_MIN_DIST, "look": look, "fov": fov}
 
 
 ## Visuale del calcio d'angolo. ball = Vector2(x, y) della bandierina da cui si batte; yaw = visuale girata col dito

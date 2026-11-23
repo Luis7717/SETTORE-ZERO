@@ -192,33 +192,37 @@ func test_cross_curvo_disegnato_apre_il_fermatempo() -> bool:
 	return done()
 
 
-# Luis 2026-11-22: il pallone arriva alla testa TESTA_FERMATEMPO_S secondi veri dopo l'apertura (3 s)
-func test_fermatempo_dura_tre_secondi_veri() -> bool:
+# Luis 2026-11-23: niente rallenty, il tempo si ferma del tutto per TESTA_FERMATEMPO_S secondi veri (3 s); finiti
+# senza linea il pallone è perso (headExpire): non si disegna più e nessun compagno lo tocca
+func test_fermatempo_ferma_il_tempo_tre_secondi() -> bool:
 	eq(FT.TESTA_FERMATEMPO_S, 3.0, "durata del fermatempo")
-	near(FT.velocita(0.6, 3.0), 0.2, 1e-9, "0,6 s di volo in 3 s veri = tempo al 20%")
-	eq(FT.velocita(0.6, 0.0), 1.0, "tempo scaduto: velocità normale")
+	check(FT.fermo(0.0, false) and FT.fermo(2.9, false), "senza linea il tempo resta fermo per 3 s")
+	check(not FT.fermo(3.0, false), "finiti i 3 s il tempo riparte")
+	check(not FT.fermo(1.0, true), "con la linea il tempo riparte subito")
 	near(FT.frazione(1.5), 0.5, 1e-9, "a metà il cerchio è pieno a metà")
-	var misure: Array = []
+	var provati := 0
 	for sd in range(1, 7):
 		var a := cross(sd)
 		var m: SimMatchScript = a[0]
 		if fino_a(m, "head_win", 3.0) == null:
 			continue
-		# ciclo come gioco.gd: fotogrammi da 1/60 s veri, motore a passi non più lunghi di 1/60 s di partita
-		var reale := 0.0
-		var dt := 1.0 / 60.0
-		while m.headFor(0) and m.headLeft() > 0.0 and reale < 6.0:
-			var v := FT.velocita(m.headLeft(), FT.TESTA_FERMATEMPO_S - reale)
-			var sdt := dt * v
-			var n := maxi(1, ceili(sdt / DT))
-			for i in n:
-				m.step(sdt / n)
+		provati += 1
+		m.headExpire()
+		check(not m.headFor(0), "seme %d: scaduto il tempo il fermatempo non accetta più linee" % sd)
+		check(not m.userHeader(0, {"goal": true, "tx": 0.0, "th": 1.5}), "seme %d: la linea dopo la scadenza non vale" % sd)
+		var toccato := false
+		var i := 0
+		while m.headWin != null and i < 180: # finché il fermatempo resta aperto (poi il pallone torna di tutti)
+			i += 1
+			m.step(DT)
+			for e: Dictionary in m.events:
+				if String(e.get("type", "")) in ["head", "pass", "shot"] and e.get("p") != null and e.get("p").team == 0:
+					toccato = true
 			m.events.clear()
-			reale += dt
-		misure.append(reale)
-		near(reale, FT.TESTA_FERMATEMPO_S, 2.0 / 60.0, "seme %d: pallone alla testa dopo %.3f s veri" % [sd, reale])
-	check(misure.size() >= 4, "fermatempi misurati: %d" % misure.size())
-	note("secondi veri dall'apertura al colpo: %s" % str(misure))
+			if m.ball.owner != null and m.ball.owner.team == 0:
+				toccato = true
+		check(not toccato, "seme %d: nessun compagno tocca il pallone perso" % sd)
+	check(provati >= 4, "fermatempi provati: %d" % provati)
 	return done()
 
 

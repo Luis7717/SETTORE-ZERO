@@ -162,8 +162,10 @@ func _wide_step(m: Object, me: int, mine: bool, duel: bool, rdt: float, pk: floa
 	var zone: bool = not duel and m.inZone(me)
 	var flee: bool = m.fleeFor(me)
 	var on: bool = mine and c != null and m.phase == "play" and (duel or zone or flee or drawing)
-	# colpo di testa controllato: visuale larga intorno a chi colpisce, con la porta avversaria in vista
-	if m.headFor(me):
+	# colpo di testa controllato: visuale vicina come nel tiro, solo chi colpisce e la porta (Luis 2026-11-23: i
+	# compagni lontani, come chi ha crossato, allargherebbero troppo l'inquadratura)
+	var testa: bool = m.headFor(me)
+	if testa:
 		c = m.headWin.p
 		zone = true
 		on = true
@@ -176,9 +178,9 @@ func _wide_step(m: Object, me: int, mine: bool, duel: bool, rdt: float, pk: floa
 		var dir := -1.0 if me == 1 else 1.0
 		var mates: Array = []
 		for p: Object in m.players:
-			if p.team == me and not p.off and p != c and p.pos != "P":
+			if not testa and p.team == me and not p.off and p != c and p.pos != "P":
 				mates.append(Vector2(p.x * dir, p.y * dir))
-		var v := CF.wide_view(Vector2(c.x * dir, c.y * dir), user_yaw, mates, CU.keep_goal(zone, user_yaw), _aspect(), base_fov)
+		var v := CF.head_view(Vector2(c.x * dir, c.y * dir), user_yaw, base_fov) if testa else CF.wide_view(Vector2(c.x * dir, c.y * dir), user_yaw, mates, CU.keep_goal(zone, user_yaw), _aspect(), base_fov)
 		_wide_p = _smooth(_wide_p, v, pk)
 	return _wide_k if _wide_p != null else 0.0
 

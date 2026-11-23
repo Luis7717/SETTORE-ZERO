@@ -317,13 +317,15 @@ func _process(delta: float) -> void:
 	esultanza.camera(vista)
 
 
-## fermatempo del colpo di testa (sim/testa.gd): il pallone arriva alla testa FermatempoTesta.TESTA_FERMATEMPO_S secondi
-## veri dopo l'apertura. Linea disegnata = tempo normale subito (il colpo parte appena il pallone arriva). 0 = niente.
+## fermatempo del colpo di testa (sim/testa.gd, Luis 2026-11-23): il tempo si ferma del tutto per
+## FermatempoTesta.TESTA_FERMATEMPO_S secondi veri. Linea disegnata = tempo normale subito (il colpo parte appena il
+## pallone arriva); secondi finiti senza linea = pallone perso (ma se il dito sta ancora disegnando si aspetta che lo
+## alzi). Restituisce la velocità del tempo (0 = fermo, 1 = normale) o −1 senza fermatempo.
 func _velocita_testa(dt: float) -> float:
 	var hw = m.headWin
-	if hw == null or hw.team != me:
+	if hw == null or hw.team != me or hw.lost:
 		_testa_reale = -1.0
-		return 0.0
+		return -1.0
 	if hw.aimed:
 		_testa_reale = -1.0
 		return 1.0
@@ -331,7 +333,11 @@ func _velocita_testa(dt: float) -> float:
 		_testa_reale = 0.0
 	else:
 		_testa_reale += dt
-	return FermatempoTesta.velocita(m.headLeft(), FermatempoTesta.TESTA_FERMATEMPO_S - _testa_reale)
+	if FermatempoTesta.fermo(_testa_reale, false) or gesti.mode == "head":
+		return 0.0
+	m.headExpire()
+	_testa_reale = -1.0
+	return 1.0
 
 
 ## cerchio che si svuota intorno a chi deve colpire di testa
@@ -378,12 +384,12 @@ func _passi_motore(dt: float) -> void:
 	var tasto_ok := allenamento == null or allenamento.finished or String(allenamento.lesson().get("id", "")) != "passaggio"
 	hud.mostra_dribbling(tasto_ok and ((m.duelFor(me) and not m.dribBooked(me)) or flee) and not gesti.drawing, flee)
 	var testa := _velocita_testa(dt)
-	if testa > 0.0:
-		ts = testa # fermatempo del colpo di testa: velocità esatta, niente passaggio dolce
+	if testa >= 0.0:
+		ts = testa # fermatempo del colpo di testa: fermo o normale, niente passaggio dolce
 	else:
 		ts += (target - ts) * minf(1.0, dt * TEMPO_K)
 	var sdt := dt * ts * _velocita
-	var n := maxi(1, ceili(sdt / PASSO_MAX))
+	var n := maxi(1, ceili(sdt / PASSO_MAX)) if sdt > 0.0 else 0 # tempo fermo (colpo di testa): nessun passo
 	if allenamento != null:
 		allenamento.before()
 	if prove != null:

@@ -70,7 +70,8 @@
   dalla fine o nello spazio). Niente più strada da correre né scatto lungo disegnato: il portatore si muove da solo (IA,
   `ai.gd`); col pallone il tocco e il dito tenuto non lo guidano. Restano i tasti Scatto e Dribbling dei rallenty.
 - **Forma del tratto** (`sim/match.gd`, `spec.tratto`): curvatura = quanto la linea si allontana dalla corda inizio-fine.
-  Sotto `max(CURVE_MIN_M 1,2 m, CURVE_MIN_FRAC 15% della lunghezza)` è **dritta** = **rasoterra** (passaggio rasoterra che
+  Sotto `max(CURVE_MIN_M 1,2 m, CURVE_MIN_FRAC 15% della lunghezza)` è **dritta** = **rasoterra** (ma il passaggio dritto
+  più lungo di `TRATTO_LOFT_M` 25 m o con un avversario sulla linea, `blocked`, va **alto ma dritto**, Luis 2026-11-23; passaggio rasoterra che
   arriva al compagno a `GROUND_ARRIVE` 5 m/s o si ferma dove finisce la linea nello spazio; tiro rasoterra che rotola
   fino al punto della porta). Sopra è **curva** = **a effetto e alta**: gira dal lato della curva disegnata (la pancia del
   volo è quella della linea) e si alza scavalcando chi sta in mezzo, di più con più curva (`CURVE_T_MIN`,
@@ -133,11 +134,12 @@
   si scelgono solo nella versione Godot (`godot/scripts/partita/meteo.gd`, col seme; in campionato secondo la giornata).
 - **Colpo di testa controllato** (Godot, Luis 2026-11-22, `godot/sim/testa.gd`): pallone alto di un compagno (cross,
   lancio, angolo) che sta per arrivare ad altezza di testa a un nostro attaccante entro 17 m dalla porta avversaria =
-  **fermatempo**: il pallone arriva alla testa dopo **3 secondi veri** (`TESTA_FERMATEMPO_S` in
-  `scripts/partita/fermatempo_testa.gd`, velocità = volo che manca / secondi veri che mancano), visuale con la porta,
-  controllo a chi colpisce, cerchio giallo intorno a lui che si svuota con la scritta piccola "Di testa!". Linea col dito
+  **fermatempo**: il tempo si **ferma del tutto** (niente rallenty, Luis 2026-11-23) per **3 secondi veri**
+  (`TESTA_FERMATEMPO_S` in `scripts/partita/fermatempo_testa.gd`; se il dito sta ancora disegnando si aspetta che lo
+  alzi), visuale vicina come nel tiro (`head_view` in `camfit.gd`: chi colpisce grande in basso, la porta sopra),
+  controllo a chi colpisce, come col pallone nel rallenty (dito vicino a lui = linea, lontano = trascinando gira la visuale), cerchio giallo intorno a lui che si svuota con la scritta piccola "Di testa!". Linea col dito
   verso la porta = colpo di testa lì (precisione secondo `tes`), verso un compagno o il campo = sponda; disegnata la
-  linea il tempo torna normale e il colpo parte appena arriva il pallone. **Senza linea il pallone è perso** (nessun
+  linea il tempo torna normale e il colpo parte appena arriva il pallone. **Finiti i 3 secondi senza linea il pallone è perso** (`headExpire`: non si disegna più) (nessun
   compagno lo tocca: passa sopra, lo prende la difesa o il portiere). Senza fermatempo i colpi di testa restano
   automatici come prima. Il cross alto si disegna col tratto curvo. Il fermatempo si apre solo se nessun avversario
   (portiere compreso) arriva sul pallone chiaramente prima; il difensore che arriva insieme se lo contende in salto

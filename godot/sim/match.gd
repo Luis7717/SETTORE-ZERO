@@ -30,6 +30,7 @@ const CURL_APEX_MIN := 1.4    # tiro a giro: punto più alto del volo (m) con po
 const CURL_APEX_MAX := 2.6    # ... e con effetto pieno
 const GROUND_ARRIVE := 5.0    # passaggio rasoterra: velocità con cui arriva al compagno (m/s)
 const GROUND_ARRIVE_SPACE := 1.0 # ... e nello spazio, dove si deve quasi fermare (m/s)
+const TRATTO_LOFT_M := 25.0  # tratto dritto più lungo di così (o con un avversario sulla linea) = pallone alto ma dritto (Luis 2026-11-23)
 const MATE_AT_END := 5.0      # c'è un compagno entro tanti metri dalla fine della linea = passaggio a lui (m)
 const FIRST_SIG := 1.15      # di prima (spec.first): errore di mira ×1,15 ...
 const FIRST_SIG_STAT := 0.008 # ... più 0,008 per ogni punto che manca a 100 (tiro per i tiri, passaggio per il resto)
@@ -416,7 +417,9 @@ func launch(p: R.Player, spec: Dictionary, noise: bool) -> Dictionary:
 		c = 0.0 # tratto dritto: dritto anche il pallone
 	if type == "auto":
 		if tratto:
-			type = "loft" if curved else "ground"
+			# curvo = alto a effetto; dritto = rasoterra se corto e con la linea libera, altrimenti alto ma dritto
+			# (Luis 2026-11-23: il lancio lungo dall'altra parte partiva rasoterra e veniva intercettato)
+			type = "loft" if (curved or D > TRATTO_LOFT_M or blocked(sx, sy, spec.tx, spec.ty, tm)) else "ground"
 		else:
 			type = "loft" if (D > 30.0 or blocked(sx, sy, spec.tx, spec.ty, tm)) else "ground"
 	var press: float = nearOpp(p.x, p.y, tm)

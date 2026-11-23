@@ -205,6 +205,7 @@ class HeadWin:
 	var tc: float = 0.0      # tempo di partita previsto dall'apertura al colpo (s)
 	var age: float = 0.0     # tempo di partita dall'apertura (s)
 	var aimed: bool = false  # la persona ha disegnato la linea
+	var lost: bool = false   # tempo del fermatempo finito senza linea: non si disegna più, il pallone è perso
 	var goal: bool = false   # ... verso la porta (altrimenti sponda verso un compagno o un punto del campo)
 	var ax: float = 0.0      # punto mirato: in porta (x, altezza ah) o nel campo (x, y)
 	var ay: float = 0.0
