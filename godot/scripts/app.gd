@@ -189,7 +189,7 @@ func _partita(tipo: String, avversario: Dictionary, titolo: String, durata: floa
 	var s: Dictionary = carriera.s
 	# squadraPartita: niente infortunati, chi è giù di forma parte stanco
 	var opz := {"squadra_a": carriera.squadraPartita(), "squadra_b": avversario, "me": 0, "tipo": tipo,
-		"durata_tempo": durata, "seme": randi() % 1000000000, "titolo": titolo, "autoGk": bool(s.settings.autoGk),
+		"durata_tempo": durata, "seme": randi() % 1000000000, "titolo": titolo, "autoGk": Carriera.portiere_auto(s.settings, tipo),
 		"derby": derby, "momenti": tipo != "allenamento" and bool(s.settings.get("momenti", false))}
 	if tipo == "allenamento": # lezioni guidate: squadre senza stile di gioco, come sempre
 		for k: String in ["squadra_a", "squadra_b"]:

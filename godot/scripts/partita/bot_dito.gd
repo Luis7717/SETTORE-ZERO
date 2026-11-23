@@ -76,7 +76,11 @@ func _decidi(g, now: int) -> void:
 		"dive":
 			var s: R.Shot = b.shot
 			var gk: R.Player = m.gk(me)
-			_linea(g, now, _sch(g, gk.x, gk.y, 1.0), _sch(g, s.cx, -dir * C.HL, s.ch), "tuffo")
+			# col fermatempo della parata la persona vede solo il bersaglio: il bot punta al suo centro
+			var ar: Dictionary = m.paraArea(me)
+			var px: float = float(ar.x) if not ar.is_empty() else s.cx
+			var ph: float = float(ar.h) if not ar.is_empty() else s.ch
+			_linea(g, now, _sch(g, gk.x, gk.y, 1.0), _sch(g, px, -dir * C.HL, ph), "tuffo")
 		"restart":
 			if c != null and b.owner == c and m.restart.t > 0.6:
 				_passa(g, now, c)

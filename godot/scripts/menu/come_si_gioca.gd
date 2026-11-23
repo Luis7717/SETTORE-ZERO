@@ -9,7 +9,7 @@ const HOWTO := [
 	["Duello e passaggio", "Quando ti avvicini a un difensore la visuale si abbassa e il tempo rallenta: <b>disegna fino a un compagno</b> (uno qualunque) per passare, oppure tocca <b>Dribbling</b> per saltarlo. Se invece un avversario ti arriva <b>alla pari o alle spalle</b> il tempo rallenta e compare <b>Scatto</b>: il tuo giocatore si stacca e prosegue dritto (oppure passi disegnando fino a un compagno). Trascinando il dito di lato sul campo giri la visuale."],
 	["Area di tiro", "Negli <b>ultimi 20 metri</b> il tempo rallenta: linea in porta per <b>tirare</b>, ogni altra linea è un <b>passaggio</b> (anche sulle rimesse il passaggio si disegna)."],
 	["Difesa", "In difesa <b>disegna una linea dai tuoi giocatori</b> (tutti tranne il portiere): corrono lungo la strada che tracci, per chiudere l’avversario o tagliare la linea del passaggio. Ogni difensore intercetta in un piccolo raggio: più largo se è bravo in difesa, più stretto se chi passa è bravo nei passaggi. Tocca un compagno per comandarlo."],
-	["Portiere", "Quando tirano la visuale va dietro la tua porta e il tempo rallenta: <b>tira una linea dal portiere al punto della porta</b> dove arriva la palla e alza il dito al momento giusto. Più la palla è lontana dal portiere, più è difficile arrivarci."],
+	["Portiere", "Il portiere para da solo, secondo la sua bravura e quella di chi tira. Nelle Impostazioni puoi provare il portiere <b>Manuale</b>: quando tirano il tempo si ferma per 3 secondi, un <b>bersaglio rosso</b> sulla porta mostra dove arriva la palla e <b>tiri una linea dal portiere al punto</b> dove tuffarti. Un tiro forte nell'angolo lontano può restare imprendibile."],
 ]
 
 var pagina := 0

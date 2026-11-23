@@ -15,6 +15,7 @@
 #   --esci-a-fine       a fine partita stampa il riassunto ed esce (codice 0)
 #   --scena=area|duello|fuga|angolo|rinvio|rilancio|pausa|gol|curva|prima   mette la partita in una situazione da fotografare (gol: tiro a
 #                       porta vuota, per vedere cronaca e replay)
+#   --scena=parata|parata_linea   tiro avversario: fermatempo della parata col bersaglio (parata_linea: dito che disegna)
 #   --scena=fuori_lato|fuori_fondo|fuori_fondo_vicino|fuori_rete|fuori_angolo   pallone che esce: scena della ripresa
 #                       (sim/riprese.gd), rimessa, rinvio col raccattapalle (sim/raccatta.gd), rinvio col pallone vicino,
 #                       rinvio col pallone dietro la rete (lo prende il raccattapalle), calcio d'angolo
@@ -73,6 +74,7 @@ const CronacaVista := preload("res://scripts/partita/cronaca_vista.gd")
 const Meteo := preload("res://scripts/partita/meteo.gd")
 const TifoEventi := preload("res://scripts/partita/tifo_eventi.gd")
 const FermatempoTesta := preload("res://scripts/partita/fermatempo_testa.gd")
+const ParataRegia := preload("res://scripts/partita/parata_regia.gd")
 const MomentiRegia := preload("res://scripts/partita/momenti_regia.gd")
 const Momenti := preload("res://scripts/partita/momenti.gd")
 const SCENA_VISTA := "res://scenes/vista_partita.tscn"
@@ -129,6 +131,7 @@ var _anteprima_viva := false
 var _inizio_ms := 0
 var _seme_partita := 0
 var _testa_reale := -1.0       # secondi veri dall'apertura del fermatempo del colpo di testa (−1 = chiuso)
+var _parata := ParataRegia.new() # fermatempo della parata col bersaglio (portiere manuale, sim/parata.gd)
 var _scena_veloce := false     # un tocco durante la scena della ripresa la fa andare più veloce (fino alla fine)
 var meteo := {"meteo": "sereno", "ora": "giorno"}  # scripts/partita/meteo.gd: avvio.meteo/ora o a caso col seme
 
@@ -240,7 +243,7 @@ func _crea_partita() -> void:
 	var auto_gk: bool = _avvio.get("autoGk", false)
 	meteo = Meteo.per_partita(_avvio, _opzioni, seme, tipo() == "allenamento" or tipo() == "prove")
 	m = SimMatchScript.new({"seed": seme, "halfLen": tempo, "human": [me == 0, me == 1],
-		"autoGk": [auto_gk and me == 0, auto_gk and me == 1], "teams": squadre, "meteo": meteo.meteo, "testa": true, "rifiniture": true,
+		"autoGk": [auto_gk and me == 0, auto_gk and me == 1], "teams": squadre, "meteo": meteo.meteo, "testa": true, "parata": true, "rifiniture": true,
 		# lezioni e prove di tiro: il tiratore non parte da solo e le riprese restano immediate
 		"portaAuto": tipo() != "allenamento" and tipo() != "prove", "riprese": tipo() != "allenamento" and tipo() != "prove"})
 	if tipo() == "allenamento":
@@ -309,6 +312,7 @@ func _process(delta: float) -> void:
 		_passi_motore(dt)
 		_eventi()
 		_cerchio_testa()
+		_parata.mostra(m, me, vista, hud)
 		if replay != null:
 			replay.registra(m)
 		_zoom()
@@ -396,6 +400,8 @@ func _passi_motore(dt: float) -> void:
 	var tasto_ok := allenamento == null or allenamento.finished or String(allenamento.lesson().get("id", "")) != "passaggio"
 	hud.mostra_dribbling(tasto_ok and ((m.duelFor(me) and not m.dribBooked(me)) or flee) and not gesti.drawing, flee)
 	var testa := _velocita_testa(dt)
+	if testa < 0.0: # fermatempo della parata: stessa regola (fermo o normale)
+		testa = _parata.velocita(dt, m, me, gesti.mode == "dive" and gesti.dito >= 0)
 	if testa >= 0.0:
 		ts = testa # fermatempo del colpo di testa: fermo o normale, niente passaggio dolce
 	else:
@@ -949,6 +955,29 @@ func _prepara_scena(nome: String) -> void:
 				m.userKick(me, {"type": "auto", "tx": cm.x, "ty": cm.y, "curve": 6.0, "tratto": true})
 				await get_tree().create_timer(0.15).timeout
 				_linea_curva_di_prova(Vector3(cm.x, cm.y, 0.9), Vector3(2.5, dy * C.HL, 1.2), 0.0, true)
+		"parata", "parata_linea": # tiro avversario da 20 m verso la nostra porta: fermatempo della parata col bersaglio
+			_metti_in_gioco()
+			var dp := -1.0 if me == 0 else 1.0 # verso della nostra porta
+			var tir_: R.Player = m.team(1 - me)[9]
+			_sposta(tir_, -6.0, dp * (C.HL - 20.0))
+			_sposta(m.gk(me), 0.0, dp * (C.HL - 0.6))
+			tir_.fx = 0.0
+			tir_.fy = dp
+			m.ball.owner = tir_
+			m.ball.last = tir_
+			m.ball.x = tir_.x
+			m.ball.y = tir_.y + 0.6 * dp
+			m.kick(tir_, {"type": "shot", "tx": 2.6, "ty": dp * C.HL, "th": 1.7})
+			if nome == "parata_linea": # il dito disegna dal portiere verso l'alto a destra e resta giù
+				while not m.paraFor(me):
+					await get_tree().process_frame
+				await get_tree().create_timer(0.8).timeout
+				var gk_: R.Player = m.gk(me)
+				var a: Vector3 = vista.world_to_screen(gk_.x, gk_.y, 1.0)
+				var b: Vector3 = vista.world_to_screen(2.4, dp * C.HL, 1.8)
+				gesti.down(Vector2(a.x, a.y), Time.get_ticks_msec())
+				for i in range(1, 13):
+					gesti.move_ev(Vector2(a.x, a.y).lerp(Vector2(b.x, b.y), i / 12.0))
 		"angolo":
 			m.setRestart("corner", me, C.HW, C.HL)
 		"rinvio": # rinvio dal fondo del nostro portiere (posa rilassata dietro il pallone)

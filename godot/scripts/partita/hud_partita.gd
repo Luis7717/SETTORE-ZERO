@@ -18,6 +18,8 @@ const SHADER_RALLENTY := preload("res://shaders/rallenty.gdshader")
 const Minimappa := preload("res://scripts/partita/minimappa.gd")
 const Anteprima := preload("res://scripts/partita/anteprima.gd")
 const CerchioTesta := preload("res://scripts/partita/cerchio_testa.gd")
+const BersaglioTiro := preload("res://scripts/partita/bersaglio_tiro.gd")
+const TESTO_PARA := "Para!"
 
 const MARGINE := 10.0
 const TASTO_DAL_FONDO := 16.0     # punti tra il tasto Dribbling/Scatto e il fondo dell'area sicura
@@ -43,6 +45,8 @@ var _rallenty_mat: ShaderMaterial
 var _rallenty_on := false
 var _anteprima: Control
 var _cerchio: Control             # cerchio del colpo di testa controllato (cerchio_testa.gd)
+var _cerchio_para: Control        # lo stesso cerchio per il fermatempo della parata, con la scritta "Para!"
+var _bersaglio: Control           # bersaglio del tiro sulla porta e scia del volo (bersaglio_tiro.gd)
 var _segnapunti: PanelContainer
 var _k0: ColorRect
 var _k1: ColorRect
@@ -85,6 +89,14 @@ func _ready() -> void:
 	_cerchio = CerchioTesta.new()
 	_cerchio.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_cerchio)
+	_bersaglio = BersaglioTiro.new()
+	_bersaglio.hud = self
+	_bersaglio.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_bersaglio)
+	_cerchio_para = CerchioTesta.new()
+	_cerchio_para.testo = TESTO_PARA
+	_cerchio_para.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_cerchio_para)
 	_crea_segnapunti()
 	_crea_angoli()
 	_crea_centro()
@@ -415,6 +427,27 @@ func cerchio_testa(c: Vector2, f: float) -> void:
 
 func cerchio_testa_visibile() -> bool:
 	return _cerchio.visible
+
+
+## cerchio "Para!" del fermatempo della parata intorno al punto `c` dello schermo; f < 0 = nascosto
+func cerchio_parata(c: Vector2, f: float) -> void:
+	if f < 0.0:
+		_cerchio_para.nascondi()
+	else:
+		_cerchio_para.mostra(c, f)
+
+
+func cerchio_parata_visibile() -> bool:
+	return _cerchio_para.visible
+
+
+## bersaglio del tiro sulla porta: dati {x, h, rx, rh, gy, volo} (parata_regia.gd); vuoto = nascosto
+func bersaglio_tiro(dati: Dictionary) -> void:
+	_bersaglio.imposta(dati)
+
+
+func bersaglio_visibile() -> bool:
+	return _bersaglio.visible
 
 
 func rallenty(si: bool) -> void:
