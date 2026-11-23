@@ -1,13 +1,13 @@
-# Come si gioca (howto() e HOWTO di src/ui.js): cinque pagine (correre e tirare, duello e passaggio, area di tiro,
+# Come si gioca (howto() e HOWTO di src/ui.js): cinque pagine (passare e tirare, duello e passaggio, area di tiro,
 # difesa, portiere) con disegno, titolo e testo; puntini in alto, Avanti, Salta; l'ultima porta all'allenamento.
 extends MenuSchermata
 
 const I := preload("res://scripts/menu/icone.gd")
 
 const HOWTO := [
-	["Correre e tirare", "Col pallone <b>disegna la strada</b> partendo dal tuo giocatore: lui la segue, e con tanta strada davanti <b>scatta</b>. Se la linea <b>finisce dentro la porta</b> è un tiro; curvala per tirare a giro."],
+	["Passare e tirare", "Col pallone il tuo giocatore <b>corre da solo</b>: tu <b>disegni dal pallone</b> e ogni linea è un calcio. Se la linea <b>finisce dentro la porta</b> è un tiro, altrimenti è un <b>passaggio</b> (a un compagno o nello spazio). Linea dritta = rasoterra; linea <b>curva</b> = palla alta a effetto, che gira dal lato della curva."],
 	["Duello e passaggio", "Quando ti avvicini a un difensore la visuale si abbassa e il tempo rallenta: <b>disegna fino a un compagno</b> (uno qualunque) per passare, oppure tocca <b>Dribbling</b> per saltarlo. Se invece un avversario ti arriva <b>alla pari o alle spalle</b> il tempo rallenta e compare <b>Scatto</b>: il tuo giocatore si stacca e prosegue dritto (oppure passi disegnando fino a un compagno). Trascinando il dito di lato sul campo giri la visuale."],
-	["Area di tiro", "Negli <b>ultimi 20 metri</b> il tempo rallenta: linea in porta per <b>tirare</b>, ogni altra linea è un <b>passaggio</b> (durante il rallenty non si disegna la corsa)."],
+	["Area di tiro", "Negli <b>ultimi 20 metri</b> il tempo rallenta: linea in porta per <b>tirare</b>, ogni altra linea è un <b>passaggio</b> (anche sulle rimesse il passaggio si disegna)."],
 	["Difesa", "In difesa <b>disegna una linea dai tuoi giocatori</b> (tutti tranne il portiere): corrono lungo la strada che tracci, per chiudere l’avversario o tagliare la linea del passaggio. Ogni difensore intercetta in un piccolo raggio: più largo se è bravo in difesa, più stretto se chi passa è bravo nei passaggi. Tocca un compagno per comandarlo."],
 	["Portiere", "Quando tirano la visuale va dietro la tua porta e il tempo rallenta: <b>tira una linea dal portiere al punto della porta</b> dove arriva la palla e alza il dito al momento giusto. Più la palla è lontana dal portiere, più è difficile arrivarci."],
 ]

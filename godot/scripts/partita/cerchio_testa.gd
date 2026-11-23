@@ -11,6 +11,7 @@ const OMBRA := Color(0, 0, 0, 0.45)
 const PUNTI := 48
 const TESTO := "Di testa!"
 const TESTO_DIM := 15
+const TESTO_SU := 30.0         # punti tra il cerchio e la scritta: sopra il triangolo del giocatore controllato
 
 var centro := Vector2.ZERO
 var frazione := 1.0            # 1 = pieno, 0 = vuoto
@@ -43,6 +44,6 @@ func _draw() -> void:
 		var a0 := -PI / 2.0
 		draw_arc(centro, RAGGIO, a0, a0 + TAU * frazione, maxi(4, int(PUNTI * frazione)), COLORE, SPESSORE, true)
 	var w := _font.get_string_size(TESTO, HORIZONTAL_ALIGNMENT_LEFT, -1, TESTO_DIM).x
-	var p := centro + Vector2(-w / 2.0, -RAGGIO - 10.0)
+	var p := centro + Vector2(-w / 2.0, -RAGGIO - TESTO_SU)
 	draw_string_outline(_font, p, TESTO, HORIZONTAL_ALIGNMENT_LEFT, -1, TESTO_DIM, 4, OMBRA)
 	draw_string(_font, p, TESTO, HORIZONTAL_ALIGNMENT_LEFT, -1, TESTO_DIM, COLORE)

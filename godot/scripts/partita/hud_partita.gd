@@ -20,6 +20,7 @@ const Anteprima := preload("res://scripts/partita/anteprima.gd")
 const CerchioTesta := preload("res://scripts/partita/cerchio_testa.gd")
 
 const MARGINE := 10.0
+const TASTO_DAL_FONDO := 16.0     # punti tra il tasto Dribbling/Scatto e il fondo dell'area sicura
 const GIALLO := Color("#ffe14a")
 const ROSSO := Color("#ff6b6b")
 const FONDO := Color(0.039, 0.063, 0.125, 0.85)
@@ -320,9 +321,10 @@ func _metti_suggerimento() -> void:
 	var s := _sicura
 	_adatta_pillola(_suggerimento, s.size.x - 24.0)
 	_suggerimento.position = Vector2(s.position.x + (s.size.x - _suggerimento.size.x) / 2.0, s.end.y - 14.0 - _suggerimento.size.y)
-	# tasto Dribbling / Scatto 62 punti sopra il fondo come nel web, ma sempre sopra il suggerimento (che può andare a capo)
+	# tasto Dribbling / Scatto in fondo all'area sicura (nel web stava 62 punti più su e copriva i piedi del
+	# portatore e il pallone da cui si disegna), ma sempre sopra il suggerimento (che può andare a capo)
 	_dribbling.reset_size()
-	var fondo := s.end.y - 62.0
+	var fondo := s.end.y - TASTO_DAL_FONDO
 	if _suggerimento.visible:
 		fondo = minf(fondo, _suggerimento.position.y - 10.0)
 	_dribbling.position = Vector2(s.position.x + (s.size.x - _dribbling.size.x) / 2.0, fondo - _dribbling.size.y)
@@ -544,7 +546,7 @@ func mostra_pausa(testo_esci: String) -> void:
 			b_esci.set_meta("ok", true)
 			b_esci.text = "Tocca di nuovo per confermare")
 	_spazio(10)
-	_nota("Attacco: disegna la strada dal giocatore per correre, una linea in porta per tirare, fino a un compagno per passare.\nDifesa: disegna linee dai tuoi giocatori, oppure tieni premuto per muovere il difensore.\nPortiere: tira una linea dal portiere al punto della porta.")
+	_nota("Attacco: il portatore corre da solo; ogni linea dal pallone è un calcio: in porta = tiro, altrimenti passaggio. Dritta = rasoterra, curva = alta a effetto.\nDifesa: disegna linee dai tuoi giocatori, oppure tieni premuto per muovere il difensore.\nPortiere: tira una linea dal portiere al punto della porta.")
 
 
 func mostra_intervallo(gol0: int, gol1: int) -> void:

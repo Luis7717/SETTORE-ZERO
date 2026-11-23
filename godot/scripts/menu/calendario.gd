@@ -43,8 +43,14 @@ func _riga(i: int, home: bool, opp: Dictionary, r: Variant, adesso: bool) -> Con
 	h.add_child(n)
 	var k := D.kit(opp.get("kit", 0))
 	h.add_child(MenuStemma.nuovo(c.teamCrest(opp), int(k[1]), int(k[2]), Vector2(22, 26)))
-	h.add_child(U.corto(("Casa" if home else "Fuori") + " · " + str(opp.name), 15.5, T.TXT, T.PESO_FORTE))
-	h.add_child(U.testo("forza %d" % int(opp.rating), 12.5, T.DIM, T.PESO_MEDIO))
+	# nome dell'avversario su tutta la larghezza; casa/fuori e forza sotto, piccoli (prima stavano sulla stessa
+	# riga e il nome si leggeva a metà)
+	var testi := U.vbox(0)
+	testi.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	testi.alignment = BoxContainer.ALIGNMENT_CENTER
+	testi.add_child(U.corto(str(opp.name), 15.5, T.TXT, T.PESO_FORTE))
+	testi.add_child(U.corto(("Casa" if home else "Fuori") + " · forza %d" % int(opp.rating), 12.5, T.DIM, T.PESO_MEDIO))
+	h.add_child(testi)
 	if r is Array and r.size() >= 2:
 		var cls := "o3" if r[0] > r[1] else ("bad" if r[0] < r[1] else "o2")
 		var v := U.valutazione(0, cls, 52)

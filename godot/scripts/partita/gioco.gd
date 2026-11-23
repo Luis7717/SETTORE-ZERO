@@ -510,7 +510,9 @@ static func _nome_giochetto(t: Variant) -> String:
 func _gol(e: Dictionary) -> void:
 	var chi: String = (e.scorer as R.Player).name if e.scorer != null else "Autogol"
 	var piccolo := "%s · %d'" % [chi, e.minute]
-	if e.team == me:
+	if prove != null: # allenamento libero: l'esito (GOL! +punti) lo scrive già il riquadro delle prove
+		audio.goal()
+	elif e.team == me:
 		audio.goal()
 		hud.big("GOL!", "g", 2600, piccolo)
 	else:

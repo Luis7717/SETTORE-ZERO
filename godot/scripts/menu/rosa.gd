@@ -394,7 +394,10 @@ func _pannello_giocatore(p: Dictionary, F: Array) -> Control:
 	info += " · %d anni · %s" % [int(p.age), D.fmt_money(D.value(p))]
 	if p.get("num") != null:
 		info += " · n. %d" % int(p.num)
-	nm.add_child(U.corto(info, 11.5, T.DIM, T.PESO_MEDIO))
+	var riga_info := U.paragrafo(info, 11.5, T.DIM, T.PESO_MEDIO) # va a capo: coi puntini si perdevano età e valore
+	riga_info.add_theme_constant_override("line_spacing", 0)
+	riga_info.max_lines_visible = 2
+	nm.add_child(riga_info)
 	testa.add_child(nm)
 	testa.add_child(U.valutazione(at.o, D.ovr_cls(at.o)))
 	var x := U.bottone("×", "Chiudi", _chiudi, 38)

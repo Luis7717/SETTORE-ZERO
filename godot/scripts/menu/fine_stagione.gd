@@ -40,6 +40,6 @@ func costruisci() -> void:
 		corpo.add_child(U.bb("[center]%s [color=%s][b]%s[/b][/color][/center]" % [U.esc(str(ob.get("messaggio", ""))), col, cifra], 15, Color("#d7e1f3")))
 	var nuovo := Dirigenza.testo(carriera().obiettivo()) if not stato().is_empty() else ""
 	if nuovo != "":
-		corpo.add_child(U.bb("[center]Obiettivo della nuova stagione: [b]%s[/b][/center]" % U.esc(nuovo), 14, T.DIM))
+		corpo.add_child(U.bb("[center]Obiettivo della nuova stagione: [b]%s[/b][/center]" % U.esc(nuovo).replace("primi ", "primi\u00a0"), 14, T.DIM)) # "(primi 5)" non si spezza
 	corpo.add_child(U.spazio(4))
 	corpo.add_child(U.bottone("AVANTI", "BtnGrande", func() -> void: vai("hub")))
