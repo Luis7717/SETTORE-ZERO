@@ -15,10 +15,13 @@
 #   --esci-a-fine       a fine partita stampa il riassunto ed esce (codice 0)
 #   --scena=area|duello|fuga|angolo|rinvio|rilancio|pausa|gol|curva|prima   mette la partita in una situazione da fotografare (gol: tiro a
 #                       porta vuota, per vedere cronaca e replay)
+#   --scena=fuori_lato|fuori_fondo|fuori_fondo_vicino|fuori_angolo   pallone che esce: scena della ripresa (sim/riprese.gd),
+#                       rimessa, rinvio col raccattapalle, rinvio col pallone vicino, calcio d'angolo
 #   --esultanza=ID      con --scena=gol chi segna è il campione e fa quell'esultanza (id in esultanze.gd)
 #   --senza-replay      dopo il gol niente replay (si va subito al calcio d'inizio)
 #   --replay=porta|lato visuale del replay del gol (predefinito: a caso)
 #   --schermata=PERCORSO.png [--dopo=SEC] [--alla-fine]   schermata dopo SEC secondi veri, o alla fine partita
+#   --ogni=SEC          con --schermata: una schermata ogni SEC secondi veri (PERCORSO_01.png, _02, ...) fino a --dopo
 #   --esci-dopo=SEC     esce dopo SEC secondi veri
 #   --campo=NOME        taglio dell'erba (strisce, strette, verticali, quadrotti, cerchi, uniforme, rombi, raggi, diagonali)
 #   --manto=NOME        colore dell'erba (vivo, milano, naturale, sintetico, sintetico_chiaro, estivo)
@@ -80,6 +83,7 @@ const PASS_DRAW_SLOW := 0.04  # mentre si disegna un passaggio o un tiro
 const DUEL_SLOW := 0.08       # duello col difensore
 const FLEE_SLOW := 0.08       # fuga: avversario alla pari o alle spalle, tasto Scatto
 const ZONE_SLOW := 0.1        # area di tiro (ultimi 20 m prima della porta avversaria)
+const SCENA_VELOCE := 3.0     # scena della ripresa (sim/riprese.gd) dopo un tocco: va tanto più veloce
 const TEMPO_K := 14.0         # 1/s: il tempo passa dolcemente da una velocità all'altra
 const DT_MAX := 0.05          # fotogramma più lungo considerato (s)
 const PASSO_MAX := 1.0 / 60.0 # passo del motore: il tempo del fotogramma si divide in passi non più lunghi di così
@@ -124,6 +128,7 @@ var _anteprima_viva := false
 var _inizio_ms := 0
 var _seme_partita := 0
 var _testa_reale := -1.0       # secondi veri dall'apertura del fermatempo del colpo di testa (−1 = chiuso)
+var _scena_veloce := false     # un tocco durante la scena della ripresa la fa andare più veloce (fino alla fine)
 var meteo := {"meteo": "sereno", "ora": "giorno"}  # scripts/partita/meteo.gd: avvio.meteo/ora o a caso col seme
 
 
@@ -235,7 +240,8 @@ func _crea_partita() -> void:
 	meteo = Meteo.per_partita(_avvio, _opzioni, seme, tipo() == "allenamento" or tipo() == "prove")
 	m = SimMatchScript.new({"seed": seme, "halfLen": tempo, "human": [me == 0, me == 1],
 		"autoGk": [auto_gk and me == 0, auto_gk and me == 1], "teams": squadre, "meteo": meteo.meteo, "testa": true,
-		"portaAuto": tipo() != "allenamento" and tipo() != "prove"}) # lezioni e prove di tiro: il tiratore non parte da solo
+		# lezioni e prove di tiro: il tiratore non parte da solo e le riprese restano immediate
+		"portaAuto": tipo() != "allenamento" and tipo() != "prove", "riprese": tipo() != "allenamento" and tipo() != "prove"})
 	if tipo() == "allenamento":
 		tempo = Allenamento.HALF_LEN
 		if not avviata_da_app():
@@ -389,6 +395,11 @@ func _passi_motore(dt: float) -> void:
 	else:
 		ts += (target - ts) * minf(1.0, dt * TEMPO_K)
 	var sdt := dt * ts * _velocita
+	if _scena_veloce:
+		if in_scena():
+			sdt *= SCENA_VELOCE
+		else:
+			_scena_veloce = false
 	var n := maxi(1, ceili(sdt / PASSO_MAX)) if sdt > 0.0 else 0 # tempo fermo (colpo di testa): nessun passo
 	if allenamento != null:
 		allenamento.before()
@@ -408,6 +419,11 @@ func _passi_motore(dt: float) -> void:
 		prove.after(sdt)
 	hud.rallenty(ts < RALLENTY_SOTTO)
 	audio.folla(FOLLA_BASE, AudioPartita.eccitazione(m.ball.y))
+
+
+## scena della ripresa in corso (sim/riprese.gd): il battitore va a prendere il pallone, la rincorsa del calcio
+func in_scena() -> bool:
+	return m != null and m.phase == "restart" and m.restart != null and (m.restart.scena != "" or m.restart.pend != null)
 
 
 # visuale larga senza palla o mentre si disegna (setZoom del web): solo se la vista lo sa fare
@@ -613,6 +629,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		if replay != null and replay.attivo(): # un tocco salta il replay (i tasti dell'HUD restano tasti)
 			if e.pressed and not paused and not hud.tocca_hud(e.position):
 				replay.salta()
+			return
+		if e.pressed and giocabile and in_scena() and not hud.tocca_hud(e.position):
+			_scena_veloce = true # scena della ripresa: un tocco la fa andare più veloce (non si batte ancora)
 			return
 		if e.pressed:
 			if giocabile and gesti.dito < 0 and not hud.tocca_hud(e.position):
@@ -832,6 +851,15 @@ func _avvia_prove() -> void:
 			while stato != "fine":
 				await get_tree().process_frame
 			await get_tree().create_timer(0.6).timeout
+		elif _opzioni.has("ogni"): # sequenza di schermate
+			var ogni := maxf(0.05, float(_opzioni["ogni"]))
+			var n := int(float(_opzioni.get("dopo", "3")) / ogni)
+			var base: String = _opzioni["schermata"].get_basename()
+			for i in range(1, n + 1):
+				await get_tree().create_timer(ogni).timeout
+				await _salva_schermata("%s_%02d.png" % [base, i])
+			_esci()
+			return
 		else:
 			await get_tree().create_timer(float(_opzioni.get("dopo", "3"))).timeout
 		await _salva_schermata(_opzioni["schermata"])
@@ -917,6 +945,8 @@ func _prepara_scena(nome: String) -> void:
 			m.setRestart("corner", me, C.HW, C.HL)
 		"rinvio": # rinvio dal fondo del nostro portiere (posa rilassata dietro il pallone)
 			m.setRestart("goalkick", me, 5.0, -C.HL if me == 0 else C.HL)
+		"fuori_lato", "fuori_fondo", "fuori_fondo_vicino", "fuori_angolo":
+			_pallone_fuori(nome)
 		"rilancio": # il nostro portiere ha preso il pallone in area: rilancio dalle mani (pallone tra le mani)
 			_metti_in_gioco()
 			var por: R.Player = m.gk(me)
@@ -975,6 +1005,42 @@ func _linea_curva_di_prova(a: Vector3, b: Vector3, pancia: float, alza: bool) ->
 		await get_tree().process_frame
 	if alza:
 		gesti.up(ultimo, Time.get_ticks_msec())
+
+
+## pallone che rotola fuori: la ripresa diventa una scena (sim/riprese.gd). fuori_lato = rimessa nostra sulla destra;
+## fuori_fondo = rinvio nostro col pallone lontano (raccattapalle); fuori_fondo_vicino = pallone vicino all'area piccola;
+## fuori_angolo = angolo nostro a destra
+func _pallone_fuori(nome: String) -> void:
+	_metti_in_gioco()
+	var d := 1.0 if me == 0 else -1.0
+	var b := m.ball
+	match nome:
+		"fuori_lato":
+			b.last = m.team(1 - me)[6]
+			b.x = d * 31.0
+			b.y = d * 6.0
+			b.vx = d * 7.0
+			b.vy = d * 1.5
+			_sposta(m.team(me)[7], d * 24.0, d * 2.0)
+		"fuori_fondo", "fuori_fondo_vicino":
+			b.last = m.team(1 - me)[9]
+			var x0 := 20.0 if nome == "fuori_fondo" else 9.0
+			b.x = d * x0
+			b.y = -d * (C.HL - 1.0)
+			b.vx = d * 1.0
+			b.vy = -d * 9.0
+			_sposta(m.gk(me), d * 1.0, -d * (C.HL - 2.0))
+		"fuori_angolo":
+			b.last = m.team(1 - me)[3]
+			b.x = d * 27.0
+			b.y = d * (C.HL - 1.0)
+			b.vx = d * 2.0
+			b.vy = d * 9.0
+			_sposta(m.team(me)[10], d * 18.0, d * (C.HL - 14.0))
+			_sposta(m.team(me)[9], d * 6.0, d * (C.HL - 11.0))
+	b.owner = null
+	if replay != null:
+		replay.buffer.svuota()
 
 
 func _metti_in_gioco() -> void:

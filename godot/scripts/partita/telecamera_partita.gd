@@ -26,6 +26,7 @@ const DUEL_BACK := 0.12        # nel duello si allontana di questa frazione dell
 const FOLLOW_K := 4.5          # 1/s: quanto in fretta insegue il pallone
 const ZOOM_K := 7.0            # 1/s: zoom (più larga senza palla e mentre si disegna)
 const MIN_Y := -HL - 15.5      # la telecamera non va oltre questo punto dietro la propria porta
+const CORNER_IN := 2.5         # 1/s: entrata nella visuale dell'angolo (senza stacco: si vede il battitore arrivare)
 
 var base_fov := 70.0
 var cx := 0.0
@@ -85,7 +86,7 @@ func aggiorna(m: Object, me: int, dt: float, rdt: float, drawing: bool, cam_drag
 	var dir := -1.0 if me == 1 else 1.0
 	var fx: float = b.x
 	var fy: float = b.y
-	if restart_on:
+	if restart_on and m.restart.scena == "": # scena della ripresa (sim/riprese.gd): si segue il pallone, senza stacchi
 		fx = m.restart.x
 		fy = m.restart.y
 	var k := minf(1.0, rdt * FOLLOW_K)
@@ -188,8 +189,8 @@ func _wide_step(m: Object, me: int, mine: bool, duel: bool, rdt: float, pk: floa
 # calcio d'angolo (di chiunque): alle spalle del battitore, verso l'area; dopo il calcio torna piano alla normale
 func _corner_step(m: Object, dir: float, rdt: float, pk: float, user_yaw: float) -> float:
 	var r: Object = m.restart
-	var on: bool = m.phase == "restart" and r != null and r.type == "corner"
-	_corn_k += ((1.0 if on else 0.0) - _corn_k) * minf(1.0, rdt * (4.0 if on else 1.5))
+	var on: bool = m.phase == "restart" and r != null and r.type == "corner" and r.sulPosto()
+	_corn_k += ((1.0 if on else 0.0) - _corn_k) * minf(1.0, rdt * (CORNER_IN if on else 1.5))
 	if _corn_k < 1e-3 and not on:
 		_corn_k = 0.0
 		_corner_p = null

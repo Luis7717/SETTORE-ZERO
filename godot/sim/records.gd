@@ -90,6 +90,10 @@ class Player:
 	var supY: float = 0.0
 	var stickT: float = 0.0
 	var claim: Kick = null # portiere: cross avversario su cui è già uscito (non torna indietro a metà strada)
+	# scena della ripresa (riprese.gd): il giocatore va camminando al suo posto (rtx, rty) invece di esserci messo
+	var rgo: bool = false
+	var rtx: float = 0.0
+	var rty: float = 0.0
 
 
 # calcio in volo: chi l'ha calciato, giocatori in fuorigioco al momento del calcio, età
@@ -222,6 +226,26 @@ class Restart:
 	var t: float = 0.0
 	var wait: float = 0.0
 	var wallSide: float = 0.0
+	# scena della ripresa (riprese.gd, opzione "riprese"): "" = pronta (come sempre), altrimenti il battitore sta ancora
+	# andando a prendere il pallone: "va", "raccogli", "porta", "posa" (lo appoggia), "indietro" (passi di rincorsa)
+	var scena: String = ""
+	var st: float = 0.0        # tempo nel tratto della scena (s)
+	var sT: float = 0.0        # tempo di tutta la scena (s)
+	var sx: float = 0.0        # posto del battitore e verso in cui guarda (quelli di setRestart)
+	var sy: float = 0.0
+	var sfx: float = 0.0
+	var sfy: float = 1.0
+	var kx: float = 0.0        # posto del pallone da calciare (quello di setRestart)
+	var ky: float = 0.0
+	var posato: bool = false   # pallone fermo a terra in (kx, ky) anche se è del battitore (appoggiato o da raccogliere)
+	var rimando: bool = false  # il raccattapalle ha già rimandato il pallone
+	var rinc: bool = false     # il battitore è indietro di qualche passo: al calcio prende la rincorsa
+	var pend: Variant = null   # calcio chiesto durante la rincorsa: parte quando arriva sul pallone
+
+
+	## battitore arrivato al posto col pallone (appoggiato o in mano): da qui si vede come una ripresa ferma
+	func sulPosto() -> bool:
+		return scena == "" or scena == "posa" or scena == "indietro"
 
 
 class Advantage:
