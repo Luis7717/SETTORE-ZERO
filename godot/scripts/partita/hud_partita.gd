@@ -20,6 +20,9 @@ const Anteprima := preload("res://scripts/partita/anteprima.gd")
 const CerchioTesta := preload("res://scripts/partita/cerchio_testa.gd")
 
 const MARGINE := 10.0
+const CERCHIO_RALLENTY_R := 13.0           # timer del rallenty col pallone: raggio del cerchietto (punti logici),
+const CERCHIO_RALLENTY_SP := 3.5           # spessore dell'arco
+const CERCHIO_RALLENTY_COL := Color(1, 1, 1, 0.9)  # bianco: diverso dal giallo del colpo di testa
 const TASTO_DAL_FONDO := 16.0     # punti tra il tasto Dribbling/Scatto e il fondo dell'area sicura
 const GIALLO := Color("#ffe14a")
 const ROSSO := Color("#ff6b6b")
@@ -43,6 +46,7 @@ var _rallenty_mat: ShaderMaterial
 var _rallenty_on := false
 var _anteprima: Control
 var _cerchio: Control             # cerchio del colpo di testa controllato (cerchio_testa.gd)
+var _cerchio_rallenty: Control    # timer del rallenty col pallone: cerchietto bianco sopra il portatore (timer_rallenty.gd)
 var _segnapunti: PanelContainer
 var _k0: ColorRect
 var _k1: ColorRect
@@ -85,6 +89,13 @@ func _ready() -> void:
 	_cerchio = CerchioTesta.new()
 	_cerchio.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_cerchio)
+	_cerchio_rallenty = CerchioTesta.new()
+	_cerchio_rallenty.raggio = CERCHIO_RALLENTY_R
+	_cerchio_rallenty.spessore = CERCHIO_RALLENTY_SP
+	_cerchio_rallenty.colore = CERCHIO_RALLENTY_COL
+	_cerchio_rallenty.testo = ""
+	_cerchio_rallenty.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_cerchio_rallenty)
 	_crea_segnapunti()
 	_crea_angoli()
 	_crea_centro()
@@ -415,6 +426,19 @@ func cerchio_testa(c: Vector2, f: float) -> void:
 
 func cerchio_testa_visibile() -> bool:
 	return _cerchio.visible
+
+
+## timer del rallenty col pallone: cerchietto sopra il portatore (punto `c` dello schermo), pieno per la frazione `f`;
+## f < 0 = nascosto
+func cerchio_rallenty(c: Vector2, f: float) -> void:
+	if f < 0.0:
+		_cerchio_rallenty.nascondi()
+	else:
+		_cerchio_rallenty.mostra(c, f)
+
+
+func cerchio_rallenty_visibile() -> bool:
+	return _cerchio_rallenty.visible
 
 
 func rallenty(si: bool) -> void:

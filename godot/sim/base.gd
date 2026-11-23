@@ -65,6 +65,11 @@ var duelCdP: Array = [null, null]
 var flee: R.Duel = null # fuga: avversario alla pari o dietro (per linee), tasto Scatto; stessi campi del duello
 var fleeCd: Array = [0.0, 0.0]
 var fleeCdP: Array = [null, null]
+# rallenty scaduto (userCalm, Luis 2026-11-23: timer di 10 s veri nel gioco): per il portatore calmP[T] duello e fuga non
+# si riaprono per CALM_CD s di partita e, se è scaduto nell'area di tiro, nemmeno l'area di tiro finché ha il pallone
+var calmP: Array = [null, null]
+var calmT: Array = [0.0, 0.0]
+var calmZone: Array = [false, false]
 var kickoffTeam: int = 0
 # meteo (campo facoltativo "meteo" delle opzioni, match.gd weatherFx): "" = nessuno, motore come sempre
 var meteo: String = ""

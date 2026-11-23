@@ -27,6 +27,8 @@ const FOLLOW_K := 4.5          # 1/s: quanto in fretta insegue il pallone
 const ZOOM_K := 7.0            # 1/s: zoom (più larga senza palla e mentre si disegna)
 const MIN_Y := -HL - 15.5      # la telecamera non va oltre questo punto dietro la propria porta
 const CORNER_IN := 2.5         # 1/s: entrata nella visuale dell'angolo (senza stacco: si vede il battitore arrivare)
+const THROW_IN := 2.5          # 1/s: entrata nella visuale della nostra rimessa laterale, quando il battitore è sulla linea
+const THROW_OUT := 1.5         # 1/s: uscita dopo il lancio
 
 var base_fov := 70.0
 var cx := 0.0
@@ -39,6 +41,8 @@ var _wide_k := 0.0
 var _wide_p: Variant = null     # {pos, look, fov} inseguita
 var _corn_k := 0.0
 var _corner_p: Variant = null
+var _throw_k := 0.0
+var _throw_p: Variant = null
 var _gk_k := 0.0
 var _save_p: Variant = null
 
@@ -59,6 +63,8 @@ func reset(x: float, y: float) -> void:
 	_wide_p = null
 	_corn_k = 0.0
 	_corner_p = null
+	_throw_k = 0.0
+	_throw_p = null
 	_gk_k = 0.0
 	_save_p = null
 
@@ -147,6 +153,9 @@ func aggiorna(m: Object, me: int, dt: float, rdt: float, drawing: bool, cam_drag
 	var ck := _corner_step(m, dir, rdt, pk_drag, user_yaw)
 	if ck > 1e-3:
 		pose = _mix(pose, _corner_p, ck)
+	var tk := _throw_step(m, me, dir, rdt, pk_drag, user_yaw)
+	if tk > 1e-3:
+		pose = _mix(pose, _throw_p, tk)
 	var gk := _save_step(m, me, dir, rdt, pk)
 	if gk > 1e-3:
 		pose = _mix(pose, _save_p, gk)
@@ -198,6 +207,26 @@ func _corner_step(m: Object, dir: float, rdt: float, pk: float, user_yaw: float)
 	if on:
 		_corner_p = _smooth(_corner_p, CF.corner_view(Vector2(r.x * dir, r.y * dir), user_yaw, _aspect(), base_fov), pk)
 	return _corn_k if _corner_p != null else 0.0
+
+
+## rimessa laterale della squadra della persona col battitore arrivato sulla linea (sim/riprese.gd: entra piano)
+static func rimessa_nostra(m: Object, me: int) -> bool:
+	var r: Object = m.restart
+	return m.phase == "restart" and r != null and r.type == "throw" and r.team == me and r.sulPosto()
+
+
+# rimessa laterale nostra: alle spalle del battitore, verso il campo; dopo il lancio torna piano alla normale
+func _throw_step(m: Object, me: int, dir: float, rdt: float, pk: float, user_yaw: float) -> float:
+	var on := rimessa_nostra(m, me)
+	_throw_k += ((1.0 if on else 0.0) - _throw_k) * minf(1.0, rdt * (THROW_IN if on else THROW_OUT))
+	if _throw_k < 1e-3 and not on:
+		_throw_k = 0.0
+		_throw_p = null
+		return 0.0
+	if on:
+		var r: Object = m.restart
+		_throw_p = _smooth(_throw_p, CF.throw_view(Vector2(r.x * dir, r.y * dir), user_yaw, _aspect(), base_fov), pk)
+	return _throw_k if _throw_p != null else 0.0
 
 
 ## la visuale della parata resta: mentre si può parare (diveWin, come il web) e poi finché il nostro portiere è in

@@ -47,6 +47,14 @@ const BURST_SHAKE := 0.6  # ... e l'avversario resta indietro: corre piano e non
 const BURST_RUN := 14.0   # ... poi il portatore prosegue dritto fino a questa distanza (m)
 const BURST_FWD_MIN := 0.5 # con portaAuto e rifiniture: corsa meno in avanti di così (coseno) = lo Scatto va in avanti in diagonale ...
 const BURST_SIDE := 0.6    # ... con tanto di lato per metro in avanti (~31°), lontano dall'avversario
+# Dopo lo Scatto (Luis 2026-11-23: "dopo lo scatto il giocatore si blocca"): con portaAuto e rifiniture la corsa dritta
+# dura quanto lo scatto (non BURST_T + 1 s fino a fermarsi sulla meta), poi il portatore torna subito alla guida
+# automatica secondo lo stile; e la fuga non si riapre per BURST_FLEE_CD s di partita (prima tornava dopo FLEE_CD,
+# quando il portatore fermo sulla meta veniva ripreso, e il rallenty lo lasciava lì).
+const BURST_FLEE_CD := 3.5
+# Rallenty scaduto (userCalm: il gioco lo chiama dopo 10 s veri senza linea né tasto): per lo stesso portatore duello e
+# fuga non si riaprono per tanto tempo di partita (s); l'area di tiro, se è scaduta lì, finché non perde il pallone.
+const CALM_CD := 4.0
 # Dribbling prenotato (Luis 2026-11-21: "il dribbling lo deve fare vicino all'avversario"): il tasto non decide subito,
 # il portatore corre verso il difensore puntando il lato scelto e il dribbling vero scatta solo quando gli arriva vicino.
 const DRIB_NEAR := 2.0    # il dribbling prenotato scatta quando il portatore arriva a questa distanza dal difensore (m)
@@ -73,7 +81,31 @@ func inZone(tm: int) -> bool:
 	var c := ball.owner
 	if c == null or c.team != tm or not human[tm] or ctrl[tm] != c or phase != "play" or c.state != "play":
 		return false
-	return (HL - c.y if tm == 0 else c.y + HL) <= ZONE_DIST
+	if calmZone[tm] and calmP[tm] == c:
+		return false # rallenty dell'area di tiro scaduto per questo portatore (userCalm)
+	return zoneDist(c) <= ZONE_DIST
+
+
+# metri tra il portatore c e la linea della porta che attacca
+func zoneDist(c: R.Player) -> float:
+	return HL - c.y if c.team == 0 else c.y + HL
+
+
+# rallenty scaduto per il portatore c (userCalm): duello e fuga non si riaprono ancora
+func calmed(c: R.Player) -> bool:
+	return calmP[c.team] == c and calmT[c.team] > 0.0
+
+
+# passo del "rallenty scaduto": finisce quando il portatore perde il pallone (il tempo di CALM_CD scorre a parte)
+func updateCalm(dt: float) -> void:
+	for tm in 2:
+		if calmP[tm] == null:
+			continue
+		calmT[tm] -= dt
+		if ball.owner != calmP[tm]:
+			calmP[tm] = null
+			calmT[tm] = 0.0
+			calmZone[tm] = false
 
 
 # si può passare (duello col difensore, fuga o area di tiro)
@@ -155,6 +187,8 @@ func updateDuel(dt: float) -> void:
 		return
 	if duelCd[c.team] > 0.0 and duelCdP[c.team] == c:
 		return
+	if calmed(c):
+		return
 	var o := frontOpp(c, DUEL_R, true)
 	if o == null:
 		return
@@ -224,7 +258,7 @@ func updateFlee(dt: float) -> void:
 	var c := b.owner
 	if c == null or not human[c.team] or ctrl[c.team] != c or c.state != "play" or c.burst > 0.0:
 		return
-	if fleeCd[c.team] > 0.0 and fleeCdP[c.team] == c:
+	if (fleeCd[c.team] > 0.0 and fleeCdP[c.team] == c) or calmed(c):
 		return
 	var o := sideOpp(c, FLEE_R)
 	if o == null:
@@ -256,6 +290,7 @@ func burst(p: R.Player, o: R.Player) -> void:
 	var tx: float = C.clamp_(p.x + rx * BURST_RUN, -HW + 1.0, HW - 1.0)
 	var ty: float = C.clamp_(p.y + ry * BURST_RUN, -HL + 1.0, HL - 1.0)
 	var sp: float = vmax(p)
+	var auto: bool = portaAuto and rifiniture and human[tm]
 	p.burst = BURST_T
 	p.fx = rx
 	p.fy = ry
@@ -269,10 +304,12 @@ func burst(p: R.Player, o: R.Player) -> void:
 		var mv := R.Move.new()
 		mv.x = tx
 		mv.y = ty
-		mv.ttl = BURST_T + 1.0
+		mv.ttl = BURST_T if auto else BURST_T + 1.0 # portaAuto: finito lo scatto riprende subito la guida automatica
 		mv.held = false
 		mv.sprint = true
 		move[tm] = mv
+	if auto:
+		p.aiT = 0.0 # la guida automatica, ripresa, sceglie subito una direzione nuova (non quella di prima dello scatto)
 	ev("burst", {"p": p, "o": o})
 
 

@@ -13,7 +13,7 @@
 #   --veloce=K          tempo fisso di K/60 s a fotogramma (prove senza schermo: la partita va più veloce del vero)
 #   --bot               un "dito finto" gioca la squadra 0 coi gesti veri (scripts/partita/bot_dito.gd)
 #   --esci-a-fine       a fine partita stampa il riassunto ed esce (codice 0)
-#   --scena=area|duello|fuga|angolo|rinvio|rilancio|pausa|gol|curva|prima   mette la partita in una situazione da fotografare (gol: tiro a
+#   --scena=area|duello|fuga|scatto|angolo|rinvio|rilancio|pausa|gol|curva|prima   mette la partita in una situazione da fotografare (gol: tiro a
 #                       porta vuota, per vedere cronaca e replay)
 #   --scena=fuori_lato|fuori_fondo|fuori_fondo_vicino|fuori_rete|fuori_angolo   pallone che esce: scena della ripresa
 #                       (sim/riprese.gd), rimessa, rinvio col raccattapalle (sim/raccatta.gd), rinvio col pallone vicino,
@@ -73,6 +73,7 @@ const CronacaVista := preload("res://scripts/partita/cronaca_vista.gd")
 const Meteo := preload("res://scripts/partita/meteo.gd")
 const TifoEventi := preload("res://scripts/partita/tifo_eventi.gd")
 const FermatempoTesta := preload("res://scripts/partita/fermatempo_testa.gd")
+const TimerRallenty := preload("res://scripts/partita/timer_rallenty.gd")
 const MomentiRegia := preload("res://scripts/partita/momenti_regia.gd")
 const Momenti := preload("res://scripts/partita/momenti.gd")
 const SCENA_VISTA := "res://scenes/vista_partita.tscn"
@@ -84,6 +85,7 @@ const PASS_DRAW_SLOW := 0.04  # mentre si disegna un passaggio o un tiro
 const DUEL_SLOW := 0.08       # duello col difensore
 const FLEE_SLOW := 0.08       # fuga: avversario alla pari o alle spalle, tasto Scatto
 const ZONE_SLOW := 0.1        # area di tiro (ultimi 20 m prima della porta avversaria)
+const CERCHIO_RALLENTY_H := 3.5  # timer del rallenty: il cerchietto sta a tanti metri d'altezza, sopra il triangolo del controllato
 const SCENA_VELOCE := 3.0     # scena della ripresa (sim/riprese.gd) dopo un tocco: va tanto più veloce
 const TEMPO_K := 14.0         # 1/s: il tempo passa dolcemente da una velocità all'altra
 const DT_MAX := 0.05          # fotogramma più lungo considerato (s)
@@ -128,6 +130,7 @@ var _fotogrammi := 0
 var _anteprima_viva := false
 var _inizio_ms := 0
 var _seme_partita := 0
+var _rallenty := TimerRallenty.new()  # timer di 10 s veri del rallenty col pallone (timer_rallenty.gd)
 var _testa_reale := -1.0       # secondi veri dall'apertura del fermatempo del colpo di testa (−1 = chiuso)
 var _scena_veloce := false     # un tocco durante la scena della ripresa la fa andare più veloce (fino alla fine)
 var meteo := {"meteo": "sereno", "ora": "giorno"}  # scripts/partita/meteo.gd: avvio.meteo/ora o a caso col seme
@@ -309,6 +312,7 @@ func _process(delta: float) -> void:
 		_passi_motore(dt)
 		_eventi()
 		_cerchio_testa()
+		_cerchio_rallenty()
 		if replay != null:
 			replay.registra(m)
 		_zoom()
@@ -365,6 +369,30 @@ func _cerchio_testa() -> void:
 	hud.cerchio_testa(Vector2(s.x, s.y), FermatempoTesta.frazione(_testa_reale))
 
 
+## timer del rallenty col pallone (Luis 2026-11-23): dopo TimerRallenty.RALLENTY_MAX_S secondi veri senza linea né
+## tasto il rallenty finisce (m.userCalm) e il portatore continua da solo. Non nelle lezioni e nelle prove di tiro.
+func _passo_rallenty(dt: float) -> void:
+	var p: Object = null
+	if allenamento == null and prove == null:
+		p = TimerRallenty.portatore_in_rallenty(m, me)
+	if _rallenty.passo(dt, p, gesti.drawing):
+		m.userCalm(me)
+
+
+## cerchietto bianco sopra il portatore che si svuota coi secondi del rallenty
+func _cerchio_rallenty() -> void:
+	var f := _rallenty.frazione()
+	var p := _rallenty.portatore as R.Player
+	if f < 0.0 or p == null:
+		hud.cerchio_rallenty(Vector2.ZERO, -1.0)
+		return
+	var s: Vector3 = vista.world_to_screen(p.x, p.y, CERCHIO_RALLENTY_H)
+	if s.z < 0.5:
+		hud.cerchio_rallenty(Vector2.ZERO, -1.0)
+		return
+	hud.cerchio_rallenty(Vector2(s.x, s.y), f)
+
+
 ## velocità del tempo voluta adesso (rallenty)
 func velocita_voluta() -> float:
 	var dive: bool = m.diveWin(me) and not m.autoGk[me]
@@ -389,6 +417,7 @@ func velocita_voluta() -> float:
 
 
 func _passi_motore(dt: float) -> void:
+	_passo_rallenty(dt)
 	var target := velocita_voluta()
 	var flee: bool = not m.duelFor(me) and m.fleeFor(me)
 	# toccato Dribbling il tasto sparisce: la prenotazione è partita, il dribbling scatta vicino al difensore
@@ -893,13 +922,13 @@ func _prepara_scena(nome: String) -> void:
 	await get_tree().create_timer(0.4).timeout
 	var att: R.Player = m.team(me)[9]
 	match nome:
-		"area", "duello", "fuga", "disegno":
+		"area", "duello", "fuga", "disegno", "scatto":
 			_metti_in_gioco()
-			var y := 8.0 if nome == "duello" or nome == "fuga" else 33.0
+			var y := 8.0 if nome == "duello" or nome == "fuga" or nome == "scatto" else 33.0
 			_sposta(att, 4.0, y)
 			if nome == "duello":
 				_sposta(m.team(1 - me)[3], 4.5, y + 4.5)
-			elif nome == "fuga": # avversario alle spalle: si apre la fuga col tasto Scatto
+			elif nome == "fuga" or nome == "scatto": # avversario alle spalle: si apre la fuga col tasto Scatto
 				_sposta(m.team(1 - me)[3], 5.0, y - 2.5)
 			m.ball.owner = att
 			m.ball.last = att
@@ -908,6 +937,11 @@ func _prepara_scena(nome: String) -> void:
 			m.ctrl[me] = att
 			if nome == "disegno":
 				_disegno_di_prova(m.team(me)[10])
+			if nome == "scatto": # aperta la fuga, il tasto Scatto: poi il portatore deve continuare da solo
+				while not m.fleeFor(me):
+					await get_tree().process_frame
+				await get_tree().create_timer(0.8).timeout
+				_dribbling()
 		"testa", "testa_linea": # cross dalla destra verso il n. 10 in area: fermatempo del colpo di testa
 			_metti_in_gioco()
 			var dt_ := 1.0 if me == 0 else -1.0

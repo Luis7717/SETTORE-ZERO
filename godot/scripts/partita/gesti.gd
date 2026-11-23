@@ -175,17 +175,17 @@ func down(p: Vector2, now_ms: int, indice: int = 0) -> void:
 		var sp := _schermo(b.x, b.y, 0.3)
 		var sc := _schermo(c.x, c.y, 1.0)
 		var Rr := maxf(PRESA_PORTATORE[0], dim.y * PRESA_PORTATORE[1])
-		# sulle rimesse il dito disegna dalla palla ovunque si appoggi, tranne nel calcio d'angolo: lì solo vicino al
-		# battitore (lontano gira la visuale, come nel rallenty)
+		# sulle riprese il dito disegna dalla palla ovunque si appoggi, tranne nel calcio d'angolo e nella nostra rimessa
+		# laterale: lì solo vicino al battitore (lontano gira la visuale, come nel rallenty)
 		if (sp.z > 0.5 and Vector2(x - sp.x, y - sp.y).length() < Rr) or (sc.z > 0.5 and Vector2(x - sc.x, y - sc.y).length() < Rr) \
-				or (hint == "restart" and not VD.corner_cam_on(m)):
+				or (hint == "restart" and not VD.restart_cam_on(m, T)):
 			mode = "draw"
 			drawing = true
 			pts = [{"x": b.x, "y": b.y, "h": 0.0, "sx": x, "sy": y}]
 			return
 	# rallenty in attacco (duello, area di tiro): dito lontano dal portatore = trascinando di lato gira la visuale;
 	# il tocco breve (sul campo o su un compagno) non fa niente: il passaggio si disegna sempre
-	if (c != null and b.owner == c and hint == "attack" and VD.user_cam_on(m, T)) or VD.corner_cam_on(m):
+	if (c != null and b.owner == c and hint == "attack" and VD.user_cam_on(m, T)) or VD.restart_cam_on(m, T):
 		mode = "cam"
 		cam_on = false
 		yaw0 = vista.user_yaw

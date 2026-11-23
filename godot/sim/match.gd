@@ -799,6 +799,7 @@ func step(dt: float) -> void:
 	updateBall(dt)
 	updateDuel(dt)
 	updateFlee(dt)
+	updateCalm(dt)
 	updateHead(dt)
 	if phase == "play":
 		contacts(dt)
@@ -1195,6 +1196,29 @@ func userSprint(tm: int) -> bool:
 		return false
 	burst(p, f.o)
 	endFlee("scatto")
+	if portaAuto and rifiniture:
+		fleeCd[tm] = BURST_FLEE_CD # dopo lo Scatto il portatore corre da solo, senza un'altra fuga appena ripreso
+	return true
+
+
+# Rallenty scaduto (Luis 2026-11-23): il gioco lo chiama quando il rallenty col pallone (duello, fuga, area di tiro) è
+# durato RALLENTY_MAX_S secondi veri senza linea né tasto. Chiude duello e fuga della squadra T e per lo stesso
+# portatore non li riapre per CALM_CD s di partita; se è nell'area di tiro, quella non rallenta più finché ha il
+# pallone. Il portatore continua da solo (portaAuto). Ritorna true se ha fatto qualcosa.
+func userCalm(tm: int) -> bool:
+	var c := ball.owner
+	if c == null or c.team != tm or not human[tm] or phase != "play":
+		return false
+	if dribBooked(tm):
+		return false # dribbling prenotato: il tempo è già normale
+	if duelFor(tm):
+		endDuel("scaduto")
+	if fleeFor(tm):
+		endFlee("scaduto")
+	calmP[tm] = c
+	calmT[tm] = CALM_CD
+	calmZone[tm] = zoneDist(c) <= ZONE_DIST
+	ev("calm", {"p": c})
 	return true
 
 
@@ -1241,6 +1265,7 @@ func substitute(tm: int, idx: int, src: Dictionary) -> bool:
 # di Godot non libera da solo. Da chiamare quando la partita non serve più (in JS ci pensa il garbage collector).
 func dispose() -> void:
 	queued = [null, null]
+	calmP = [null, null]
 	for p: R.Player in players:
 		p.supC = null
 		p.beatBy = null

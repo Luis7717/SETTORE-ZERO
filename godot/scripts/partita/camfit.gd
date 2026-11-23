@@ -51,6 +51,18 @@ const CORNER_RUNUP := 1.5      # il battitore prende la rincorsa tanti metri die
 const CORNER_FOV_MAX := 90.0   # campo visivo verticale massimo (gradi)
 const CORNER_MARGIN := {"l": 0.06, "r": 0.06, "t": 0.2, "b": 0.3}
 
+# Rimessa laterale della squadra della persona (Luis 2026-11-23): come nel calcio d'angolo, telecamera alle spalle del
+# battitore, fuori dalla linea laterale, girata verso il campo e un po' verso la porta avversaria; si gira col dito.
+const THROW_BACK := 3.5        # distanza dietro il battitore (m)
+const THROW_H := 6.5           # altezza di partenza (m)
+const THROW_PITCH := 0.5       # inclinazione verso il basso (rad, ~29°)
+const THROW_AIM_IN := 16.0     # guarda verso il punto a tanti metri dentro il campo ...
+const THROW_AIM_FWD := 9.0     # ... e tanti metri più avanti, verso la porta avversaria
+const THROW_TURN_MAX := 1.45   # girata col dito: al massimo tanto (rad, ~83°) dalla perpendicolare alla linea laterale (mai verso le tribune)
+const THROW_MAX_BACK := 7.0    # non oltre tanti metri all'indietro (le tribune sono vicine)
+const THROW_FOV_MAX := 80.0    # campo visivo verticale massimo (gradi)
+const THROW_MARGIN := {"l": 0.08, "r": 0.08, "t": 0.2, "b": 0.42}  # in basso più aria: anello e piedi del battitore a schermo
+
 const NEAR := 1.0   # ogni punto almeno a tanti metri davanti alla telecamera
 
 
@@ -288,6 +300,24 @@ static func corner_view(ball: Vector2, yaw: float, aspect: float, fov: float) ->
 	out.look = (full.look as Vector3).lerp(free.look, w)
 	out.fov = full.fov + (free.fov - full.fov) * w
 	return out
+
+
+## Visuale della rimessa laterale. ball = Vector2(x, y) del punto della rimessa (spazio orientato), yaw = visuale girata
+## col dito (rad, + = guarda verso destra): gira intorno al battitore, che resta in basso al centro (tenendo a schermo
+## anche i compagni vicini il battitore finiva nell'angolo dello schermo, mezzo tagliato).
+static func throw_view(ball: Vector2, yaw: float, aspect: float, fov: float) -> Dictionary:
+	var sx := 1.0 if ball.x >= 0.0 else -1.0
+	var inward := -sx * PI / 2.0 # verso il centro del campo, perpendicolare alla linea laterale
+	var a := atan2(-sx * THROW_AIM_IN, THROW_AIM_FWD) + yaw
+	a = clampf(a, inward - THROW_TURN_MAX, inward + THROW_TURN_MAX)
+	var h := Vector2(sin(a), cos(a))
+	var c0 := Vector3(ball.x - h.x * THROW_BACK, THROW_H, ball.y - h.y * THROW_BACK)
+	var kicker := [Vector3(ball.x, 0, ball.y), Vector3(ball.x, 2.3, ball.y)]
+	return fit_view({
+		"c0": c0, "yaw": a, "pitch": THROW_PITCH, "aspect": aspect, "fov": fov, "fovMax": maxf(fov, THROW_FOV_MAX),
+		"m": THROW_MARGIN, "tMin": 0.0, "tMax": THROW_MAX_BACK - THROW_BACK, "centerX": true, "keep": 1,
+		"groups": [kicker],
+	})
 
 
 # ordina [[chiave, valore], ...] per chiave crescente mantenendo l'ordine dei pari (come Array.sort del JS)
