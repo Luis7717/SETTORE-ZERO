@@ -1,4 +1,4 @@
-# Impostazioni (settings() di src/ui.js): partita intera o momenti chiave (settings.momenti), durata di un tempo, difficoltà, portiere, audio; in più musica e
+# Impostazioni (settings() di src/ui.js): durata di un tempo, difficoltà, portiere, audio; in più musica e
 # vibrazione (campi nuovi del salvataggio, accesi se mancano); stile della divisa e stemma; cancella la carriera
 # (secondo tocco = conferma). Ogni scelta si salva subito e avvisa App (App.impostazioni(), come api.settings).
 extends MenuSchermata
@@ -15,7 +15,6 @@ func costruisci() -> void:
 	if s.is_empty():
 		return
 	var st: Dictionary = s.get("settings", {})
-	_opzioni(st, "Partita", "momenti", [[false, "Intera"], [true, "Momenti chiave (~10 azioni)"]], false)
 	_opzioni(st, "Durata di un tempo", "half", [[90, "1:30"], [150, "2:30"], [240, "4:00"], [360, "6:00"]], 150)
 	_opzioni(st, "Difficoltà avversari", "diff", [[0, "Facile"], [1, "Normale"], [2, "Difficile"]], 1)
 	_opzioni(st, "Portiere", "autoGk", [[false, "Manuale (tuffo col dito)"], [true, "Automatico"]], false)

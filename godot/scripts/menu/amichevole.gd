@@ -2,7 +2,6 @@
 # Non conta per il campionato e non cambia i soldi.
 extends MenuSchermata
 
-const SceltaModo := preload("res://scripts/menu/scelta_modo.gd")
 
 const AVVERSARI := [[46, "Avversario facile", 1], [58, "Avversario medio", 2], [72, "Avversario forte", 3]]
 
@@ -13,7 +12,6 @@ func prepara() -> void:
 
 func costruisci() -> void:
 	corpo.add_child(U.paragrafo("Partita di prova: non conta per il campionato e non cambia i soldi.", 13.5))
-	corpo.add_child(SceltaModo.nuova(self)) # partita intera o momenti chiave
 	for a: Array in AVVERSARI:
 		var b := U.bottone("", "", gioca.bind("amichevole", a[0]), 56)
 		var h := U.hbox(8)

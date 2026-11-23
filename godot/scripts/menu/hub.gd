@@ -1,6 +1,6 @@
 # Casa della carriera (hub() di src/ui.js): barra della squadra (stemma, nome, divisione, stagione, posto),
 # obiettivo della dirigenza (verde se oggi è raggiunto), prossima partita (giornata, casa/trasferta, DERBY contro
-# la rivale, le due squadre con la forza, avanzamento, scelta partita intera / momenti chiave, GIOCA che pulsa),
+# la rivale, le due squadre con la forza, avanzamento, GIOCA che pulsa),
 # ultimo risultato e le otto caselle (Rosa, Mercato, Classifica, Calendario, Amichevole, 1 contro 1,
 # Come si gioca, Impostazioni), più quella larga dell'allenamento libero.
 extends MenuSchermata
@@ -8,7 +8,6 @@ extends MenuSchermata
 const I := preload("res://scripts/menu/icone.gd")
 const Dirigenza := preload("res://scripts/carriera/dirigenza.gd")
 const Meteo := preload("res://scripts/partita/meteo.gd")
-const SceltaModo := preload("res://scripts/menu/scelta_modo.gd")
 const Stili := preload("res://sim/stili.gd")
 const GIORNATE := 18
 const PULSA := 2.4                 # s: un respiro del pulsante GIOCA (uiPulse)
@@ -132,7 +131,6 @@ func _carta_prossima(nm: Dictionary, me: Dictionary, k1: Color) -> Control:
 	v.add_child(U.spazio(18))
 	v.add_child(U.barra((float(nm.day) - 1.0) / GIORNATE, 5.0))
 	v.add_child(U.spazio(12))
-	v.add_child(SceltaModo.nuova(self)) # partita intera o momenti chiave
 	v.add_child(U.spazio(12))
 	var gioca_btn := U.bottone("GIOCA", "BtnGrande", func() -> void: gioca("campionato"))
 	U.contenuto_centrato(gioca_btn, MenuDisegno.nuovo(I.play(), Vector2(24, 24), Vector2(22, 22)), "GIOCA", 18, T.INK, T.PESO_NERO)

@@ -27,7 +27,6 @@
 #   --campo=NOME        taglio dell'erba (strisce, strette, verticali, quadrotti, cerchi, uniforme, rombi, raggi, diagonali)
 #   --manto=NOME        colore dell'erba (vivo, milano, naturale, sintetico, sintetico_chiaro, estivo)
 #   --meteo=sereno|nuvoloso|pioggia|neve  --ora=giorno|tramonto|notte   forzano meteo e ora (scripts/partita/meteo.gd)
-#   --momenti           momenti chiave: ~10 azioni giocate, il resto simulato (scripts/partita/momenti_regia.gd)
 #   --allenamento       allenamento guidato (tipo "allenamento", scripts/partita/allenamento.gd) invece dell'amichevole;
 #                       con --lezione=N [--prova=K] parte da lì, con --scheda mostra la scheda della lezione N
 #   --prove=tiri|punizioni|rigori   allenamento libero a punti (tipo "prove", scripts/partita/prove_tiro_regia.gd)
@@ -36,7 +35,7 @@
 # con opz = {squadra_a, squadra_b, me, tipo: "campionato"|"amichevole"|"allenamento", durata_tempo, seme,
 # titolo (facoltativo), autoGk (facoltativo), stadio_seme (facoltativo: seme della squadra di casa, sceglie taglio e
 # manto dell'erba; senza, vengono dal seme della partita), derby (facoltativo: partita contro la rivale, pubblico più
-# rumoroso), momenti (facoltativo: momenti chiave)}; `--campo=<nome>`/`--manto=<nome>` li forzano per le prove; squadre come Carriera.squadraPartita()/aiMatchTeam() (kit compreso).
+# rumoroso)}; `--campo=<nome>`/`--manto=<nome>` li forzano per le prove; squadre come Carriera.squadraPartita()/aiMatchTeam() (kit compreso).
 # Al fischio finale (la schermata di fine resta sopra) o se si esce dalla pausa la scena emette `finita(esito)` con
 # {gol_a, gol_b, marcatori, statistiche, abbandonata, tipo, me, derby, conteggi, tabellino}; conteggi = per giocatore della
 # persona (scripts/partita/conta_giocatori.gd), tabellino = dati della schermata delle statistiche (stesso file); "Esci" in campionato = sconfitta 0-3 a tavolino.
@@ -73,8 +72,6 @@ const CronacaVista := preload("res://scripts/partita/cronaca_vista.gd")
 const Meteo := preload("res://scripts/partita/meteo.gd")
 const TifoEventi := preload("res://scripts/partita/tifo_eventi.gd")
 const FermatempoTesta := preload("res://scripts/partita/fermatempo_testa.gd")
-const MomentiRegia := preload("res://scripts/partita/momenti_regia.gd")
-const Momenti := preload("res://scripts/partita/momenti.gd")
 const SCENA_VISTA := "res://scenes/vista_partita.tscn"
 
 # velocità del tempo (rallenty), come src/main.js
@@ -112,7 +109,6 @@ var replay: Replay = null     # replay del gol (null in allenamento o con --senz
 var cronaca: Cronaca = null   # cronaca scritta (null in allenamento)
 var cronaca_vista: CronacaVista = null
 var tifo_eventi := TifoEventi.new()   # fatti del motore → pubblico 3D e cori (occasione, parata, palo, fischio)
-var momenti: MomentiRegia = null  # momenti chiave (avvio.momenti o --momenti): si giocano ~10 azioni, il resto è simulato
 var _festa_finita := false    # il motore ha finito la festa del gol ed è trattenuto (aspetta esultanza e replay)
 var _esultanza_in_corso := false
 
@@ -154,9 +150,6 @@ static func manto_campo(opz: Dictionary, seme_partita: int) -> int:
 	return Tagli.manto_da_seme(int(opz.stadio_seme) if opz.has("stadio_seme") else seme_partita)
 
 
-## momenti chiave: opzione "momenti" dell'avvio (impostazione della carriera) o --momenti nelle prove; mai in allenamento
-func con_momenti() -> bool:
-	return tipo() != "allenamento" and (bool(_avvio.get("momenti", false)) or _opzioni.has("momenti"))
 
 
 func avviata_da_app() -> bool:
@@ -214,9 +207,6 @@ func _parti() -> void:
 	else:
 		hud.big(_titolo(), "", 2200, Meteo.testo(meteo))
 	_crea_replay_e_cronaca()
-	if con_momenti():
-		momenti = MomentiRegia.new(self)
-		add_child(momenti)
 	stato = "partita"
 	if _opzioni.has("bot") and prove == null: # nell'allenamento libero tira la regia
 		var seme_bot := int(_opzioni.get("seme", "1")) + 99
@@ -235,8 +225,6 @@ func _crea_partita() -> void:
 		if not _opzioni.has("tempo"): # --tempo vince anche dall'app (prove veloci)
 			tempo = float(_avvio.get("durata_tempo", TEMPO_PREDEFINITO))
 	_seme_partita = seme
-	if con_momenti(): # orologio lento: un'azione di 20 s di gioco dura un minuto
-		tempo = Momenti.HALF_LEN
 	var auto_gk: bool = _avvio.get("autoGk", false)
 	meteo = Meteo.per_partita(_avvio, _opzioni, seme, tipo() == "allenamento" or tipo() == "prove")
 	m = SimMatchScript.new({"seed": seme, "halfLen": tempo, "human": [me == 0, me == 1],
@@ -417,8 +405,6 @@ func _passi_motore(dt: float) -> void:
 		m.step(sdt / n)
 	if replay != null and replay.festa_finita():
 		_fine_festa_gol()
-	if momenti != null:
-		momenti.dopo_passi(sdt)
 	if allenamento != null:
 		_allenamento_dopo(sdt)
 	if prove != null:
@@ -764,9 +750,6 @@ func riassunto() -> String:
 		m.teams[0].short, m.score[0], m.score[1], m.teams[1].short, m.time, "abbandonata" if abbandonata else ("finita" if stato == "fine" else "in corso")]
 	if bot != null:
 		testo += "\n" + bot.riassunto()
-	if momenti != null:
-		testo += "\nmomenti chiave: %d azioni %s · esiti %s" % [momenti.mo.piano.size(),
-			str(momenti.mo.piano.map(func(a: Dictionary) -> String: return "%d'%s" % [a.minuto, a.tipo])), str(momenti.mo.esiti)]
 	if allenamento != null:
 		testo += "\n" + _riassunto_allenamento()
 	if prove != null:

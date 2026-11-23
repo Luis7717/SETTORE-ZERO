@@ -172,7 +172,8 @@
 - Comandi (G = `Godot_v4.7.2-stable_win64_console.exe`, in `C:\Users\forma\Documents\godot-tools`):
   `$G --headless --path godot --import` · `$G --headless --path godot -- --esci-dopo=4` (niente errori) ·
   `$G --path godot -- --schermata=shots/x.png --dopo=3` (anche `--vista=vicina|porta|alta`, `--senza-vsync`, `--prova-tocchi`).
-- **Momenti chiave** (`settings.momenti`, predefinito false; prova `-- --bot --momenti`): ~10 azioni giocate da centrocampo (min 3 in attacco, quota secondo la forza), il resto simulato col seme e raccontato tra un'azione e l'altra: `scripts/partita/momenti.gd` (logica, `tests/test_momenti.gd`), `momenti_regia.gd`, `momenti_vista.gd`.
+- I **Momenti chiave** sono stati tolti (Luis 2026-11-23): resta solo la partita intera. Il campo `settings.momenti` dei
+  salvataggi vecchi resta ma non conta più.
 - Allenamento libero (tiri/punizioni/rigori a punti, record nel campo `prove` del salvataggio): `scripts/partita/prove_tiro*.gd`, menu `scripts/menu/allenamento_libero.gd`, prova `-- --prove=tiri --bot`.
 - Meteo e ora della partita: `scripts/partita/meteo.gd` (prove: `--meteo=sereno|nuvoloso|pioggia|neve`, `--ora=giorno|tramonto|notte`).
 - Build: workflow `.github/workflows/tiro-a-giro-godot-ipa.yml` (push su `tiro-a-giro` che tocca `godot/**`) →

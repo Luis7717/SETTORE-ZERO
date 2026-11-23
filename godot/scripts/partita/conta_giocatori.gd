@@ -10,7 +10,6 @@
 #   parato, respinto, fuori); per i giocatori della persona palle perse (contrasto subito o passaggio preso
 #   dall'avversario) e gol subiti mentre erano in campo, e l'elenco di chi è sceso in campo (anche chi entra con
 #   un cambio) con nome, ruolo, numero e campione.
-# Nei momenti chiave i tiri del resto simulato arrivano con aggiungi_simulato() (scripts/partita/momenti.gd).
 extends RefCounted
 
 const R := preload("res://sim/records.gd")
@@ -134,27 +133,6 @@ func _evento(e: Dictionary) -> void:
 			_somma(e.p, "scatti")
 		"aerial":
 			_somma(e.p, "testa")
-
-
-## tiro del resto della partita simulato (momenti chiave, scripts/partita/momenti.gd): non passa dal motore.
-## ev = {tipo: gol|parata|palo|fuori, team, p: chi tira, gk: portiere che difende, assist (facoltativo), x, y}
-func aggiungi_simulato(ev: Dictionary) -> void:
-	var p: R.Player = ev.p
-	var tipo: String = ev.tipo
-	var esiti := {"gol": "gol", "parata": "parato", "palo": "fuori", "fuori": "fuori"}
-	_somma(p, "tiri")
-	_tiri.append({"team": p.team, "x": ev.get("x", 0.0), "y": ev.get("y", 0.0), "kind": "shot",
-		"esito": esiti.get(tipo, "fuori"), "nome": p.name})
-	if tipo == "gol":
-		_somma(p, "gol")
-		_somma(p, "in_porta")
-		_somma(ev.get("assist"), "assist")
-		if p.team != squadra:
-			for k: String in _in_campo:
-				_somma_chiave(k, "subiti")
-	elif tipo == "parata":
-		_somma(p, "in_porta")
-		_somma(ev.get("gk"), "parate")
 
 
 # il tiro in volo finisce con questo esito (vale il primo che arriva)
