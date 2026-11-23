@@ -45,6 +45,8 @@ const BURST_T := 1.2      # Scatto: per questo tempo il portatore corre più vel
 const BURST_SPD := 1.15   # ... di questo fattore (sopra lo scatto normale)
 const BURST_SHAKE := 0.6  # ... e l'avversario resta indietro: corre piano e non lo contrasta per questo tempo (s)
 const BURST_RUN := 14.0   # ... poi il portatore prosegue dritto fino a questa distanza (m)
+const BURST_FWD_MIN := 0.5 # con portaAuto e rifiniture: corsa meno in avanti di così (coseno) = lo Scatto va in avanti in diagonale ...
+const BURST_SIDE := 0.6    # ... con tanto di lato per metro in avanti (~31°), lontano dall'avversario
 # Dribbling prenotato (Luis 2026-11-21: "il dribbling lo deve fare vicino all'avversario"): il tasto non decide subito,
 # il portatore corre verso il difensore puntando il lato scelto e il dribbling vero scatta solo quando gli arriva vicino.
 const DRIB_NEAR := 2.0    # il dribbling prenotato scatta quando il portatore arriva a questa distanza dal difensore (m)
@@ -248,7 +250,7 @@ func endFlee(reason: String) -> void:
 # Scatto: il portatore si stacca dall'avversario e prosegue dritto nel verso di corsa
 func burst(p: R.Player, o: R.Player) -> void:
 	var tm := p.team
-	var rd := runDir(p)
+	var rd := burstDir(p, o)
 	var rx: float = rd[0]
 	var ry: float = rd[1]
 	var tx: float = C.clamp_(p.x + rx * BURST_RUN, -HW + 1.0, HW - 1.0)
@@ -272,6 +274,22 @@ func burst(p: R.Player, o: R.Player) -> void:
 		mv.sprint = true
 		move[tm] = mv
 	ev("burst", {"p": p, "o": o})
+
+
+# Verso dello Scatto: quello di corsa. Col portatore umano automatico (portaAuto, con "rifiniture") che protegge palla, si correva
+# spesso di lato o all'indietro (1 Scatto su 4 verso la propria porta, controllo del gameplay 2026-11-23): lì si
+# scatta in avanti in diagonale, lontano dall'avversario (verso il centro vicino alla linea laterale).
+func burstDir(p: R.Player, o: R.Player) -> PackedFloat64Array:
+	var rd := runDir(p)
+	var dir: float = -1.0 if p.team else 1.0
+	if not (portaAuto and rifiniture) or not human[p.team] or rd[1] * dir >= BURST_FWD_MIN:
+		return rd
+	var side: float = C.sign_(p.x - o.x) if (o != null and absf(p.x - o.x) > 0.3) else -C.sign_(p.x)
+	if absf(p.x) > HW - SIDE_EDGE:
+		side = -C.sign_(p.x)
+	var bx: float = side * BURST_SIDE
+	var n: float = C.hyp(bx, 1.0)
+	return PackedFloat64Array([bx / n, dir / n])
 
 
 # Lato del dribbling di p su o: +1 = alla sinistra di p (guardando il difensore), -1 = alla destra. Dalla parte opposta

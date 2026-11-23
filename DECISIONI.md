@@ -1584,3 +1584,42 @@ Dettagli in `godot/README.md`, "Altezza e corporatura". File nuovo `godot/script
   Nel duello e nella fuga resta il movimento di prima (piano e dritto): i rallenty partono come prima (test).
 - **Da provare sull'iPhone**: se gli stili si riconoscono guardando la partita (soprattutto contropiede e fasce), se il
   portatore automatico è comodo o va dove non si vuole, se il pannello Stile nella Rosa è chiaro.
+
+## 2026-11-23 — Controllo del gameplay con partite simulate (solo versione Godot)
+- **Strumento**: `godot/tools/controllo_gameplay.gd` + `godot/tools/dito_motore.gd`. Partite a livello di motore con
+  una "persona simulata" che manda gli stessi comandi dei gesti (tratto dritto/curvo, dritto lungo, di prima, Dribbling,
+  Scatto, colpo di testa nel fermatempo, tuffo, linee di difesa, riprese) con tempi di reazione in secondi VERI; il
+  tempo scorre come in `gioco.gd` (rallenty, fermatempo di 3 s), così si misura anche il tempo vero. Opzioni del gioco:
+  `testa`, `portaAuto`, `rifiniture`, meteo a rotazione, stile della CPU col suo seme. ~17 s a partita; più processi
+  in parallelo e `--somma=` per sommare. È un giocatore "medio" scritto da me: i numeri assoluti dipendono da lui,
+  i confronti prima/dopo no.
+- **Bug corretto 1 — "campanili"**: un tiro ribattuto fino a 20 m dalla porta e mandato in angolo (`deflectBehind`,
+  anche le respinte del portiere) volava a 3-6 m/s per arrivare oltre la linea: fino a 7 s in aria e 30-50 m di altezza
+  (0,45 volte a partita; "pallone di nessuno" per più di 4 s 0,3 volte a partita). Ora con l'opzione `rifiniture` il volo
+  dura al massimo `DEFLECT_T_MAX` = 1,4 s (pallone al più ~3 m). Dopo: 0 palloni sopra i 12 m in 160 partite (erano 73).
+- **Bug corretto 2 — Scatto all'indietro**: col portatore automatico che protegge palla, lo Scatto seguiva il verso
+  di corsa: 28% degli Scatti verso la propria porta, 12% di lato. Con `portaAuto` e `rifiniture` (`duel.gd burstDir`)
+  se la corsa va meno in avanti di `BURST_FWD_MIN` (coseno 0,5) si scatta in avanti in diagonale (`BURST_SIDE` 0,6 m di
+  lato per metro, ~31°) lontano dall'avversario, verso il centro vicino alla linea laterale. Dopo: 100% in avanti.
+- **Opzione nuova `rifiniture`** del Match (predefinita false, la accende solo `gioco.gd`): i confronti col JS e
+  l'impronta restano identici. Test: `tests/test_rifiniture.gd` (6).
+- **Numeri** (umano 60 contro CPU 60, 160 partite da 2×150 s prima e dopo, stessi semi): V/N/P 43/64/53 → 40/67/53;
+  gol 0,42-0,59 → 0,62-0,73; tiri 2,2-8,6 → 2,7-9,0; possesso umano 35% → 34%; tempo vero 412 s a partita;
+  rallenty 25% del tempo vero (~137 volte a partita: duello 29, fuga 32, disegno 49, linee di difesa 45, parata 8, area 3).
+  Forza della CPU (40 partite, dopo): contro 50 V/N/P 19/15/6 (gol 0,97-0,33); contro 70 1/15/24 (gol 0,17-1,55,
+  **1 tiro a partita** per la persona). Stile della squadra umana (40 partite, CPU 60): possesso 9/22/9, fasce 10/22/8,
+  lanci 11/19/10, contropiede 6/18/16, equilibrato 25%/42%/33%: nessuno stile rotto (rumore ±0,2 punti).
+- **Meccaniche** (dopo, a partita): passaggio rasoterra 27 (79% al compagno), alto dritto 8 (71%), curvo 11 (70%);
+  tiro rasoterra 45% gol (34% parati), **tiro a giro 11-15% gol (67% parati)**: è lento (vola ~1 s per salire al punto
+  più alto `CURL_APEX_*` e scendere, ~15 m/s contro ~30 del rasoterra) e il portiere ci arriva. Di prima ~0,3 a partita,
+  1 gol su 4. Colpo di testa col fermatempo solo 0,3-0,5 volte a partita (2 gol su 19 colpi). Duello 30 a partita,
+  Dribbling riuscito 47% (a pari statistiche), palla persa dopo il dribbling fallito ~7 a partita (la fonte principale di
+  palle perse). Scatto: palla persa nei 3 s dopo quasi mai (riesce sempre, come voluto). Portatore automatico: quasi mai
+  perde palla da solo (0,03 a partita), mai "impallato" (fermo oltre 2,5 s senza avversari vicini), quasi mai fuori.
+- **Non raggiunto / da decidere** (proposte nel rapporto, non fatte perché di gusto o fuori dal mio campo):
+  falli = **zero** in tutte le partite (vengono solo dalle scivolate, tolte anche all'IA il 2026-11-20): niente
+  punizioni, rigori, cartellini né vantaggio in partita. Gol da angolo della CPU 10-20% (obiettivo 3-8%; riprese = altro
+  agente). Tiro a giro poco efficace. Fuga molto frequente (32 a partita) con lo Scatto che riesce sempre: tanti rallenty
+  brevi. Contro una CPU più forte di 10 punti la persona tira una volta a partita.
+- **Da provare sull'iPhone**: lo Scatto quando il portatore stava proteggendo palla (deve partire in avanti in
+  diagonale), le respinte in angolo (niente più pallone altissimo).

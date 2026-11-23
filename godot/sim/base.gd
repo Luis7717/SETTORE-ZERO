@@ -90,6 +90,9 @@ var marks: Array = [{}, {}]        # marcatura a uomo: indice del giocatore -> i
 var offLineD: Array = [0.0, 0.0]
 # portatore della squadra umana che si muove da solo senza strada disegnata (opzione "portaAuto", ai.gd humanCarrierAuto)
 var portaAuto: bool = true
+# correzioni di gameplay solo della versione Godot (opzione "rifiniture" della partita, la accende il gioco; spenta nei
+# confronti col JS, che restano identici). Controllo del gameplay del 2026-11-23: vedi DECISIONI.md
+var rifiniture: bool = false
 var autoSpd: Array = [1.0, 1.0]
 var autoSpr: Array = [false, false]   # fuorigioco: linea comune dei difensori (y nel verso d'attacco della squadra)
 

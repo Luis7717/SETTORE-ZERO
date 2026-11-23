@@ -5,6 +5,8 @@
 #          Facoltativi: "stileAtt" e "stileDif" = stile di gioco (stili.gd); senza, motore identico a prima.
 # Opzione "portaAuto" (predefinita true): il portatore della squadra umana senza strada si muove da solo (ai.gd
 # humanCarrierAuto); false = come prima (avanza piano e dritto), lo usano i test confrontati col JS.
+# Opzione "rifiniture" (predefinita false, il gioco la accende): correzioni di gameplay solo Godot (motion.gd
+# deflectBehind: niente "campanili" sulle respinte in angolo da lontano; duel.gd burstDir: Scatto in avanti).
 class_name SimMatch
 extends "ai.gd"
 
@@ -114,6 +116,7 @@ func _init(o: Dictionary) -> void:
 	human = o.get("human", [true, false])
 	autoGk = o.get("autoGk", [false, false])
 	portaAuto = bool(o.get("portaAuto", true))
+	rifiniture = bool(o.get("rifiniture", false))
 	teams = o.teams
 	var wx := weatherFx(o.get("meteo"))
 	var mt: Variant = o.get("meteo")
