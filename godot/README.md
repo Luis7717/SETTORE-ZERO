@@ -101,6 +101,7 @@ interfaccia dei menu, sfondo del menu e allenamento guidato, grafica.
 | `scripts/partita/effetti.gd` | scia del pallone, sbuffi d'erba, coriandoli |
 | `scripts/partita/qualita.gd` | livelli grafici automatici (logica pura, `tests/test_qualita.gd`) |
 | `scripts/partita/schiene.gd` | atlante di cognomi e numeri sulle schiene |
+| `tools/controllo_gameplay.gd`, `tools/dito_motore.gd` | controllo del gameplay: N partite a livello di motore con una persona simulata che usa i comandi dei gesti (tratto, di prima, Dribbling, Scatto, testa, tuffo, linee di difesa) e le opzioni del gioco; tabella di risultati, meccaniche, riprese, rallenty e possibili bug (`-s res://tools/controllo_gameplay.gd -- --partite=20 --forza=60`, ~17 s a partita) |
 | `tools/genera_texture.gd` | genera `assets/textures/` (pallone HD e normal map, fili d'erba `erba_fili.png`; `-- solo-erba` rifà solo quella) |
 | `scenes/prova_vista.tscn` | prova: computer contro computer disegnato dalla vista, scene per le schermate e misure |
 | `scenes/menu/sfondo_menu.tscn` | sfondo 3D del menu: campione che palleggia, fa giochetti e tira (`scripts/menu/sfondo_menu.gd`, `routine_menu.gd`) |

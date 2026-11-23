@@ -20,6 +20,7 @@ const CATCH_MAX := 0.97
 const PARRY_SIDE_V := 8.0   # respinta in campo: velocità verso l'esterno (m/s, più fino a 3)...
 const PARRY_FWD_V := 4.0    # ... e lontano dalla porta (m/s, più fino a 3)
 const BLOCK_OUT := 0.4      # tiri ribattuti vicino all'area che finiscono in angolo
+const DEFLECT_T_MAX := 1.4  # con "rifiniture": volo massimo della respinta mandata in angolo (s; pallone alto al più ~3 m)
 const TACKLE_LOOSE := 0.3   # contrasti vinti in cui la palla schizza via invece di restare al difensore
 const PASS_DEFLECT := 0.3   # passaggi intercettati che vengono solo deviati
 # raggio difensivo sui passaggi avversari (m): INT_BASE a parità 60 contro 60, più difesa e meno passaggio lo allargano
@@ -463,6 +464,9 @@ func deflectBehind(p: R.Player) -> void:
 	var by: float = out_ * HL
 	var dist: float = maxf(0.3, absf(by - b.y))
 	var tt: float = maxf(0.3, dist / (3.0 + rnd() * 3.0))
+	if rifiniture:
+		# da lontano (tiro ribattuto fino a 20 m dalla porta) il volo durava fino a 7 s e il pallone saliva a 30-50 m
+		tt = minf(tt, DEFLECT_T_MAX)
 	var vy: float = out_ * dist / tt
 	var sx: float = C.sign_(b.x) if absf(b.x) > 0.3 else (-1.0 if rnd() < 0.5 else 1.0)
 	var vx: float = (sx * (GW / 2.0 + 0.9 + rnd() * 3.0) - b.x) / tt
