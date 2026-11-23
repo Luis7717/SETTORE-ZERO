@@ -191,6 +191,7 @@ func _crea_angoli() -> void:
 	add_child(_pausa)
 	_fps = _etichetta(10, Color(0.85, 1.0, 0.85, 0.85), false)
 	_ombra(_fps, 3)
+	_fps.visible = false # Luis 2026-11-23: non serve più (resta il conteggio per le prove)
 	add_child(_fps)
 	_orologio = PanelContainer.new()
 	var so := _stile(FONDO, 10)
