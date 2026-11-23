@@ -201,6 +201,9 @@ col tempo scalato → **eventi** (suoni, scritte) → **vista** (`update_view(dt
 `dt_game = dt · max(velocità del tempo, 0,25)` e `dt_real = dt`, come `view.update` e `view.rdt` del web).
 Rallenty con le costanti di `src/main.js`: duello 0,08, fuga 0,08, area di tiro 0,1, disegno di passaggio o tiro 0,04 (anche
 fuori dai rallenty: col pallone ogni linea è un calcio), di linea di difesa 0,13, parata 0,1; il tempo passa dolcemente da una velocità all'altra (14/s).
+Il rallenty col pallone (duello, fuga, area di tiro) dura al massimo 10 s veri (`scripts/partita/timer_rallenty.gd`,
+`RALLENTY_MAX_S`, cerchietto bianco sopra il portatore che si svuota; fermo mentre si disegna): poi `m.userCalm` lo
+chiude e per lo stesso portatore non si riapre subito (`CALM_CD` in `sim/duel.gd`). Non nelle lezioni e nelle prove di tiro.
 Tempo di un tempo: 150 s (come il web). Squadra della persona: la 0 (Virtus Borgoalto), contro Aurora Portosole (IA).
 
 **Contratto della vista** (la vista vera è `class_name PartitaVista`, scena `scenes/vista_partita.tscn`; se manca si
@@ -230,8 +233,9 @@ viaggia, linea dal compagno che riceve, che calcia appena tocca il pallone (`use
 difesa da ogni proprio giocatore tranne il portiere (si vedono già tagliate a 14 m), tieni premuto = muovi il
 controllato (lontano = scatto), tocco su un proprio giocatore in difesa = comandarlo, portiere (automatico di
 base; manuale da provare nelle Impostazioni: fermatempo di 3 s col bersaglio sulla porta, linea dal portiere al
-punto della porta, tuffo al momento giusto fin dove arriva, `sim/parata.gd`), rimesse (si disegna da ovunque, tranne nel calcio d'angolo: solo vicino al
-battitore), visuale girata col dito nel rallenty e nel calcio d'angolo (dito lontano dal portatore, soglia 12 px,
+punto della porta, tuffo al momento giusto fin dove arriva, `sim/parata.gd`), rimesse (si disegna da ovunque, tranne
+nel calcio d'angolo e nella nostra rimessa laterale: solo vicino al battitore), visuale girata col dito nel rallenty,
+nel calcio d'angolo e nella nostra rimessa laterale (`throw_view` in `camfit.gd`, alle spalle del battitore) (dito lontano dal portatore, soglia 12 px,
 150° per schermo, ±100°, "si afferra il campo"). Un dito solo; i tocchi annullati dal sistema non danno ordini;
 l'app che va in sottofondo mette in pausa.
 

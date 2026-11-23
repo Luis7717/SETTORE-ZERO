@@ -527,6 +527,39 @@ func test_calcio_d_angolo_visuale_e_cross() -> bool:
 	return done()
 
 
+# rimessa laterale nostra (Luis 2026-11-23): visuale alle spalle del battitore; lontano dal battitore il dito la gira,
+# vicino disegna il passaggio. Quella della CPU no.
+func test_rimessa_laterale_nostra_visuale_e_passaggio() -> bool:
+	prepara()
+	m.setRestart("throw", 0, -C.HW, 0.0)
+	check(VD.throw_cam_on(m, 0), "nostra rimessa: visuale girabile")
+	check(VD.user_cam_on(m, 0), "anche per user_cam_on")
+	check(not VD.throw_cam_on(m, 1), "non per l'altra squadra")
+	m.restart.t = 1.0
+	var t: R.Player = m.restart.taker
+	m.ctrl[0] = t
+	t.stun = 0.0
+	# lontano dal battitore: gira la visuale
+	g.down(Vector2(330.0, 200.0), 1000)
+	eq(g.mode, "cam", "lontano dal battitore = visuale")
+	for p in linea(Vector2(330.0, 200.0), Vector2(200.0, 200.0)).slice(1):
+		g.move_ev(p)
+	g.up(Vector2(200.0, 200.0), 1300)
+	check(v.user_yaw > 0.3, "visuale girata nella rimessa (%.2f)" % v.user_yaw)
+	eq(reg.calls.size(), 0, "nessun ordine")
+	# vicino al battitore: si disegna il passaggio
+	var compagno: R.Player = m.team(0)[10] if t != m.team(0)[10] else m.team(0)[9]
+	H.wake(compagno, -20.0, 6.0)
+	trascina(linea(sch(t.x, t.y), sch(compagno.x, compagno.y)))
+	eq(reg.nomi(), ["kick"], "dal battitore = rimessa")
+	check(m.phase == "play", "la rimessa rimette in gioco")
+	# rimessa della CPU: niente visuale girabile
+	m.setRestart("throw", 1, C.HW, 0.0)
+	check(not VD.throw_cam_on(m, 0), "rimessa della CPU: niente visuale")
+	check(not VD.restart_cam_on(m, 0), "... nemmeno come ripresa")
+	return done()
+
+
 # ---------------------------------------------------------------- un dito solo, tocchi annullati
 func test_secondo_dito_e_tocco_annullato_ignorati() -> bool:
 	prepara()

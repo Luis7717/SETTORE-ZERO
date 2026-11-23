@@ -19,9 +19,20 @@ static func corner_cam_on(m: SimMatchScript) -> bool:
 	return m != null and m.phase == "restart" and m.restart != null and m.restart.type == "corner" and m.restart.sulPosto()
 
 
+## rimessa laterale della squadra tm col battitore pronto sulla linea (Luis 2026-11-23): visuale alle spalle del
+## battitore che si gira col dito, come nel calcio d'angolo (le rimesse della CPU no)
+static func throw_cam_on(m: SimMatchScript, tm: int) -> bool:
+	return m != null and m.phase == "restart" and m.restart != null and m.restart.type == "throw" and m.restart.team == tm and m.restart.sulPosto()
+
+
+## ripresa con la visuale alle spalle del battitore che si gira col dito: calcio d'angolo (di chiunque) o nostra rimessa
+static func restart_cam_on(m: SimMatchScript, tm: int) -> bool:
+	return corner_cam_on(m) or throw_cam_on(m, tm)
+
+
 ## visuale che si può girare: calcio d'angolo, oppure rallenty (in gioco, pallone a un giocatore di tm, duello, fuga o area di tiro)
 static func user_cam_on(m: SimMatchScript, tm: int) -> bool:
-	if corner_cam_on(m):
+	if restart_cam_on(m, tm):
 		return true
 	if m == null or m.phase != "play":
 		return false

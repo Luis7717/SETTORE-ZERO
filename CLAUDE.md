@@ -106,6 +106,12 @@
   passaggio, difensore lontano) la prenotazione si annulla. L'IA dribbla subito, a 3,2 m, come prima.
 - **Area di tiro** (ultimi 20 m prima della porta avversaria, col pallone): tempo al 22%; linea in porta = tiro,
   ogni altra linea = passaggio (fino a un compagno entro 5 m, o nello spazio). Anche sulle rimesse il passaggio si disegna.
+- **Timer del rallenty** (Godot, Luis 2026-11-23): il rallenty col pallone (duello, fuga, area di tiro) dura al massimo
+  **10 secondi veri** (`RALLENTY_MAX_S` in `godot/scripts/partita/timer_rallenty.gd`), con un cerchietto bianco sopra il
+  portatore che si svuota; mentre il dito disegna il timer è fermo. Scaduto senza linea né tasto, `m.userCalm` chiude
+  duello/fuga e il gioco torna a velocità normale col portatore che va da solo; per lo stesso portatore duello e fuga
+  non si riaprono per `CALM_CD` 4 s di partita, l'area di tiro (se è scaduta lì) finché non perde il pallone. Non nelle
+  lezioni dell'allenamento né nelle prove di tiro.
 - **Visuale girata col dito** (duello e area di tiro, pallone nostro): trascinare di lato partendo lontano dal portatore
   gira la telecamera intorno a lui (si afferra il campo: 150° per schermo, al massimo ±100°, `src/camuser.js`); niente
   più rotazione automatica. Il tocco breve sul campo o su un compagno lì non fa niente. Resta finché dura il rallenty
@@ -115,8 +121,17 @@
   il tempo rallenta (8%), si può **passare** disegnando (ogni linea è un passaggio, niente corsa) e il tasto in basso è **Scatto**; toccandolo il portatore si stacca (+15% di velocità per 1,2 s,
   l'avversario resta indietro e non contrasta per 0,6 s) e prosegue dritto per 14 m. Riesce sempre. Avversario **davanti**
   per linee = duello col **Dribbling** o il passaggio disegnato. L'IA dribbla come prima.
+  Godot (Luis 2026-11-23, "dopo lo scatto si blocca"): con `portaAuto` e `rifiniture` la corsa dritta dura quanto lo
+  scatto (1,2 s), poi il portatore torna subito alla guida automatica secondo lo stile, e la fuga non si riapre per
+  `BURST_FLEE_CD` 3,5 s (prima si fermava sulla meta finché durava il comando, l'avversario lo riprendeva e la fuga
+  riapriva il rallenty col portatore fermo).
 - La finta è stata tolta (2026-11-20).
 - Calcio d'angolo: telecamera alle spalle del battitore; dito vicino al battitore = cross, lontano = trascinando si gira la visuale.
+- **Rimessa laterale nostra** (Godot, Luis 2026-11-23): quando il battitore è sulla linea (`restart.sulPosto()`) la
+  telecamera entra piano alle spalle del battitore, fuori dal campo, girata verso il campo e un po' verso la porta
+  avversaria (`throw_view` in `camfit.gd`, `_throw_step` in `telecamera_partita.gd`), col battitore in basso al centro;
+  dito vicino al battitore = passaggio, lontano = trascinando si gira la visuale (mai verso le tribune). Le
+  rimesse della CPU restano con la telecamera normale.
 - **Niente doppio tocco** sui calci da fermo (2026-11-21): chi batte rimessa, angolo, punizione, rinvio, calcio d'inizio o
   rigore non può toccare il pallone finché non l'ha toccato un altro (compagno, avversario o portiere: dopo il palo il
   rigorista no, dopo la parata sì). Niente punizione indiretta: semplicemente non lo tocca (`b.dbl`, `dblBan`). La CPU

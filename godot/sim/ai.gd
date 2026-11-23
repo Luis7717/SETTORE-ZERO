@@ -1053,6 +1053,8 @@ func humanCarrierAuto(p: R.Player) -> void:
 		p.tx = p.x * 0.9
 		p.ty = C.clamp_(p.y + dir * 8.0, -HL + 3.0, HL - 3.0)
 		p.spdF = 0.7
+		if rifiniture:
+			p.aiT = 0.0 # finito il rallenty sceglie subito una direzione nuova (prima ripartiva verso la meta vecchia)
 		return
 	p.aiT -= dtT
 	if p.aiT <= 0.0 or p.supC != p:
