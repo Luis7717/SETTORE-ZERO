@@ -186,6 +186,8 @@ func aggiorna(p: Object, dt: float, ctx: Dictionary) -> float:
 	_ripresa = ""
 	if m != null and m.phase == "restart" and m.restart != null and m.restart.taker == p and m.restart.scena == "":
 		_ripresa = m.restart.type   # (durante la scena della ripresa, sim/riprese.gd, il battitore non è ancora al posto)
+	elif p.pos == "R" and p.stato == "lancia":
+		_ripresa = "throw"          # raccattapalle (sim/raccatta.gd): pallone sopra la testa, poi lo lancia come una rimessa
 	_avanza_tempo(dt)
 	# ---- esultanza
 	if ctx.phase == "goal" and p.cele > 0 and m != null:
@@ -377,7 +379,7 @@ func _giro_verso_il_campo(p: Object) -> float:
 
 
 func _peso_difesa(p: Object, m: Object, ctx: Dictionary) -> float:
-	if m == null or ctx.phase != "play" or p.pos == "P" or p.state != "play":
+	if m == null or ctx.phase != "play" or p.pos == "P" or p.pos == "R" or p.state != "play":
 		return 0.0
 	var o: Object = m.ball.owner
 	if o == null or o.team == p.team:

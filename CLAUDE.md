@@ -149,12 +149,18 @@
 - **Riprese senza teletrasporto** (Godot, Luis 2026-11-23, `godot/sim/riprese.gd`, opzione `"riprese": true` del Match
   messa dal gioco, spenta in allenamento/prove e nei confronti col JS): rimessa, rinvio dal fondo e angolo non hanno più
   il nero né il battitore messo sul posto. Il pallone esce e si ferma poco fuori; il battitore corre a prenderlo, si
-  china, lo raccoglie e lo porta al posto (rimessa: sulla linea, dove l'ha raccolto entro 3 m dall'uscita). Pallone
-  lontano (oltre 9 m dal posto): lo rimanda un raccattapalle con un pallonetto. Rinvio e angolo: appoggia il pallone, fa
+  china, lo raccoglie e lo porta al posto (rimessa: sulla linea, dove l'ha raccolto entro 3 m dall'uscita). Rinvio e
+  angolo col pallone lontano (oltre 9 m dal posto) o dietro la rete: lo prende il **raccattapalle** di quel fondo
+  (`godot/sim/raccatta.gd`, due ragazzini in tuta giallo fluo, uno dietro ogni porta davanti ai cartelloni, grafica in
+  `scripts/partita/raccattapalle_vista.gd`): corre al pallone sempre fuori dal campo girando intorno alla rete, si
+  china, lo raccoglie, si gira e lo lancia a due mani (clip della rimessa) col pallonetto al battitore, poi torna
+  camminando al posto; non è un giocatore, niente numeri casuali. Il pallone fermo non resta mai dentro la rete. La
+  rimessa la va sempre a prendere il battitore. Rinvio e angolo: appoggia il pallone, fa
   2 m indietro un po' di lato e al calcio prende la rincorsa. Gli altri vanno di corsa ai loro posti; la telecamera segue
   il pallone (l'angolo entra piano nella sua visuale). Durante la scena (`restart.scena`) non si batte; un tocco la fa
-  andare ×3 (`SCENA_VELOCE` in `gioco.gd`). Durata tipica 2,5-4 s (di più se il battitore è lontano). Prove:
-  `--scena=fuori_lato|fuori_fondo|fuori_fondo_vicino|fuori_angolo`, sequenze con `--schermata=... --ogni=0.5 --dopo=6`.
+  andare ×3 (`SCENA_VELOCE` in `gioco.gd`, vale anche per il raccattapalle). Durata tipica 2,5-4 s, 4-7 s col
+  raccattapalle (fino a ~8 s col pallone fermo lontano di lato). Prove:
+  `--scena=fuori_lato|fuori_fondo|fuori_fondo_vicino|fuori_rete|fuori_angolo`, sequenze con `--schermata=... --ogni=0.5 --dopo=6`.
 - Portiere: sul tiro la visuale va dietro la propria porta e il tempo rallenta; linea dal portiere al punto della porta,
   il tuffo parte quando si alza il dito.
 

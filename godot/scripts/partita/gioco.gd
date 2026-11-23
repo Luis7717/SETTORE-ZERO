@@ -15,8 +15,9 @@
 #   --esci-a-fine       a fine partita stampa il riassunto ed esce (codice 0)
 #   --scena=area|duello|fuga|angolo|rinvio|rilancio|pausa|gol|curva|prima   mette la partita in una situazione da fotografare (gol: tiro a
 #                       porta vuota, per vedere cronaca e replay)
-#   --scena=fuori_lato|fuori_fondo|fuori_fondo_vicino|fuori_angolo   pallone che esce: scena della ripresa (sim/riprese.gd),
-#                       rimessa, rinvio col raccattapalle, rinvio col pallone vicino, calcio d'angolo
+#   --scena=fuori_lato|fuori_fondo|fuori_fondo_vicino|fuori_rete|fuori_angolo   pallone che esce: scena della ripresa
+#                       (sim/riprese.gd), rimessa, rinvio col raccattapalle (sim/raccatta.gd), rinvio col pallone vicino,
+#                       rinvio col pallone dietro la rete (lo prende il raccattapalle), calcio d'angolo
 #   --esultanza=ID      con --scena=gol chi segna è il campione e fa quell'esultanza (id in esultanze.gd)
 #   --senza-replay      dopo il gol niente replay (si va subito al calcio d'inizio)
 #   --replay=porta|lato visuale del replay del gol (predefinito: a caso)
@@ -947,7 +948,7 @@ func _prepara_scena(nome: String) -> void:
 			m.setRestart("corner", me, C.HW, C.HL)
 		"rinvio": # rinvio dal fondo del nostro portiere (posa rilassata dietro il pallone)
 			m.setRestart("goalkick", me, 5.0, -C.HL if me == 0 else C.HL)
-		"fuori_lato", "fuori_fondo", "fuori_fondo_vicino", "fuori_angolo":
+		"fuori_lato", "fuori_fondo", "fuori_fondo_vicino", "fuori_rete", "fuori_angolo":
 			_pallone_fuori(nome)
 		"rilancio": # il nostro portiere ha preso il pallone in area: rilancio dalle mani (pallone tra le mani)
 			_metti_in_gioco()
@@ -1011,7 +1012,7 @@ func _linea_curva_di_prova(a: Vector3, b: Vector3, pancia: float, alza: bool) ->
 
 ## pallone che rotola fuori: la ripresa diventa una scena (sim/riprese.gd). fuori_lato = rimessa nostra sulla destra;
 ## fuori_fondo = rinvio nostro col pallone lontano (raccattapalle); fuori_fondo_vicino = pallone vicino all'area piccola;
-## fuori_angolo = angolo nostro a destra
+## fuori_rete = pallone che finisce dietro la nostra rete (raccattapalle); fuori_angolo = angolo nostro a destra
 func _pallone_fuori(nome: String) -> void:
 	_metti_in_gioco()
 	var d := 1.0 if me == 0 else -1.0
@@ -1026,10 +1027,17 @@ func _pallone_fuori(nome: String) -> void:
 			_sposta(m.team(me)[7], d * 24.0, d * 2.0)
 		"fuori_fondo", "fuori_fondo_vicino":
 			b.last = m.team(1 - me)[9]
-			var x0 := 20.0 if nome == "fuori_fondo" else 9.0
+			var x0 := 14.0 if nome == "fuori_fondo" else 9.0
 			b.x = d * x0
 			b.y = -d * (C.HL - 1.0)
 			b.vx = d * 1.0
+			b.vy = -d * 9.0
+			_sposta(m.gk(me), d * 1.0, -d * (C.HL - 2.0))
+		"fuori_rete":
+			b.last = m.team(1 - me)[9]
+			b.x = d * 4.6
+			b.y = -d * (C.HL - 2.0)
+			b.vx = -d * 1.6
 			b.vy = -d * 9.0
 			_sposta(m.gk(me), d * 1.0, -d * (C.HL - 2.0))
 		"fuori_angolo":

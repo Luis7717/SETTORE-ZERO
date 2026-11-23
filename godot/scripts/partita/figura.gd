@@ -201,7 +201,7 @@ func posa(p: Object, dt: float, ctx: Dictionary) -> void:
 	var cele: bool = p.cele > 0 and ctx.phase == "goal"
 	var b: Object = ctx.ball
 	var near_ball: bool = b != null and Vector2(b.x - p.x, b.y - p.y).length() < 2.2
-	var header: bool = p.kickAnim > 0.0 and near_ball and b.h > HEAD_H
+	var header: bool = p.kickAnim > 0.0 and near_ball and b.h > HEAD_H and p.pos != "R"   # R = raccattapalle: lancia
 	var trick: Variant = ctx.get("trick")
 	var m: Object = ctx.get("m")
 	var in_mano := palla_in_mano(p, m)
@@ -296,6 +296,8 @@ func posa(p: Object, dt: float, ctx: Dictionary) -> void:
 
 ## portiere col pallone in mano: rilancio dalle mani (ripresa "gk" del motore) finché non calcia
 static func palla_in_mano(p: Object, m: Object) -> bool:
+	if p.pos == "R":   # raccattapalle (sim/raccatta.gd): col pallone davanti al petto; sopra la testa lo tiene la clip
+		return p.palla and p.stato != "lancia"
 	if m == null or m.phase != "restart" or m.restart == null:
 		return false
 	var r: Object = m.restart
@@ -306,6 +308,8 @@ static func palla_in_mano(p: Object, m: Object) -> bool:
 
 ## battitore chinato sul pallone nella scena della ripresa: lo raccoglie o lo appoggia (sim/riprese.gd)
 static func chinato(p: Object, m: Object) -> bool:
+	if p.pos == "R":   # raccattapalle che raccoglie il pallone
+		return p.stato == "raccogli"
 	if m == null or m.phase != "restart" or m.restart == null or m.restart.taker != p:
 		return false
 	var r: Object = m.restart

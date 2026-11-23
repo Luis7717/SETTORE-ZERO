@@ -239,6 +239,7 @@ class Restart:
 	var ky: float = 0.0
 	var posato: bool = false   # pallone fermo a terra in (kx, ky) anche se è del battitore (appoggiato o da raccogliere)
 	var rimando: bool = false  # il raccattapalle ha già rimandato il pallone
+	var raccatta: bool = false # il pallone lo va a prendere il raccattapalle (raccatta.gd), non il battitore
 	var rinc: bool = false     # il battitore è indietro di qualche passo: al calcio prende la rincorsa
 	var pend: Variant = null   # calcio chiesto durante la rincorsa: parte quando arriva sul pallone
 
@@ -266,3 +267,36 @@ class Chase:
 	var p2: Player = null
 	var x2: float = 0.0
 	var y2: float = 0.0
+
+
+# raccattapalle (raccatta.gd, opzione "riprese"): non è un giocatore della partita, sta fuori dal campo. I campi da
+# `team` a `src` hanno gli stessi nomi di Player perché la figura della grafica (figura.gd) li legge allo stesso modo
+class Raccatta:
+	extends RefCounted
+	var team: int = -1
+	var i: int = 0             # 0 = dietro la porta in basso (y < 0), 1 = in alto
+	var name: String = "raccattapalle"
+	var pos: String = "R"
+	var state: String = "play"
+	var src: Dictionary = {}
+	var x: float = 0.0
+	var y: float = 0.0
+	var vx: float = 0.0
+	var vy: float = 0.0
+	var fx: float = 0.0
+	var fy: float = 1.0
+	var t: float = 0.0
+	var kickAnim: float = 0.0  # lancio appena partito (come il calcio di un giocatore)
+	var sprint: bool = false
+	var cele: int = 0
+	var warn: bool = false
+	var off: bool = false
+	var dive: Dive = null
+	var hx: float = 0.0        # il suo posto (seduto davanti ai cartelloni)
+	var hy: float = 0.0
+	var spd: float = 0.0       # velocità attuale (m/s)
+	# "fermo" al posto, "va" verso il pallone, "raccogli" chinato, "mira" col pallone in mano girato verso il battitore,
+	# "lancia" pallone sopra la testa, "dopo" fermo dopo il lancio, "torna" camminando al posto
+	var stato: String = "fermo"
+	var st: float = 0.0        # tempo nello stato (s)
+	var palla: bool = false    # ha il pallone in mano

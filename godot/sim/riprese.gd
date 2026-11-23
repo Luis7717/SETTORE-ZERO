@@ -1,18 +1,22 @@
 # Riprese senza teletrasporto (Luis 2026-11-23: "quando la palla esce non fare il teletrasporto, fai un giocatore che
 # va a prendere la palla"). Rimessa laterale, rinvio dal fondo e calcio d'angolo: il pallone esce e si ferma poco fuori
-# (cartelloni), il battitore va a prenderlo di corsa, si china, lo raccoglie e lo porta al posto della ripresa. Se il
-# pallone è lontano dal posto glielo rimanda un raccattapalle con un pallonetto, che il battitore prende al volo (o
-# raccoglie se arriva tardi). Nel rinvio e nell'angolo il battitore appoggia il pallone e fa qualche passo indietro per
+# (cartelloni), il battitore va a prenderlo di corsa, si china, lo raccoglie e lo porta al posto della ripresa. Nel
+# rinvio e nell'angolo, se il pallone si ferma lontano dal posto (o dietro la rete), lo va a prendere il raccattapalle
+# di quel fondo (raccatta.gd) e glielo lancia con un pallonetto, che il battitore prende al volo (o raccoglie se arriva
+# tardi). Nel rinvio e nell'angolo il battitore appoggia il pallone e fa qualche passo indietro per
 # la rincorsa; al calcio corre sul pallone e calcia. Gli altri vanno di corsa leggera ai posti che setRestart darebbe loro.
 # Finché la scena dura (restart.scena != "") non si batte; finita, la ripresa è quella di sempre (r.t, wait, aiRestart).
 # Solo con l'opzione "riprese" della partita (la mette il gioco): senza, il motore resta identico (confronti col JS).
-extends "testa.gd"
+extends "raccatta.gd"
 
 const SCENE_TYPES := ["throw", "goalkick", "corner"]
 const SCENE_DAMP := 2.5        # 1/s: frenata in più del pallone libero durante la scena (erba fuori dal campo)
 const SCENE_OUT_X := HW + 2.6  # il pallone fuori si ferma entro qui (più in là ci sono i cartelloni, a 5 m) ...
 const SCENE_OUT_Y := HL + 2.2  # ... e dietro le porte: il battitore ci arriva (lui resta entro HW + 3, HL + 2,5)
 const FETCH_NEAR := 9.0        # pallone entro tanti metri dal posto della ripresa: il battitore va a prenderlo (m)
+const NET_SIDE := 1.0          # pallone fermo dietro la rete (entro tanto di lato dai pali): lo prende il raccattapalle
+const NET_OUT := 0.12          # il pallone resta fuori dalla rete di tanto (m) ...
+const NET_ROLL := 2.0          # ... e se ci finisce sopra rotola fuori a questa velocità (m/s)
 const FETCH_GAP := 0.55        # si ferma a tanto dal pallone per raccoglierlo (m)
 const PICK_R := 0.3            # ... con questa tolleranza (m)
 const PICK_V := 2.5            # pallone abbastanza lento da raccogliere (m/s)
@@ -32,6 +36,8 @@ const RUNUP_ANG := 0.5         # ... un po' di lato (rad), verso l'esterno: il p
 const RUNUP_HIT := 0.6         # il calcio parte col battitore a tanto dal pallone (m)
 const RUNUP_MAX_S := 2.0       # sicurezza: la rincorsa più lunga di così calcia lo stesso (s)
 const THROW_SLIDE := 3.0       # rimessa: si batte dove il battitore raccoglie, al massimo tanto dal punto d'uscita (m)
+const BB_AIM_S := 0.2          # raccattapalle: col pallone in mano si gira verso il battitore almeno tanto (s) ...
+const BB_WIND_S := 0.35        # ... poi lo tiene sopra la testa tanto prima di lanciarlo (s)
 const LOB_V := 13.0            # pallonetto del raccattapalle: velocità media (m/s) ...
 const LOB_T_MIN := 0.8         # ... volo di almeno tanti secondi ...
 const LOB_T_MAX := 1.6         # ... e al massimo tanti
@@ -161,9 +167,24 @@ func runupBack(r: R.Restart) -> Vector2:
 	return Vector2(r.sx + (bx * cos(a) - by * sin(a)) * RUNUP_M, r.sy + (bx * sin(a) + by * cos(a)) * RUNUP_M)
 
 
-## il battitore va lui a prendere il pallone (vicino al posto della ripresa)
+## il battitore va lui a prendere il pallone (se non ci va il raccattapalle)
 func _sceneFetch(r: R.Restart) -> bool:
-	return C.hyp(ball.x - r.sx, ball.y - r.sy) < FETCH_NEAR
+	return not r.raccatta or r.rimando # pallonetto finito a terra senza presa: lo raccoglie lui
+
+
+## dove si fermerà più o meno il pallone libero della scena (frenata SCENE_DAMP, entro i cartelloni)
+func sceneRest() -> Vector2:
+	var b := ball
+	return Vector2(C.clamp_(b.x + b.vx / SCENE_DAMP, -SCENE_OUT_X, SCENE_OUT_X),
+		C.clamp_(b.y + b.vy / SCENE_DAMP, -SCENE_OUT_Y, SCENE_OUT_Y))
+
+
+## il pallone (fermo in q) lo va a prendere il raccattapalle: rinvio e angolo, lontano dal posto o dietro la rete
+func sceneBallboyWanted(r: R.Restart, q: Vector2) -> bool:
+	if r.type == "throw":
+		return false
+	var rete: bool = absf(q.x) < GW / 2.0 + NET_SIDE and absf(q.y) > HL + NET_D * 0.5
+	return rete or C.hyp(q.x - r.sx, q.y - r.sy) >= FETCH_NEAR
 
 
 ## punto da cui parte il calcio dopo la rincorsa: dietro il pallone, sulla linea del calcio chiesto
@@ -190,17 +211,37 @@ func runupDone() -> bool:
 func sceneBall(dt: float) -> void:
 	var b := ball
 	var r := restart
-	if b.owner != null:
+	if b.owner != null or raccattaHaPalla():
 		return
 	if not (r.rimando and b.h > 0.0): # il pallonetto del raccattapalle vola libero
 		var k: float = maxf(0.0, 1.0 - SCENE_DAMP * dt)
 		b.vx *= k
 		b.vy *= k
+	if r.rimando:
+		return # il pallonetto parte da dietro (le mani del raccattapalle) e va verso il campo: niente cartelloni
 	if absf(b.x) > SCENE_OUT_X:
 		b.x = C.sign_(b.x) * SCENE_OUT_X
 		b.vx = 0.0
 	if absf(b.y) > SCENE_OUT_Y:
 		b.y = C.sign_(b.y) * SCENE_OUT_Y
+		b.vy = 0.0
+	_sceneNet(b, dt)
+
+
+## il pallone fermo non resta dentro la rete: si ferma contro la rete di lato o, finito sopra, rotola fuori dal lato
+## più vicino (il raccattapalle non ci entra)
+func _sceneNet(b: R.Ball, dt: float) -> void:
+	var ax: float = absf(b.x)
+	var ay: float = absf(b.y)
+	if ay <= HL or ay >= HL + NET_D + NET_OUT or ax >= GW / 2.0 + NET_OUT or b.h >= GH:
+		return
+	var lato: float = GW / 2.0 + NET_OUT - ax
+	var dietro: float = HL + NET_D + NET_OUT - ay
+	if lato < dietro:
+		b.x += (1.0 if b.x >= 0.0 else -1.0) * minf(lato, NET_ROLL * dt)
+		b.vx = 0.0
+	else:
+		b.y += C.sign_(b.y) * minf(dietro, NET_ROLL * dt)
 		b.vy = 0.0
 
 
@@ -216,7 +257,7 @@ func sceneStep(dt: float) -> void:
 		return
 	match r.scena:
 		"va":
-			_sceneGo(r, b, p)
+			_sceneGo(r, b, p, dt)
 		"raccogli":
 			faceTo(p, b.x, b.y)
 			if r.st >= PICK_S:
@@ -247,7 +288,7 @@ func sceneStep(dt: float) -> void:
 				_sceneEnd(r)
 
 
-func _sceneGo(r: R.Restart, b: R.Ball, p: R.Player) -> void:
+func _sceneGo(r: R.Restart, b: R.Ball, p: R.Player, dt: float) -> void:
 	var d: float = C.hyp(b.x - p.x, b.y - p.y)
 	# presa al volo del pallonetto del raccattapalle
 	if r.rimando and b.h > 0.25 and b.h < CATCH_H and b.vh < 0.0 and d < CATCH_R:
@@ -256,7 +297,7 @@ func _sceneGo(r: R.Restart, b: R.Ball, p: R.Player) -> void:
 		b.vh = 0.0
 		_sceneStage(r, "porta")
 		return
-	if b.h < 0.3 and C.hyp(b.vx, b.vy) < PICK_V and d < FETCH_GAP + PICK_R:
+	if (not r.raccatta or r.rimando) and b.h < 0.3 and C.hyp(b.vx, b.vy) < PICK_V and d < FETCH_GAP + PICK_R:
 		b.vx = 0.0
 		b.vy = 0.0
 		b.vh = 0.0
@@ -268,21 +309,40 @@ func _sceneGo(r: R.Restart, b: R.Ball, p: R.Player) -> void:
 			_throwSpot(r, b.y)
 		_sceneStage(r, "raccogli")
 		return
-	if not r.rimando and not _sceneFetch(r) and b.h <= 0.0 and C.hyp(b.vx, b.vy) < BALL_REST_V:
-		var tx: float = r.sx + r.sfx * 0.4
-		var ty: float = r.sy + r.sfy * 0.4
-		var T: float = C.clamp_(C.hyp(tx - b.x, ty - b.y) / LOB_V, LOB_T_MIN, LOB_T_MAX)
-		# il raccattapalle lancia quando il battitore arriva al posto più o meno insieme al pallone
-		if C.hyp(p.x - r.sx, p.y - r.sy) <= vmax(p) * T:
-			_sceneLob(tx, ty, T)
+	_sceneBallboy(r, b, p, dt)
 
 
-## pallonetto del raccattapalle dal punto in cui il pallone si è fermato fino al battitore
+## il raccattapalle: chiamato appena si capisce che il pallone si fermerà lontano (o dietro la rete); col pallone in
+## mano si gira verso il battitore e lo lancia quando lui arriva al posto più o meno insieme al pallone
+func _sceneBallboy(r: R.Restart, b: R.Ball, p: R.Player, dt: float) -> void:
+	if not r.raccatta:
+		if b.owner == null and b.h < 0.3 and sceneBallboyWanted(r, sceneRest()):
+			r.raccatta = true
+			raccattaChiama(raccattaDi(b.y))
+		return
+	if r.rimando:
+		return
+	var bb := raccattaDi(r.ky)
+	var tx: float = r.sx + r.sfx * 0.4
+	var ty: float = r.sy + r.sfy * 0.4
+	var T: float = C.clamp_(C.hyp(tx - b.x, ty - b.y) / LOB_V, LOB_T_MIN, LOB_T_MAX)
+	if bb.stato == "mira" or bb.stato == "lancia":
+		_bbGira(bb, tx - bb.x, ty - bb.y, dt)
+	if bb.stato == "mira" and bb.st >= BB_AIM_S and C.hyp(p.x - r.sx, p.y - r.sy) <= vmax(p) * (T + BB_WIND_S):
+		_bbStato(bb, "lancia")
+	elif bb.stato == "lancia" and bb.st >= BB_WIND_S:
+		bb.palla = false
+		bb.kickAnim = BB_KICK_T
+		_bbStato(bb, "dopo")
+		_sceneLob(tx, ty, T)
+
+
+## pallonetto del raccattapalle dalle sue mani (o da dove il pallone si è fermato) fino al battitore
 func _sceneLob(tx: float, ty: float, T: float) -> void:
 	var b := ball
 	b.vx = (tx - b.x) / T
 	b.vy = (ty - b.y) / T
-	b.h = 0.02
+	b.h = maxf(b.h, 0.02)
 	b.vh = (LOB_H - b.h + 0.5 * G * T * T) / T
 	restart.rimando = true
 	ev("ballboy", {"team": restart.team})
