@@ -278,6 +278,11 @@ func _exit_tree() -> void:
 		vista.dispose()
 	if m != null:
 		m.dispose()
+	# partita aperta da sola (prova della build, scena di prova): nessuna App lascia le risorse grafiche condivise a
+	# fine programma, lo fa la partita (sul Mac della build, senza, uno shader risulta "leaked", 2026-11-23)
+	if not avviata_da_app():
+		load("res://scripts/giocatore.gd").libera_condivisi()
+		load("res://scripts/partita/capelli.gd").libera_condivisi()
 
 
 # ---------------------------------------------------------------- ciclo principale (frame() di src/main.js)
