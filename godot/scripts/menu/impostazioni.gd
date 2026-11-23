@@ -17,7 +17,7 @@ func costruisci() -> void:
 	var st: Dictionary = s.get("settings", {})
 	_opzioni(st, "Durata di un tempo", "half", [[90, "1:30"], [150, "2:30"], [240, "4:00"], [360, "6:00"]], 150)
 	_opzioni(st, "Difficoltà avversari", "diff", [[0, "Facile"], [1, "Normale"], [2, "Difficile"]], 1)
-	_opzioni(st, "Portiere", "autoGk", [[false, "Manuale (tuffo col dito)"], [true, "Automatico"]], false)
+	_opzioni(st, "Portiere", "gkManuale", [[false, "Automatico"], [true, "Manuale (prova)"]], false)
 	_opzioni(st, "Audio", "sound", [[true, "Acceso"], [false, "Spento"]], true)
 	_opzioni(st, "Musica", "music", [[true, "Accesa"], [false, "Spenta"]], true)
 	_opzioni(st, "Vibrazione", "vibra", [[true, "Accesa"], [false, "Spenta"]], true)

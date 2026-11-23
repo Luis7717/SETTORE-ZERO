@@ -228,8 +228,9 @@ dritto = rasoterra, curvo = a effetto e alto (soglie `CURVE_*` in `sim/match.gd`
 viaggia, linea dal compagno che riceve, che calcia appena tocca il pallone (`userQueue`); duello (avversario davanti
 "per linee") col tasto Dribbling, fuga (avversario alla pari o dietro entro 4 m) col tasto Scatto, linee di
 difesa da ogni proprio giocatore tranne il portiere (si vedono già tagliate a 14 m), tieni premuto = muovi il
-controllato (lontano = scatto), tocco su un proprio giocatore in difesa = comandarlo, portiere (linea dal portiere al
-punto della porta, tuffo al rilascio), rimesse (si disegna da ovunque, tranne nel calcio d'angolo: solo vicino al
+controllato (lontano = scatto), tocco su un proprio giocatore in difesa = comandarlo, portiere (automatico di
+base; manuale da provare nelle Impostazioni: fermatempo di 3 s col bersaglio sulla porta, linea dal portiere al
+punto della porta, tuffo al momento giusto fin dove arriva, `sim/parata.gd`), rimesse (si disegna da ovunque, tranne nel calcio d'angolo: solo vicino al
 battitore), visuale girata col dito nel rallenty e nel calcio d'angolo (dito lontano dal portatore, soglia 12 px,
 150° per schermo, ±100°, "si afferra il campo"). Un dito solo; i tocchi annullati dal sistema non danno ordini;
 l'app che va in sottofondo mette in pausa.

@@ -5,7 +5,8 @@
 #    (sull'iPhone il pallone non si vedeva, vedi vista.gd materiale_pallone).
 # 2. Lezione Portiere col tocco vero: InputEventScreenTouch / ScreenDrag passati da Input come fa iOS (in pixel della
 #    finestra, con la scala dello schermo), dal portiere al punto della porta dove arriva il tiro, con la telecamera
-#    dietro la porta: al rilascio il motore riceve il tuffo (stato "dive", verso il punto giusto), la telecamera resta
+#    dietro la porta: col tempo fermo (fermatempo della parata, bersaglio e cerchio "Para!" a schermo) si disegna; al
+#    rilascio il motore riceve il punto e il tuffo parte al momento giusto (verso il punto giusto), la telecamera resta
 #    sulla parata e la figura del portiere si vede tuffarsi (testa giù e di lato rispetto ai piedi).
 #    In allenamento niente suggerimento in basso: spiega il riquadro in alto.
 # 3. Amichevole vera (Luis 2026-11-22): niente suggerimenti in basso; sul rinvio dal fondo il nostro portiere sta
@@ -84,6 +85,8 @@ func _process(_d: float) -> bool:
 			_tuffo_attesa()
 		"tuffo_dito":
 			_tuffo_dito()
+		"tuffo_parte":
+			_tuffo_parte()
 		"tuffo_dopo":
 			_tuffo_dopo()
 		"partita_attesa", "partita_rinvio", "partita_rilancio":
@@ -177,10 +180,29 @@ func _tuffo_dito() -> void:
 	check(gk.state == "play", "finché il dito è giù il portiere non si tuffa")
 	var tv: Variant = g.gesti.dive_target()
 	check(tv != null and absf(float(tv.x) - meta_x) < 0.3, "punto in porta sotto il dito: %s (atteso x=%.2f)" % [tv, meta_x])
+	# fermatempo della parata (sim/parata.gd): tempo fermo, bersaglio sulla porta e cerchio "Para!"
+	check(g.ts == 0.0, "fermatempo: tempo fermo mentre si disegna (%.2f)" % g.ts)
+	check(g.hud.bersaglio_visibile(), "bersaglio del tiro sulla porta")
+	check(g.hud.cerchio_parata_visibile(), "cerchio \"Para!\" intorno al portiere")
 	_tocca(false, meta_schermo)
-	check(gk.state == "dive", "al rilascio il motore riceve il tuffo (stato %s)" % gk.state)
+	check(gk.state == "dive" or m.paraAim[0] != null, "al rilascio il motore riceve il punto del tuffo (stato %s)" % gk.state)
+	check(not m.paraFor(0), "linea data: fermatempo chiuso")
+	passo = 0
+	fase = "tuffo_parte"
+
+
+## il tuffo parte al momento giusto (al pallone manca poco), verso il punto indicato fin dove il portiere arriva
+func _tuffo_parte() -> void:
+	var m = g.m
+	var gk: R.Player = m.gk(0)
+	passo += 1
+	if gk.state != "dive" and passo < 240:
+		return
+	check(gk.state == "dive", "il portiere si tuffa (stato %s dopo %d fotogrammi)" % [gk.state, passo])
 	if gk.dive != null:
-		check(absf(gk.dive.tx - clampf(meta_x, -C.GW / 2.0 - 0.9, C.GW / 2.0 + 0.9)) < 0.3, "tuffo verso il punto indicato (%.2f)" % gk.dive.tx)
+		var x0: float = m.ball.shot.gx0 if m.ball.shot != null else 0.0
+		var atteso: float = m.paraReachX(x0, gk.st.por, meta_x)
+		check(absf(gk.dive.tx - atteso) < 0.3, "tuffo verso il punto indicato (%.2f, atteso %.2f)" % [gk.dive.tx, atteso])
 	t_rilascio = m.time
 	fase = "tuffo_dopo"
 

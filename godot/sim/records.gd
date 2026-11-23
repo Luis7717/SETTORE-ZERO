@@ -28,6 +28,7 @@ class Dive:
 	var hh: float = 0.0
 	var x0: float = 0.0
 	var dirx: float = 0.0
+	var auto: bool = false     # parata.gd: tuffo partito da solo, finito il fermatempo senza linea
 
 
 class Player:
@@ -126,6 +127,8 @@ class Shot:
 	var tc: float = 0.0
 	var on: bool = false
 	var gx0: float = 0.0
+	# parata.gd (opzione "parata"): bersaglio mostrato sulla porta {x, h, rx, rh}; vuoto senza l'opzione
+	var area: Dictionary = {}
 
 
 class Ball:

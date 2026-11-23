@@ -9,8 +9,10 @@
 # il battitore va a prendere il pallone (riprese.gd).
 # Opzione "rifiniture" (predefinita false, il gioco la accende): correzioni di gameplay solo Godot (motion.gd
 # deflectBehind: niente "campanili" sulle respinte in angolo da lontano; duel.gd burstDir: Scatto in avanti).
+# Opzione "parata" (predefinita false, la accende il gioco): fermatempo della parata col bersaglio sulla porta e il punto
+# scelto rispettato (parata.gd).
 class_name SimMatch
-extends "ai.gd"
+extends "parata.gd"
 
 # Calci da fermo (Luis 2026-11-21): chi batte non può toccare il pallone una seconda volta finché non l'ha toccato un altro.
 const DBL_FREE := 6.0 # sicurezza: dopo tanto tempo di pallone libero senza che nessun altro lo tocchi, il battitore può riprenderlo (s)
@@ -124,6 +126,8 @@ func _init(o: Dictionary) -> void:
 	var mt: Variant = o.get("meteo")
 	meteo = mt if mt is String else ""
 	headCtl = bool(o.get("testa", false))
+	paraCtl = bool(o.get("parata", false))
+	paraSeed = sd
 	riprese = bool(o.get("riprese", false))
 	if riprese:
 		raccattaPrepara() # raccattapalle dietro le porte (raccatta.gd)
@@ -628,6 +632,8 @@ func detectShot() -> void:
 				sh.tc = i * dt
 				sh.on = absf(cx) < GW / 2.0 and ch < GH
 				sh.gx0 = g.x
+				if paraCtl:
+					paraMark(sh) # bersaglio sulla porta (parata.gd)
 				b.shot = sh
 				g.reactT = maxf(0.06, GK_REACT - g.st.por * 0.0026) * (1.25 - 0.35 * float(teams[defT].skill))
 				g.decided = false
@@ -800,6 +806,7 @@ func step(dt: float) -> void:
 	updateDuel(dt)
 	updateFlee(dt)
 	updateHead(dt)
+	updatePara(dt)
 	if phase == "play":
 		contacts(dt)
 		if phase == "play":
@@ -1141,18 +1148,7 @@ func userSlide(tm: int, dx: float, dy: float) -> bool:
 	return true
 
 
-func diveWin(tm: int) -> bool:
-	var b := ball
-	var g := gk(tm)
-	return bool(human[tm]) and phase == "play" and b.shot != null and b.shot.team != tm and b.owner == null and g.state == "play"
-
-
-func userDive(tm: int, dxm: float, th: float) -> bool:
-	if not diveWin(tm):
-		return false
-	var g := gk(tm)
-	startDive(g, g.x + dxm, th)
-	return true
+# diveWin e userDive stanno in parata.gd (con l'opzione "parata": fermatempo e bersaglio)
 
 
 func userSwitch(tm: int, p: R.Player) -> bool:

@@ -51,7 +51,9 @@ const TOWN := ["Borgoalto", "Roccamarina", "Valdoro", "Monteluce", "Pietrafina",
 ## campione creato nell'editor: un buon giovane della Terza Divisione (le squadre lì stanno tra 50 e 60)
 const CHAMP_LEVEL := 62
 # momenti: false = partita intera, true = momenti chiave (~10 azioni, il resto simulato: scripts/partita/momenti.gd)
-const SETTINGS_DEFAULT := {"half": 150, "diff": 1, "sound": true, "autoGk": false, "music": true, "vibra": true, "momenti": false}
+# gkManuale (Luis 2026-11-23): parata col dito, fermatempo e bersaglio, da provare; predefinito no = portiere automatico,
+# anche per i salvataggi vecchi (la vecchia chiave autoGk resta nel salvataggio ma non conta più: portiere_auto)
+const SETTINGS_DEFAULT := {"half": 150, "diff": 1, "sound": true, "autoGk": false, "music": true, "vibra": true, "momenti": false, "gkManuale": false}
 const ROUNDS := 18           # giornate di una stagione (10 squadre, andata e ritorno)
 const SQUAD_MAX := 24
 const SQUAD_MIN := 14
@@ -195,6 +197,12 @@ static func swapLineup(lineup: Array, a: Variant, b: Variant) -> Array:
 	for id: Variant in lineup:
 		out.append(b if id == a else (a if id == b else id))
 	return out
+
+
+## il portiere della persona para da solo? Sì, a meno che nelle Impostazioni non si scelga "Manuale (prova)"
+## (gkManuale); nelle lezioni guidate sempre manuale (c'è la lezione del portiere)
+static func portiere_auto(settings: Dictionary, tipo: String) -> bool:
+	return tipo != "allenamento" and not bool(settings.get("gkManuale", false))
 
 
 # ---------------------------------------------------------------- salvataggio

@@ -46,13 +46,14 @@ static func senza_campi_godot(v: Variant) -> Variant:
 	return v
 
 
-## stato della carriera senza quello che il web non ha: impostazioni music, vibra e momenti, chiavi della fase B
+## stato della carriera senza quello che il web non ha: impostazioni music, vibra, momenti e gkManuale, chiavi della fase B
 ## (CHIAVI_GODOT: forma, infortuni, obiettivo, rivale, ...)
 static func come_web(s: Dictionary) -> Dictionary:
 	var c: Dictionary = s.duplicate(true)
 	c.settings.erase("music")
 	c.settings.erase("vibra")
 	c.settings.erase("momenti")
+	c.settings.erase("gkManuale")
 	for k: String in CarrieraScript.CHIAVI_GODOT:
 		c.erase(k)
 	return c

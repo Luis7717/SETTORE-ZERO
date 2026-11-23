@@ -161,8 +161,17 @@
   andare ×3 (`SCENA_VELOCE` in `gioco.gd`, vale anche per il raccattapalle). Rinvio e angolo vanno da soli al doppio della velocità
   (`SCENA_FONDO`, Luis 2026-11-23: metà del tempo): rimessa ~2,7 s, rinvio ~2,5 s, angolo e raccattapalle 2-4 s. Prove:
   `--scena=fuori_lato|fuori_fondo|fuori_fondo_vicino|fuori_rete|fuori_angolo`, sequenze con `--schermata=... --ogni=0.5 --dopo=6`.
-- Portiere: sul tiro la visuale va dietro la propria porta e il tempo rallenta; linea dal portiere al punto della porta,
-  il tuffo parte quando si alza il dito.
+- **Portiere** (Luis 2026-11-23): **predefinito automatico** (`gkManuale` false nelle Impostazioni, chiave nuova del
+  salvataggio; la vecchia `autoGk` resta ma non conta, `Carriera.portiere_auto`): para il motore di sempre, secondo
+  tiro e precisione del tiratore contro la bravura del portiere (misure: `tests/parate_fasce.gd`). Nelle lezioni guidate
+  sempre manuale. **Manuale (prova)**: sul tiro la visuale va dietro la propria porta e il tempo **si ferma** per 3 s
+  veri (`scripts/partita/fermatempo_parata.gd`, `parata_regia.gd`, cerchio "Para!"), con un **bersaglio** rosso
+  sulla porta (`bersaglio_tiro.gd`: ellisse che contiene il punto vero, centro spostato col seme, più grande con
+  tiratore bravo e tiro forte) e la scia tratteggiata del volo fino al suo centro. Linea dal portiere al punto della
+  porta = alzato il dito il tempo riparte e il portiere va verso quel punto (passi fino a `PARA_STEP`, tuffo quando
+  al pallone manca `PARA_LEAD`), ma si ferma dove arriva (`PARA_DIVE_MAX` + bravura: un tiro forte nell'angolo
+  lontano resta spesso gol). Finiti i 3 s senza linea fa da solo: dopo la reazione si tuffa verso il centro del
+  bersaglio (tuffo `auto`, la lezione non lo conta). Motore `godot/sim/parata.gd`, opzione `"parata": true` del Match.
 
 ## Versione Godot (in costruzione)
 - Cartella **`godot/`** (Godot 4.7.2-stable, GDScript, renderer Mobile, 390×844 verticale): `project.godot`,

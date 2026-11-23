@@ -1,4 +1,4 @@
-# Cerchio del colpo di testa controllato: intorno al giocatore che deve colpire, si svuota mentre passano i secondi del
+# Cerchio del colpo di testa controllato (e, con la scritta "Para!", del fermatempo della parata): intorno al giocatore che deve colpire, si svuota mentre passano i secondi del
 # fermatempo (fermatempo_testa.gd), con la scritta piccola "Di testa!" sopra. Discreto ma leggibile sul telefono.
 # Lo muove l'HUD (hud_partita.gd → cerchio_testa()) con la posizione sullo schermo del giocatore.
 extends Control
@@ -15,6 +15,7 @@ const TESTO_SU := 30.0         # punti tra il cerchio e la scritta: sopra il tri
 
 var centro := Vector2.ZERO
 var frazione := 1.0            # 1 = pieno, 0 = vuoto
+var testo := TESTO             # scritta sopra il cerchio (la parata usa "Para!", hud_partita.gd)
 var _font: Font
 
 
@@ -43,7 +44,7 @@ func _draw() -> void:
 		# parte dall'alto e si svuota in senso orario
 		var a0 := -PI / 2.0
 		draw_arc(centro, RAGGIO, a0, a0 + TAU * frazione, maxi(4, int(PUNTI * frazione)), COLORE, SPESSORE, true)
-	var w := _font.get_string_size(TESTO, HORIZONTAL_ALIGNMENT_LEFT, -1, TESTO_DIM).x
+	var w := _font.get_string_size(testo, HORIZONTAL_ALIGNMENT_LEFT, -1, TESTO_DIM).x
 	var p := centro + Vector2(-w / 2.0, -RAGGIO - TESTO_SU)
-	draw_string_outline(_font, p, TESTO, HORIZONTAL_ALIGNMENT_LEFT, -1, TESTO_DIM, 4, OMBRA)
-	draw_string(_font, p, TESTO, HORIZONTAL_ALIGNMENT_LEFT, -1, TESTO_DIM, COLORE)
+	draw_string_outline(_font, p, testo, HORIZONTAL_ALIGNMENT_LEFT, -1, TESTO_DIM, 4, OMBRA)
+	draw_string(_font, p, testo, HORIZONTAL_ALIGNMENT_LEFT, -1, TESTO_DIM, COLORE)

@@ -78,8 +78,8 @@ const LESSONS := [
 	},
 	{
 		"id": "portiere", "title": "Portiere",
-		"short": "Quando tira, linea dal portiere al punto della porta.",
-		"text": "Quando l'avversario tira la visuale va dietro la tua porta e il tempo rallenta. <b>Tira una linea dal portiere al punto della porta</b> dove arriva la palla e alza il dito al momento giusto: troppo presto o troppo lontano e non ci arriva.",
+		"short": "Quando tira, il tempo si ferma: linea dal portiere al bersaglio.",
+		"text": "Quando l'avversario tira la visuale va dietro la tua porta e il tempo <b>si ferma per 3 secondi</b>: il <b>bersaglio rosso</b> sulla porta mostra dove arriva la palla, più o meno. <b>Tira una linea dal portiere al punto della porta</b> dove vuoi tuffarti: alzato il dito il tempo riparte e il portiere va lì. Un tiro forte nell'angolo lontano può restare imprendibile; senza linea il portiere fa da solo, ma in ritardo.",
 		"freeze": "all-but-shooter",
 	},
 ]
@@ -447,4 +447,12 @@ func _setup_portiere(kk: int) -> Dictionary:
 
 
 func _check_portiere(e: Dictionary) -> bool:
-	return (e.type == "dive" or e.type == "save") and (e.p as R.Player).team == 0 and (e.type == "save" or not m.autoGk[0])
+	if e.type != "dive" and e.type != "save":
+		return false
+	var g := e.p as R.Player
+	if g.team != 0:
+		return false
+	# il tuffo partito da solo (fermatempo finito senza linea, sim/parata.gd) non conta: la lezione è la linea
+	if e.get("auto", false) or (g.dive != null and g.dive.auto):
+		return false
+	return e.type == "save" or not m.autoGk[0]
