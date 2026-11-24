@@ -111,7 +111,9 @@ func prepara(kit: Dictionary, aspetto: Dictionary, sfasa: float, tex_avviso: Tex
 	_fix = Node3D.new()
 	_fix.name = "Fix"
 	corpo.add_child(_fix)
-	var modello := (load(MODELLO_PATH) as PackedScene).instantiate() as Node3D
+	if Giocatore._scena == null:
+		Giocatore._scena = load(MODELLO_PATH) as PackedScene
+	var modello := Giocatore._scena.instantiate() as Node3D
 	modello.name = "Modello"
 	_fix.add_child(modello)
 	var mesh := modello.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D
@@ -120,6 +122,10 @@ func prepara(kit: Dictionary, aspetto: Dictionary, sfasa: float, tex_avviso: Tex
 	# anche se Giocatore ha già lasciato le sue risorse (partita di prova ricaricata dopo libera_condivisi)
 	if not _pronto or Giocatore._mesh_divisa == null:
 		_prepara_condivisi(mesh, _scheletro, player)
+	# loop su ogni modello: se il modello è stato ricaricato le clip sono nuove (Luis 2026-11-24, "scivolano")
+	Giocatore._metti_loop(player)
+	if player.has_animation("jump"):
+		player.get_animation("jump").loop_mode = Animation.LOOP_LINEAR
 	mesh.mesh = Giocatore._mesh_divisa
 	mesh.material_override = Giocatore._materiale
 	for k: String in kit:

@@ -9,6 +9,7 @@ const TV := preload("res://scripts/partita/texture_vista.gd")
 const Giochetti := preload("res://scripts/partita/mosse/giochetti.gd")
 const Mossa := preload("res://scripts/partita/mosse/mossa.gd")
 const Coord := preload("res://scripts/coord.gd")
+const Giocatore := preload("res://scripts/giocatore.gd")
 const KIT := {"maglia": Color.RED, "calzoncini": Color.WHITE, "calzettoni": Color.RED, "bordino": Color.WHITE}
 const LOOK := {"pelle": Color.TAN, "capelli": Color.BLACK}
 
@@ -239,4 +240,28 @@ func test_pallone_a_schermo_in_proporzione_coi_giocatori() -> bool:
 	var k: float = vista.BALL_R * 2.0 / alto
 	check(k > 0.12 and k < 0.15, "diametro del pallone / altezza del giocatore = %.3f" % k)
 	near(vista.BALL_R, Figura.PALLA_R, 1e-6, "la vista disegna il pallone della figura (mani del portiere)")
+	return done()
+
+
+# Luis 2026-11-24, "i giocatori non corrono, scivolano sul terreno": il modello caricato con load() poteva essere
+# ricaricato da capo, con clip nuove senza loop (impostato solo sul primo modello): la corsa andava una volta e
+# poi le gambe restavano ferme. Ogni figura deve avere fermo/corsa/scatto in loop, anche dopo un ricaricamento
+func test_ogni_figura_ha_la_corsa_in_loop_anche_dopo_un_ricaricamento() -> bool:
+	for giro in 3:
+		if giro > 0:
+			Giocatore._scena = null   # come dopo libera_condivisi o un modello lasciato dalla cache
+		var f := nuova()
+		var ap := f.find_children("*", "AnimationPlayer", true, false)[0] as AnimationPlayer
+		for nome: String in ["idle", "run", "sprint"]:
+			if ap.has_animation(nome):
+				eq(ap.get_animation(nome).loop_mode, Animation.LOOP_LINEAR, "giro %d: %s in loop" % [giro, nome])
+		f.free()
+	# ricaricato ignorando la cache = clip nuove: la figura le mette comunque in loop
+	var nuova_scena := ResourceLoader.load(Giocatore.MODELLO_PATH, "", ResourceLoader.CACHE_MODE_IGNORE) as PackedScene
+	Giocatore._scena = nuova_scena
+	var g := nuova()
+	var ap2 := g.find_children("*", "AnimationPlayer", true, false)[0] as AnimationPlayer
+	eq(ap2.get_animation("run").loop_mode, Animation.LOOP_LINEAR, "modello ricaricato da capo: corsa in loop")
+	g.free()
+	Giocatore._scena = null
 	return done()

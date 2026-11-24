@@ -23,6 +23,7 @@ const PARAM_MOTO := &"parameters/moto/blend_position"   # StringName: niente con
 const PARAM_TEMPO := &"parameters/tempo/scale"
 
 # risorse condivise tra tutti i giocatori (costruite una volta)
+static var _scena: PackedScene   # modello caricato una volta e tenuto (si lascia in libera_condivisi)
 static var _mesh_divisa: ArrayMesh
 static var _materiale: ShaderMaterial
 static var _albero: AnimationNodeBlendTree
@@ -44,6 +45,7 @@ static func set_contorno(c: Color) -> void:
 
 ## a fine programma (App._exit_tree): lascia le risorse condivise prima che si spenga il server grafico
 static func libera_condivisi() -> void:
+	_scena = null
 	_mesh_divisa = null
 	_materiale = null
 	_albero = null
@@ -57,7 +59,9 @@ var _yaw := 0.0
 
 ## kit: Dictionary con maglia, calzoncini, calzettoni, bordino (Color); aspetto: pelle, capelli (Color)
 func prepara(kit: Dictionary, aspetto: Dictionary, sfasa: float) -> void:
-	_modello = (load(MODELLO_PATH) as PackedScene).instantiate() as Node3D
+	if _scena == null:
+		_scena = load(MODELLO_PATH) as PackedScene
+	_modello = _scena.instantiate() as Node3D
 	_modello.name = "Modello"
 	add_child(_modello)
 	_mesh = _modello.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D
@@ -65,6 +69,9 @@ func prepara(kit: Dictionary, aspetto: Dictionary, sfasa: float) -> void:
 	var player := _modello.find_children("*", "AnimationPlayer", true, false)[0] as AnimationPlayer
 	if _mesh_divisa == null:
 		_prepara_condivisi(_mesh, scheletro, player)
+	# clip in loop su OGNI modello (Luis 2026-11-24, "scivolano sul terreno"): se il modello viene ricaricato le sue
+	# clip sono nuove e senza loop la corsa va una volta sola, poi le gambe restano ferme
+	_metti_loop(player)
 	_mesh.mesh = _mesh_divisa
 	_mesh.material_override = _materiale
 	for k in ["maglia", "calzoncini", "calzettoni", "bordino"]:
@@ -144,10 +151,13 @@ static func _prepara_condivisi(mi: MeshInstance3D, scheletro: Skeleton3D, player
 	Viso.applica(_materiale)
 	_materiale.set_shader_parameter("viso_maschere", load(MASCHERE_VISO_PATH))
 	_materiale.set_shader_parameter("contorno", _contorno)
+	_albero = _costruisci_albero()
+
+
+static func _metti_loop(player: AnimationPlayer) -> void:
 	for nome in CLIP_IN_LOOP:
 		if player.has_animation(nome):
 			player.get_animation(nome).loop_mode = Animation.LOOP_LINEAR
-	_albero = _costruisci_albero()
 
 
 # centro dell'occhio sinistro (x > 0) in posa di riposo: i vertici col tassello degli occhi nelle UV (come il web)
