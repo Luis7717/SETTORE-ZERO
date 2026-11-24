@@ -92,7 +92,13 @@
   fondo aspetta il cross, lanci lunghi resta quasi fermo a testa alta). **Non passa e non tira mai da solo**: il dito
   sceglie passaggi e tiri, e i tasti Dribbling e Scatto nei rallenty (nel duello e nella fuga avanza piano e dritto
   come prima).
-- **Stili di gioco** (Fase D, `godot/sim/stili.gd`): nella Rosa, tasto **Stile**: attacco (Equilibrato, Contropiede,
+- **Rosa in alto** (Godot, Luis 2026-11-24, `scripts/menu/rosa_scelte.gd`): tre tasti uguali **Formazione** /
+  **Attacco** / **Difesa** con la scelta attuale; ognuno apre un menu a comparsa (una riga di spiegazione per scelta,
+  scelta attuale in giallo, si chiude toccando fuori o con la ×). "Migliori 11" tolto (resta `autoLineup`).
+  **8 formazioni** in `sim/core.gd`: le 4 del web (prime, identiche) + 4-5-1, 3-4-3, 5-3-2, 4-1-4-1. La CPU sorteggia
+  come il JS tra le 4 del web (`aiMatchTeam`), poi metà squadre usa la "cugina" nuova (`FORMAZIONE_CUGINA`,
+  `formazioneDi`, in partita con `avversarioPartita`). Test: `tests/test_formazioni.gd`.
+- **Stili di gioco** (Fase D, `godot/sim/stili.gd`): nella Rosa, tasti **Attacco** e **Difesa**: attacco (Equilibrato, Contropiede,
   Possesso, Fasce, Lanci lunghi) e difesa (Equilibrata, Pressing, Catenaccio, A uomo, Fuorigioco). Valgono per i
   compagni della CPU e per gli avversari (stile fisso per squadra, mostrato nell'hub). Campi `stileAtt`/`stileDif`
   della squadra del Match e del salvataggio; senza, motore identico a prima.

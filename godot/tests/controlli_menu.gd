@@ -12,6 +12,7 @@ const SALVA := "user://test_menu_schermate.json"
 const SCHERMATE := ["principale", "nuova_carriera", "hub", "rosa", "mercato", "classifica", "calendario", "amichevole",
 	"uno_contro_uno", "impostazioni", "come_si_gioca", "editor", "dopo_partita", "fine_stagione", "statistiche"]
 const ProvaMenu := preload("res://tests/prova_menu.gd")
+const Stili := preload("res://sim/stili.gd")
 
 var _andate: Array = []
 var _app_carriera: Variant = null
@@ -95,6 +96,45 @@ func test_rosa_due_tocchi_scambiano_titolare_e_panchina() -> bool:
 	check(not c.s.lineup.has(titolare), "il titolare va in panchina")
 	_finisci(n)
 	return done()
+
+
+# i tre tasti in alto (Formazione, Attacco, Difesa) aprono il loro menu; una scelta si salva e chiude il menu
+func test_rosa_menu_formazione_e_stili() -> bool:
+	var c := _carriera()
+	_inizia(c)
+	var n := _apri("rosa")
+	check(n._velo == null, "all'inizio nessun menu aperto")
+	n._apri_menu("formazione")
+	check(n._velo != null and is_instance_valid(n._velo), "Formazione apre il menu")
+	var voci := _bottoni(n._velo)
+	eq(voci.size(), 1 + C.FORMATIONS.size(), "× più una voce per formazione")
+	voci[1 + C.FORMATIONS.keys().find("5-3-2")].pressed.emit()
+	eq(c.s.formation, "5-3-2", "formazione scelta")
+	eq(c.s.lineup.size(), 11, "11 titolari")
+	eq(n._menu, "", "menu chiuso dopo la scelta")
+	n._apri_menu("attacco")
+	_bottoni(n._velo)[1 + Stili.ATTACCO.find("contropiede")].pressed.emit()
+	eq(c.stileAtt(), "contropiede", "stile offensivo scelto")
+	n._apri_menu("difesa")
+	_bottoni(n._velo)[1 + Stili.DIFESA.find("catenaccio")].pressed.emit()
+	eq(c.stileDif(), "catenaccio", "stile difensivo scelto")
+	eq(c.stileAtt(), "contropiede", "l'attacco resta")
+	n._apri_menu("difesa")
+	_bottoni(n._velo)[0].pressed.emit()   # ×
+	eq(n._menu, "", "la × chiude")
+	var dati: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(SALVA))
+	eq([dati.carriera.formation, dati.carriera.stileAtt, dati.carriera.stileDif], ["5-3-2", "contropiede", "catenaccio"], "salvato su file con le chiavi di sempre")
+	_finisci(n)
+	return done()
+
+
+static func _bottoni(n: Node) -> Array:
+	var out: Array = []
+	for k in n.get_children():
+		if k is Button:
+			out.append(k)
+		out.append_array(_bottoni(k))
+	return out
 
 
 func test_mercato_compra_al_secondo_tocco() -> bool:

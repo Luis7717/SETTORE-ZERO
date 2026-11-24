@@ -30,6 +30,26 @@ const FORMATIONS := {
 	"4-3-3": [["P", 0.0, 0.03], ["D", -0.72, 0.2], ["D", -0.24, 0.16], ["D", 0.24, 0.16], ["D", 0.72, 0.2], ["C", -0.5, 0.42], ["C", 0.0, 0.37], ["C", 0.5, 0.42], ["A", -0.72, 0.64], ["A", 0.0, 0.69], ["A", 0.72, 0.64]],
 	"3-5-2": [["P", 0.0, 0.03], ["D", -0.5, 0.19], ["D", 0.0, 0.16], ["D", 0.5, 0.19], ["C", -0.85, 0.45], ["C", -0.4, 0.41], ["C", 0.0, 0.36], ["C", 0.4, 0.41], ["C", 0.85, 0.45], ["A", -0.22, 0.66], ["A", 0.22, 0.66]],
 	"4-2-3-1": [["P", 0.0, 0.03], ["D", -0.72, 0.2], ["D", -0.24, 0.16], ["D", 0.24, 0.16], ["D", 0.72, 0.2], ["C", -0.25, 0.35], ["C", 0.25, 0.35], ["C", -0.7, 0.53], ["C", 0.0, 0.52], ["C", 0.7, 0.53], ["A", 0.0, 0.7]],
+	# solo Godot (Luis 2026-11-24): le 4 del web restano le prime, identiche (confronti col JS)
+	"4-5-1": [["P", 0.0, 0.03], ["D", -0.72, 0.2], ["D", -0.24, 0.16], ["D", 0.24, 0.16], ["D", 0.72, 0.2], ["C", -0.84, 0.44], ["C", -0.42, 0.4], ["C", 0.0, 0.36], ["C", 0.42, 0.4], ["C", 0.84, 0.44], ["A", 0.0, 0.67]],
+	"3-4-3": [["P", 0.0, 0.03], ["D", -0.5, 0.19], ["D", 0.0, 0.16], ["D", 0.5, 0.19], ["C", -0.8, 0.43], ["C", -0.26, 0.39], ["C", 0.26, 0.39], ["C", 0.8, 0.43], ["A", -0.7, 0.64], ["A", 0.0, 0.69], ["A", 0.7, 0.64]],
+	"5-3-2": [["P", 0.0, 0.03], ["D", -0.84, 0.24], ["D", -0.44, 0.18], ["D", 0.0, 0.15], ["D", 0.44, 0.18], ["D", 0.84, 0.24], ["C", -0.5, 0.42], ["C", 0.0, 0.38], ["C", 0.5, 0.42], ["A", -0.22, 0.66], ["A", 0.22, 0.66]],
+	"4-1-4-1": [["P", 0.0, 0.03], ["D", -0.72, 0.2], ["D", -0.24, 0.16], ["D", 0.24, 0.16], ["D", 0.72, 0.2], ["C", 0.0, 0.31], ["C", -0.78, 0.47], ["C", -0.27, 0.45], ["C", 0.27, 0.45], ["C", 0.78, 0.47], ["A", 0.0, 0.69]],
+}
+## formazioni del web (src/sim.js): le squadre della CPU tirano a sorte tra queste come il JS (Carriera.aiMatchTeam)
+const FORMATIONS_WEB := ["4-4-2", "4-3-3", "3-5-2", "4-2-3-1"]
+## per ogni formazione del web la "cugina" solo Godot che la CPU può usare al suo posto (Carriera.formazioneDi)
+const FORMAZIONE_CUGINA := {"4-4-2": "4-5-1", "4-3-3": "3-4-3", "3-5-2": "5-3-2", "4-2-3-1": "4-1-4-1"}
+## nome breve e una riga di spiegazione per il menu Formazione della Rosa
+const FORMAZIONE_SPIEGA := {
+	"4-4-2": "Classica: due punte e quattro a centrocampo, coperta in ogni zona.",
+	"4-3-3": "Tre attaccanti larghi, ali che puntano il fondo e crossano.",
+	"3-5-2": "Tre dietro, centrocampo affollato e due punte vicine.",
+	"4-2-3-1": "Due mediani davanti alla difesa, tre dietro all'unica punta.",
+	"4-5-1": "Cinque a centrocampo e una punta sola: compatta, si chiude bene.",
+	"3-4-3": "Tre difensori e tre attaccanti: tanta gente in avanti, rischiosa.",
+	"5-3-2": "Cinque dietro con gli esterni che spingono, due punte in avanti.",
+	"4-1-4-1": "Un mediano davanti alla difesa, quattro in mezzo, una punta.",
 }
 
 # Colpi di testa (`tes`): i giocatori dei salvataggi vecchi non ce l'hanno e lo si ricava da fisico e tiro,

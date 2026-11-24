@@ -731,11 +731,16 @@ func myMatchTeam() -> Dictionary:
 	return {"name": s.club, "short": s.teams.me.short, "formation": s.formation, "players": players, "bench": bench(), "skill": 0.6, "kit": kit}
 
 
-## squadra del computer per SimMatch (giocatori generati dal seme della squadra e dalla stagione)
-func aiMatchTeam(t: Dictionary) -> Dictionary:
+## squadra del computer per SimMatch (giocatori generati dal seme della squadra e dalla stagione).
+## Senza `formazione` è quella del web (sorteggio tra le 4 di C.FORMATIONS_WEB, confronti col JS); con
+## `formazione` (avversarioPartita: formazioneDi, anche le formazioni solo Godot) gli stessi numeri casuali
+## generano i giocatori per i ruoli di quella formazione.
+func aiMatchTeam(t: Dictionary, formazione: String = "") -> Dictionary:
 	var r := JS.rng32(int(t.seed) + int(s.season) * 977)
-	var fs: Array = FORMATIONS.keys()
+	var fs: Array = C.FORMATIONS_WEB
 	var formation: String = fs[int(floor(r.call() * fs.size()))]
+	if FORMATIONS.has(formazione):
+		formation = formazione
 	var F: Array = FORMATIONS[formation]
 	var players: Array = []
 	for i in F.size():
@@ -1003,7 +1008,7 @@ func setFisico(id: Variant, altezza: Variant, corporatura: Variant) -> bool:
 
 ## squadra del computer per la partita (al posto di aiMatchTeam): statistiche col fisico (Fisico.applicaSquadra)
 func avversarioPartita(t: Dictionary) -> Dictionary:
-	var sq: Dictionary = Fisico.applicaSquadra(aiMatchTeam(t))
+	var sq: Dictionary = Fisico.applicaSquadra(aiMatchTeam(t, formazioneDi(t)))
 	var st := stileDi(t)
 	sq["stileAtt"] = st.att
 	sq["stileDif"] = st.dif
@@ -1114,11 +1119,16 @@ func setStili(att: Variant, dif: Variant) -> void:
 	save()
 
 
-## formazione della squadra del computer in questa stagione (la stessa che sceglie aiMatchTeam)
+## formazione della squadra del computer in questa stagione (quella che usa in partita, avversarioPartita):
+## la formazione del web di aiMatchTeam oppure, per metà delle squadre (dal seme e dalla stagione, senza toccare
+## i numeri casuali dei giocatori), la sua "cugina" solo Godot (C.FORMAZIONE_CUGINA): così escono tutte e 8.
 func formazioneDi(t: Dictionary) -> String:
 	var r := JS.rng32(int(t.get("seed", 0)) + int(s.season) * 977)
-	var fs: Array = FORMATIONS.keys()
-	return fs[int(floor(r.call() * fs.size()))]
+	var fs: Array = C.FORMATIONS_WEB
+	var web: String = fs[int(floor(r.call() * fs.size()))]
+	if Asp.hash32("formazione", int(t.get("seed", 0)), int(s.season)) % 2 == 1:
+		return C.FORMAZIONE_CUGINA[web]
+	return web
 
 
 ## stile della squadra del computer {att, dif}: fisso per squadra e stagione (seme, nome, forza, formazione)

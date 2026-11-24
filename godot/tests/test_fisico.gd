@@ -164,7 +164,7 @@ func test_squadre_della_partita_col_fisico_carriera_invariata() -> bool:
 		check(not orig.has("altezza") or orig.get("champ", false), "la carriera non cambia")
 	eq(base.players.size(), t.players.size(), "stessi titolari")
 	var nm: Variant = c.nextMatch()
-	var ai := c.aiMatchTeam(nm.opp)
+	var ai := c.aiMatchTeam(nm.opp, c.formazioneDi(nm.opp))   # la formazione in partita (anche le nuove solo Godot)
 	var av := c.avversarioPartita(nm.opp)
 	check(not ai.players[0].has("altezza"), "aiMatchTeam resta come il JS")
 	eq(av.players.size(), ai.players.size(), "avversario: stessi giocatori")

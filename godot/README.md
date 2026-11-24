@@ -626,7 +626,9 @@ Il nome della scena è il nome per `App.vai(nome, arg)`:
   dell'iPhone da `DisplayServer.get_display_safe_area()` (`--tacca=47,34` le simula sul PC).
 - **Stemmi e visi** (`stemma.gd` = `crestSvg`, `faccia.gd` = `faceSvg`): lo stesso testo SVG del web, disegnato da
   ThorVG (`Image.load_svg_from_string`) alla risoluzione dello schermo, con una cache (`svg.gd`).
-- **Rosa** (`rosa.gd`, `carta_giocatore.gd`, `rosa_logica.gd` = `squad-layout.js`): carte FUT sul campo, panchina che
+- **Rosa** (`rosa.gd`, `carta_giocatore.gd`, `rosa_logica.gd` = `squad-layout.js`, `rosa_scelte.gd`): in alto tre tasti
+  Formazione / Attacco / Difesa con la scelta attuale, ognuno apre un menu a comparsa (8 formazioni disegnate a
+  puntini, 5 stili per lato, una riga di spiegazione; arg `{"menu": "formazione"|"attacco"|"difesa"}` lo apre già); carte FUT sul campo, panchina che
   scorre, tocco = scegli, secondo tocco = confronta, terzo = scambia (come il web); confronto delle statistiche e
   variazione della forza.
 - **Editor** (`editor.gd`, `anteprima_giocatore.gd`): palco fisso in alto (stemma grande, oppure il giocatore della

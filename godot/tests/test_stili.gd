@@ -305,7 +305,7 @@ func test_stile_della_cpu_fisso_e_coerente() -> bool:
 		eq(c.stileDi(t), a, "stesso stile ogni volta: " + str(t.name))
 		var sq := c.avversarioPartita(t)
 		eq([sq.stileAtt, sq.stileDif], [a.att, a.dif], "in partita lo stile mostrato: " + str(t.name))
-		eq(c.formazioneDi(t), c.aiMatchTeam(t).formation, "formazione come aiMatchTeam")
+		eq(c.formazioneDi(t), sq.formation, "formazione mostrata = quella in partita")
 		visti[a.att] = true
 		visti[a.dif] = true
 	# su tante squadre finte escono tutti gli stili
