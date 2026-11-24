@@ -41,6 +41,7 @@ const CarrieraScript := preload("res://scripts/carriera/carriera.gd")
 const ProveApp := preload("res://scripts/app_prove.gd")
 const AudioPartita := preload("res://scripts/partita/audio_partita.gd")
 const Meteo := preload("res://scripts/partita/meteo.gd")
+const DiviseScript := preload("res://scripts/carriera/divise.gd")
 const MUSICA := "res://assets/audio/music.mp3"
 const MUSICA_VOLUME := 0.35     # come Sfx.music del web (gain 0,35)
 const CLIC_HZ := 520.0          # tocco: come Sfx.click del web (triangolo 520 Hz, 0,05 s, volume 0,12)
@@ -135,7 +136,7 @@ func gioca_campionato() -> void:
 	# stadio (taglio e manto dell'erba) della squadra di casa: in casa il mio, fuori quello dell'avversario
 	var stadio: Variant = carriera.s.get("seed") if nm.home else nm.opp.get("seed")
 	_partita("campionato", carriera.avversarioPartita(nm.opp), titolo, float(carriera.s.settings.half), stadio, derby,
-		Meteo.per_giornata(int(carriera.s.get("seed", 0)), int(carriera.s.get("season", 1)), int(nm.day)))
+		Meteo.per_giornata(int(carriera.s.get("seed", 0)), int(carriera.s.get("season", 1)), int(nm.day)), {}, bool(nm.home))
 
 
 ## avversario: id di una squadra del campionato, oppure livello (numero), oppure null = livello della mia squadra
@@ -182,7 +183,8 @@ func _ha_carriera() -> bool:
 # stadio_seme: seme della squadra di casa (taglio e manto dell'erba); null = a caso col seme della partita
 # meteo: {meteo, ora} previsti (campionato: gli stessi dell'hub); vuoto = a caso col seme della partita
 # extra: altre opzioni di avvia() (allenamento libero: {prova})
-func _partita(tipo: String, avversario: Dictionary, titolo: String, durata: float, stadio_seme: Variant = null, derby := false, meteo := {}, extra := {}) -> void:
+# casa_mia: in campionato fuori casa la mia squadra è l'ospite (maglie: DiviseScript.assegna)
+func _partita(tipo: String, avversario: Dictionary, titolo: String, durata: float, stadio_seme: Variant = null, derby := false, meteo := {}, extra := {}, casa_mia := true) -> void:
 	if schermata == "partita":
 		return # doppio tocco sul tasto: la partita sta già partendo
 	var s: Dictionary = carriera.s
@@ -190,6 +192,10 @@ func _partita(tipo: String, avversario: Dictionary, titolo: String, durata: floa
 	var opz := {"squadra_a": carriera.squadraPartita(), "squadra_b": avversario, "me": 0, "tipo": tipo,
 		"durata_tempo": durata, "seme": randi() % 1000000000, "titolo": titolo, "autoGk": Carriera.portiere_auto(s.settings, tipo),
 		"derby": derby}
+	# maglia di casa e da trasferta: le due squadre sempre ben distinguibili (Luis 2026-11-24)
+	var ko := DiviseScript.indice_di(avversario.get("kit", {}))
+	if ko >= 0:
+		DiviseScript.assegna(opz.squadra_a, int(s.kit), avversario, ko, casa_mia)
 	if tipo == "allenamento": # lezioni guidate: squadre senza stile di gioco, come sempre
 		for k: String in ["squadra_a", "squadra_b"]:
 			(opz[k] as Dictionary).erase("stileAtt")
