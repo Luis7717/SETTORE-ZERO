@@ -17,6 +17,7 @@
 #                       porta vuota, per vedere cronaca e replay)
 #   --scena=fallo|rigore|espulso   fallo da dietro sul nostro n. 10 (sim/falli.gd): giallo e punizione con la barriera,
 #                       giallo e rigore, secondo giallo = espulso
+#   --scena=recupero   il nostro n. 4 ruba palla in contrasto frontale: respiro dopo il recupero, rallenty, passaggio
 #   --scena=parata|parata_linea   tiro avversario: fermatempo della parata col bersaglio (parata_linea: dito che disegna)
 #   --scena=fuori_lato|fuori_lato_cpu|fuori_fondo|fuori_fondo_vicino|fuori_rete|fuori_angolo   pallone che esce: scena della ripresa
 #                       (sim/riprese.gd), rimessa, rinvio col raccattapalle (sim/raccatta.gd), rinvio col pallone vicino,
@@ -243,7 +244,7 @@ func _crea_partita() -> void:
 		# lezioni e prove di tiro: il tiratore non parte da solo e le riprese restano immediate
 		"portaAuto": tipo() != "allenamento" and tipo() != "prove", "riprese": tipo() != "allenamento" and tipo() != "prove",
 		# falli sui contrasti da dietro e in ritardo (sim/falli.gd): non nelle lezioni e nelle prove di tiro
-		"falli": tipo() != "allenamento" and tipo() != "prove"})
+		"falli": tipo() != "allenamento" and tipo() != "prove", "contatti": true})
 	if tipo() == "allenamento":
 		tempo = Allenamento.HALF_LEN
 		if not avviata_da_app():
@@ -1072,6 +1073,26 @@ func _prepara_scena(nome: String) -> void:
 		"pausa":
 			await get_tree().create_timer(0.8).timeout
 			_mostra_pausa()
+		"recupero": # il nostro n. 4 ruba il pallone in contrasto frontale al n. 10 avversario che gli corre addosso
+			# (Luis 2026-11-24: "quando recupero palla me la rubano subito"): si vede chi ha perso il pallone e il rallenty
+			_metti_in_gioco()
+			var dr := 1.0 if me == 0 else -1.0
+			var cpu: R.Player = m.team(1 - me)[9]
+			var dif: R.Player = m.team(me)[3]
+			_sposta(cpu, 3.0, -dr * 14.0)
+			_sposta(dif, 3.0, -dr * 15.0)
+			_sposta(m.team(me)[6], -9.0, -dr * 4.0) # un compagno libero a cui passare
+			cpu.fx = 0.0
+			cpu.fy = -dr
+			dif.fx = 0.0
+			dif.fy = dr
+			m.ball.owner = cpu
+			m.ball.last = cpu
+			m.ball.x = cpu.x
+			m.ball.y = cpu.y - 0.6 * dr
+			m.ctrl[me] = dif
+			dif.contact = 9.0 # contrasto al primo contatto
+			cpu.aiT = 9.0 # il portatore non passa subito: gli va addosso
 		"fallo", "rigore", "espulso": # fallo da dietro sul nostro n. 10 (sim/falli.gd): giallo e punizione con la
 			# barriera a 24 m dalla porta, giallo e rigore in area, secondo giallo = rosso
 			_metti_in_gioco()

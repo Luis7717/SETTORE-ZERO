@@ -25,6 +25,9 @@
 #   --me=0|1              squadra umana (1 = campo capovolto, si attacca sempre "in su")
 #   --vicino=N            telecamera fissa vicina al giocatore m.players[N] (0 = portiere di casa)
 #   animazioni mocap (figura_mocap.gd), telecamera vicina a chi le fa:
+#   --scena=contatto [--dist=0.7]   due coppie ferme a quella distanza tra i centri (compenetrazione delle figure)
+#   --scena=recupero      il difensore corre incontro al portatore e gli ruba il pallone (telecamera vicina)
+#   --senza-contatti      motore senza l'opzione "contatti" (giocatori fino a 0,7 m, come prima; sim/contatti.gd)
 #   --scena=esultanza | tiro | piatto | rimessa | difesa   (e parata con --tuffo=X,ALTEZZA per scegliere il tuffo)
 #   --senza-mocap         le stesse scene con le pose calcolate (per confronto)
 #   --traccia=N|segui     stampa a ogni fotogramma lo stato mocap di m.players[N] o di quello seguito (clip, tempo, peso)
@@ -86,7 +89,8 @@ func _ready() -> void:
 			kit["style"] = {"fit": int(dv[1]) if dv.size() > 1 else 0, "sleeves": 0, "collar": int(dv[0]),
 				"pattern": 0, "shorts": 0, "socks": 0}
 			squadre[k]["kit"] = kit
-	m = SimMatch.new({"seed": seme, "halfLen": 600.0, "human": [false, false], "kickoff": 0, "teams": squadre})
+	m = SimMatch.new({"seed": seme, "halfLen": 600.0, "human": [false, false], "kickoff": 0, "teams": squadre,
+		"contatti": not _opz.has("senza-contatti")})
 	vista.setup(m, int(_opz.get("me", "0")))
 	if _opz.has("qualita"):
 		vista.qualita_auto = false
@@ -255,6 +259,10 @@ func _prepara_scena() -> void:
 			_segui = m.restart.taker
 		"difesa":
 			await _difensore_vicino()
+		"contatto":
+			await _contatto(float(_opz.get("dist", "0.7")))
+		"recupero":
+			await _contatto(0.0)
 		"gol", "rete", "festa":
 			await _corri(1.0)
 			_tiro_in_porta()
@@ -377,6 +385,44 @@ func _difensore_vicino() -> void:
 	m.restart = null
 	_segui = d
 	_fermo = true
+
+
+# due coppie ferme a --dist=D m tra i centri (portatore e difensore di fronte, due avversari fianco a fianco): per vedere
+# da che distanza le figure si compenetrano (Luis 2026-11-24; motore: contatti.gd, SEP_R)
+## dist = 0: "recupero", il difensore corre incontro al portatore e gli ruba il pallone (motore che va avanti)
+func _contatto(dist: float) -> void:
+	await _corri(1.0)
+	var o: R.Player = m.players[20]
+	var d: R.Player = m.players[4]
+	var a: R.Player = m.players[18]
+	var b: R.Player = m.players[6]
+	var vivo := dist <= 0.0
+	var pos := [[o, 2.0, 6.0, -1.0], [d, 2.0, 6.0 - dist, 1.0], [a, 0.6, 3.0, 1.0], [b, 0.6 - dist, 3.0, 1.0]]
+	if vivo:
+		pos = [[o, 2.0, 6.0, -1.0], [d, 2.0, 4.6, 1.0], [a, 6.0, 9.0, -1.0], [b, -6.0, 5.0, 1.0]]
+	for q: Array in pos:
+		var p: R.Player = q[0]
+		p.x = q[1]
+		p.y = q[2]
+		p.fx = 0.0
+		p.fy = q[3]
+		p.vx = 0.0
+		p.vy = 0.0
+		p.state = "play"
+	m.ball.owner = o
+	m.ball.x = o.x
+	m.ball.y = o.y - 0.6
+	m.ball.h = 0.0
+	m.ball.vx = 0.0
+	m.ball.vy = 0.0
+	m.phase = "play"
+	m.restart = null
+	_segui = d
+	if vivo:
+		d.contact = 9.0 # ruba al primo contatto
+		o.aiT = 9.0     # il portatore della CPU non passa subito
+	else:
+		_fermo = true
 
 
 # tiro della squadra 1 verso la porta della squadra 0 (y = −50), dal limite dell'area

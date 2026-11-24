@@ -1,5 +1,5 @@
 # Movimento dei giocatori, scivolate, tuffi, parate, falli, possesso e contatti col pallone (porting di src/sim/motion.js).
-extends "duel.gd"
+extends "contatti.gd"
 
 # Regolazioni (misurate con test/balance.mjs, test/diag-flow.mjs e i test in test/unit)
 const SLIDE_T := 0.45       # durata della scivolata (s); sotto la pioggia ×slideK
@@ -162,6 +162,8 @@ func movePlayers(dt: float) -> void:
 				if c != taker:
 					c.x += dx * k
 					c.y += dy * k
+	if contattiOn:
+		softSeparate(dt) # contatti.gd: spinta morbida fino a SEP_R (le figure non si compenetrano)
 	# calcio d'inizio con "rifiniture": nel cerchio solo il battitore, ognuno nella propria metà (kickoffClear qui sotto)
 	if rifiniture and phase == "restart" and restart.type == "kickoff":
 		kickoffClear(taker, false)
@@ -620,6 +622,8 @@ func contacts(dt: float) -> void:
 	for p: R.Player in players:
 		if p.off or p.state != "play" or p.stun > 0.0 or (b.noP == p and b.noT > 0.0) or dblBan(p) or headSkip(p):
 			continue
+		if contattiOn and shielded(p):
+			continue # contatti.gd: passaggio della persona che parte bene, l'avversario addosso non lo prende subito
 		var isGk: bool = p.pos == "P" and inOwnBox(p)
 		var d: float = C.hyp(p.x - b.x, p.y - b.y)
 		# palla appena calciata che si allontana: non si può toccare

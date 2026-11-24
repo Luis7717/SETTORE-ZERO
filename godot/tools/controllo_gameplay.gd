@@ -5,6 +5,7 @@
 #   $G --headless --path godot -s res://tools/controllo_gameplay.gd -- --partite=20 --forza=60 --mia=60 --tempo=150
 #   opzioni: --seme=1 (primo seme) · --stile=<attacco della squadra umana> · --stilecpu=att/dif|caso|base
 #            --meteo=caso|sereno|pioggia|neve · --righe (una riga per partita) · --senza-falli (opzione "falli" spenta)
+#            --senza-contatti (opzione "contatti" spenta: giocatori a 0,7 m, niente respiro dopo il recupero)
 # Stampa una tabella per gruppi: risultati, tiri, meccaniche della persona, riprese, fluidità, possibili bug.
 extends SceneTree
 
@@ -93,11 +94,12 @@ func _partita(sd: int, opz: Dictionary) -> void:
 	if meteo == "caso":
 		meteo = ["sereno", "sereno", "nuvoloso", "pioggia", "neve"][sd % 5]
 	var m := H.newMatch(sd, tempo, [true, false], ta, tb, meteo, {"portaAuto": true, "testa": true, "rifiniture": not opz.has("senza-rifiniture"),
-		"falli": not opz.has("senza-falli")})
+		"falli": not opz.has("senza-falli"), "contatti": not opz.has("senza-contatti")})
 	var dito := Dito.new(sd * 31 + 7)
 	var st := {"ts": 1.0, "testa_reale": -1.0, "last_restart": ["", ""], "last_restart_t": [-99.0, -99.0],
 		"pass": null, "owner_prev": null, "fermo_t": 0.0, "libera_t": 0.0, "slow": false, "ultimo_calcio": {},
-		"sub_dito": "", "duel_t": -1.0, "burst_t": -1.0, "drib_t": -1.0, "burst_p": null, "causa": "", "storia": [], "alta": false, "owner_step": null, "duel_o": null, "booked": false, "tiro": ""}
+		"sub_dito": "", "duel_t": -1.0, "burst_t": -1.0, "drib_t": -1.0, "burst_p": null, "causa": "", "storia": [], "alta": false, "owner_step": null, "duel_o": null, "booked": false, "tiro": "",
+		"poss": -1, "rec": null, "hk": null, "fase_prev": "play"}
 	dito.on_kick = func(sub: String) -> void: st.sub_dito = sub
 	var frames := 0
 	var cap := 60 * 60 * 40
@@ -390,6 +392,7 @@ func _conta(m, st: Dictionary, sdt: float) -> void:
 		if debug and dove == "corsa":
 			print("DEBUG persa in corsa t=%.1f a (%.1f, %.1f) nuovo %s" % [m.time, op2.x, op2.y, o.name if o != null else "nessuno"])
 	st.owner_step = o
+	_contatti(m, st, sdt)
 	if o != null and o.team == 0 and m.ctrl[0] == o and m.phase == "play":
 		_add("porta_u_s", sdt)
 		if not m.duelFor(0) and not m.fleeFor(0) and C.hyp(o.vx, o.vy) < FERMO_V and m.nearOpp(o.x, o.y, 0) > FERMO_LIBERO:
@@ -439,6 +442,130 @@ func _conta(m, st: Dictionary, sdt: float) -> void:
 			if not p.off and (absf(p.x) > C.HW + FUORI_M or absf(p.y) > C.HL + FUORI_M):
 				_add("bug?_giocatore_fuori_campo_passi")
 				break
+
+
+## compenetrazioni e recuperi palla della persona (Luis 2026-11-24: "i giocatori si compenetrano", "quando recupero
+## palla me la rubano subito")
+func _contatti(m, st: Dictionary, sdt: float) -> void:
+	var b: R.Ball = m.ball
+	var o: R.Player = b.owner
+	var gioco: bool = m.phase == "play" and st.fase_prev == "play"
+	st.fase_prev = m.phase
+	if m.phase != "play":
+		st.poss = -1 # dopo una ripresa il possesso riparte da capo: non è un recupero
+	if gioco and sdt > 0.0:
+		var dmin := 99.0
+		var dmin_avv := 99.0
+		var n: int = m.players.size()
+		for i in n:
+			var a: R.Player = m.players[i]
+			if a.off:
+				continue
+			for j in range(i + 1, n):
+				var c: R.Player = m.players[j]
+				if c.off:
+					continue
+				var d := C.hyp(a.x - c.x, a.y - c.y)
+				dmin = minf(dmin, d)
+				if a.team != c.team:
+					dmin_avv = minf(dmin_avv, d)
+		_add("ct_s", sdt)
+		_add("ct_dmin_sum", dmin * sdt)
+		_add("ct_dminavv_sum", dmin_avv * sdt)
+		if dmin < 0.6:
+			_add("ct_sotto06_s", sdt)
+		if dmin_avv < 0.6:
+			_add("ct_avv_sotto06_s", sdt)
+		if dmin < 0.85:
+			_add("ct_sotto085_s", sdt)
+		if dmin_avv < 0.85:
+			_add("ct_avv_sotto085_s", sdt)
+		if dmin < 0.45:
+			_add("ct_sotto045_s", sdt)
+		if o != null:
+			var dp: float = m.nearOpp(o.x, o.y, o.team)
+			_add("ct_portatore_sum", dp * sdt)
+			_add("ct_portatore_s", sdt)
+			if dp < 0.6:
+				_add("ct_portatore_sotto06_s", sdt)
+	# passaggi della persona intercettati entro 1 s
+	for e: Dictionary in m.events:
+		if e.type == "kick" and (e.p as R.Player).team == 0 and (e.kind == "ground" or e.kind == "loft"):
+			var kp: R.Player = e.p
+			var dk: float = m.nearOpp(kp.x, kp.y, 0)
+			st.hk = {"t": m.time, "d": dk, "x": m.ball.x, "y": m.ball.y, "kind": e.kind, "sh": (m.ball.kick.shield.size() if m.ball.kick != null and "shield" in m.ball.kick else -1)}
+			_add("rk_pass_u")
+			_add("rk_pass_u_vicino:" + _fascia(dk))
+	if st.hk != null:
+		var hk: Dictionary = st.hk
+		var tolto := (o != null and o.team == 1)
+		for e: Dictionary in m.events:
+			if (e.type == "block" or e.type == "tackle") and e.get("p", null) is R.Player and (e.p as R.Player).team == 1:
+				tolto = true
+		if tolto and m.time - float(hk.t) <= 1.0:
+			if debug and float(hk.d) < 1.0:
+				var chi: R.Player = o
+				for e: Dictionary in m.events:
+					if (e.type == "block" or e.type == "tackle") and e.get("p", null) is R.Player:
+						chi = e.p
+				print("DEBUG passaggio vicino intercettato t=%.2f dopo %.2f s · %s · avversario più vicino al calcio %.2f m · scudo %d · pallone a %.1f m dal calcio, h %.2f · da %s (%s)" % [m.time, m.time - float(hk.t), hk.kind, hk.d, hk.sh,
+					C.hyp(m.ball.x - float(hk.x), m.ball.y - float(hk.y)), m.ball.h, chi.name if chi != null else "-", str(m.events.map(func(e: Dictionary) -> String: return String(e.type)))])
+			_add("rk_pass_u_int1s")
+			_add("rk_pass_u_int1s_vicino:" + _fascia(float(hk.d)))
+			st.hk = null
+		elif m.time - float(hk.t) > 1.0 or (o != null and o.team == 0):
+			st.hk = null
+	# recuperi palla della persona
+	if o != null and gioco:
+		if o.team == 0 and int(st.poss) == 1:
+			var dr: float = m.nearOpp(o.x, o.y, 0)
+			st.rec = {"t": m.time, "p": o, "d0": dr, "dmin": dr, "rall": false, "vicino": _fascia(dr)}
+			_add("rec_n")
+			_add("rec_vicino:" + _fascia(dr))
+			_add("rec_d0_sum", dr)
+		st.poss = o.team
+	if st.rec != null:
+		var rc: Dictionary = st.rec
+		var age: float = m.time - float(rc.t)
+		for e: Dictionary in m.events:
+			if e.type == "kick" and (e.p as R.Player).team == 0:
+				rc.passato = true
+			if e.type == "dribble" and (e.p as R.Player).team == 0:
+				rc.drib = true
+		if o != null and o.team == 0:
+			rc.dmin = minf(float(rc.dmin), m.nearOpp(o.x, o.y, 0))
+		if age <= 1.0 and (m.duelFor(0) or m.fleeFor(0)) and not rc.rall:
+			rc.rall = true
+			_add("rec_rallenty1s")
+		if o != null and o.team == 1:
+			if age <= 2.0:
+				var come := "palla_libera"
+				if rc.get("passato", false):
+					come = "passaggio"
+				for e: Dictionary in m.events:
+					if e.type == "tackle":
+						come = "contrasto"
+				if rc.get("drib", false):
+					come = "dribbling"
+				if debug:
+					print("DEBUG recupero perso dopo %.2f s (%s) · avversario al recupero %.2f m · rallenty %s · ultimi: %s" % [age, come, float(rc.d0), rc.rall, " | ".join(st.storia.slice(-5))])
+				_add("rec_persa2s_dopo:" + ("a<0.5" if age < 0.5 else ("b<1" if age < 1.0 else "c<2")))
+				_add("rec_persa2s")
+				_add("rec_persa2s:" + come)
+				_add("rec_persa2s_vicino:" + String(rc.vicino))
+				if rc.rall:
+					_add("rec_persa2s_dopo_rallenty")
+			_add("rec_dmin_sum", float(rc.dmin))
+			_add("rec_chiusi")
+			st.rec = null
+		elif age > 2.0 or m.phase != "play":
+			_add("rec_dmin_sum", float(rc.dmin))
+			_add("rec_chiusi")
+			st.rec = null
+
+
+func _fascia(d: float) -> String:
+	return "a<1" if d < 1.0 else ("b1-2" if d < 2.0 else ("c2-4" if d < 4.0 else "d>4"))
 
 
 func _v(k: String) -> float:
@@ -503,6 +630,15 @@ func _stampa(n: int, opz: Dictionary) -> void:
 	print("GOL CPU per tipo:   %s" % _elenco("gol_tipo_c:"))
 	print("GOL da ripresa:     umano %s · CPU %s" % [_elenco("gol_da_u:"), _elenco("gol_da_c:")])
 	print("BUG?               %s" % _elenco("bug"))
+	print("CONTATTI   distanza minima media tra due giocatori %.2f m (avversari %.2f) · tempo con due a meno di 0,6 m %s (avversari %s, sotto 0,45 m %s) · a meno di 0,85 m %s (avversari %s) · portatore: avversario più vicino in media %.2f m, a meno di 0,6 m %s del tempo" % [
+		_v("ct_dmin_sum") / maxf(0.001, _v("ct_s")), _v("ct_dminavv_sum") / maxf(0.001, _v("ct_s")), _pct(_v("ct_sotto06_s"), _v("ct_s")), _pct(_v("ct_avv_sotto06_s"), _v("ct_s")),
+		_pct(_v("ct_sotto045_s"), _v("ct_s")), _pct(_v("ct_sotto085_s"), _v("ct_s")), _pct(_v("ct_avv_sotto085_s"), _v("ct_s")), _v("ct_portatore_sum") / maxf(0.001, _v("ct_portatore_s")), _pct(_v("ct_portatore_sotto06_s"), _v("ct_portatore_s"))])
+	print("RECUPERI   della persona %.1f a partita · avversario più vicino al recupero %.2f m %s · più vicino nei 2 s %.2f m · rallenty duello/fuga entro 1 s %s · persi entro 2 s %s (%.1f a partita) %s · per distanza %s" % [
+		_v("rec_n") / N, _v("rec_d0_sum") / maxf(1.0, _v("rec_n")), _elenco("rec_vicino:"), _v("rec_dmin_sum") / maxf(1.0, _v("rec_chiusi")), _pct(_v("rec_rallenty1s"), _v("rec_n")),
+		_pct(_v("rec_persa2s"), _v("rec_n")), _v("rec_persa2s") / N, _elenco("rec_persa2s:"), _elenco("rec_persa2s_vicino:")])
+	print("RECUPERI   persi entro 2 s: quanto dopo %s · dopo il rallenty %d" % [_elenco("rec_persa2s_dopo:"), _v("rec_persa2s_dopo_rallenty")])
+	print("PASSAGGI P passaggi della persona %.1f a partita · intercettati entro 1 s %s (%.1f a partita) · per avversario vicino al calcio: fatti %s, intercettati %s" % [
+		_v("rk_pass_u") / N, _pct(_v("rk_pass_u_int1s"), _v("rk_pass_u")), _v("rk_pass_u_int1s") / N, _elenco("rk_pass_u_vicino:"), _elenco("rk_pass_u_int1s_vicino:")])
 
 
 func _cause(N: float) -> String:

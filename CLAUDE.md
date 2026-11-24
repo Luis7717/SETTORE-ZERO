@@ -153,6 +153,14 @@
   dietro la palla nella loro posizione; la linea disegnata ha sempre la precedenza. Contrasto un po' "magnetico" per chi
   muove la persona; un passaggio avversario intercettato dà il possesso. La scivolata del giocatore è stata tolta. Raggio di
   intercetto = difesa del difensore contro passaggio di chi passa.
+- **Contatti e recupero palla** (Godot, Luis 2026-11-24, `godot/sim/contatti.gd`, opzione `"contatti": true` del Match
+  messa dal gioco, spenta nei confronti col JS): i giocatori si spingono via morbidamente sotto `SEP_R` 0,9 m tra i centri
+  (le figure ×1,25 a 0,7 m si compenetravano; chi va addosso perde la velocità verso l'altro, il portatore non viene
+  spostato). Quando la persona recupera il pallone dalla CPU: protetto per `RESPIRO_PROTECT` 0,8 s e gli avversari entro
+  2,5 m non contrastano per `RESPIRO_CD` 1,1 s. Passaggio della persona: chi stava entro `SHIELD_NEAR` 1,5 m dal pallone
+  (o entro 2,5 m ma non sulla linea) non lo intercetta nei primi `SHIELD_D` 3 m. Misure: righe CONTATTI/RECUPERI/PASSAGGI P
+  di `tools/controllo_gameplay.gd` (`--senza-contatti` per confronto); prove: `prova_vista --scena=contatto --dist=0.7`,
+  `--scena=recupero` (anche nel gioco).
 - **Falli** (Godot, Luis 2026-11-24, `godot/sim/falli.gd`, opzione `"falli": true` del Match messa dal gioco, spenta in
   lezioni, prove di tiro e confronti col JS): pochi, circa 2-3 a partita (tempi da 2:30). Solo sui contrasti **da dietro**
   o **di fianco un po' dietro** (il frontale resta pulito) e **in ritardo** (addosso di corsa a chi ha appena calciato);
