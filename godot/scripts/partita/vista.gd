@@ -50,6 +50,7 @@ const PASS_RECV := 5.0         # linea "pass": compagno entro questa distanza da
 const RING_K := 1.9            # anello del controllato: scala, pulsa di ±0,12 a 6 rad/s
 const MARKER_H := 2.75         # segnalino sopra il controllato (m)
 const SHADOW_SIZE := 1.15      # ombra morbida sotto i giocatori (m)
+const SHADOW_FARI := 3.6       # di notte: lato del disegno con le quattro scie dei fari (texture_vista.ombra_fari) (m)
 const NET_FAR := 0.78          # trasparenza della rete: porta avversaria / propria porta (guardata attraverso)
 const NET_NEAR := 0.22
 const RETE_FONDO := 2.0        # profondità della rete a terra e alla traversa (come scripts/campo.gd)
@@ -63,6 +64,8 @@ const DOF_VICINO := 16.0       # telecamera più vicina di così al pallone (m):
 const DOF_PRIMO := 9.0         # ... piena da qui
 const DOF_OLTRE := 16.0        # nel rallenty è a fuoco fino a questa distanza oltre il pallone (m); nel primo piano 5
 const DOF_FORZA := 0.07        # sfocatura massima (dof_blur_amount)
+const NOTTE_BUIO_FUORI := 0.55 # di notte l'erba oltre le linee si scurisce così (campo.set_notte)
+const COLORE := {"esposizione": 1.04, "bianco": 1.2, "contrasto": 1.12, "saturazione": 1.2}   # colore() di giorno
 
 # divise come nel gioco web (src/career.js kitOf: Rosso e Blu; portieri arancio e verde)
 const KIT_CASA := {"shirt": 0xc8102e, "shorts": 0xffffff, "socks": 0xc8102e, "gk": {"shirt": 0xffa41c, "shorts": 0x222222, "socks": 0xffa41c}}
@@ -767,6 +770,16 @@ func set_manto(i: int) -> void:
 	_campo.set_manto(i)
 
 
+## notte coi fari (meteo.gd): ombre a stella sotto i giocatori e erba fuori dalle linee più scura
+func set_notte(si: bool) -> void:
+	var q := _shadows.multimesh.mesh as PlaneMesh
+	var lato := SHADOW_FARI if si else SHADOW_SIZE
+	q.size = Vector2(lato, lato)
+	(_shadows.material_override as StandardMaterial3D).albedo_texture = TV.ombra_fari() if si else TV.ombra(64, 0.42)
+	if _campo.has_method("set_notte"):
+		_campo.set_notte(NOTTE_BUIO_FUORI if si else 0.0)
+
+
 ## livello grafico a mano (0 minimo .. 3 alto, vedi qualita.gd); la discesa automatica riparte da qui
 func set_qualita(l: int) -> void:
 	_qualita.imposta(l)
@@ -805,6 +818,20 @@ func _imposta_bagliore() -> void:
 	_env.glow_hdr_threshold = 1.0
 	_env.glow_hdr_scale = 1.6
 	_env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SCREEN
+	colore(_env, COLORE)
+
+
+## colori dell'immagine (2026-11-24, "grafica più accattivante"): un po' più di contrasto e di colore, nel passaggio
+## del tonemap che c'è già (niente passaggi in più sul telefono). k = {esposizione, bianco, contrasto, saturazione};
+## il meteo (meteo.gd) lo richiama con i valori dell'ora
+static func colore(env: Environment, k: Dictionary) -> void:
+	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	env.tonemap_exposure = float(k.get("esposizione", 1.0))
+	env.tonemap_white = float(k.get("bianco", 1.0))
+	env.adjustment_enabled = true
+	env.adjustment_brightness = 1.0
+	env.adjustment_contrast = float(k.get("contrasto", 1.0))
+	env.adjustment_saturation = float(k.get("saturazione", 1.0))
 
 
 func _aggiorna_effetti(b: Object, dt_game: float, dt_real: float) -> void:

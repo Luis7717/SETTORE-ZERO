@@ -47,6 +47,12 @@ instance uniform vec4 barba : source_color = vec4(0.0);   // colore della barba 
 instance uniform vec4 iride2 : source_color = vec4(0.0);  // eterocromia: colore dell'occhio sinistro (x > 0) se a = 1
 instance uniform vec4 sopracciglia : source_color = vec4(0.0);   // a = 1: colore delle sopracciglia (capelli particolari)
 
+// contorno di luce (2026-11-24): i bordi della figura visti di taglio si schiariscono un po' (luce da dietro), così i
+// giocatori si staccano dall'erba anche piccoli. rgb = colore, a = forza (0 = niente); lo cambia l'ora della partita
+// (Giocatore.set_contorno da scripts/partita/meteo.gd). Costo: qualche conto per pixel, niente letture di texture.
+uniform vec4 contorno = vec4(1.0, 0.97, 0.9, 0.5);
+const float CONTORNO_ESP = 3.0;   // più alto = bordo più sottile
+
 // misure del corpo in posa di riposo (m), dalle ossa: le imposta scripts/giocatore.gd
 uniform float anca_y = 0.97;
 uniform float caviglia_y = 0.09;
@@ -678,4 +684,6 @@ void fragment() {
 	ALBEDO = c;
 	ROUGHNESS = ruvido;
 	SPECULAR = 0.35;
+	float bordo = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), CONTORNO_ESP);
+	EMISSION = contorno.rgb * (contorno.a * bordo) * (0.3 + 0.7 * c);   // il colore della stoffa tinge il bordo
 }

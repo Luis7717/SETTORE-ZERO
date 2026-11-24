@@ -255,6 +255,13 @@ func set_meteo(bagnato: float, neve: float) -> void:
 	_param("neve", clampf(neve, 0.0, 1.0))
 
 
+## notte: quanto si scurisce l'erba fuori dalle linee (0 = niente; uniform buio_fuori di shaders/erba_comune.gdshaderinc)
+func set_notte(k: float) -> void:
+	if _mat_erba == null:
+		return
+	_param("buio_fuori", clampf(k, 0.0, 1.0))
+
+
 func manto() -> int:
 	return _manto_forzato if _manto_forzato >= 0 else _manto
 

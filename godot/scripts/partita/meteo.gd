@@ -20,6 +20,7 @@
 extends Node3D
 
 const SimRngScript := preload("res://sim/rng.gd")
+const Giocatore := preload("res://scripts/giocatore.gd")
 
 const METEO := ["sereno", "nuvoloso", "pioggia", "neve"]
 const ORE := ["giorno", "tramonto", "notte"]
@@ -39,13 +40,21 @@ const PROB_ORA := [45, 25, 30]           # [giorno, tramonto, notte]
 # di giorno la direzione del sole resta quella di vista.gd (_ready)
 const ORA_GIORNO := {"luce": Color(1.0, 0.92, 0.8), "energia": 1.2,
 	"cielo": Color(0.25, 0.45, 0.8), "orizzonte": Color(0.7, 0.79, 0.9), "terra": Color(0.18, 0.22, 0.18),
-	"ambiente": 0.6, "nebbia": Color(0.62, 0.7, 0.82), "pubblico": 1.0}
-const ORA_TRAMONTO := {"elev": 13.0, "az": 255.0, "luce": Color(1.0, 0.7, 0.46), "energia": 1.3,
+	"ambiente": 0.6, "nebbia": Color(0.62, 0.7, 0.82), "pubblico": 1.0,
+	"colore": {"esposizione": 1.04, "bianco": 1.2, "contrasto": 1.12, "saturazione": 1.2},
+	"contorno": Color(1.0, 0.97, 0.9, 0.5)}
+# tramonto (2026-11-24): sole un filo più alto e luce meno arancione, più ambiente: prima l'erba diventava marrone
+const ORA_TRAMONTO := {"elev": 17.0, "az": 255.0, "luce": Color(1.0, 0.82, 0.64), "energia": 1.35,
 	"cielo": Color(0.2, 0.27, 0.52), "orizzonte": Color(0.98, 0.6, 0.36), "terra": Color(0.16, 0.14, 0.14),
-	"ambiente": 0.5, "nebbia": Color(0.85, 0.6, 0.45), "pubblico": 0.8}
+	"ambiente": 0.8, "nebbia": Color(0.85, 0.6, 0.45), "pubblico": 0.8,
+	"ambiente_colore": Color(0.6, 0.66, 0.86),
+	"colore": {"esposizione": 1.1, "bianco": 1.2, "contrasto": 1.1, "saturazione": 1.22},
+	"contorno": Color(1.0, 0.75, 0.5, 0.75)}
 const ORA_NOTTE := {"elev": 62.0, "az": 200.0, "luce": Color(0.94, 0.97, 1.0), "energia": 0.95,
 	"cielo": Color(0.02, 0.035, 0.08), "orizzonte": Color(0.09, 0.12, 0.2), "terra": Color(0.03, 0.035, 0.04),
-	"ambiente": 0.55, "nebbia": Color(0.08, 0.1, 0.16), "pubblico": 0.5}
+	"ambiente": 0.55, "nebbia": Color(0.08, 0.1, 0.16), "pubblico": 0.5,
+	"colore": {"esposizione": 1.04, "bianco": 1.2, "contrasto": 1.16, "saturazione": 1.15},
+	"contorno": Color(0.8, 0.88, 1.0, 0.8)}
 # di notte l'ambiente viene da un colore (il cielo è nero): blu tenue, così i giocatori in ombra si leggono
 const NOTTE_AMBIENTE := Color(0.42, 0.48, 0.62)
 const NOTTE_LAMPADE := 7.0         # forza delle lampade delle torri (di giorno 3, stadio.gd)
@@ -72,6 +81,7 @@ const RALLENTY_MIN := 0.12         # nel rallenty le gocce rallentano, ma non si
 
 var scelta := {"meteo": "sereno", "ora": "giorno"}
 var _cam: Camera3D = null
+var _contorno_messo: Variant = null   # contorno dei giocatori messo da questa partita (Color)
 var _gocce: GPUParticles3D = null
 
 
@@ -140,10 +150,15 @@ func applica(vista: Node3D, s: Dictionary) -> void:
 	var ora: Dictionary = {"tramonto": ORA_TRAMONTO, "notte": ORA_NOTTE}.get(s.ora, ORA_GIORNO)
 	var fx: Dictionary = METEO_FX.get(s.meteo, METEO_FX.sereno)
 	var notte: bool = s.ora == "notte"
+	# contorno di luce dei giocatori (divisa.gdshader): caldo al tramonto, freddo e più forte coi fari di notte
+	Giocatore.set_contorno(ora.contorno)
+	_contorno_messo = ora.contorno
 	_luce(vista.get_node_or_null("Sole") as DirectionalLight3D, ora, fx, notte)
 	var amb := vista.get_node_or_null("Ambiente") as WorldEnvironment
 	if amb != null and amb.environment != null:
 		_ambiente(amb.environment, ora, fx, notte)
+	if vista.has_method("set_notte"):
+		vista.set_notte(notte)
 	var campo := vista.get_node_or_null("Campo")
 	if campo != null and campo.has_method("set_meteo"):
 		campo.set_meteo(fx.bagnato, fx.neve)
@@ -205,12 +220,21 @@ func _ambiente(env: Environment, ora: Dictionary, fx: Dictionary, notte: bool) -
 	if notte:
 		env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 		env.ambient_light_color = NOTTE_AMBIENTE
+	elif ora.has("ambiente_colore"):
+		# tramonto: nell'ombra delle tribune luce fredda del cielo (prima marrone: il cielo basso è arancione),
+		# al sole luce calda: il contrasto caldo/freddo del tramonto
+		env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+		env.ambient_light_color = (ora.ambiente_colore as Color).lerp(fx.grigio as Color, cop * 0.6)
 	else:
 		env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	env.ambient_light_energy = float(ora.ambiente) * (1.0 + 0.35 * cop)
 	env.fog_enabled = true
 	env.fog_light_color = (ora.nebbia as Color).lerp(grigio, cop)
 	env.fog_density = float(fx.nebbia)
+	# colori dell'immagine (PartitaVista.colore): col cielo coperto meno colore
+	var col: Dictionary = (ora.colore as Dictionary).duplicate()
+	col.saturazione = float(col.saturazione) * lerpf(1.0, 0.9, cop)
+	PartitaVista.colore(env, col)
 
 
 # di notte le lampade delle torri si accendono forte, con un alone finto (niente luci vere in più).
@@ -337,6 +361,13 @@ func _particelle_neve() -> GPUParticles3D:
 	mat.disable_fog = true
 	q.material = mat
 	return _particelle(NEVE_N, SCATOLA.y * 2.0 / NEVE_V, q, pm)
+
+
+# fuori dalla partita (menu, anteprima del giocatore) il contorno torna quello di giorno
+# (solo se nessun'altra partita l'ha già cambiato nel frattempo)
+func _exit_tree() -> void:
+	if _contorno_messo != null and Giocatore._contorno == _contorno_messo:
+		Giocatore.set_contorno(ORA_GIORNO.contorno)
 
 
 func _process(_delta: float) -> void:

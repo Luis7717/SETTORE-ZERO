@@ -20,6 +20,8 @@ uniform float forza_dettaglio = 0.7; // rilievo dei fili alla luce del sole
 uniform float piega_fili = 0.06;   // fili piegati dal taglio: nelle fasce alterne pendono in versi opposti
 uniform float bagnato = 0.0;       // pioggia (scripts/partita/meteo.gd): erba più scura e lucida; 0 = asciutta
 uniform float neve = 0.0;          // neve: chiazze bianche (0 = niente, 1 = quasi tutto bianco)
+uniform float buio_fuori = 0.0;    // notte (2026-11-24): l'erba fuori dalle linee si scurisce, il campo coi fari risalta
+const vec2 BUIO_FUORI_M = vec2(0.5, 9.0);   // m oltre le linee: da qui comincia a scurirsi, qui è scura del tutto
 const vec3 BIANCO_NEVE = vec3(0.80, 0.83, 0.88);
 const float BAGNATO_SCURO = 0.34;  // quanto si scurisce l'erba bagnata
 const float NEVE_VELO = 0.25;      // neve: parte bianca anche fuori dalle chiazze
@@ -199,6 +201,10 @@ Erba erba_colore(vec2 pos_mondo, vec2 dp, vec2 dx, vec2 dy, float dist, vec3 vis
 		pozza = smoothstep(0.62, 0.9, texture(grana, pos_mondo / 31.0 + vec2(0.83, 0.07)).r) * bagnato;
 	}
 	c *= (1.0 - BAGNATO_SCURO * bagnato) * (1.0 - 0.08 * pozza);
+	if (buio_fuori > 0.0) {
+		float oltre = max(abs(p.x) - HW, abs(p.y) - HL);
+		c *= 1.0 - buio_fuori * smoothstep(BUIO_FUORI_M.x, BUIO_FUORI_M.y, oltre);
+	}
 	e.albedo = c;
 	e.roughness = mix(1.0, 0.5, bagnato) - 0.15 * pozza; // meno lucida: con 0,32 a fondo campo brillavano puntini bianchi
 	e.specular = mix(0.06, 0.3, bagnato);  // all'asciutto 0,06: il riflesso del cielo azzurro spegneva il giallo-verde
