@@ -40,6 +40,8 @@ const CURVE_MIN_M := 1.2      # sotto tanti metri di curvatura il tratto è drit
 const CURVE_MIN_FRAC := 0.15  # ... e anche sotto il 15% della lunghezza
 const CURVE_FULL_FRAC := 0.3  # curvatura pari al 30% della lunghezza = effetto pieno (k = 1)
 const CURVE_T_MIN := 1.25     # passaggio curvo: volo di almeno tanti secondi (punta oltre 2 m: scavalca chi sta in mezzo) ...
+const CURVE_GROUND_M := 20.0  # con le rifiniture il passaggio curvo fino a tanti metri resta rasoterra a effetto (Godot)
+const ARC_PARTS := 8           # la curva rasoterra si controlla a tanti pezzi dritti (arcBlocked)
 const CURVE_T_EXTRA := 0.5    # ... più tanti secondi a effetto pieno (più alto)
 const CURL_APEX_MIN := 1.4    # tiro a giro: punto più alto del volo (m) con poco effetto ...
 const CURL_APEX_MAX := 2.6    # ... e con effetto pieno
@@ -456,6 +458,11 @@ func launch(p: R.Player, spec: Dictionary, noise: bool) -> Dictionary:
 			# curvo = alto a effetto; dritto = rasoterra se corto e con la linea libera, altrimenti alto ma dritto
 			# (Luis 2026-11-23: il lancio lungo dall'altra parte partiva rasoterra e veniva intercettato)
 			type = "loft" if (curved or D > TRATTO_LOFT_M or blocked(sx, sy, spec.tx, spec.ty, tm)) else "ground"
+			# passaggio a giro corto (Luis 2026-11-24, "il giocatore sceglie di fare un passaggio alto anche se è corto"):
+			# con le rifiniture il tratto curvo fino a CURVE_GROUND_M resta rasoterra a effetto, gira intorno a chi sta in mezzo
+			# se la curva rasoterra passa libera; se un avversario sta sulla curva il pallone si alza e lo scavalca (come prima)
+			if rifiniture and curved and D <= CURVE_GROUND_M and not arcBlocked(sx, sy, spec.tx, spec.ty, c, tm):
+				type = "ground"
 		else:
 			type = "loft" if (D > 30.0 or blocked(sx, sy, spec.tx, spec.ty, tm)) else "ground"
 	var press: float = nearOpp(p.x, p.y, tm)
@@ -529,6 +536,33 @@ func launch(p: R.Player, spec: Dictionary, noise: bool) -> Dictionary:
 	var ac: float = C.clamp_(-8.0 * c / (Tt * Tt), -14.0, 14.0)
 	var lv: float = -ac * Tt / 2.0
 	return {"type": type, "sx": sx, "sy": sy, "v0": v0, "vx": ux * v0 + nx * lv, "vy": uy * v0 + ny * lv, "vh": vh, "cax": nx * ac, "cay": ny * ac, "ct": Tt if ac != 0.0 else 0.0, "curved": curved}
+
+
+## un avversario sta sulla curva rasoterra da (x1, y1) a (x2, y2) con curvatura c (m, col segno del lato, come launch:
+## spostamento laterale 4·c·f·(1−f) lungo la normale sinistra della corda)? Stessi margini di `blocked`
+func arcBlocked(x1: float, y1: float, x2: float, y2: float, c: float, tm: int) -> bool:
+	var D: float = C.hyp(x2 - x1, y2 - y1)
+	if D < 0.5:
+		return false
+	var ux: float = (x2 - x1) / D
+	var uy: float = (y2 - y1) / D
+	var px: float = x1
+	var py: float = y1
+	for i in range(1, ARC_PARTS + 1):
+		var f: float = float(i) / float(ARC_PARTS)
+		var off: float = 4.0 * c * f * (1.0 - f)
+		var qx: float = x1 + ux * D * f - uy * off
+		var qy: float = y1 + uy * D * f + ux * off
+		for o: R.Player in players:
+			if o.team == tm or o.off:
+				continue
+			var si := C.segInfo(o.x, o.y, px, py, qx, qy)
+			var along: float = (float(i - 1) + si[1]) / float(ARC_PARTS) * D
+			if along > 2.0 and along < D - 1.5 and si[0] < 1.4:
+				return true
+		px = qx
+		py = qy
+	return false
 
 
 ## il tratto (curvatura c su lunghezza D, in m) è curvo? Sotto la soglia conta come dritto
@@ -605,6 +639,7 @@ func kick(p: R.Player, spec: Dictionary) -> void:
 		b.prev = b.last
 		b.last = p
 	var exempt := false
+	var rsType: String = restart.type if phase == "restart" else ""
 	# calcio da fermo (il portiere che rilancia dalle mani no): il battitore non può ritoccare il pallone (dblBan)
 	b.dbl = p if (phase == "restart" and restart.type != "gk") else null
 	b.dblT = 0.0
@@ -621,6 +656,9 @@ func kick(p: R.Player, spec: Dictionary) -> void:
 			if m.team == tm and m != p and not m.off and m.y * dir > line + 0.3 and m.y * dir > sy * dir + 0.3 and m.y * dir > 0.0:
 				off.append(m)
 	b.kick = R.Kick.make(tm, p, type, 0.0, off, bool(spec.get("human", false)))
+	b.kick.x0 = Lc.sx
+	b.kick.y0 = Lc.sy
+	b.kick.rs = rsType
 	if contattiOn and b.kick.human and type != "shot":
 		shieldOf(b.kick, Lc.sx, Lc.sy, Lc.vx, Lc.vy) # contatti.gd
 	b.shot = null

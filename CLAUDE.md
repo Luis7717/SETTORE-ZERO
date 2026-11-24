@@ -77,7 +77,10 @@
   volo è quella della linea) e si alza scavalcando chi sta in mezzo, di più con più curva (`CURVE_T_MIN`,
   `CURVE_T_EXTRA`; tiro a giro con punto più alto `CURL_APEX_MIN..MAX`, entra all'altezza dove finisce la linea). Anche il
   cross: dritto rasoterra, curvo alto (apre il fermatempo del colpo di testa); `isCross` tolto. L'IA (senza `tratto`)
-  resta come prima. Il tiro caricato è stato scartato (Luis 2026-11-22): la potenza la sceglie il gioco.
+  resta come prima. **Passaggio a giro corto** (Godot, Luis 2026-11-24, con `rifiniture`): il tratto curvo fino a
+  `CURVE_GROUND_M` 20 m resta **rasoterra a effetto** se la curva passa libera (`arcBlocked`); con un avversario sulla
+  curva si alza e lo scavalca come prima; oltre 20 m curvo = alto. Senza rifiniture (lezioni, confronti col JS) come
+  prima. Test `tests/test_passaggio_giro.gd`. Il tiro caricato è stato scartato (Luis 2026-11-22): la potenza la sceglie il gioco.
 - **Di prima** (2026-11-22): mentre un nostro passaggio viaggia, dito sul compagno che lo riceverà (entro 6 m dal volo
   previsto, `PRIMA_VOLO_M`) = si disegna già il calcio dopo (passaggio o tiro, stessa forma del tratto); a dito alzato la
   linea resta **tratteggiata** (verde, gialla se tiro) sul compagno finché arriva il pallone, poi lui calcia **subito,
@@ -221,6 +224,11 @@
   il pallone). Senza avversario attaccato tutto come prima: il lancio sulla fascia si controlla e si corre. I cross in
   attacco (`kind` "att") restano identici. Prove: `--scena=testa_difesa|testa_difesa_linea|testa_passaggio|
   testa_passaggio_linea|testa_fascia`; test `godot/tests/test_testa_contesa.gd`.
+  **Cross o filtrante** (Luis 2026-11-24, "l'attaccante la riceverebbe, la controllerebbe e andrebbe avanti"): il
+  fermatempo "att" (e il colpo di testa automatico verso la porta, `airPlay`) vale solo sui **cross** (`headCross`):
+  da angolo o punizione (`kick.rs`), partiti dalla fascia (oltre `HEAD_CROSS_X` 17 m dal centro, `kick.x0`) o che
+  arrivano di traverso (più di `HEAD_CROSS_ANG` 35° dalla direzione della porta). Il lancio dritto dal centro verso la
+  porta è un **filtrante**: l'attaccante lo controlla e va avanti (il salto conteso col difensore attaccato resta).
   Nel motore vale solo con l'opzione `"testa": true` (la mette il gioco; i confronti col JS restano identici).
 - **Riprese senza teletrasporto** (Godot, Luis 2026-11-23, `godot/sim/riprese.gd`, opzione `"riprese": true` del Match
   messa dal gioco, spenta in allenamento/prove e nei confronti col JS): rimessa, rinvio dal fondo e angolo non hanno più

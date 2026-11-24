@@ -431,6 +431,10 @@ func headGiven(_p: R.Player) -> bool:
 	return false # testa.gd
 
 
+func headCross(_k: R.Kick, _x: float, _y: float) -> bool:
+	return true # testa.gd
+
+
 func headDuelEdge(_p: R.Player, _o: R.Player) -> float:
 	return 0.0 # testa.gd
 

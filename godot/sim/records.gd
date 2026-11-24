@@ -110,6 +110,10 @@ class Kick:
 	var shield: Array = []
 	var sx: float = 0.0
 	var sy: float = 0.0
+	# da dove è partito il calcio e se da una ripresa (tipo: "corner", "freekick"...; "" in gioco): testa.gd (headCross)
+	var x0: float = 0.0
+	var y0: float = 0.0
+	var rs: String = ""
 
 	static func make(team_: int, kicker_: Player, type_: String, age_: float = 0.0, off_: Array = [], human_: bool = false) -> Kick:
 		var k := Kick.new()

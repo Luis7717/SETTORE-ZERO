@@ -253,3 +253,67 @@ func test_frequenza_in_partita() -> bool:
 	check(tot.def + tot.pass >= 1, "il salto conteso capita (%d)" % (tot.def + tot.pass))
 	check(tot.def + tot.pass <= 3 * 8, "ma è un momento speciale, non continuo (%d in 3 partite)" % (tot.def + tot.pass))
 	return done()
+
+
+# Luis 2026-11-24: "passaggio alto filtrante che supera la difesa e va sul mio attaccante: mi dà solo il colpo di testa,
+# quando in realtà l'attaccante la riceverebbe, la controllerebbe e andrebbe avanti". Lancio dritto dal centro verso la
+# porta = filtrante: niente fermatempo del colpo di testa, l'attaccante lo controlla. Il cross resta come prima.
+func test_filtrante_dritto_si_controlla_non_testa() -> bool:
+	var aperti_prima := 0
+	var controllati := 0
+	var colpi := 0
+	for sd in range(1, 11):
+		var m := H.scene(sd, [true, false])
+		m.headCtl = true
+		var pas: R.Player = m.team(0)[6]
+		var rc: R.Player = m.team(0)[9]
+		H.wake(pas, 0.0, C.HL - 40.0)
+		H.wake(rc, 1.0, C.HL - 13.0)
+		H.wake(m.team(1)[3], 14.0, C.HL - 20.0) # nessun difensore attaccato
+		H.give(m, pas)
+		m.ctrl[0] = pas
+		m.kick(pas, {"type": "loft", "tx": rc.x, "ty": rc.y + 4.0})
+		m.events.clear()
+		var evs: Array = []
+		var visto := false
+		for i in 240:
+			if not visto and m.ball.owner == null and m.ball.kick != null:
+				var w := m.headFind(0)
+				if w != null:
+					visto = true
+					aperti_prima += 1 # col codice di prima qui si apriva il colpo di testa verso la porta
+					check(not m.headCross(m.ball.kick, w.x, w.y), "seme %d: lancio dritto dal centro = filtrante" % sd)
+			m.step(DT)
+			evs.append_array(m.events)
+			m.events.clear()
+		check(not hasEvent(evs, "head_win"), "seme %d: niente fermatempo del colpo di testa" % sd)
+		if hasEvent(evs, "control", func(x: Dictionary) -> bool: return x.p == rc):
+			controllati += 1
+		if hasEvent(evs, "kick", func(x: Dictionary) -> bool: return x.p == rc and x.kind == "header"):
+			colpi += 1
+	note("filtranti dritti: colpo di testa possibile prima %d/10, controllati ora %d/10, colpi di testa %d" % [aperti_prima, controllati, colpi])
+	check(aperti_prima >= 5, "la prova riproduce il caso (pallone ad altezza di testa vicino alla porta: %d/10)" % aperti_prima)
+	check(controllati >= 7, "l'attaccante controlla il filtrante (%d/10)" % controllati)
+	eq(colpi, 0, "nessun colpo di testa automatico verso la porta")
+	return done()
+
+
+func test_cross_o_filtrante_dalla_provenienza() -> bool:
+	var m := H.scene(1, [true, false])
+	var k := R.Kick.make(0, m.team(0)[7], "loft")
+	var porta_y: float = C.HL - 10.0
+	k.x0 = 0.0
+	k.y0 = C.HL - 40.0
+	check(not m.headCross(k, 1.0, porta_y), "dal centro dritto verso la porta: filtrante")
+	k.x0 = 22.0
+	check(m.headCross(k, 1.0, porta_y), "dalla fascia: cross")
+	k.x0 = 10.0
+	k.y0 = C.HL - 16.0
+	check(m.headCross(k, -2.0, porta_y), "di traverso dentro l'area: cross")
+	k.x0 = 0.0
+	k.y0 = C.HL - 40.0
+	k.rs = "freekick"
+	check(m.headCross(k, 1.0, porta_y), "da punizione: cross")
+	k.rs = "corner"
+	check(m.headCross(k, 1.0, porta_y), "da calcio d'angolo: cross")
+	return done()
