@@ -1,7 +1,9 @@
 # Foto delle esultanze del campione (mosse/esultanza.gd) per controllarle a occhio: per ognuna un foglio con 6
 # istanti (colonne) da due lati (riga 1 di tre quarti davanti, riga 2 di fianco), giocatore della partita su un prato.
 # Uso (finestra vera, non --headless):
-#   $G --path godot -s res://tests/foto_esultanze.gd [-- --cartella=shots/esultanze --solo=id1,id2 --istanti=0.8,1.0,...]
+#   $G --path godot -s res://tests/foto_esultanze.gd [-- --cartella=shots/esultanze --solo=id1,id2 --istanti=0.8,1.0,...
+#   --busto --zoom=2 --guarda=1.85]  (--busto: da vicino su braccia e mani, davanti e di fianco, anche se il giocatore
+#   si è girato; --zoom: ancora più vicino; --guarda: altezza in m del punto guardato)
 # (--istanti: secondi delle 6 foto, per guardare da vicino un tratto; senza, 6 istanti distribuiti su tutta l'esultanza)
 # Scrive CARTELLA/<id>.png (cartella relativa a quella che contiene godot/).
 extends SceneTree
@@ -17,6 +19,9 @@ const TILE := Vector2i(300, 400)
 const COLONNE := 6
 const PASSO := 1.0 / 30.0
 const VISTE := [Vector3(2.2, 1.5, 5.2), Vector3(5.6, 1.3, 0.0)]   # rispetto al giocatore (davanti = +Z)
+## --busto: da vicino sul busto (braccia e mani), riga 1 davanti un po' di lato, riga 2 di fianco (lato destro)
+const VISTE_BUSTO := [Vector3(0.5, 0.15, 2.3), Vector3(-2.3, 0.15, 0.25)]
+const ALTEZZA_BUSTO := 1.6     # m veri: punto guardato da vicino (petto e testa)
 
 
 class Fermo:
@@ -40,6 +45,8 @@ var _fig: Node3D
 var _istanti: Array = []
 var _vps: Array[SubViewport] = []
 var _cams: Array[Camera3D] = []
+var _busto := false
+var _altezza := ALTEZZA_BUSTO
 
 
 func _initialize() -> void:
@@ -49,6 +56,8 @@ func _initialize() -> void:
 			var p := a.substr(2).split("=", true, 1)
 			opz[p[0]] = p[1] if p.size() > 1 else "1"
 	var cartella: String = opz.get("cartella", "shots/esultanze")
+	_busto = opz.has("busto") or opz.has("zoom")
+	_altezza = float(opz.get("guarda", ALTEZZA_BUSTO))
 	if opz.has("istanti"):
 		for x in String(opz.istanti).split(","):
 			_istanti.append(float(x))
@@ -71,7 +80,7 @@ func _initialize() -> void:
 		vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 		root.add_child(vp)
 		var cam := Camera3D.new()
-		cam.fov = 40.0
+		cam.fov = 40.0 / maxf(1.0, float(opz.get("zoom", "1")))
 		vp.add_child(cam)
 		_vps.append(vp)
 		_cams.append(cam)
@@ -128,8 +137,17 @@ func _giro(ids: Array, cartella: String) -> void:
 			_fig.esultanza = E.posa(id, t)
 			_fig.posa(fermo, PASSO, ctx)
 			var c: Vector3 = _fig.corpo.to_global(Vector3(0, 0.9, 0))   # bacino (anche capovolto)
-			c.y = 1.0
+			c.y = _altezza if _busto else 1.0
 			for v in VISTE.size():
+				if _busto:
+					# davanti al giocatore anche quando si è girato o spostato (verso del corpo)
+					var b: Basis = _fig.corpo.global_transform.basis.orthonormalized()
+					var fw := b * Vector3(0, 0, 1)
+					fw.y = 0.0
+					var yaw := atan2(fw.x, fw.z) if fw.length() > 0.1 else 0.0
+					var ob: Vector3 = Basis(Vector3.UP, yaw) * (VISTE_BUSTO[v] as Vector3)
+					_cams[v].look_at_from_position(c + ob, c)
+					continue
 				var o: Vector3 = VISTE[v]
 				_cams[v].look_at_from_position(c + o - Vector3(0, 1.0, 0), c)
 			if t >= istanti[col] - 1e-4:

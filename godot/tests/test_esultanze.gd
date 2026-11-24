@@ -178,3 +178,62 @@ func test_salvataggio_vecchio_senza_il_campo_si_carica() -> bool:
 	check(c2.setEsultanza(ch.id, "ballo"), "e la si può scegliere")
 	c.reset()
 	return done()
+
+
+# le tre pose che Luis vedeva sbagliate (2026-11-25), misurate sulla figura vera con le mani girate (verso della mano)
+func test_saluto_cuore_conserte_giusti_sulla_figura() -> bool:
+	var f := Figura.new()
+	f.prepara({"maglia": Color.RED}, {"pelle": Color.TAN}, 0.0, TV.avviso())
+	var p := R.Player.new()
+	var ctx := {"t": 0.0, "phase": "goal", "flip": 1.0, "yaw": 0.0, "ball": null, "trick": null}
+	# saluto: mano destra tesa e dritta, punta delle dita alla tempia destra, gomito in fuori all'altezza della spalla
+	f.esultanza = E.posa("saluto", 2.0)
+	f.posa(p, 0.0, ctx)
+	var testa: Vector3 = f.pos_corpo("Head")
+	var punta: Vector3 = f.punta_mano("r")
+	var avamb: Vector3 = (f.pos_corpo("hand_r") - f.pos_corpo("lowerarm_r")).normalized()
+	check(punta.x < testa.x - 0.04 and punta.x > testa.x - 0.11, "saluto: punta sul lato destro della testa (x %.3f, testa %.3f)" % [punta.x, testa.x])
+	check(absf(punta.y - testa.y - 0.13) < 0.04, "saluto: punta all'altezza del sopracciglio (%.3f sopra la testa)" % (punta.y - testa.y))
+	check(punta.z > testa.z + 0.02, "saluto: punta davanti, non dentro la testa")
+	check(rad_to_deg(avamb.angle_to(f.verso_mano("r").x)) < 10.0, "saluto: mano dritta con l'avambraccio (%.0f°)" % rad_to_deg(avamb.angle_to(f.verso_mano("r").x)))
+	check(f.verso_mano("r").y.y < -0.3, "saluto: palmo in giù (%s)" % f.verso_mano("r").y)
+	var incl := rad_to_deg(asin(avamb.y))
+	check(incl > 25.0 and incl < 55.0, "saluto: avambraccio inclinato %.0f°" % incl)
+	check(absf(f.pos_corpo("lowerarm_r").y - f.pos_corpo("upperarm_r").y) < 0.06, "saluto: gomito all'altezza della spalla")
+	check(f.pos_corpo("lowerarm_r").x < f.pos_corpo("upperarm_r").x - 0.15, "saluto: gomito in fuori")
+	check(f.pos_corpo("hand_l").y < f.pos_corpo("pelvis").y + 0.1, "saluto: braccio sinistro lungo il fianco")
+	# cuore: punte delle dita che si toccano davanti al petto, gomiti larghi
+	f.esultanza = E.posa("cuore", 2.0)
+	f.posa(p, 0.0, ctx)
+	var pl: Vector3 = f.punta_mano("l")
+	var pr: Vector3 = f.punta_mano("r")
+	var petto: Vector3 = f.pos_corpo("spine_03")
+	check(pl.distance_to(pr) < 0.04, "cuore: le punte delle dita si toccano (%.3f)" % pl.distance_to(pr))
+	check(pl.z > petto.z + 0.2, "cuore: davanti al petto")
+	check(pl.y > petto.y and pl.y < f.pos_corpo("Head").y, "cuore: tra petto e mento (%.3f)" % pl.y)
+	check(f.pos_corpo("hand_l").distance_to(f.pos_corpo("hand_r")) < 0.3, "cuore: polsi vicini")
+	for s: String in ["l", "r"]:
+		check(absf(f.pos_corpo("lowerarm_" + s).x) > absf(f.pos_corpo("upperarm_" + s).x) + 0.03, "cuore: gomito %s largo" % s)
+	# braccia conserte: avambracci incrociati davanti al petto, ogni mano sul braccio dell'altro lato, fuori dal torace
+	f.esultanza = E.posa("conserte", 2.0)
+	f.posa(p, 0.0, ctx)
+	petto = f.pos_corpo("spine_03")
+	for s: String in ["l", "r"]:
+		var o := "r" if s == "l" else "l"
+		var polso: Vector3 = f.pos_corpo("hand_" + s)
+		var centro: Vector3 = polso + f.verso_mano(s).x * 0.11
+		var d := _dist_segmento(centro, f.pos_corpo("upperarm_" + o), f.pos_corpo("lowerarm_" + o))
+		check(d < 0.11, "conserte: mano %s sul braccio opposto (%.3f)" % [s, d])
+		check(signf(centro.x) == Corpo.SIDE[o], "conserte: mano %s dall'altra parte" % s)
+		check(polso.z > petto.z + 0.1, "conserte: polso %s davanti al petto, non dentro (%.3f)" % [s, polso.z - petto.z])
+		var av: Vector3 = (polso - f.pos_corpo("lowerarm_" + s)).normalized()
+		check(absf(rad_to_deg(asin(av.y))) < 25.0, "conserte: avambraccio %s quasi orizzontale" % s)
+	check(f.pos_corpo("hand_l").z > f.pos_corpo("hand_r").z, "conserte: il sinistro sopra, più avanti")
+	f.free()
+	return done()
+
+
+static func _dist_segmento(p: Vector3, a: Vector3, b: Vector3) -> float:
+	var ab := b - a
+	var k := clampf((p - a).dot(ab) / maxf(1e-9, ab.length_squared()), 0.0, 1.0)
+	return p.distance_to(a + ab * k)

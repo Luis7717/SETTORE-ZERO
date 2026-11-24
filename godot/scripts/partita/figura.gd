@@ -490,6 +490,10 @@ func applica_mossa(fr: Dictionary, w: float, w_corpo: float = -1.0, w_braccia: f
 			var a: Variant = fr.arms.get(s)
 			if a != null:
 				_arto(_limbs["arm_" + s], a.hand, a.pole, null, wb)
+				# verso della mano (esultanze): hq = giro rispetto alla posa di legame, hw = suo peso
+				var hw: float = wb * float(a.get("hw", 0.0))
+				if hw > 0.0 and a.get("hq") != null:
+					_set_quat("hand_" + s, (a.hq as Quaternion) * _rest_q["hand_" + s], hw)
 	if wc > 0.0:
 		for s: String in ["l", "r"]:
 			var l: Variant = fr.legs.get(s)
@@ -522,6 +526,26 @@ func _arto(lm: Dictionary, target: Vector3, pole: Vector3, fq: Variant, w: float
 	_set_quat(lm.mid, Corpo.q_align(lm.dL, lm.h, ((s.end as Vector3) - (s.knee as Vector3)).normalized(), hinge) * _rest_q[lm.mid], w)
 	if fq != null:
 		_set_quat(lm.end, (fq as Quaternion) * _rest_q[lm.end], w)
+
+
+## verso della mano s adesso, nel riferimento del corpo: x = dal polso verso la punta delle dita, y = palmo
+func verso_mano(s: String) -> Basis:
+	var r := _fix_q * _rot_globale(_ossa["hand_" + s]) * (_rest_q["hand_" + s] as Quaternion).inverse()
+	var x := 1.0 if s == "l" else -1.0
+	var d := r * Vector3(x, 0, 0)
+	var n := r * Vector3(0, -1, 0)
+	return Basis(d, n, d.cross(n))
+
+
+## lunghezza della mano dal polso alla punta delle dita (modello a T: mezza larghezza meno il polso)
+func lunghezza_mano() -> float:
+	var polso := _fix_q * (_scheletro.get_bone_global_rest(_ossa["hand_l"]).origin * _fix_scale)
+	return Giocatore._mesh_divisa.get_aabb().size.x * 0.5 * _fix_scale - absf(polso.x)
+
+
+## punta delle dita della mano s adesso (riferimento del corpo)
+func punta_mano(s: String) -> Vector3:
+	return pos_corpo("hand_" + s) + verso_mano(s).x * lunghezza_mano()
 
 
 ## posizione di un osso nel riferimento del corpo (metri del modello: +X sinistra, +Y su, +Z avanti)
