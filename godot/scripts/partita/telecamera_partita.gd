@@ -29,6 +29,9 @@ const MIN_Y := -HL - 15.5      # la telecamera non va oltre questo punto dietro 
 const CORNER_IN := 2.5         # 1/s: entrata nella visuale dell'angolo (senza stacco: si vede il battitore arrivare)
 const THROW_IN := 2.5          # 1/s: entrata nella visuale della nostra rimessa laterale, quando il battitore è sulla linea
 const THROW_OUT := 1.5         # 1/s: uscita dopo il lancio
+const DRIB_IN := 3.0           # 1/s: entrata nella visuale del dribbling (girata di ~45°, dribbling_regia.gd) ...
+const DRIB_OUT := 1.6          # ... e ritorno alla visuale normale, senza scatti
+const DRIB_POSE_K := 4.0       # 1/s: quanto in fretta la visuale del dribbling insegue portatore e difensore
 
 var base_fov := 70.0
 var cx := 0.0
@@ -44,6 +47,8 @@ var _corner_p: Variant = null
 var _throw_k := 0.0
 var _throw_p: Variant = null
 var _gk_k := 0.0
+var _drib_k := 0.0
+var _drib_p: Variant = null
 var _save_p: Variant = null
 
 
@@ -67,6 +72,8 @@ func reset(x: float, y: float) -> void:
 	_throw_p = null
 	_gk_k = 0.0
 	_save_p = null
+	_drib_k = 0.0
+	_drib_p = null
 
 
 func _aspect() -> float:
@@ -76,7 +83,8 @@ func _aspect() -> float:
 
 ## a ogni fotogramma dopo il passo del motore. dt = tempo di gioco, rdt = tempo vero (s); zoom_t = zoom voluto dal
 ## gioco (setZoom del web), < 0 = calcolato qui con le stesse regole di src/main.js
-func aggiorna(m: Object, me: int, dt: float, rdt: float, drawing: bool, cam_drag: bool, user_yaw: float, zoom_t: float = -1.0) -> void:
+## drib = visuale del dribbling della persona {p, o, yaw} (dribbling_regia.gd → camera()), {} = nessuna
+func aggiorna(m: Object, me: int, dt: float, rdt: float, drawing: bool, cam_drag: bool, user_yaw: float, zoom_t: float = -1.0, drib: Dictionary = {}) -> void:
 	var b: Object = m.ball
 	var size := get_viewport().get_visible_rect().size
 	var port := size.x < size.y
@@ -150,6 +158,9 @@ func aggiorna(m: Object, me: int, dt: float, rdt: float, drawing: bool, cam_drag
 	var wk := _wide_step(m, me, mine, duel, rdt, pk_drag, drawing, user_yaw)
 	if wk > 1e-3:
 		pose = _mix(pose, _wide_p, wk)
+	var dk := _drib_step(drib, dir, rdt)
+	if dk > 1e-3:
+		pose = _mix(pose, _drib_p, dk)
 	var ck := _corner_step(m, dir, rdt, pk_drag, user_yaw)
 	if ck > 1e-3:
 		pose = _mix(pose, _corner_p, ck)
@@ -193,6 +204,22 @@ func _wide_step(m: Object, me: int, mine: bool, duel: bool, rdt: float, pk: floa
 		var v := CF.head_view(Vector2(c.x * dir, c.y * dir), user_yaw, base_fov) if testa else CF.wide_view(Vector2(c.x * dir, c.y * dir), user_yaw, mates, CU.keep_goal(zone, user_yaw), _aspect(), base_fov)
 		_wide_p = _smooth(_wide_p, v, pk)
 	return _wide_k if _wide_p != null else 0.0
+
+
+# dribbling della persona: girata di ~45° intorno al portatore dal lato del dribbling, entra e poi torna piano
+func _drib_step(drib: Dictionary, dir: float, rdt: float) -> float:
+	var on := not drib.is_empty()
+	_drib_k += ((1.0 if on else 0.0) - _drib_k) * minf(1.0, rdt * (DRIB_IN if on else DRIB_OUT))
+	if _drib_k < 1e-3 and not on:
+		_drib_k = 0.0
+		_drib_p = null
+		return 0.0
+	if on:
+		var p: Object = drib.p
+		var o: Object = drib.o
+		var v := CF.dribble_view(Vector2(p.x * dir, p.y * dir), Vector2(o.x * dir, o.y * dir), float(drib.yaw), _aspect(), base_fov)
+		_drib_p = _smooth(_drib_p, v, minf(1.0, rdt * DRIB_POSE_K))
+	return _drib_k if _drib_p != null else 0.0
 
 
 # calcio d'angolo (di chiunque): alle spalle del battitore, verso l'area; dopo il calcio torna piano alla normale

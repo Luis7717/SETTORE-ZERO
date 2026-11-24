@@ -102,6 +102,148 @@ func test_lato_opposto_allo_sbilanciamento_e_verso_il_centro() -> bool:
 	return done()
 
 
+# --- giochetto del dribbling prenotato (solo con "rifiniture", Luis 2026-11-24: "falli vedere bene")
+
+# tasto Dribbling col duello aperto (difensore a 5 m) e passi finché arriva l'esito: [m, p, o, evento dribble]
+static func book_and_resolve(seed_value: int, rif: bool) -> Array:
+	var s := setup(seed_value, 5.0)
+	var m: SimMatchScript = s[0]
+	m.rifiniture = rif
+	var p: R.Player = s[1]
+	var o: R.Player = s[2]
+	p.st.dri = 99
+	o.st.dif = 20
+	var e: Variant = findEvent(H.tapDribble(m), "dribble")
+	return [m, p, o, e]
+
+
+# primo seme (da 1) in cui il dribbling riesce
+static func first_ok_seed() -> int:
+	for sd in range(1, 30):
+		var r := book_and_resolve(sd, true)
+		if r[3] != null and r[3].ok:
+			return sd
+	return -1
+
+
+func test_esito_uguale_con_e_senza_rifiniture() -> bool:
+	# Arrange / Act: stessi semi, con e senza il giochetto (la probabilità non cambia: stesso numero casuale)
+	var diversi := 0
+	var riusciti := 0
+	for sd in range(1, 21):
+		var a := book_and_resolve(sd, true)
+		var b := book_and_resolve(sd, false)
+		if a[3] == null or b[3] == null or bool(a[3].ok) != bool(b[3].ok):
+			diversi += 1
+		elif a[3].ok:
+			riusciti += 1
+	# Assert
+	eq(diversi, 0, "stesso esito con e senza rifiniture")
+	check(riusciti > 0, "almeno un dribbling riuscito")
+	return done()
+
+
+func test_giochetto_frena_poi_scatta_oltre_il_difensore() -> bool:
+	# Arrange
+	var sd := first_ok_seed()
+	check(sd > 0, "un seme col dribbling riuscito")
+	var r := book_and_resolve(sd, true)
+	var m: SimMatchScript = r[0]
+	var p: R.Player = r[1]
+	var o: R.Player = r[2]
+	var e: Dictionary = r[3]
+	# Assert: il giochetto parte, il tempo del motore lo dice alla grafica
+	near(float(e.show), D.DRIB_SHOW_T, 1e-6, "evento dribble con la durata del giochetto")
+	check(m.dribShow != null and m.dribShow.p == p, "giochetto in corso")
+	# Act: durante il giochetto
+	var vmax := 0.0
+	var dmin := 99.0
+	var go: Variant = null
+	var t := 0.0
+	var side: float = e.side
+	var x0 := p.x
+	for i in 90:
+		m.step(DT)
+		t += DT
+		go = findEvent(m.events, "dribble_go")
+		m.events.clear()
+		if go != null:
+			break
+		if t > 0.2: # dopo la frenata
+			vmax = maxf(vmax, C.hyp(p.vx, p.vy))
+		dmin = minf(dmin, dist(p, o))
+		check(m.ball.owner == p, "il pallone resta al portatore")
+	# Assert
+	check(go != null, "poi lo scatto (dribble_go)")
+	near(t, D.DRIB_SHOW_T, 2.0 * DT, "lo scatto dopo DRIB_SHOW_T")
+	check(vmax <= D.DRIB_SHOW_V + 0.3, "durante il giochetto va piano: %.2f m/s" % vmax)
+	check(dmin >= D.DRIB_SHOW_GAP - 0.5, "non finisce addosso al difensore: %.2f m" % dmin)
+	check((p.x - x0) * side > 0.0, "la finta va dal lato opposto a quello scelto (+1 = sinistra = x minori)")
+	check(m.dribShow == null, "giochetto finito")
+	check(C.hyp(p.vx, p.vy) > 5.0, "accelera: %.2f m/s" % C.hyp(p.vx, p.vy))
+	check(p.vx * -side > 0.0, "cambia direzione verso il lato scelto")
+	# Act / Assert: supera il difensore col pallone
+	H.run(m, 1.2)
+	check(p.y > o.y + 0.5, "oltre il difensore")
+	check(m.ball.owner == p, "col pallone")
+	m.dispose()
+	return done()
+
+
+func test_senza_rifiniture_corsa_subito() -> bool:
+	# Arrange / Act
+	var sd := first_ok_seed()
+	var r := book_and_resolve(sd, false)
+	var m: SimMatchScript = r[0]
+	# Assert: come prima (e come il JS): niente giochetto, corsa subito
+	check(r[3] != null and r[3].ok, "riuscito")
+	near(float(r[3].show), 0.0, 1e-9, "show = 0")
+	check(m.dribShow == null, "niente giochetto")
+	check(C.hyp(r[1].vx, r[1].vy) > 5.0, "corre subito")
+	m.dispose()
+	return done()
+
+
+func test_giochetto_finisce_se_il_gioco_si_ferma() -> bool:
+	# Arrange
+	var r := book_and_resolve(first_ok_seed(), true)
+	var m: SimMatchScript = r[0]
+	check(m.dribShow != null, "giochetto in corso")
+	# Act
+	m.setRestart("throw", 1, C.HW, 0.0)
+	H.run(m, 0.6)
+	# Assert
+	check(m.dribShow == null, "giochetto annullato")
+	check(findEvent(m.events, "dribble_go") == null, "niente scatto")
+	m.dispose()
+	return done()
+
+
+func test_dribbling_fallito_frena_davanti_al_difensore() -> bool:
+	# Arrange / Act: difensore fortissimo, si cerca un fallito
+	var trovato := false
+	for sd in range(1, 30):
+		var s := setup(sd, 5.0)
+		var m: SimMatchScript = s[0]
+		m.rifiniture = true
+		var p: R.Player = s[1]
+		var o: R.Player = s[2]
+		p.st.dri = 1
+		o.st.dif = 99
+		var e: Variant = findEvent(H.tapDribble(m), "dribble")
+		if e != null and not e.ok:
+			trovato = true
+			var o_dir := Vector2(o.x - p.x, o.y - p.y).normalized()
+			# Assert
+			check(Vector2(p.vx, p.vy).dot(o_dir) <= D.DRIB_SHOW_V + 1e-6, "frena: non corre addosso al difensore")
+			check(m.dribShow == null, "niente giochetto")
+			m.dispose()
+			break
+		m.dispose()
+	check(trovato, "un dribbling fallito")
+	return done()
+
+
 # calcio da fermo `type` della squadra umana 0, tutti gli altri parcheggiati; il battitore calcia a 3 m e insegue
 static func set_piece(type: String, seed_value: int) -> Array:
 	var pos := {"throw": [C.HW, 5.0], "corner": [C.HW, C.HL], "freekick": [5.0, -10.0], "goalkick": [5.0, -C.HL], "kickoff": [0.0, 0.0], "penalty": [0.0, 0.0]}
