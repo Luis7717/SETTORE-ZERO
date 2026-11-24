@@ -72,7 +72,7 @@ interfaccia dei menu, sfondo del menu e allenamento guidato, grafica.
 | `scripts/partita/gioco.gd` | ciclo della partita (`frame()` di `src/main.js`): gesti → motore col tempo scalato → eventi → vista; pausa, intervallo, fine |
 | `scripts/partita/gesti.gd` | comandi a un dito, porting di `src/input.js` (logica pura, provata senza schermo) |
 | `scripts/partita/visuale_dito.gd` | visuale girata col dito: la parte "gesto" di `src/camuser.js` |
-| `scripts/partita/hud_partita.gd` | punteggio, tempo, minimappa, suggerimenti, tasto Dribbling / Scatto, pausa, scritte, frecce, menu, FPS |
+| `scripts/partita/hud_partita.gd` | punteggio, tempo, minimappa, suggerimenti, tasto Dribbling / Scatto, pausa, scritte, frecce, menu, FPS. Stile (2026-11-24): pannelli scuri con ombra e filo di luce in alto, punteggio nel suo riquadro che "salta" quando cambia, scritta grande con l'ombra e seconda riga più piccola, tasto col bordo scuro, lampo dorato e "GOL!" che rimbalza al nostro gol |
 | `scripts/partita/minimappa.gd`, `anteprima.gd` | minimappa; anteprima del calcio disegnato (volo, fuorigioco, chi riceve) |
 | `scripts/partita/audio_partita.gd` | suoni agganciati agli eventi del motore, pubblico che cresce vicino alla porta |
 | `scripts/partita/squadre_prova.gd` | due squadre inventate (Virtus Borgoalto, Aurora Portosole) finché non c'è la carriera |
@@ -576,7 +576,8 @@ dopo la vista) e mostra "Notte · Pioggia" sotto il titolo all'inizio.
   - cielo (`ProceduralSkyMaterial` nuovo a ogni partita), luce, ombre più leggere col coperto, nebbia;
   - erba: uniform `bagnato` (più scura, lucida, con pozze larghe appena accennate) e `neve` (velo bianco più chiazze
     morbide; le righe restano sopra) in `shaders/erba.gdshader`, da `campo.gd set_meteo()`; a 0 l'erba è come prima;
-  - tramonto: sole basso e caldo da ovest, ombre lunghe;
+  - tramonto: sole basso e caldo da ovest, ombre lunghe; nell'ombra delle tribune l'ambiente è un colore freddo
+    (`ambiente_colore`, 2026-11-24: prima l'erba in ombra diventava marrone col cielo arancione);
   - notte: nessuna luce in più (le ombre multiple costano sull'iPhone). La luce principale diventa quella dei fari
     (alta, bianca), l'ambiente un colore blu tenue, lo stadio passa su uno strato che la luce non illumina (tribune
     scure, campo illuminato; cartelloni e maxischermi esclusi), lampade delle torri più forti con un alone finto (tutte e 4: i pannelli arrivano da
@@ -585,6 +586,15 @@ dopo la vista) e mostra "Notte · Pioggia" sotto il titolo all'inizio.
   - pioggia (900 righe) e neve (700 fiocchi): `GPUParticles3D` in una scatola che segue la telecamera (solo la
     posizione, così cadono dritte); nel rallenty rallentano (`ts` di `gioco.gd`);
   - sulla neve il pallone diventa arancione.
+  - colori dell'immagine per ora (`colore` delle tabelle `ORA_*` → `PartitaVista.colore()`: tonemap Filmic,
+    esposizione, contrasto e saturazione nel passaggio del tonemap che c'è già, niente passaggi in più); col coperto
+    meno saturazione;
+  - contorno di luce dei giocatori (`contorno` delle tabelle `ORA_*` → `Giocatore.set_contorno()`, uniform
+    `contorno` di `shaders/divisa.gdshader`): i bordi della figura visti di taglio si schiariscono, così si staccano
+    dall'erba anche da lontano; caldo al tramonto, freddo e più forte di notte; a fine partita torna quello di giorno;
+  - notte (2026-11-24): ombre a stella sotto i giocatori (macchia più quattro scie verso le torri,
+    `texture_vista.ombra_fari()`, stesso MultiMesh delle ombre di sempre) ed erba fuori dalle linee più scura
+    (uniform `buio_fuori`, `campo.set_notte()`): `PartitaVista.set_notte()`.
 - **Prove**: `tests/test_meteo.gd` (stesso seme stesso meteo, neve rara, stagioni, opzioni),
   `test/unit/weather.test.mjs` (motore JS), `test_meteo_moltiplicatori` in `test_equivalence.gd`.
   Equilibrio: `npm run balance -- 60 60 60 1 pioggia` (sesto argomento = meteo).
@@ -741,6 +751,7 @@ $G --path godot res://scenes/prova_vista.tscn -- --schermata=shots/vista/partita
 #   --scena=rallenty | girata | parata | angolo | giochetto | linea | gol | rete | festa | primo | volti
 #           (più --sequenza=N --ogni=SEC)
 #   --me=1 (campo capovolto) · --vicino=N (telecamera vicina a m.players[N]) · --senza-vsync --esci-dopo=15
+#   --meteo=sereno|nuvoloso|pioggia|neve --ora=giorno|tramonto|notte (come in partita, anche per misurare)
 #   --qualita=0..3 (livello grafico fisso) · --senza=pubblico,cartelloni,schermi,tetti,fari,bagliore,dof,ombre,effetti,aspetto
 #   --scala3d=2 (tanti pixel 3D quanti sull'iPhone): con --esci-dopo stampa anche GPU e disegno CPU per fotogramma
 $G --headless --path godot -s res://tools/genera_texture.gd   # rigenera assets/textures/ (poi --import)

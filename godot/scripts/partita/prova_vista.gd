@@ -10,6 +10,7 @@
 #                         · festa (gol visto dal centro: tifosi in piedi, maxischermo, coriandoli)
 #                         · primo (primo piano di un giocatore da dietro: aspetto, cognome e numero)
 #                         · volti (primo piano di tre giocatori di fronte: pelle, capelli, barba, occhi)
+#   --meteo=sereno|nuvoloso|pioggia|neve  --ora=giorno|tramonto|notte   come in partita (scripts/partita/meteo.gd)
 #   --qualita=0..3        livello grafico fisso (3 alto, 2 medio, 1 basso, 0 minimo; niente cambi automatici)
 #   --senza=a,b,...       spegne singole voci per misurarne il costo: pubblico, cartelloni, schermi, tetti, fari,
 #                         bagliore, dof, ombre, effetti, rete, aspetto
@@ -47,6 +48,7 @@ const FiguraMocap := preload("figura_mocap.gd")
 const TifoEventi := preload("tifo_eventi.gd")
 const DribblingRegia := preload("dribbling_regia.gd")
 const CoreoDrib := preload("mosse/coreo_dribbling.gd")
+const Meteo := preload("meteo.gd")
 
 var vista: PartitaVista
 var m: SimMatch
@@ -99,6 +101,10 @@ func _ready() -> void:
 	m = SimMatch.new({"seed": seme, "halfLen": 600.0, "human": [drib, false], "kickoff": 0, "teams": squadre,
 		"contatti": not _opz.has("senza-contatti"), "rifiniture": drib, "portaAuto": drib})
 	vista.setup(m, int(_opz.get("me", "0")))
+	if _opz.has("meteo") or _opz.has("ora"):   # --meteo=... --ora=... come in partita (scripts/partita/meteo.gd)
+		var nodo_meteo := Meteo.new()
+		add_child(nodo_meteo)
+		nodo_meteo.applica(vista, Meteo.per_partita({}, _opz, seme))
 	if _opz.has("qualita"):
 		vista.qualita_auto = false
 		vista.set_qualita(int(_opz["qualita"]))

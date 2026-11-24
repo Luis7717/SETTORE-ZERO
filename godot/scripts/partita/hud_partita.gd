@@ -42,6 +42,17 @@ const CARTELLINO_SU := 60.0              # ... quanto sta sopra la scritta
 const CARTELLINO_GIRO := -0.14           # ... un po' inclinato, come alzato dall'arbitro (radianti)
 const CARTELLINO_GIALLO := Color("#ffd400")
 const CARTELLINO_ROSSO := Color("#e8202a")
+# stile (2026-11-24, grafica più curata): pannelli con un filo di luce in alto e ombra sotto, punteggio nel suo
+# riquadro, scritte grandi con l'ombra, lampo dorato e scritta che "salta" sul gol
+const OMBRA_PANNELLO := Color(0, 0, 0, 0.32)
+const LUCE_PANNELLO := Color(1, 1, 1, 0.22)        # bordo in alto dei pannelli scuri
+const FONDO_PUNTI := Color(1, 1, 1, 0.1)           # riquadro del punteggio
+const BORDO_TASTO := Color("#141414")              # bordo del tasto Dribbling/Scatto: si legge anche sull'erba chiara
+const LAMPO_GOL := Color(1.0, 0.86, 0.3, 0.38)     # lampo sullo schermo al nostro gol (sparisce in LAMPO_S)
+const LAMPO_S := 0.45
+const BIG_SOTTO_DIM := 26                          # carattere della seconda riga della scritta grande
+const BIG_SOTTO_MARGINE := 16.0
+const PUNTI_SALTO := 1.45                          # il punteggio cambiato si ingrandisce così e torna giù
 
 var vista = null                  # per l'anteprima del calcio e per niente altro (world_to_screen)
 var gesti = null
@@ -68,6 +79,7 @@ var _orologio_l: Label
 var _fps: Label
 var _mappa: Control
 var _big: Label
+var _big_sotto: Label             # seconda riga della scritta grande, più piccola (chi ha segnato, chi è ammonito...)
 var _big_fino := 0
 var _big_tween: Tween = null
 var _cartellino: Panel            # cartellino giallo o rosso sopra la scritta grande (figlio di _big: sparisce con lei)
@@ -80,6 +92,10 @@ var _fade: ColorRect
 var _overlay: ColorRect
 var _overlay_box: VBoxContainer
 var _fps_t := 0.0
+var _lampo: ColorRect
+var _lampo_tw: Tween = null
+var _salto_tw: Tween = null
+var _punti_prima := ""
 var _peggiore_ms := 0.0
 var _hint_testo := "-"
 var _hint_caldo := false
@@ -149,6 +165,16 @@ func _stile(fondo: Color, raggio: int, bordo: Color = BORDO) -> StyleBoxFlat:
 	s.content_margin_right = 12
 	s.content_margin_top = 6
 	s.content_margin_bottom = 6
+	if fondo.a > 0.5 and fondo.get_luminance() < 0.2:   # pannelli scuri: ombra sotto e filo di luce in alto
+		s.shadow_color = OMBRA_PANNELLO
+		s.shadow_size = 5
+		s.shadow_offset = Vector2(0, 2)
+		s.border_color = LUCE_PANNELLO
+		s.border_width_top = 1
+		s.border_width_left = 0
+		s.border_width_right = 0
+		s.border_width_bottom = 0
+		s.anti_aliasing = true
 	return s
 
 
@@ -188,12 +214,24 @@ func _crea_segnapunti() -> void:
 	riga.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_k0 = _colore_kit()
 	_tn0 = _etichetta(15)
-	_sc = _etichetta(20, GIALLO)
+	_sc = _etichetta(21, GIALLO)
 	_sc.custom_minimum_size.x = 54
 	_sc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_sc.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.45))
+	_sc.add_theme_constant_override("shadow_offset_y", 2)
+	var riquadro := PanelContainer.new()
+	var sr := StyleBoxFlat.new()
+	sr.bg_color = FONDO_PUNTI
+	sr.set_corner_radius_all(8)
+	sr.content_margin_left = 6
+	sr.content_margin_right = 6
+	riquadro.add_theme_stylebox_override("panel", sr)
+	riquadro.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	riquadro.add_child(_sc)
+	_sc.resized.connect(func() -> void: _sc.pivot_offset = _sc.size / 2.0)
 	_tn1 = _etichetta(15)
 	_k1 = _colore_kit()
-	for n: Control in [_k0, _tn0, _sc, _tn1, _k1]:
+	for n: Control in [_k0, _tn0, riquadro, _tn1, _k1]:
 		riga.add_child(n)
 	_segnapunti.add_child(riga)
 	add_child(_segnapunti)
@@ -201,7 +239,7 @@ func _crea_segnapunti() -> void:
 
 func _colore_kit() -> ColorRect:
 	var k := ColorRect.new()
-	k.custom_minimum_size = Vector2(10, 14)
+	k.custom_minimum_size = Vector2(6, 18)   # striscia sottile col colore della maglia
 	k.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	k.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return k
@@ -243,8 +281,17 @@ func _crea_centro() -> void:
 	_big.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_big.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.55))
 	_big.add_theme_constant_override("outline_size", 10)
+	_big.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.4))
+	_big.add_theme_constant_override("shadow_offset_x", 0)
+	_big.add_theme_constant_override("shadow_offset_y", 4)
 	_big.modulate.a = 0.0
 	add_child(_big)
+	_big_sotto = _etichetta(BIG_SOTTO_DIM)
+	_big_sotto.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_big_sotto.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART   # testi lunghi (fine allenamento) vanno a capo
+	_big_sotto.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
+	_big_sotto.add_theme_constant_override("outline_size", 7)
+	_big.add_child(_big_sotto)
 	_cartellino = Panel.new()
 	_cartellino.size = CARTELLINO
 	_cartellino.pivot_offset = CARTELLINO / 2.0
@@ -287,7 +334,8 @@ func _crea_basso() -> void:
 	_dribbling.add_theme_font_override("font", _font_forte)
 	_dribbling.add_theme_font_size_override("font_size", 19)
 	for st in ["normal", "hover", "pressed", "focus"]:
-		var s := _stile(GIALLO if st != "pressed" else GIALLO.darkened(0.15), 999, Color(0, 0, 0, 0))
+		var s := _stile(GIALLO if st != "pressed" else GIALLO.darkened(0.15), 999, BORDO_TASTO)
+		s.set_border_width_all(2)
 		s.shadow_color = Color("#b39400")
 		s.shadow_offset = Vector2(0, 0 if st == "pressed" else 6)
 		s.shadow_size = 1
@@ -302,6 +350,12 @@ func _crea_basso() -> void:
 	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_fade.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_fade)
+	_lampo = ColorRect.new()
+	_lampo.color = LAMPO_GOL
+	_lampo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_lampo.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_lampo.visible = false
+	add_child(_lampo)
 
 
 func _crea_overlay() -> void:
@@ -345,6 +399,7 @@ func _disponi() -> void:
 	_big.size = Vector2(tutto.x, 0)
 	_big.position = Vector2(0, tutto.y * BIG_TOP)
 	_big.pivot_offset = Vector2(tutto.x / 2.0, 30.0)
+	_big_sotto.size = Vector2(tutto.x - 2.0 * BIG_SOTTO_MARGINE, 0)
 	_cartellino.position = Vector2((tutto.x - CARTELLINO.x) / 2.0, -CARTELLINO_SU)
 	_adatta_pillola(_cam_tip, s.size.x - 12.0 - 96.0)
 	_cam_tip.position = Vector2(s.position.x + 12.0 + (s.size.x - 108.0 - _cam_tip.size.x) / 2.0, top + 52.0)
@@ -411,7 +466,12 @@ func imposta_squadre(sigla0: String, colore0: Color, sigla1: String, colore1: Co
 
 ## punteggio, minuto e minimappa (ogni 100 ms)
 func aggiorna(m, me: int) -> void:
-	_sc.text = "%d – %d" % [m.score[0], m.score[1]]
+	var punti := "%d – %d" % [m.score[0], m.score[1]]
+	if punti != _sc.text:
+		if _punti_prima != "":
+			_salta_punteggio()
+		_punti_prima = punti
+	_sc.text = punti
 	_orologio_l.text = "%d'" % m.minute()
 	_mappa.m = m
 	_mappa.me = me
@@ -501,15 +561,46 @@ func aiuto_visuale(chiave: String) -> void:
 
 ## scritta grande al centro (big() del web); classe "g" = gialla, "b" = rossa
 func big(testo: String, classe: String = "", ms: int = 1400, piccolo: String = "") -> void:
-	_big.text = testo + ("\n" + piccolo if piccolo != "" else "")
-	_big.add_theme_color_override("font_color", GIALLO if classe == "g" else (ROSSO if classe == "b" else Color.WHITE))
+	_big.text = testo
+	var colore := GIALLO if classe == "g" else (ROSSO if classe == "b" else Color.WHITE)
+	_big.add_theme_color_override("font_color", colore)
+	_big_sotto.text = piccolo
+	_big_sotto.add_theme_color_override("font_color", colore.lerp(Color.WHITE, 0.35))
+	_big_sotto.position = Vector2(BIG_SOTTO_MARGINE, _big.get_combined_minimum_size().y - 6.0)
 	_big_fino = Time.get_ticks_msec() + ms
 	_cartellino.visible = false
 	_big.modulate.a = 0.0
 	_big.scale = Vector2(0.8, 0.8)
 	var tw := _nuovo_tween_big().set_parallel()
 	tw.tween_property(_big, "modulate:a", 1.0, 0.18)
-	tw.tween_property(_big, "scale", Vector2.ONE, 0.18)
+	if testo == "GOL!":
+		# il nostro gol: la scritta arriva grande e rimbalza, lampo dorato sullo schermo
+		_big.scale = Vector2(1.9, 1.9)
+		tw.tween_property(_big, "scale", Vector2.ONE, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		_lampeggia()
+	else:
+		tw.tween_property(_big, "scale", Vector2.ONE, 0.18)
+
+
+func _lampeggia() -> void:
+	if _lampo_tw != null and _lampo_tw.is_valid():
+		_lampo_tw.kill()
+	_lampo.visible = true
+	_lampo.modulate.a = 1.0
+	var tw := create_tween()
+	_lampo_tw = tw
+	tw.tween_property(_lampo, "modulate:a", 0.0, LAMPO_S).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(func() -> void: _lampo.visible = false)
+
+
+# il punteggio appena cambiato si ingrandisce e torna giù
+func _salta_punteggio() -> void:
+	if _salto_tw != null and _salto_tw.is_valid():
+		_salto_tw.kill()
+	_sc.scale = Vector2(PUNTI_SALTO, PUNTI_SALTO)
+	var tw := create_tween()
+	_salto_tw = tw
+	tw.tween_property(_sc, "scale", Vector2.ONE, 0.5).set_trans(Tween.TRANS_ELASTIC).set_ease(Tween.EASE_OUT)
 
 
 # un solo tween alla volta sulla scritta grande: una scritta nuova durante la dissolvenza della vecchia resterebbe invisibile
@@ -539,7 +630,9 @@ func cartellino_mostrato() -> String:
 
 
 func testo_big() -> String:
-	return _big.text if _big_fino > 0 else ""
+	if _big_fino <= 0:
+		return ""
+	return _big.text + ("\n" + _big_sotto.text if _big_sotto.text != "" else "")
 
 
 ## taglio di scena (ripartenza lontana): nero che sparisce

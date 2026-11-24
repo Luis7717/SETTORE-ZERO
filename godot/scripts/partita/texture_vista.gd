@@ -41,6 +41,33 @@ static func ombra(lato: int = 64, a0: float = 0.55) -> ImageTexture:
 	return _tex(img)
 
 
+## ombre dei fari di notte (2026-11-24): la macchia di ombra() più quattro scie leggere verso gli angoli, come
+## sotto le quattro torri faro (ombre a stella delle partite in notturna). Si legge anche senza luci vere in più.
+## dir = verso di una scia (le altre sono i suoi simmetrici); a0 = scuro della macchia, scia = scuro delle scie
+static var _ombra_fari: ImageTexture = null   # fatta una volta sola (il disegno costa sul telefono)
+
+
+static func ombra_fari(lato: int = 96, a0: float = 0.42, scia: float = 0.2, dir := Vector2(0.55, 0.83)) -> ImageTexture:
+	if _ombra_fari != null:
+		return _ombra_fari
+	var img := Image.create(lato, lato, false, Image.FORMAT_RGBA8)
+	var c := lato / 2.0
+	var dirs := [dir, Vector2(-dir.x, dir.y), -dir, Vector2(dir.x, -dir.y)]
+	for y in lato:
+		for x in lato:
+			var p := Vector2(x + 0.5 - c, y + 0.5 - c) / c   # -1..1
+			var a := a0 * clampf(1.0 - p.length() / 0.36, 0.0, 1.0)   # macchia: un terzo del lato
+			for d: Vector2 in dirs:
+				var lungo := p.dot(d)                     # 0 al centro, 1 al bordo
+				var largo := absf(p.dot(Vector2(-d.y, d.x)))
+				if lungo > 0.0:
+					var w := 0.07 + 0.05 * lungo           # la scia si allarga un po' andando via
+					a = maxf(a, scia * clampf(1.0 - lungo / 0.95, 0.0, 1.0) * clampf(1.0 - largo / w, 0.0, 1.0))
+			img.set_pixel(x, y, Color(0, 0, 0, a))
+	_ombra_fari = _tex(img)
+	return _ombra_fari
+
+
 ## anello (contorno di un cerchio) di spessore `sp` su 128 px
 static func anello(col: Color = GIALLO, raggio: float = 52.0, sp: float = 12.0) -> ImageTexture:
 	var img := Image.create(128, 128, false, Image.FORMAT_RGBA8)

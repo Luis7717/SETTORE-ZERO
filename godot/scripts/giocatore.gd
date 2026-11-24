@@ -29,6 +29,17 @@ static var _yaw_modello := 0.0
 static var _peso_testa := PackedFloat32Array()
 
 
+static var _contorno := Color(1.0, 0.97, 0.9, 0.5)
+
+
+## contorno di luce dei giocatori (uniform contorno di shaders/divisa.gdshader): rgb colore, a forza. Vale per tutti
+## (un solo materiale); se il materiale non c'è ancora si usa quando nasce
+static func set_contorno(c: Color) -> void:
+	_contorno = c
+	if _materiale != null:
+		_materiale.set_shader_parameter("contorno", c)
+
+
 ## a fine programma (App._exit_tree): lascia le risorse condivise prima che si spenga il server grafico
 static func libera_condivisi() -> void:
 	_mesh_divisa = null
@@ -130,6 +141,7 @@ static func _prepara_condivisi(mi: MeshInstance3D, scheletro: Skeleton3D, player
 	Viso.misura(arr, _peso_testa, t.c, t.occhio_l, t.occhio_r)
 	Viso.applica(_materiale)
 	_materiale.set_shader_parameter("viso_maschere", MASCHERE_VISO)
+	_materiale.set_shader_parameter("contorno", _contorno)
 	for nome in CLIP_IN_LOOP:
 		if player.has_animation(nome):
 			player.get_animation(nome).loop_mode = Animation.LOOP_LINEAR
