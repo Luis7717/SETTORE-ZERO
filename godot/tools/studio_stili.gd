@@ -81,7 +81,7 @@ func _partita(sd: int, k: int, opz: Dictionary) -> void:
 	var teams: Array = [ts_, tb] if s_team == 0 else [tb, ts_]
 	var umano: bool = modo != "cpu"
 	var m := H.newMatch(sd, float(opz.get("tempo", "150")), [umano, false], teams[0], teams[1], "sereno",
-		{"portaAuto": true, "testa": true, "rifiniture": true, "falli": true, "contatti": true, "riprese": true, "parata": true})
+		{"portaAuto": true, "testa": true, "rifiniture": true, "falli": true, "contatti": true, "riprese": true, "parata": true, "attacco": not opz.has("senza-attacco")})
 	if ruoli.is_empty():
 		for p: R.Player in m.players:
 			if p.team == s_team:

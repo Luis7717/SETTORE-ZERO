@@ -17,6 +17,8 @@
 # (contatti.gd).
 # Opzione "parata" (predefinita false, la accende il gioco): fermatempo della parata col bersaglio sulla porta e il punto
 # scelto rispettato (parata.gd).
+# Opzione "attacco" (predefinita false, la accende il gioco): fase d'attacco della CPU e dei compagni CPU (attacco.gd):
+# corse in area e cross verso chi arriva, qualche taglio in fuorigioco, contropiede, fasce, lanci lunghi.
 class_name SimMatch
 extends "parata.gd"
 
@@ -139,6 +141,7 @@ func _init(o: Dictionary) -> void:
 	riprese = bool(o.get("riprese", false))
 	falliOn = bool(o.get("falli", false))
 	contattiOn = bool(o.get("contatti", false))
+	attaccoOn = bool(o.get("attacco", false))
 	if riprese:
 		raccattaPrepara() # raccattapalle dietro le porte (raccatta.gd)
 	roll = wx.roll

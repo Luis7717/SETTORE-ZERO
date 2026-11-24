@@ -12,7 +12,7 @@
 # Solo con l'opzione "parata" della partita (paraCtl, la accende il gioco): senza, il motore resta identico a prima
 # (confronti col JS). Nessun numero casuale del generatore della partita: lo scostamento usa un generatore a parte
 # con un seme ricavato da quello della partita, così la partita resta ripetibile e uguale con o senza bersaglio.
-extends "ai.gd"
+extends "attacco.gd"
 
 const PARA_LEAD := 0.45      # il tuffo parte quando al pallone mancano tanti secondi di partita ...
 const PARA_MARGIN := 0.12    # ... o prima, se alla mano serve più tempo per arrivare al punto (s in più)

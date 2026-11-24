@@ -26,6 +26,7 @@ lo stato (pallone e 22 giocatori) è identico al JS a ogni passo, con stessi eve
 | — | `falli.gd` (solo Godot) | falli sui contrasti da dietro e in ritardo (opzione `falli`): punizioni, vantaggio, cartellini, rigori |
 | — | `testa.gd`, `raccatta.gd`, `riprese.gd` (solo Godot) | colpo di testa controllato; raccattapalle; riprese senza teletrasporto (opzione `riprese`) |
 | — | `contatti.gd` (solo Godot) | giocatori che non si compenetrano (spinta morbida fino a 0,9 m), respiro dopo il recupero palla della persona, passaggio che parte bene (opzione `contatti`) |
+| — | `attacco.gd` (solo Godot) | fase d'attacco della CPU con l'opzione `attacco`: corse in area e cross verso chi arriva, taglio anticipato (qualche fuorigioco), contropiede basso in difesa, fasce (sovrapposizione, esterni sfalsati), lanci lunghi distinti dal contropiede |
 | — | `angoli.gd` (solo Godot) | difesa sui calci d'angolo con l'opzione `rifiniture`: marcatura, contesa aerea, uscite del portiere |
 
 Uso dal gioco: `var m := SimMatch.new({"seed": 7, "halfLen": 150.0, "human": [true, false], "teams": [a, b]})`,

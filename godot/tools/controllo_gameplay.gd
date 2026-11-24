@@ -95,7 +95,7 @@ func _partita(sd: int, opz: Dictionary) -> void:
 	if meteo == "caso":
 		meteo = ["sereno", "sereno", "nuvoloso", "pioggia", "neve"][sd % 5]
 	var m := H.newMatch(sd, tempo, [true, false], ta, tb, meteo, {"portaAuto": true, "testa": true, "rifiniture": not opz.has("senza-rifiniture"),
-		"falli": not opz.has("senza-falli"), "contatti": not opz.has("senza-contatti")})
+		"falli": not opz.has("senza-falli"), "contatti": not opz.has("senza-contatti"), "attacco": not opz.has("senza-attacco")})
 	var dito := Dito.new(sd * 31 + 7)
 	var st := {"ts": 1.0, "testa_reale": -1.0, "last_restart": ["", ""], "last_restart_t": [-99.0, -99.0],
 		"pass": null, "owner_prev": null, "fermo_t": 0.0, "libera_t": 0.0, "slow": false, "ultimo_calcio": {},
