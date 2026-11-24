@@ -6,7 +6,9 @@
 # la stessa luce del meteo (uniform `luce`).
 extends MultiMeshInstance3D
 
-const SHADER := preload("res://shaders/bandiere.gdshader")
+# shader caricati con load() quando servono, non con preload in una costante: una costante tiene lo shader vivo
+# finché vive lo script, cioè fino a dopo lo spegnimento della grafica ("DummyShader leaked" sul Mac della build)
+const SHADER_PATH := "res://shaders/bandiere.gdshader"
 
 const ASTA := 2.3              # lunghezza dell'asta (m), dalle mani in su
 const ASTA_SOTTO := 0.35       # quanto spunta sotto le mani (m)
@@ -34,7 +36,7 @@ func _init() -> void:
 	_rng.seed = 5150
 	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_mat = ShaderMaterial.new()
-	_mat.shader = SHADER
+	_mat.shader = load(SHADER_PATH)
 	_mat.set_shader_parameter("telo_lungo", TELO_LUNGO)
 	material_override = _mat
 

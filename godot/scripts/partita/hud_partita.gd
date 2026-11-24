@@ -14,7 +14,9 @@ signal nuova_partita
 
 const C := preload("res://sim/core.gd")
 const R := preload("res://sim/records.gd")
-const SHADER_RALLENTY := preload("res://shaders/rallenty.gdshader")
+# shader caricati con load() quando servono, non con preload in una costante: una costante tiene lo shader vivo
+# finché vive lo script, cioè fino a dopo lo spegnimento della grafica ("DummyShader leaked" sul Mac della build)
+const SHADER_RALLENTY_PATH := "res://shaders/rallenty.gdshader"
 const Minimappa := preload("res://scripts/partita/minimappa.gd")
 const Anteprima := preload("res://scripts/partita/anteprima.gd")
 const CerchioTesta := preload("res://scripts/partita/cerchio_testa.gd")
@@ -198,7 +200,7 @@ func _crea_rallenty() -> void:
 	_rallenty.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_rallenty.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_rallenty_mat = ShaderMaterial.new()
-	_rallenty_mat.shader = SHADER_RALLENTY
+	_rallenty_mat.shader = load(SHADER_RALLENTY_PATH)
 	_rallenty_mat.set_shader_parameter("forza", 0.0)
 	_rallenty.material = _rallenty_mat
 	add_child(_rallenty)

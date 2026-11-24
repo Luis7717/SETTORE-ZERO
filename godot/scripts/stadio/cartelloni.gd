@@ -4,7 +4,9 @@
 # lo sponsor: come negli stadi veri girano tutti insieme, ogni tanto a mosaico; il cambio scorre lungo la linea.
 extends Node3D
 
-const SHADER := preload("res://shaders/led.gdshader")
+# shader caricati con load() quando servono, non con preload in una costante: una costante tiene lo shader vivo
+# finché vive lo script, cioè fino a dopo lo spegnimento della grafica ("DummyShader leaked" sul Mac della build)
+const SHADER_PATH := "res://shaders/led.gdshader"
 
 const AD_M := 7.6              # metri di cartellone per una grafica (512 × 64 px su ~0,9 m)
 const U_PER_M := 0.5 / AD_M    # u per metro (una riga della texture contiene due grafiche)
@@ -41,7 +43,7 @@ var _t := 0.0
 func _init() -> void:
 	name = "Cartelloni"
 	_mat = ShaderMaterial.new()
-	_mat.shader = SHADER
+	_mat.shader = load(SHADER_PATH)
 	_mat.set_shader_parameter("grafiche", _provvisoria())
 
 

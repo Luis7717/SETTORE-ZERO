@@ -53,6 +53,11 @@ static func svuota() -> void:
 	_ordine.clear()
 
 
+## a fine programma (Uscita.libera_cache_grafiche): come svuota()
+static func libera_condivisi() -> void:
+	svuota()
+
+
 ## numero #rrggbb di un colore Godot
 static func hex(c: Color) -> String:
 	return "#" + c.to_html(false)

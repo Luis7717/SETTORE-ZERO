@@ -7,11 +7,13 @@
 extends Node3D
 
 const Coord := preload("res://scripts/coord.gd")
-const SHADER_ERBA := preload("res://shaders/erba.gdshader")
-const SHADER_CIUFFI := preload("res://shaders/erba_ciuffi.gdshader")
-const SHADER_RIGHE := preload("res://shaders/righe.gdshader")
-const SHADER_RETE := preload("res://shaders/rete.gdshader")
-const SHADER_BANDIERINA := preload("res://shaders/bandierina.gdshader")
+# shader caricati con load() quando servono, non con preload in una costante: una costante tiene lo shader vivo
+# finché vive lo script, cioè fino a dopo lo spegnimento della grafica ("DummyShader leaked" sul Mac della build)
+const SHADER_ERBA_PATH := "res://shaders/erba.gdshader"
+const SHADER_CIUFFI_PATH := "res://shaders/erba_ciuffi.gdshader"
+const SHADER_RIGHE_PATH := "res://shaders/righe.gdshader"
+const SHADER_RETE_PATH := "res://shaders/rete.gdshader"
+const SHADER_BANDIERINA_PATH := "res://shaders/bandierina.gdshader"
 const ReteMolle := preload("res://scripts/rete_molle.gd")
 const Tagli := preload("res://scripts/tagli_campo.gd")
 const RigheCampo := preload("res://scripts/righe_campo.gd")
@@ -69,10 +71,10 @@ func _ready() -> void:
 # ---------------------------------------------------------------- erba, taglio e righe
 func _costruisci_erba() -> void:
 	var mat := ShaderMaterial.new()
-	mat.shader = SHADER_ERBA
+	mat.shader = load(SHADER_ERBA_PATH)
 	_mat_erba = mat
 	_mat_ciuffi = ShaderMaterial.new()
-	_mat_ciuffi.shader = SHADER_CIUFFI
+	_mat_ciuffi.shader = load(SHADER_CIUFFI_PATH)
 	_mat_ciuffi.set_shader_parameter("raggio", CIUFFI_RAGGIO)
 	_param("grana", _texture_grana())
 	_param("ciuffi_tex", _texture_ciuffi())
@@ -220,7 +222,7 @@ func _costruisci_righe() -> void:
 	righe.name = "Righe"
 	righe.mesh = RigheCampo.mesh()
 	var mat := ShaderMaterial.new()
-	mat.shader = SHADER_RIGHE
+	mat.shader = load(SHADER_RIGHE_PATH)
 	righe.material_override = mat
 	righe.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	# lo shader allarga le righe lontane: la scatola per il taglio fuori schermo deve tenerne conto
@@ -398,7 +400,7 @@ func _materiale_rete() -> ShaderMaterial:
 	img.fill_rect(Rect2i(0, 0, 2, lato), Color(1, 1, 1, 1))
 	img.generate_mipmaps()
 	var m := ShaderMaterial.new()
-	m.shader = SHADER_RETE
+	m.shader = load(SHADER_RETE_PATH)
 	m.set_shader_parameter("maglia", ImageTexture.create_from_image(img))
 	m.set_shader_parameter("colore", Color(0.95, 0.95, 0.95, 0.9))
 	return m
@@ -431,7 +433,7 @@ func _costruisci_bandierina(sx: float, sy: float) -> void:
 	q.subdivide_depth = 2
 	telo.mesh = q
 	var tm := ShaderMaterial.new()
-	tm.shader = SHADER_BANDIERINA
+	tm.shader = load(SHADER_BANDIERINA_PATH)
 	tm.set_shader_parameter("colore", Color("#ffcc1a"))
 	telo.material_override = tm
 	telo.position = Vector3(-sx * 0.21, BANDIERINA_H - 0.15, 0.0)

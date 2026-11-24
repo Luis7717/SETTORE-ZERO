@@ -275,16 +275,16 @@ func _prove() -> void:
 			for i in 4:   # qualche fotogramma: clip e telecamera al loro posto
 				await get_tree().process_frame
 			await _salva(base.get_basename() + "_%02d_%s.png" % [n, ist[0]])
-		get_tree().quit(0)
+		Uscita.esci(get_tree(), 0)   # toglie la scena e lascia le risorse grafiche prima di uscire
 	elif _opzioni.has("schermata"):
 		await get_tree().create_timer(float(_opzioni.get("dopo", "2"))).timeout
 		await _salva(_opzioni["schermata"])
-		get_tree().quit(0)
+		Uscita.esci(get_tree(), 0)   # toglie la scena e lascia le risorse grafiche prima di uscire
 	elif _opzioni.has("esci-dopo"):
 		await get_tree().create_timer(float(_opzioni["esci-dopo"])).timeout
 		var secondi := maxf(0.001, (Time.get_ticks_msec() - _inizio_ms) / 1000.0)
 		print("FPS medi %.1f · %s" % [_fotogrammi / secondi, HudFase1.testo_memoria()])
-		get_tree().quit(0)
+		Uscita.esci(get_tree(), 0)   # toglie la scena e lascia le risorse grafiche prima di uscire
 
 
 ## istanti da fotografare: [nome, tempo della sequenza]

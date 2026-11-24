@@ -92,6 +92,13 @@ var _mano := 0.0               # peso del pallone tra le mani (rimessa)
 var _contatto := 0.0
 
 
+## a fine programma (Uscita.libera_cache_grafiche): lascia la libreria delle clip (si ricarica se serve ancora)
+static func libera_condivisi() -> void:
+	_lib = null
+	_info = {}
+	_caricata = false
+
+
 ## carica la libreria una volta; false se manca (allora niente mocap e il gioco va avanti come prima)
 static func carica() -> bool:
 	if _caricata:

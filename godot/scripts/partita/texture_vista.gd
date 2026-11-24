@@ -47,6 +47,11 @@ static func ombra(lato: int = 64, a0: float = 0.55) -> ImageTexture:
 static var _ombra_fari: ImageTexture = null   # fatta una volta sola (il disegno costa sul telefono)
 
 
+## a fine programma (Uscita.libera_cache_grafiche): lascia la texture condivisa (si rifà se serve ancora)
+static func libera_condivisi() -> void:
+	_ombra_fari = null
+
+
 static func ombra_fari(lato: int = 96, a0: float = 0.42, scia: float = 0.2, dir := Vector2(0.55, 0.83)) -> ImageTexture:
 	if _ombra_fari != null:
 		return _ombra_fari

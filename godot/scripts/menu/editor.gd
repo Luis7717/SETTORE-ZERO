@@ -199,7 +199,7 @@ func _crea_palco() -> void:
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var m := ShaderMaterial.new()
-	m.shader = SHADER_SFONDO
+	m.shader = load(SHADER_SFONDO_PATH)
 	m.set_shader_parameter("centro", T.mix(colori_squadra()[0], 45, Color("#1d2c4b")))
 	m.set_shader_parameter("mezzo", Color("#0c1528"))
 	m.set_shader_parameter("bordo", Color("#0c1528"))

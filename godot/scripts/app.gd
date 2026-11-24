@@ -96,7 +96,7 @@ func avvio() -> void:
 		get_tree().create_timer(float(opzioni["esci-dopo"])).timeout.connect(func() -> void:
 			var secondi := maxf(0.001, (Time.get_ticks_msec() - t0) / 1000.0)
 			print("FPS medi %.1f · schermata %s" % [(Engine.get_process_frames() - f0) / secondi, schermata]) # la build lo cerca
-			get_tree().quit(0))
+			Uscita.esci(get_tree(), 0)) # toglie la scena e lascia le risorse grafiche prima di uscire
 	if not opzioni.has("app") and OPZIONI_PARTITA.any(func(k: String) -> bool: return opzioni.has(k)):
 		_metti((load(SCENA_PARTITA) as PackedScene).instantiate()) # partita di prova: parte da sola
 		schermata = "partita"
@@ -327,9 +327,8 @@ func _exit_tree() -> void:
 			p.stop()
 			p.stream = null
 	# e si lasciano le risorse grafiche condivise (variabili static): sul Mac della build, senza, a fine programma
-	# uno shader risultava "leaked" (2026-11-22) e la prova della build falliva
-	load("res://scripts/giocatore.gd").libera_condivisi()
-	load("res://scripts/partita/capelli.gd").libera_condivisi()
+	# uno shader risultava "leaked" (2026-11-22) e la prova della build falliva. Solo pulizia, niente attese
+	Uscita.libera_cache_grafiche()
 
 
 # l'app va in sottofondo o si chiude: si salva subito

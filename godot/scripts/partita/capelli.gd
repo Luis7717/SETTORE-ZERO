@@ -13,8 +13,10 @@
 # La mesh va sotto l'osso "Head" con la trasformazione di legame della pelle (attacca()), segue la testa come la pelle.
 extends RefCounted
 
-const SHADER := preload("res://shaders/capelli.gdshader")
-const TINTA := preload("res://assets/textures/capelli_tinta.png")
+# shader e texture caricati con load() quando servono, non con preload in una costante: una costante li tiene vivi
+# finché vive lo script, cioè fino a dopo lo spegnimento della grafica ("DummyShader leaked" sul Mac della build)
+const SHADER_PATH := "res://shaders/capelli.gdshader"
+const TINTA_PATH := "res://assets/textures/capelli_tinta.png"
 
 const N_TAGLI := 17
 const HAIR_TILT := 10.0          # gradi: inclinazione all'indietro del riferimento dei capelli
@@ -138,8 +140,8 @@ static func prepara(a: Array, testa_w: PackedFloat32Array) -> Dictionary:
 	_base_radiale(libera)
 	_cache.clear()
 	_materiale = ShaderMaterial.new()
-	_materiale.shader = SHADER
-	_materiale.set_shader_parameter("tinta", TINTA)
+	_materiale.shader = load(SHADER_PATH)
+	_materiale.set_shader_parameter("tinta", load(TINTA_PATH))
 	return {"c": c, "occhio_l": el, "occhio_r": er}
 
 

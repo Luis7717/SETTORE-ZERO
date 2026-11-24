@@ -92,7 +92,7 @@ static func carta_sfumata(a: Color, b: Color, angolo: float, fine: float, raggio
 	var fondo := ColorRect.new()
 	fondo.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var m := ShaderMaterial.new()
-	m.shader = preload("res://shaders/carta_menu.gdshader")
+	m.shader = load("res://shaders/carta_menu.gdshader")   # load, non preload: lo shader non resta vivo con lo script
 	m.set_shader_parameter("colore_a", a)
 	m.set_shader_parameter("colore_b", b)
 	m.set_shader_parameter("angolo", angolo)

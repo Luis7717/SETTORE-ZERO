@@ -194,7 +194,7 @@ func _parti() -> void:
 	_inizio_ms = Time.get_ticks_msec()
 	_crea_partita()
 	_crea_vista()
-	hud = preload("res://scenes/hud_partita.tscn").instantiate()
+	hud = (load("res://scenes/hud_partita.tscn") as PackedScene).instantiate()   # load: non resta vivo con lo script
 	add_child(hud)
 	hud.vista = vista
 	hud.gesti = gesti
@@ -291,8 +291,7 @@ func _exit_tree() -> void:
 	# partita aperta da sola (prova della build, scena di prova): nessuna App lascia le risorse grafiche condivise a
 	# fine programma, lo fa la partita (sul Mac della build, senza, uno shader risulta "leaked", 2026-11-23)
 	if not avviata_da_app():
-		load("res://scripts/giocatore.gd").libera_condivisi()
-		load("res://scripts/partita/capelli.gd").libera_condivisi()
+		Uscita.libera_cache_grafiche()
 
 
 # ---------------------------------------------------------------- ciclo principale (frame() di src/main.js)
@@ -866,7 +865,9 @@ func _esci() -> void:
 	# un paio di fotogrammi perché il server audio lasci i suoni fermati (altrimenti restano in memoria all'uscita)
 	for i in 3:
 		await get_tree().process_frame
-	get_tree().quit(0)
+	# via la scena, qualche fotogramma perché materiali e shader vengano liberati, cache static svuotate, poi esce
+	# (sul Mac della build a volte uno shader restava vivo oltre lo spegnimento della grafica: "DummyShader leaked")
+	Uscita.esci(get_tree(), 0)
 
 
 func _nuova_partita() -> void:

@@ -10,7 +10,7 @@ extends Node3D
 
 const Coord := preload("res://scripts/coord.gd")
 const Giocatore := preload("res://scripts/giocatore.gd")
-const MODELLO := preload("res://assets/models/athlete.glb")
+const MODELLO_PATH := "res://assets/models/athlete.glb"   # load() quando serve: vedi giocatore.gd
 const Mossa := preload("mosse/mossa.gd")
 const Giochetti := preload("mosse/giochetti.gd")
 const Corpo := preload("mosse/corpo.gd")
@@ -95,6 +95,13 @@ var chino := 0.0
 var esultanza: Variant = null
 
 
+## a fine programma (Uscita.libera_cache_grafiche): lascia l'albero delle animazioni condiviso; la prossima figura
+## (se il programma va avanti) rifà le risorse condivise
+static func libera_condivisi() -> void:
+	_albero = null
+	_pronto = false
+
+
 ## kit: maglia, calzoncini, calzettoni, bordino (Color) e se c'è stile, numero (Vector4); aspetto: pelle, capelli
 ## (Color) e se ci sono iride, scarpe (Color), stile2 (Vector4): parametri di shaders/divisa.gdshader
 func prepara(kit: Dictionary, aspetto: Dictionary, sfasa: float, tex_avviso: Texture2D) -> void:
@@ -104,13 +111,14 @@ func prepara(kit: Dictionary, aspetto: Dictionary, sfasa: float, tex_avviso: Tex
 	_fix = Node3D.new()
 	_fix.name = "Fix"
 	corpo.add_child(_fix)
-	var modello := MODELLO.instantiate() as Node3D
+	var modello := (load(MODELLO_PATH) as PackedScene).instantiate() as Node3D
 	modello.name = "Modello"
 	_fix.add_child(modello)
 	var mesh := modello.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D
 	_scheletro = modello.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
 	var player := modello.find_children("*", "AnimationPlayer", true, false)[0] as AnimationPlayer
-	if not _pronto:
+	# anche se Giocatore ha già lasciato le sue risorse (partita di prova ricaricata dopo libera_condivisi)
+	if not _pronto or Giocatore._mesh_divisa == null:
 		_prepara_condivisi(mesh, _scheletro, player)
 	mesh.mesh = Giocatore._mesh_divisa
 	mesh.material_override = Giocatore._materiale

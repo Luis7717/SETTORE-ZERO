@@ -12,7 +12,9 @@ extends Control
 const T := preload("res://scripts/menu/tema_menu.gd")
 const U := preload("res://scripts/menu/ui.gd")
 const D := preload("res://scripts/menu/menu_dati.gd")
-const SHADER_SFONDO := preload("res://shaders/sfondo_menu.gdshader")
+# shader caricati con load() quando servono, non con preload in una costante: una costante tiene lo shader vivo
+# finché vive lo script, cioè fino a dopo lo spegnimento della grafica ("DummyShader leaked" sul Mac della build)
+const SHADER_SFONDO_PATH := "res://shaders/sfondo_menu.gdshader"
 const SFONDO_3D := "res://scenes/menu/sfondo_menu.tscn"
 const CARTELLA := "res://scenes/menu/%s.tscn"
 
@@ -271,7 +273,7 @@ func _sfumatura() -> Control:
 	r.set_anchors_preset(Control.PRESET_FULL_RECT)
 	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var m := ShaderMaterial.new()
-	m.shader = SHADER_SFONDO
+	m.shader = load(SHADER_SFONDO_PATH)
 	r.material = m
 	return r
 

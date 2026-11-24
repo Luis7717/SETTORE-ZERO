@@ -4,11 +4,13 @@
 extends Node3D
 
 const Coord := preload("res://scripts/coord.gd")
-const MODELLO := preload("res://assets/models/athlete.glb")
-const SHADER_DIVISA := preload("res://shaders/divisa.gdshader")
+# modello, shader e texture caricati con load() quando servono, non con preload in una costante: una costante li
+# tiene vivi finché vive lo script, cioè fino a dopo lo spegnimento della grafica ("DummyShader leaked" sul Mac della build)
+const MODELLO_PATH := "res://assets/models/athlete.glb"
+const SHADER_DIVISA_PATH := "res://shaders/divisa.gdshader"
 const Capelli := preload("res://scripts/partita/capelli.gd")
 const Viso := preload("res://scripts/partita/viso.gd")
-const MASCHERE_VISO := preload("res://assets/textures/viso_maschere.png")
+const MASCHERE_VISO_PATH := "res://assets/textures/viso_maschere.png"
 const Vestibilita := preload("res://scripts/partita/vestibilita.gd")
 
 const RUN_REF := 4.2       # m/s: velocità a cui il clip di corsa gira a velocità 1 (come src/athlete3d.js)
@@ -55,7 +57,7 @@ var _yaw := 0.0
 
 ## kit: Dictionary con maglia, calzoncini, calzettoni, bordino (Color); aspetto: pelle, capelli (Color)
 func prepara(kit: Dictionary, aspetto: Dictionary, sfasa: float) -> void:
-	_modello = MODELLO.instantiate() as Node3D
+	_modello = (load(MODELLO_PATH) as PackedScene).instantiate() as Node3D
 	_modello.name = "Modello"
 	add_child(_modello)
 	_mesh = _modello.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D
@@ -115,7 +117,7 @@ func _scala_tempo(v: float) -> float:
 static func _prepara_condivisi(mi: MeshInstance3D, scheletro: Skeleton3D, player: AnimationPlayer) -> void:
 	_mesh_divisa = _mesh_con_riposo(mi.mesh as ArrayMesh, _nomi_ossa(mi.skin, scheletro))
 	_materiale = ShaderMaterial.new()
-	_materiale.shader = SHADER_DIVISA
+	_materiale.shader = load(SHADER_DIVISA_PATH)
 	var osso := func(nome: String) -> Vector3:
 		var i := scheletro.find_bone(nome)
 		return scheletro.get_bone_global_rest(i).origin if i >= 0 else Vector3.ZERO
@@ -140,7 +142,7 @@ static func _prepara_condivisi(mi: MeshInstance3D, scheletro: Skeleton3D, player
 	Capelli.applica(_materiale)
 	Viso.misura(arr, _peso_testa, t.c, t.occhio_l, t.occhio_r)
 	Viso.applica(_materiale)
-	_materiale.set_shader_parameter("viso_maschere", MASCHERE_VISO)
+	_materiale.set_shader_parameter("viso_maschere", load(MASCHERE_VISO_PATH))
 	_materiale.set_shader_parameter("contorno", _contorno)
 	for nome in CLIP_IN_LOOP:
 		if player.has_animation(nome):
