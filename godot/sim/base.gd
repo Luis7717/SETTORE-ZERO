@@ -226,9 +226,9 @@ func anchor(p: R.Player) -> PackedFloat64Array:
 				ax = C.sign_(p.bx)
 		elif p.pos != "P":
 			if sd.pressing:
-				ay += Stili.PRESS_LINE
+				ay += Stili.PRESS_LINE_R if rifiniture else Stili.PRESS_LINE
 			elif sd.fuorigioco:
-				ay += Stili.OFF_LINE
+				ay += Stili.OFF_LINE_R if rifiniture else Stili.OFF_LINE
 			elif sd.catenaccio:
 				ay += Stili.CAT_LINE
 				ax *= Stili.CAT_NARROW

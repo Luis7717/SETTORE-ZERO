@@ -21,6 +21,7 @@ class_name SimMatch
 extends "parata.gd"
 
 # Calci da fermo (Luis 2026-11-21): chi batte non può toccare il pallone una seconda volta finché non l'ha toccato un altro.
+const GK_GOALKICK_Y := 1.2 # rinvio dal fondo avversario con "rifiniture": l'altro portiere sta a tanto dalla sua linea (m, come gkAI a gioco fermo)
 const DBL_FREE := 6.0 # sicurezza: dopo tanto tempo di pallone libero senza che nessun altro lo tocchi, il battitore può riprenderlo (s)
 # Meteo: campo facoltativo "meteo" delle opzioni della partita ("sereno" | "nuvoloso" | "pioggia" | "neve").
 # Senza il campo (o sereno, nuvoloso, valori sconosciuti) il motore resta identico a prima. Come src/sim/match.js.
@@ -290,7 +291,13 @@ func setRestart(type: String, tm: int, x: float, y: float, taker: R.Player = nul
 			if not p.off and p != taker:
 				var an := anchor(p)
 				var px: float = an[0] + (rnd() - 0.5)
-				place(p, px, an[1] + (rnd() - 0.5))
+				var py: float = an[1] + (rnd() - 0.5)
+				if rifiniture and p.pos == "P":
+					# l'altro portiere resta in porta (prima andava al suo posto di squadra, ~33 m fuori, e con le riprese ci correva)
+					var pd: float = -1.0 if p.team else 1.0
+					px = 0.0
+					py = -pd * HL + pd * GK_GOALKICK_Y
+				place(p, px, py)
 		place(taker, x, y - dir * 0.5)
 		for o: R.Player in theirs:
 			if absf(o.x) < BOX_W / 2.0 + 1.0 and o.y * dir < -HL + BOX_D + 1.0:
