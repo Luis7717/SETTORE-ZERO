@@ -32,6 +32,9 @@ const THROW_OUT := 1.5         # 1/s: uscita dopo il lancio
 const DRIB_IN := 3.0           # 1/s: entrata nella visuale del dribbling (girata di ~45°, dribbling_regia.gd) ...
 const DRIB_OUT := 1.6          # ... e ritorno alla visuale normale, senza scatti
 const DRIB_POSE_K := 4.0       # 1/s: quanto in fretta la visuale del dribbling insegue portatore e difensore
+const POSA_MIN_M := 0.01       # posa valida: punto guardato ad almeno tanti metri in orizzontale dalla telecamera
+const FOV_VALIDO := Vector2(1.0, 170.0)   # ... e campo visivo (gradi) dentro questo intervallo
+const SCHERMO_FUORI := Vector2(390, 844)  # schermo supposto fuori dall'albero (test)
 
 var base_fov := 70.0
 var cx := 0.0
@@ -64,20 +67,16 @@ func reset(x: float, y: float) -> void:
 	cx = x
 	cy = y
 	_near = 0.0
-	_wide_k = 0.0
-	_wide_p = null
-	_corn_k = 0.0
-	_corner_p = null
-	_throw_k = 0.0
-	_throw_p = null
-	_gk_k = 0.0
-	_save_p = null
-	_drib_k = 0.0
-	_drib_p = null
+	_scarta_inseguite()
+
+
+## grandezza dello schermo (fuori dall'albero, nei test: quella dell'iPhone in verticale)
+func _schermo() -> Vector2:
+	return get_viewport().get_visible_rect().size if is_inside_tree() else SCHERMO_FUORI
 
 
 func _aspect() -> float:
-	var r := get_viewport().get_visible_rect().size
+	var r := _schermo()
 	return r.x / maxf(1.0, r.y)
 
 
@@ -86,7 +85,7 @@ func _aspect() -> float:
 ## drib = visuale del dribbling della persona {p, o, yaw} (dribbling_regia.gd → camera()), {} = nessuna
 func aggiorna(m: Object, me: int, dt: float, rdt: float, drawing: bool, cam_drag: bool, user_yaw: float, zoom_t: float = -1.0, drib: Dictionary = {}) -> void:
 	var b: Object = m.ball
-	var size := get_viewport().get_visible_rect().size
+	var size := _schermo()
 	var port := size.x < size.y
 	base_fov = 70.0 if port else 42.0   # le visuali calcolate lo allargano solo quando serve
 	var restart_on: bool = m.phase == "restart" and m.restart != null
@@ -103,6 +102,14 @@ func aggiorna(m: Object, me: int, dt: float, rdt: float, drawing: bool, cam_drag
 	if restart_on and m.restart.scena == "": # scena della ripresa (sim/riprese.gd): si segue il pallone, senza stacchi
 		fx = m.restart.x
 		fy = m.restart.y
+	# sicurezza ("tutto nero" al 49', Luis 2026-11-24): un pallone NaN entrava in cx/cy inseguiti e ci restava per sempre
+	if not (is_finite(fx) and is_finite(fy)):
+		fx = cx
+		fy = cy
+	if not (is_finite(cx) and is_finite(cy) and is_finite(_near) and is_finite(_zoom) and is_finite(_duel_k) and is_finite(_def_w)):
+		_ripristina(fx, fy)
+	if not is_finite(user_yaw):
+		user_yaw = 0.0
 	var k := minf(1.0, rdt * FOLLOW_K)
 	if Vector2(fx - cx, fy - cy).length() > CAM_SNAP:
 		cx = fx
@@ -153,6 +160,7 @@ func aggiorna(m: Object, me: int, dt: float, rdt: float, drawing: bool, cam_drag
 		lx = l2.x
 		ly = l2.y
 	var pose := {"pos": Vector3(px, hh, py), "look": Vector3(lx, 0, ly), "fov": base_fov}
+	var normale := pose
 	var pk := minf(1.0, rdt * POSE_K)
 	var pk_drag := minf(1.0, rdt * POSE_K_DRAG) if cam_drag else pk
 	var wk := _wide_step(m, me, mine, duel, rdt, pk_drag, drawing, user_yaw)
@@ -170,11 +178,57 @@ func aggiorna(m: Object, me: int, dt: float, rdt: float, drawing: bool, cam_drag
 	var gk := _save_step(m, me, dir, rdt, pk)
 	if gk > 1e-3:
 		pose = _mix(pose, _save_p, gk)
+	if not posa_valida(pose): # visuale calcolata andata storta: si buttano gli stati inseguiti, resta la normale
+		_scarta_inseguite()
+		pose = normale if posa_valida(normale) else _posa_sicura(dir)
 	var pos: Vector3 = pose.pos
 	var look: Vector3 = pose.look
 	look_at_from_position(Vector3(pos.x, pos.y, -pos.z), Vector3(look.x, look.y, -look.z), Vector3.UP)
 	if absf(fov - float(pose.fov)) > 0.01:
 		fov = pose.fov
+
+
+## posa {pos, look, fov} disegnabile: tutto finito, punto guardato non sopra né sotto la telecamera (look_at con la
+## direzione parallela a UP non gira), campo visivo sensato. Una posa NaN darebbe lo schermo tutto nero.
+static func posa_valida(pose: Dictionary) -> bool:
+	var pos: Vector3 = pose.pos
+	var look: Vector3 = pose.look
+	var f: float = pose.fov
+	if not (pos.is_finite() and look.is_finite() and is_finite(f)):
+		return false
+	return Vector2(look.x - pos.x, look.z - pos.z).length() >= POSA_MIN_M and f >= FOV_VALIDO.x and f <= FOV_VALIDO.y
+
+
+## via le visuali calcolate inseguite: ripartono da zero (la prima volta ci vanno subito)
+func _scarta_inseguite() -> void:
+	_wide_k = 0.0
+	_wide_p = null
+	_corn_k = 0.0
+	_corner_p = null
+	_throw_k = 0.0
+	_throw_p = null
+	_gk_k = 0.0
+	_save_p = null
+	_drib_k = 0.0
+	_drib_p = null
+
+
+## stati inseguiti non finiti: si riparte dal punto (x, y) (o dal centro del campo) come a inizio partita
+func _ripristina(x: float, y: float) -> void:
+	if not (is_finite(x) and is_finite(y)):
+		x = 0.0
+		y = 0.0
+	reset(x, y)
+	_zoom = 0.0
+	_duel_k = 0.0
+	_def_w = 0.0
+
+
+## ultima risorsa: dietro il punto seguito, alla distanza e altezza normali
+func _posa_sicura(dir: float) -> Dictionary:
+	if not (is_finite(cx) and is_finite(cy)):
+		_ripristina(0.0, 0.0)
+	return {"pos": Vector3(cx * dir, CAM_H, cy * dir - CAM_BACK), "look": Vector3(cx * dir, 0.0, cy * dir + 9.0), "fov": base_fov}
 
 
 # rallenty in attacco (duello, fuga, area di tiro, disegno col pallone, colpo di testa): visuale larga coi compagni davanti e di fianco
