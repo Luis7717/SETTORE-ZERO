@@ -85,7 +85,7 @@ interfaccia dei menu, sfondo del menu e allenamento guidato, grafica.
 | `scripts/partita/telecamera_partita.gd` | telecamera come `View.update` del web: normale, vicino alla porta, difesa, duello, rallenty largo, angolo, parata, girata |
 | `scripts/partita/camfit.gd`, `camuser.gd` | inquadrature calcolate e visuale girata col dito (conti puri, provati senza schermo) |
 | `scripts/partita/figura.gd` | un giocatore in partita: clip fermo/corsa/scatto/salto, pose (calcio, testa, tuffo, scivolata, esultanza), giochetti con la IK |
-| `scripts/partita/mosse/` | movimenti calcolati dei giochetti (`mossa.gd`, `corpo.gd`, `giochetti.gd`), palleggi e tiro del menu (`palleggi.gd`, `tiro.gd`) e IK a due ossa (`ik.gd`) |
+| `scripts/partita/mosse/` | movimenti calcolati dei giochetti (`mossa.gd`, `corpo.gd`, `giochetti.gd`), coreografie del dribbling ancorate al campo (`coreo.gd`, `coreo_dribbling.gd`), palleggi e tiro del menu (`palleggi.gd`, `tiro.gd`) e IK a due ossa (`ik.gd`) |
 
 | `scripts/partita/figura_mocap.gd` | animazioni mocap vere sopra la figura: esultanze, parate, piatto/collo/rigore, rimessa, difesa (vedi "Animazioni mocap") |
 | `assets/mocap/mocap.res` | le clip mocap reindirizzate sul nostro scheletro (AnimationLibrary compressa, ~436 KB), fatte da `tools/converti_mocap.gd` |
@@ -213,7 +213,7 @@ usa `scripts/partita/vista_finta.gd`, che ha le stesse firme):
 |---|---|---|
 | `gioco.gd` | `setup(m, 0)` | una volta, dopo aver creato la partita |
 | `gioco.gd` | `drawing = gesti.drawing`, poi `update_view(dt_game, dt_real)` | a ogni fotogramma, dopo motore ed eventi (in pausa: 0, 0) |
-| `gioco.gd` | `trick(p, -1, side, dur)` → `{name, ...}` (o una stringa), `reazione(p, tipo, lato, dur)` | evento `dribble`: giochetto e pose di reazione (`dribbling_regia.gd → esito`), nome nella scritta grande |
+| `gioco.gd` | `dribbling(e, es)` → `{name, ...}` (giochetto, `{}` se fallito), `dribbling_go(e)` | eventi `dribble` / `dribble_go`: coreografie di portatore e difensore (`mosse/coreo_dribbling.gd`, `es = dribbling_regia.esito`), nome nella scritta grande |
 | `gioco.gd` | `dribbling_cam = regia.camera()` | a ogni fotogramma: visuale girata di 45° del dribbling della persona (`{}` = nessuna) |
 | `gioco.gd` | `dispose()` | uscendo dalla scena (anche "Nuova partita") |
 | `gesti.gd` | `world_to_screen(x, y, h)` → `Vector3(x_px, y_px, visibile)` | presa di pallone, portatore, giocatori; omografia della porta |

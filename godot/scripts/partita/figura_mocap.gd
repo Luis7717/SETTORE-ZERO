@@ -38,7 +38,7 @@ const P_TS := &"parameters/mc_ts/scale"
 const ENTRA := 0.12            # s: la clip arriva a peso pieno
 const ENTRA_CALCIO := 0.05     # s: nel calcio si entra quasi subito (il pallone parte adesso)
 const ESCE := 0.25             # s: uscita dolce verso fermo/corsa
-const REAZ_ESCE := 0.08        # s: uscita veloce quando parte una reazione al dribbling (la posa calcolata va subito)
+const REAZ_ESCE := 0.08        # s: uscita veloce quando parte una coreografia del dribbling (mosse/coreo.gd)
 const XFADE := 0.08            # s: passaggio tra due clip mocap
 const HEAD_H := 1.3            # pallone sopra questa altezza vicino al giocatore = colpo di testa (come figura.gd)
 const NEAR_BALL := 2.2
@@ -234,8 +234,8 @@ func aggiorna(p: Object, dt: float, ctx: Dictionary) -> float:
 				_imposta_ts(-PRESA_TS)
 			elif t <= float(inf.presa_da) and _ts < 0.0:
 				_imposta_ts(PRESA_TS)
-	# ---- difesa (non durante una reazione al dribbling: lì comanda la posa calcolata, figura.gd → _posa_reazione)
-	var reaz: bool = ctx.get("reazione") != null
+	# ---- difesa (non durante una coreografia del dribbling: lì comanda quella, mosse/coreo.gd)
+	var reaz: bool = ctx.get("coreo") != null
 	var wd := 0.0 if reaz else _peso_difesa(p, m, ctx)
 	if wd > 0.0 and (tipo == "" or tipo == "difesa"):
 		if tipo == "":

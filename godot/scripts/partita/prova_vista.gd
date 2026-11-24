@@ -31,6 +31,9 @@
 #   --scena=esultanza | tiro | piatto | rimessa | difesa   (e parata con --tuffo=X,ALTEZZA per scegliere il tuffo)
 #   --senza-mocap         le stesse scene con le pose calcolate (per confronto)
 #   --traccia=N|segui     stampa a ogni fotogramma lo stato mocap di m.players[N] o di quello seguito (clip, tempo, peso)
+#   dribbling della persona da vicino (coreografie di mosse/coreo_dribbling.gd), a passo fisso (non dipende da quanto
+#   è veloce il PC): --scena=dribbling_ok | dribbling_ko [--lato=1|-1] [--giochetto=finta|doppiopasso|elastico]
+#   [--vista=lato|dietro|alto] --foto=CARTELLA/prefisso [--ogni-passi=N]: una schermata ogni N fotogrammi (tempo al 30%)
 extends Node
 
 const VISTA := preload("res://scenes/vista_partita.tscn")
@@ -42,6 +45,8 @@ const DT := 1.0 / 60.0
 const SLOW := 0.22             # rallenty (come l'area di tiro del gioco web)
 const FiguraMocap := preload("figura_mocap.gd")
 const TifoEventi := preload("tifo_eventi.gd")
+const DribblingRegia := preload("dribbling_regia.gd")
+const CoreoDrib := preload("mosse/coreo_dribbling.gd")
 
 var vista: PartitaVista
 var m: SimMatch
@@ -60,6 +65,7 @@ var _cpu_ms := 0.0
 var _n_misure := 0
 var _tifo := TifoEventi.new()  # fatti del motore → tifo (come in partita vera)
 var _segui: Object = null      # giocatore da guardare da vicino (scene mocap)
+var _manuale := false          # motore e vista li fa andare la scena (dribbling a passo fisso): _process non fa niente
 
 
 func _ready() -> void:
@@ -89,8 +95,9 @@ func _ready() -> void:
 			kit["style"] = {"fit": int(dv[1]) if dv.size() > 1 else 0, "sleeves": 0, "collar": int(dv[0]),
 				"pattern": 0, "shorts": 0, "socks": 0}
 			squadre[k]["kit"] = kit
-	m = SimMatch.new({"seed": seme, "halfLen": 600.0, "human": [false, false], "kickoff": 0, "teams": squadre,
-		"contatti": not _opz.has("senza-contatti")})
+	var drib := _scena.begins_with("dribbling")   # dribbling della persona: squadra 0 umana, rifiniture del gioco
+	m = SimMatch.new({"seed": seme, "halfLen": 600.0, "human": [drib, false], "kickoff": 0, "teams": squadre,
+		"contatti": not _opz.has("senza-contatti"), "rifiniture": drib, "portaAuto": drib})
 	vista.setup(m, int(_opz.get("me", "0")))
 	if _opz.has("qualita"):
 		vista.qualita_auto = false
@@ -126,6 +133,8 @@ static func squadra(nome: String, rating: float, seme: int) -> Dictionary:
 
 
 func _process(delta: float) -> void:
+	if _manuale:
+		return
 	var dt := minf(delta, 0.1)
 	_ms.append(delta * 1000.0)
 	var t0 := Time.get_ticks_usec()
@@ -275,6 +284,8 @@ func _prepara_scena() -> void:
 		"angolo":
 			await _corri(1.0)
 			m.setRestart("corner", 0, Coord_HW(), 50.0)
+		"dribbling_ok", "dribbling_ko":
+			await _dribbling_da_vicino()
 		"giochetto":
 			await _palla_nostra_in_attacco()
 			_fermo = true
@@ -286,6 +297,99 @@ func _prepara_scena() -> void:
 			vista.trick(c, 0.1)   # dribbling altissimo e r basso: il più bello, l'arcobaleno
 		_:
 			pass
+
+
+# dribbling della persona a passo fisso: n. 10 col pallone, difensore davanti, tasto Dribbling (come la scena di
+# gioco.gd), tempo al 30%; esito e scatto alla vista come in partita. Schermate con --foto, poi esce.
+func _dribbling_da_vicino() -> void:
+	_manuale = true
+	await get_tree().process_frame
+	m.phase = "play"
+	m.restart = null
+	var att: Object = m.players[9]
+	var dif: Object = m.players[11 + 3]
+	for q: Object in m.players:   # gli altri lontano, fermi
+		if q != att and q != dif:
+			q.x = clampf(q.x, -30.0, -12.0) if q.x < 0.0 else clampf(q.x, 14.0, 30.0)
+	for q: Object in [att, dif]:
+		q.vx = 0.0
+		q.vy = 0.0
+		q.state = "play"
+	att.x = 4.0
+	att.y = 8.0
+	att.fx = 0.0
+	att.fy = 1.0
+	att.tx = 4.0
+	att.ty = 30.0
+	dif.x = 4.6
+	dif.y = 14.5
+	dif.fx = 0.0
+	dif.fy = -1.0
+	dif.tx = dif.x
+	dif.ty = dif.y
+	var ok := _scena == "dribbling_ok"
+	att.st.dri = 99.0 if ok else 1.0
+	dif.st.dif = 1.0 if ok else 99.0
+	m.ball.owner = att
+	m.ball.last = att
+	m.ball.x = att.x
+	m.ball.y = att.y + 0.6
+	m.ctrl[0] = att
+	var lato := float(_opz.get("lato", "0"))
+	var foto: String = _opz.get("foto", "")
+	var ogni := int(_opz.get("ogni-passi", "4"))
+	var regia := DribblingRegia.new()
+	var acc := 0.0
+	var prenotato := false
+	var n := 0
+	var k := 0
+	var cam := Vector3(4.0, 0.0, -8.0)
+	var fine := -1.0
+	while n < 2400:
+		var ts := regia.velocita() if regia.velocita() > 0.0 else (0.3 if prenotato else 1.0)
+		var dt := DT * ts
+		acc += dt
+		while acc >= DT - 1e-9:
+			m.step(DT)
+			acc -= DT
+			for e: Dictionary in m.events:
+				regia.evento(e, 0)
+				match String(e.type):
+					"dribble":
+						var es := DribblingRegia.esito(e)
+						if _opz.has("giochetto") and bool(e.ok):
+							CoreoDrib.FORZA = String(_opz.giochetto)
+						var tk: Dictionary = vista.dribbling(e, es)
+						print("prova dribbling: %s %s lato %s" % [tk.get("name", "-"), "riuscito" if e.ok else "fallito", e.side])
+						fine = m.time + 1.3
+					"dribble_go":
+						vista.dribbling_go(e)
+			m.events.clear()
+			regia.passo(m, 0, DT, ts)
+		if not prenotato and m.duelFor(0):
+			if lato != 0.0:
+				m.userDribble(0)
+				m.duel.side = lato
+			else:
+				m.userDribble(0)
+			prenotato = true
+		vista.update_view(dt, DT)
+		# telecamera vicina che segue (piano) il portatore
+		var s := vista.flip
+		var c := Vector3(s * att.x, 0.0, -s * att.y)
+		cam = cam.lerp(c, 0.08) if n > 0 else c
+		var dove: String = _opz.get("vista", "lato")
+		var o := Vector3(6.5, 2.0, -1.0) if dove == "lato" else (Vector3(1.2, 2.4, 6.5) if dove == "dietro" else Vector3(3.0, 7.5, 2.0))
+		vista.cam.fov = 38.0
+		vista.cam.look_at_from_position(cam + o, cam + Vector3(0, 0.8, -1.0), Vector3.UP)
+		await RenderingServer.frame_post_draw
+		if foto != "" and prenotato and n % ogni == 0:
+			k += 1
+			_salva(foto + "_%02d.png" % k)
+		n += 1
+		if fine > 0.0 and m.time > fine:
+			break
+	_esci()
 
 
 static func Coord_HW() -> float:

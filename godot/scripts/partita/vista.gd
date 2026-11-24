@@ -12,7 +12,11 @@
 #   show_preview(points, offside_y)    puntini del volo vero (m.predictKick) e linea del fuorigioco (facoltativa:
 #                                      nel gioco l'anteprima la disegna l'interfaccia in 2D)
 #   trick(p[, r, side, dur])           parte un giochetto del dribbling per p (solo grafica); ritorna {id, name, dur}
-#   reazione(p, tipo, lato, dur)       posa di reazione al dribbling: "affondo" (difensore che interviene a vuoto),
+#   dribbling(e, es)                   esito di un dribbling (evento 'dribble' del motore, es = dribbling_regia.esito):
+#                                      coreografie di portatore e difensore (mosse/coreo_dribbling.gd); ritorna il
+#                                      giochetto {id, name, dur} (vuoto se fallito)
+#   dribbling_go(e)                    scatto del portatore dopo il giochetto (evento 'dribble_go')
+#   reazione(p, tipo, lato, dur)       solo la reazione di uno: "affondo" (difensore che interviene a vuoto),
 #                                      "contrasto" (difensore che prende il pallone), "inciampo" (portatore fermato)
 #   dribbling_cam                      {p, o, yaw} della regia del dribbling (dribbling_regia.gd) o {}: visuale girata
 #   dispose()                          via tutto (la partita la chiude chi l'ha creata); va bene anche da _exit_tree
@@ -40,6 +44,8 @@ const Giocatore := preload("res://scripts/giocatore.gd")
 const TV := preload("texture_vista.gd")
 const CU := preload("camuser.gd")
 const Giochetti := preload("mosse/giochetti.gd")
+const Coreo := preload("mosse/coreo.gd")
+const CoreoDrib := preload("mosse/coreo_dribbling.gd")
 const Effetti := preload("effetti.gd")
 const Qualita := preload("qualita.gd")
 const Raccattapalle := preload("raccattapalle_vista.gd")
@@ -87,7 +93,9 @@ var t := 0.0
 var _figs: Array = []          # Figura per ogni m.players[i]
 var _srcs: Array = []          # src del giocatore che la figura rappresenta (cambio = figura nuova)
 var _tricks := {}              # indice in m.players → {id, name, dur, t, side}
-var _reazioni := {}            # indice in m.players → {tipo, t, dur, lato} (reazione())
+var _coreo := {}               # indice in m.players → Coreo (coreografia del dribbling in corso)
+var _palla_vista := Vector3.ZERO   # pallone mostrato all'ultimo fotogramma (a terra, riferimento delle figure) ...
+var _palla_vista_v := Vector3.ZERO # ... e sua velocità
 var _rng := RandomNumberGenerator.new()
 var _yaw_owner: Object = null
 var _ball: MeshInstance3D
@@ -97,7 +105,7 @@ var _shadows: MultiMeshInstance3D
 var _ring: MeshInstance3D
 var _marker: Sprite3D
 var _tex_warn: Texture2D
-var _ctx := {"t": 0.0, "phase": "", "flip": 1.0, "yaw": 0.0, "ball": null, "trick": null, "reazione": null, "m": null}   # riusato per tutti
+var _ctx := {"t": 0.0, "phase": "", "flip": 1.0, "yaw": 0.0, "ball": null, "trick": null, "coreo": null, "m": null}   # riusato per tutti
 var _mano_i := -1              # [mocap] figura col pallone tra le mani (rimessa)
 var _zoom_t := -1.0            # zoom voluto dal gioco (set_zoom); < 0 = lo calcola la telecamera
 ## il livello grafico scende da solo se gli FPS restano sotto 58 (qualita.gd)
@@ -163,7 +171,7 @@ func setup(match_: SimMatch, me_: int) -> void:
 	flip = -1.0 if me == 1 else 1.0
 	_nastri.flip = flip
 	_tricks.clear()
-	_reazioni.clear()
+	_coreo.clear()
 	_yaw_owner = null
 	user_yaw = 0.0
 	_zoom_t = -1.0
@@ -195,11 +203,6 @@ func update_view(dt_game: float, dt_real: float) -> void:
 		tk.t += dt_game
 		if tk.t >= tk.dur:
 			_tricks.erase(k)
-	for k: int in _reazioni.keys():
-		var rz: Dictionary = _reazioni[k]
-		rz.t += dt_game
-		if rz.t >= rz.dur:
-			_reazioni.erase(k)
 	var mm := _shadows.multimesh
 	for i in m.players.size():
 		var p: Object = m.players[i]
@@ -224,6 +227,14 @@ func update_view(dt_game: float, dt_real: float) -> void:
 		bx += c.fx * o.x - c.fy * o.y * tk.side
 		by += c.fy * o.x + c.fx * o.y * tk.side
 		bh += o.z
+	var vb := Vector2.INF   # velocità mostrata del pallone (INF = quella del motore)
+	var cp := _pallone_coreo()   # coreografia del dribbling: il pallone lo muovono i tocchi
+	if cp.w > 0.0:
+		bx = lerpf(bx, s * cp.x, cp.w)
+		by = lerpf(by, -s * cp.z, cp.w)
+		bh = lerpf(bh, 0.0, cp.w)
+		if cp.w >= 1.0:
+			vb = Vector2(s * _palla_vista_v.x, -s * _palla_vista_v.z)
 	var rete := _dentro_la_rete(bx, by, bh)
 	by = rete.x
 	bh = rete.y
@@ -232,7 +243,11 @@ func update_view(dt_game: float, dt_real: float) -> void:
 		bx = lerpf(bx, s * pm.x, pm.w)
 		by = lerpf(by, -s * pm.z, pm.w)
 		bh = lerpf(bh, maxf(0.0, pm.y - BALL_R), pm.w)
-	_aggiorna_pallone(b, bx, by, bh, dt_game)
+	var prima := _palla_vista
+	_palla_vista = Vector3(s * bx, 0.0, -s * by)
+	if dt_game > 0.0:
+		_palla_vista_v = (_palla_vista - prima) / dt_game
+	_aggiorna_pallone(b, bx, by, bh, dt_game, vb)
 	if replay:
 		_ring.visible = false
 		_marker.visible = false
@@ -341,21 +356,82 @@ func trick(p: Object, r: float = -1.0, side: float = 0.0, dur_voluta: float = -1
 	return {"id": tk.id, "name": tk.name, "dur": dur}
 
 
-## posa di reazione al dribbling per p (solo grafica, dribbling_regia.gd → reazioni): tipo "affondo" | "contrasto" |
-## "inciampo"; lato = verso cui si butta (+1 = sua sinistra, −1 = destra, 0 = in avanti); dur in s di partita
-func reazione(p: Object, tipo: String, lato: float, dur: float) -> void:
+## esito di un dribbling (evento 'dribble' del motore) a schermo: es = dribbling_regia.esito(e) (durata del giochetto
+## e reazioni). Dribbling della persona riuscito (show > 0): coreografia del portatore (finta, poi lo scatto con
+## dribbling_go) col giochetto scelto qui; dell'IA: giochetto calcolato di sempre (trick). Le reazioni (difensore a
+## vuoto, contrasto, inciampo) sono coreografie anche loro. Ritorna il giochetto {id, name, dur} ({} se fallito).
+func dribbling(e: Dictionary, es: Dictionary) -> Dictionary:
+	if m == null:
+		return {}
+	var p: Object = e.p
+	var show := float(e.get("show", 0.0))
+	var res := {}
+	if bool(e.ok) and show > 0.0:
+		var tk := CoreoDrib.scegli(float(p.st.dri), _rng.randf())
+		_tricks.erase(m.players.find(p))
+		var c := _avvia_coreo(p)
+		if c != null:
+			CoreoDrib.portatore(c, String(tk.id), float(e.get("side", 1.0)), show)
+		res = {"id": tk.id, "name": tk.name, "dur": show}
+	elif bool(e.ok):
+		res = trick(p, -1.0, float(e.get("side", 0.0)), float(es.get("dur", -1.0)))
+	for rz: Array in es.get("reazioni", []):
+		reazione(rz[0], rz[1], rz[2], float(rz[3]), show)
+	return res
+
+
+## scatto del portatore dopo il giochetto (evento 'dribble_go'): tocco del pallone dal lato scelto e primi passi;
+## il difensore allunga la gamba a vuoto
+func dribbling_go(e: Dictionary) -> void:
+	if m == null:
+		return
+	for q: Object in [e.get("p"), e.get("o")]:
+		var c: Coreo = _coreo.get(m.players.find(q)) if q != null else null
+		if c == null or c.finito:
+			continue
+		if c.tipo == "affondo":
+			CoreoDrib.difensore_go(c)
+		elif c.tipo in CoreoDrib.FINTE:
+			CoreoDrib.portatore_go(c)
+
+
+## reazione al dribbling di p (solo grafica, mosse/coreo_dribbling.gd): tipo "affondo" | "contrasto" | "inciampo";
+## lato = verso cui si butta o dov'è il pallone (+1 = sua sinistra, −1 = destra, 0 = davanti); show = durata del
+## giochetto del portatore (0 = nessuno: dribbling dell'IA)
+func reazione(p: Object, tipo: String, lato: float, _dur: float = 0.0, show: float = 0.0) -> void:
 	if m == null or p == null:
 		return
-	_reazioni[m.players.find(p)] = {"tipo": tipo, "t": 0.0, "dur": maxf(0.05, dur), "lato": lato}
+	var c := _avvia_coreo(p)
+	if c == null:
+		return
+	match tipo:
+		"affondo":
+			CoreoDrib.difensore_vuoto(c, lato, show, func() -> Vector3: return _palla_vista)
+		"contrasto":
+			CoreoDrib.contrasto(c, lato, m.ball.owner == p)
+		_:
+			CoreoDrib.inciampo(c)
 
 
-func _reazione_di(p: Object) -> Variant:
-	if _reazioni.is_empty():
+# coreografia nuova per p (sostituisce quella che aveva), dai piedi e dal pallone come sono adesso
+func _avvia_coreo(p: Object) -> Coreo:
+	var i: int = m.players.find(p)
+	if i < 0 or i >= _figs.size() or not is_instance_valid(_figs[i]):
 		return null
-	var k: Variant = _reazioni.get(m.players.find(p))
-	if k == null:
-		return null
-	return {"tipo": k.tipo, "q": minf(1.0, k.t / k.dur), "lato": k.lato}
+	var f: Node3D = _figs[i]
+	var c := Coreo.new(p, flip, f.scale, f.caviglie_mondo(), _palla_vista, _palla_vista_v)
+	_coreo[i] = c
+	return c
+
+
+# pallone della coreografia che lo muove: {x, z (riferimento delle figure), w (peso)}
+func _pallone_coreo() -> Dictionary:
+	for k: int in _coreo:
+		var c: Coreo = _coreo[k]
+		if c.pallone_attivo():
+			var q := c.pallone()
+			return {"x": q.x, "z": q.z, "w": c.peso}
+	return {"x": 0.0, "z": 0.0, "w": 0.0}
 
 
 ## via figure e riferimenti alla partita (la partita la chiude chi l'ha creata, con m.dispose()).
@@ -365,7 +441,7 @@ func dispose() -> void:
 	m = null
 	_yaw_owner = null
 	_tricks.clear()
-	_reazioni.clear()
+	_coreo.clear()
 	_zoom_t = -1.0
 	if is_instance_valid(_nastri) and _nastri.is_node_ready():
 		_nastri.nascondi_linea()
@@ -472,6 +548,14 @@ func _posa(i: int, p: Object, dt: float) -> void:
 	f.position = Vector3(s * p.x, 0.0, -s * p.y)
 	f.rotation = Vector3(0.0, yaw, 0.0)
 	var tk := _trick_of(p)
+	var co: Coreo = _coreo.get(i)
+	if co != null:   # coreografia del dribbling: il corpo gira dolce (il verso del motore può scattare)
+		co.passo(dt, p, m.ball)
+		if co.finito:
+			_coreo.erase(i)
+			co = null
+		else:
+			f.rotation = Vector3(0.0, co.yaw, 0.0)
 	_ctx.t = t
 	_ctx.phase = m.phase
 	_ctx.flip = s
@@ -479,7 +563,7 @@ func _posa(i: int, p: Object, dt: float) -> void:
 	_ctx.ball = m.ball
 	_ctx.m = m   # [mocap] figura_mocap.gd legge gol, rimesse e portatore
 	_ctx.trick = null if tk.is_empty() else tk
-	_ctx.reazione = _reazione_di(p)
+	_ctx.coreo = null if co == null else {"fr": co.frame(f.transform, _palla_vista), "w": co.peso}
 	f.posa(p, dt, _ctx)
 
 
@@ -629,12 +713,13 @@ static func materiale_pallone() -> StandardMaterial3D:
 	return mat
 
 
-func _aggiorna_pallone(b: Object, bx: float, by: float, bh: float, dt: float) -> void:
+func _aggiorna_pallone(b: Object, bx: float, by: float, bh: float, dt: float, vb: Vector2 = Vector2.INF) -> void:
 	var s := flip
 	_ball.position = Vector3(s * bx, bh + BALL_R, -s * by)
-	var sp := sqrt(b.vx * b.vx + b.vy * b.vy)
+	var v := Vector2(b.vx, b.vy) if vb == Vector2.INF else vb   # vb: velocità mostrata (coreografia del dribbling)
+	var sp := v.length()
 	if sp > 0.2 and dt > 0.0:   # rotola nel verso giusto (asse = su × velocità)
-		_ball.rotate(Vector3(-s * b.vy, 0.0, -s * b.vx).normalized(), sp * dt / BALL_R)
+		_ball.rotate(Vector3(-s * v.y, 0.0, -s * v.x).normalized(), sp * dt / BALL_R)
 		_ball.basis = _ball.basis.orthonormalized()
 		if not _ball.basis.is_finite(): # mai un pallone sparito per un giro fatto di NaN
 			_ball.basis = Basis()
