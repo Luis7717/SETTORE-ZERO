@@ -136,8 +136,9 @@ func update_view(_dt_game: float, dt_real: float) -> void:
 	_anello.visible = c != null and not c.off
 	if c != null:
 		_anello.position = Coord.a_godot(c.x, c.y, 0.05)
-	# visuale girata: resta nel rallenty o mentre si disegna, fuori torna dritta (relaxYaw di src/camuser.js)
-	if not (VD.user_cam_on(_m, _me) or drawing or cam_drag):
+	# visuale girata: resta col pallone nostro (rallenty o gioco normale), nelle riprese o mentre si disegna, fuori
+	# torna dritta (relaxYaw di src/camuser.js; la vista vera tiene anche il passaggio a un compagno, camuser.gd)
+	if not (VD.drag_cam_on(_m, _me) or drawing or cam_drag):
 		user_yaw *= exp(-YAW_RITORNO * maxf(0.0, dt_real))
 		if absf(user_yaw) < 1e-3:
 			user_yaw = 0.0

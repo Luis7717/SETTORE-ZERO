@@ -101,6 +101,7 @@ var _palla_vista := Vector3.ZERO   # pallone mostrato all'ultimo fotogramma (a t
 var _palla_vista_v := Vector3.ZERO # ... e sua velocità
 var _rng := RandomNumberGenerator.new()
 var _yaw_owner: Object = null
+var _yaw_dopo := 0.0             # secondi veri da quando _yaw_owner ha lasciato il pallone (visuale girata che resta)
 var _ball: MeshInstance3D
 var _ball_sh: MeshInstance3D
 var _ball_sh_mat: StandardMaterial3D
@@ -176,6 +177,7 @@ func setup(match_: SimMatch, me_: int) -> void:
 	_tricks.clear()
 	_coreo.clear()
 	_yaw_owner = null
+	_yaw_dopo = 0.0
 	user_yaw = 0.0
 	_zoom_t = -1.0
 	t = 0.0
@@ -256,11 +258,14 @@ func update_view(dt_game: float, dt_real: float) -> void:
 		_marker.visible = false
 	else:
 		_aggiorna_segni()
-	# visuale girata dalla persona: resta finché dura il rallenty in attacco con lo stesso portatore e mentre si
-	# disegna; poi torna dolcemente dritta (src/camuser.js). Con un portatore nuovo si riparte dritti.
+	# visuale girata dalla persona: resta finché lo stesso portatore ha il pallone (rallenty, gioco normale, riprese) e
+	# mentre si disegna; passato il pallone a un compagno resta ancora CAM_USER_PASS_HOLD s se il possesso è nostro
+	# (così si vede il passaggio dopo); poi torna dolcemente dritta (src/camuser.js, camuser.gd hold_yaw)
 	if cam_drag:
 		_yaw_owner = b.owner
-	var hold: bool = (CU.user_cam_on(m, me) and b.owner == _yaw_owner) or drawing
+	var same: bool = b.owner == _yaw_owner
+	_yaw_dopo = 0.0 if (same or cam_drag) else _yaw_dopo + maxf(0.0, dt_real)
+	var hold: bool = CU.hold_yaw(m, me, same, _yaw_dopo) or drawing or cam_drag
 	user_yaw = CU.relax_yaw(user_yaw, hold, dt_real)
 	if not replay:
 		cam.aggiorna(m, me, dt_game, dt_real, drawing, cam_drag, user_yaw, _zoom_t, dribbling_cam)
