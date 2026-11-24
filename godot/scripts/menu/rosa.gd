@@ -8,7 +8,14 @@
 # gioco, sim/stili.gd); ognuno mostra la scelta attuale e apre un menu a comparsa con una riga di spiegazione per
 # scelta. La scelta si salva subito (formation + autoLineup, setStili). arg {"menu": "formazione"|"attacco"|"difesa"}
 # apre già quel menu ({"stili": true} = attacco, come prima).
+# Modo partita (Luis 2026-11-24, arg {"in_partita": true, "cambi": CambiPartita}): aperta sopra la partita ferma dalla
+# pausa o dall'intervallo (gioco.gd). Niente Aspetto, Vendi né altre schermate: in alto "Cambi N/5" (quanti restano),
+# in basso "Torna alla partita" (segnale `chiusa`). Regole dei cambi in scripts/partita/cambi_partita.gd: al massimo 5
+# sostituzioni, chi è uscito resta in panchina segnato "USCITO", l'espulso non si tocca; formazione nuova = gli stessi
+# 11 nei posti nuovi. Tutto si salva nella carriera come fuori partita.
 extends MenuSchermata
+
+signal chiusa
 
 const Rosa := preload("res://scripts/menu/rosa_logica.gd")
 const Carta := preload("res://scripts/menu/carta_giocatore.gd")
@@ -19,6 +26,7 @@ const Scelte := preload("res://scripts/menu/rosa_scelte.gd")
 const ALTEZZA_SOPRA := 150.0       # .sqtop
 const MENU := ["formazione", "attacco", "difesa"]
 const RIGA_CAMPO := Color(1, 1, 1, 0.11)
+const TASTO_TORNA := 52.0
 
 var sel: Variant = null
 var tgt: Variant = null
@@ -33,6 +41,9 @@ var _scorri_panchina := 0
 var _colori: Array = ["#c8102e", "#ffffff"]
 var _k1 := 0
 var _rate := func(p: Dictionary, r: String) -> int: return D.overall_as(p, r)
+var in_partita := false            # aperta dalla pausa della partita (modo partita)
+var cambi: Object = null           # CambiPartita (scripts/partita/cambi_partita.gd), solo in modo partita
+var _carriera_partita: Object = null  # carriera della partita (arg "carriera"; senza, quella dell'App)
 
 
 func prepara() -> void:
@@ -44,6 +55,22 @@ func prepara() -> void:
 		_menu = str(arg.get("menu", "attacco" if arg.get("stili", false) else ""))
 		if not MENU.has(_menu):
 			_menu = ""
+		in_partita = bool(arg.get("in_partita", false)) and arg.get("cambi") is Object
+		if in_partita:
+			cambi = arg.get("cambi")
+			_carriera_partita = arg.get("carriera") if arg.get("carriera") is Object else null
+			titolo = "Rosa e tattica"
+			indietro = ""
+			soldi = false
+			_pillola_cambi()
+
+
+func carriera() -> Object:
+	return _carriera_partita if _carriera_partita != null else super.carriera()
+
+
+func _pillola_cambi() -> void:
+	pillola = "Cambi %d/%d" % [cambi.restano(), cambi.MAX_CAMBI]
 
 
 func costruisci() -> void:
@@ -103,7 +130,10 @@ func costruisci() -> void:
 	lbl.add_child(U.testo("PANCHINA", 11.5, T.DIM, T.PESO_NERO))
 	lbl.add_child(U.testo(str(bench.size()), 11.5, T.TXT, T.PESO_NERO))
 	lbl.add_child(U.riempi())
-	lbl.add_child(U.testo("Rosa %d/24" % s.squad.size(), 11.5, T.DIM, T.PESO_FORTE))
+	if in_partita:
+		lbl.add_child(U.testo("Cambi: %d/%d" % [cambi.restano(), cambi.MAX_CAMBI], 11.5, T.GOLD, T.PESO_FORTE))
+	else:
+		lbl.add_child(U.testo("Rosa %d/24" % s.squad.size(), 11.5, T.DIM, T.PESO_FORTE))
 	corpo.add_child(lbl)
 	var bm := MarginContainer.new()
 	bm.add_theme_constant_override("margin_left", -16)
@@ -130,7 +160,42 @@ func costruisci() -> void:
 	bm.add_child(_panchina)
 	corpo.add_child(bm)
 	_rimetti_panchina.call_deferred(_scorri_panchina)
+	if in_partita:
+		var torna := U.bottone("Torna alla partita", "BtnVai", _torna_alla_partita, TASTO_TORNA)
+		torna.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		corpo.add_child(torna)
 	_mostra_menu(_menu if sp == null else "")
+
+
+func _torna_alla_partita() -> void:
+	if U.al_tocco.is_valid():
+		U.al_tocco.call()
+	chiusa.emit()
+
+
+func torna_indietro() -> void:
+	if in_partita:
+		_torna_alla_partita()
+	else:
+		super.torna_indietro()
+
+
+# in partita non si va in altre schermate (la partita resta sotto)
+func vai(nome: String, a: Variant = null) -> void:
+	if in_partita:
+		return
+	super.vai(nome, a)
+
+
+## stato della carta in partita: "uscito", "espulso" o ""
+func _stato_partita(id: Variant) -> String:
+	if not in_partita:
+		return ""
+	if cambi.espulso(id):
+		return "espulso"
+	if cambi.uscito(id):
+		return "uscito"
+	return ""
 
 
 func _carta(p: Dictionary, slot_pos: String, sp: Variant, F: Array) -> MenuCarta:
@@ -138,6 +203,7 @@ func _carta(p: Dictionary, slot_pos: String, sp: Variant, F: Array) -> MenuCarta
 	carta.imposta(p, slot_pos, MenuFaccia.svg_tondo(D.look_of(p), _colori[0], _colori[1], MenuFaccia.fondo_di(_k1)), _delta(p, sp, F))
 	carta.segna(sel == p.id, tgt == p.id, just is Array and (just as Array).has(p.id))
 	carta.fisico(carriera().forma_di(p.id), carriera().infortunio(p.id))
+	carta.in_partita(_stato_partita(p.id))
 	carta.toccata.connect(_tocca)
 	return carta
 
@@ -147,6 +213,8 @@ func _carta(p: Dictionary, slot_pos: String, sp: Variant, F: Array) -> MenuCarta
 func _delta(p: Dictionary, sp: Variant, F: Array) -> Variant:
 	var s := stato()
 	if sp == null or p.id == sp.id or not Rosa.can_swap(s.lineup, sp.id, p.id):
+		return null
+	if _stato_partita(p.id) != "":
 		return null
 	var d := Rosa.swap_delta(s.lineup, F, sp, p, _rate)
 	return d if d > 0 or _ruolo_ora(p, F) == _ruolo_ora(sp, F) else null
@@ -221,13 +289,33 @@ func _tocca(id: Variant) -> void:
 		U.al_tocco.call()
 	var c := carriera()
 	var s := stato()
+	var vietato := _stato_partita(id)
+	if vietato != "":
+		var nome: String = c.player(id).name if c.player(id) != null else "?"
+		toast(("%s è espulso: non si può cambiare" if vietato == "espulso" else "%s è già uscito: non può rientrare") % nome)
+		return
 	var nuovo := Rosa.pick_card({"sel": sel, "tgt": tgt}, s.lineup, id, func(x: Variant) -> bool: return c.player(x) != null)
+	if in_partita and nuovo.swap != null:
+		var err: String = cambi.errore_scambio(s.lineup, nuovo.swap[0], nuovo.swap[1], func(x: Variant) -> String: return str(c.player(x).name))
+		if err != "":
+			sel = null
+			tgt = null
+			just = null
+			toast(err)
+			return
+	if nuovo.swap != null and not in_partita and c.campioneInPanchina(nuovo.swap[0], nuovo.swap[1]):
+		toast("%s è il tuo campione: resta sempre in campo" % c.campione().name)
+		nuovo = {"sel": null, "tgt": null, "just": null, "swap": null}
 	if nuovo.swap != null and c.entraInfortunato(nuovo.swap[0], nuovo.swap[1]):
 		var chi: Variant = nuovo.swap[1] if s.lineup.has(nuovo.swap[0]) else nuovo.swap[0]
 		toast("%s è infortunato: non può giocare (ancora %d)" % [c.player(chi).name, c.infortunio(chi)])
 		nuovo = {"sel": null, "tgt": null, "just": null, "swap": null}
 	if nuovo.swap != null:
-		c.swap(nuovo.swap[0], nuovo.swap[1])
+		var prima: Array = s.lineup.duplicate()
+		c.swap(nuovo.swap[0], nuovo.swap[1], in_partita)
+		if in_partita and stato().lineup != prima:
+			cambi.registra(prima, nuovo.swap[0], nuovo.swap[1])
+			_pillola_cambi()
 	sel = nuovo.sel
 	tgt = nuovo.tgt
 	just = nuovo.just
@@ -258,6 +346,13 @@ func _formazione(f: String) -> void:
 		_chiudi()
 		return
 	var c := carriera()
+	if in_partita: # gli stessi 11 nei posti nuovi: nessuno entra dalla panchina
+		var s := stato()
+		s.lineup = cambi.formazione_stessi_11(C.FORMATIONS[f], s.lineup, func(id: Variant, r: String) -> int: return D.overall_as(c.player(id), r))
+		s.formation = f
+		salva()
+		_chiudi()
+		return
 	stato().formation = f
 	c.autoLineup()
 	salva()
@@ -296,7 +391,10 @@ func _controlli() -> Control:
 	forza.autowrap_mode = TextServer.AUTOWRAP_OFF
 	forza.fit_content = true
 	v.add_child(forza)
-	v.add_child(U.paragrafo("Tocca un giocatore per vederlo, poi un altro per scambiarli.", 12.5))
+	if in_partita:
+		v.add_child(U.paragrafo("Tocca un titolare e poi uno della panchina per il cambio: restano %d cambi su %d." % [cambi.restano(), cambi.MAX_CAMBI], 12.5))
+	else:
+		v.add_child(U.paragrafo("Tocca un giocatore per vederlo, poi un altro per scambiarli.", 12.5))
 	return v
 
 
@@ -400,6 +498,11 @@ func _pannello_giocatore(p: Dictionary, F: Array) -> Control:
 		g.add_child(cella)
 	v.add_child(g)
 	v.add_child(U.riempi())
+	if in_partita: # in partita niente Aspetto né Vendi
+		var st := _stato_partita(p.id)
+		var nota := "Espulso: non si può cambiare" if st == "espulso" else ("Già uscito: non rientra" if st == "uscito" else "Tocca un altro giocatore per scambiarli")
+		v.add_child(U.testo(nota, 12.5, T.BAD if st != "" else T.DIM, T.PESO_FORTE, HORIZONTAL_ALIGNMENT_CENTER))
+		return pann
 	# solo il campione creato all'inizio si può modificare (Luis 2026-11-24): gli altri hanno solo Vendi
 	var mio: bool = p.get("champ", false)
 	var bt := U.griglia(2 if mio else 1, 8, 8)

@@ -1308,7 +1308,8 @@ func hint(tm: int) -> String:
 	return "loose"
 
 
-func substitute(tm: int, idx: int, src: Dictionary) -> bool:
+## fuori (facoltativo) = nome di chi esce, va nell'evento "sub" (cronaca: "Cambio: entra X, esce Y")
+func substitute(tm: int, idx: int, src: Dictionary, fuori: String = "") -> bool:
 	var tl := team(tm)
 	if idx < 0 or idx >= tl.size():
 		return false
@@ -1327,8 +1328,73 @@ func substitute(tm: int, idx: int, src: Dictionary) -> bool:
 		endDuel("gioco fermo")
 	if flee != null and (flee.p == p or flee.o == p):
 		endFlee("gioco fermo")
-	ev("sub", {"p": p})
+	var e := {"p": p}
+	if fuori != "":
+		e["fuori"] = fuori
+	ev("sub", e)
 	return true
+
+
+## Cambi a partita in corso (pausa, "Rosa e tattica" del gioco: scripts/partita/cambi_partita.gd). La squadra tm prende
+## gli 11 giocatori `srcs`, nell'ordine dei posti della formazione `formation`. Chi ha già in campo il suo src (lo
+## stesso Dictionary, is_same) resta lo stesso giocatore (posizione, energia, cartellini) e passa al posto i, col ruolo e
+## la posizione di base della formazione; un src nuovo entra al posto di uno che non c'è più (substitute: energia
+## piena se il src non ha energy0). Un espulso (off) non può uscire: in quel caso non cambia niente. stileAtt/stileDif
+## null = restano. Ritorna i cambi fatti: [{i, p (chi entra), fuori (nome), fuoriSrc, fuoriPos, x, y (dove stava chi esce)}]
+## (fuoriPos = ruolo di chi esce); null se la richiesta non va (numero sbagliato di giocatori, src ripetuti, espulso fuori).
+func cambiaSquadra(tm: int, srcs: Array, formation: String, stileAtt: Variant = null, stileDif: Variant = null) -> Variant:
+	if srcs.size() != 11:
+		return null
+	var F: Array = C.FORMATIONS.get(formation, C.FORMATIONS["4-4-2"])
+	var old := team(tm)
+	var nuovi: Array = []
+	nuovi.resize(11)
+	var tenuti := {}
+	for i in 11:
+		if not srcs[i] is Dictionary:
+			return null
+		for p: R.Player in old:
+			if is_same(p.src, srcs[i]):
+				if tenuti.has(p.i):
+					return null
+				nuovi[i] = p
+				tenuti[p.i] = true
+				break
+	var liberi: Array = []
+	for p: R.Player in old:
+		if not tenuti.has(p.i):
+			if p.off:
+				return null # l'espulso non si sostituisce
+			liberi.append(p)
+	var out: Array = []
+	for i in 11:
+		if nuovi[i] == null:
+			var p: R.Player = liberi.pop_front()
+			nuovi[i] = p
+			out.append({"i": i, "p": p, "fuori": p.name, "fuoriSrc": p.src, "fuoriPos": p.pos, "x": p.x, "y": p.y})
+	for i in 11:
+		var p: R.Player = nuovi[i]
+		players[tm * 11 + i] = p
+		p.i = i
+		p.pos = F[i][0]
+		p.bx = F[i][1]
+		p.by = F[i][2]
+		p.st = C.effStats(p.src, p.pos)
+	for c: Dictionary in out:
+		substitute(tm, c.i, srcs[c.i], c.fuori)
+	var td: Dictionary = teams[tm]
+	td["formation"] = formation
+	td["players"] = srcs.duplicate()
+	if stileAtt != null:
+		td["stileAtt"] = stileAtt
+		stA[tm] = Stili.att(stileAtt)
+	if stileDif != null:
+		td["stileDif"] = stileDif
+		stD[tm] = Stili.dif(stileDif)
+	runs[tm] = []
+	move[tm] = null
+	queued[tm] = null
+	return out
 
 
 # Fine partita: rompe i riferimenti circolari tra giocatori (supC, beatBy) che il conteggio dei riferimenti
