@@ -20,7 +20,9 @@
 extends Node3D
 
 const SimRngScript := preload("res://sim/rng.gd")
-const Giocatore := preload("res://scripts/giocatore.gd")
+# giocatore.gd caricato solo quando serve: App (autoload) carica meteo.gd, e un preload qui terrebbe vivo lo shader
+# delle divise fino a dopo lo spegnimento della grafica (perdita "DummyShader leaked" sul Mac, prova della build)
+const GIOCATORE_PATH := "res://scripts/giocatore.gd"
 
 const METEO := ["sereno", "nuvoloso", "pioggia", "neve"]
 const ORE := ["giorno", "tramonto", "notte"]
@@ -151,7 +153,7 @@ func applica(vista: Node3D, s: Dictionary) -> void:
 	var fx: Dictionary = METEO_FX.get(s.meteo, METEO_FX.sereno)
 	var notte: bool = s.ora == "notte"
 	# contorno di luce dei giocatori (divisa.gdshader): caldo al tramonto, freddo e più forte coi fari di notte
-	Giocatore.set_contorno(ora.contorno)
+	load(GIOCATORE_PATH).set_contorno(ora.contorno)
 	_contorno_messo = ora.contorno
 	_luce(vista.get_node_or_null("Sole") as DirectionalLight3D, ora, fx, notte)
 	var amb := vista.get_node_or_null("Ambiente") as WorldEnvironment
@@ -366,8 +368,11 @@ func _particelle_neve() -> GPUParticles3D:
 # fuori dalla partita (menu, anteprima del giocatore) il contorno torna quello di giorno
 # (solo se nessun'altra partita l'ha già cambiato nel frattempo)
 func _exit_tree() -> void:
-	if _contorno_messo != null and Giocatore._contorno == _contorno_messo:
-		Giocatore.set_contorno(ORA_GIORNO.contorno)
+	if _contorno_messo == null:
+		return
+	var giocatore: GDScript = load(GIOCATORE_PATH)
+	if giocatore._contorno == _contorno_messo:
+		giocatore.set_contorno(ORA_GIORNO.contorno)
 
 
 func _process(_delta: float) -> void:
