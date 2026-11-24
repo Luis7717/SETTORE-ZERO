@@ -318,12 +318,12 @@ func aerialDuel(p: R.Player) -> R.Player:
 	var b := ball
 	var dp: float = C.hyp(p.x - b.x, p.y - b.y)
 	var o: R.Player = null
-	var dO: float = 0.95
+	var dO: float = 1e9
 	for q: R.Player in players:
 		if q.team == p.team or q.off or q.state != "play" or q.stun > 0.0 or (b.noP == q and b.noT > 0.0) or dblBan(q) or q.pos == "P" or headSkip(q):
 			continue
 		var d: float = C.hyp(q.x - b.x, q.y - b.y)
-		if d < dO and (airPlay(q) != "" or b.h < 1.7):
+		if d < dO and d < airDuelR(q) and (airPlay(q) != "" or b.h < 1.7):
 			dO = d
 			o = q
 	if o == null:
@@ -682,7 +682,7 @@ func gkContest(p: R.Player) -> R.Player:
 		return null
 	if C.hyp(g.x - b.x, g.y - b.y) >= GK_BOX_REACH or b.h >= gkReach(g):
 		return null
-	var win: float = C.clamp_(GK_CLAIM_WIN + (g.st.por - 60.0) * GK_CLAIM_POR, GK_CLAIM_MIN, GK_CLAIM_MAX)
+	var win: float = C.clamp_(GK_CLAIM_WIN + (g.st.por - 60.0) * GK_CLAIM_POR + gkClaimBonus(g), GK_CLAIM_MIN, GK_CLAIM_MAX)
 	if rnd() < win:
 		ev("aerial", {"p": g, "o": p})
 		return g

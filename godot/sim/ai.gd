@@ -1,5 +1,5 @@
 # IA: tiro, passaggi, portatore, rimesse, posizioni in attacco e difesa, portiere (porting di src/sim/ai.js).
-extends "riprese.gd"
+extends "angoli.gd"
 
 # Regolazioni dell'IA (misurate con test/balance.mjs e test/diag-flow.mjs)
 const CLEAR_ZONE := 30.0     # metri dalla propria linea di fondo in cui un difensore pressato può spazzare
@@ -47,6 +47,10 @@ const CHASE_N := 36
 const GK_CLAIM_R := 12.0      # punto di presa entro questa distanza dal centro della propria porta (m)
 const GK_CLAIM_MARGIN := 0.3  # ... raggiunto almeno così prima del primo avversario che può colpirlo di testa (s)
 const GK_CROSS_OUT := 1.2     # cross avversario in volo e portiere che non esce: al massimo così fuori dalla linea (m)
+# ... sul cross di un calcio d'angolo, con "rifiniture" (angoli.gd, 2026-11-24): esce con più decisione anche sui
+# cross che scendono vicino alla porta e su cui è in anticipo di poco (oltre alle uscite di sopra)
+const CORNER_GK_CLAIM_R := 6.0      # punto di presa entro questa distanza dal centro della porta (m)
+const CORNER_GK_CLAIM_MARGIN := 0.1 # ... raggiunto almeno così prima del primo attaccante (s; i tempi vanno a passi di 0,1)
 # Portatore della squadra umana che si muove da solo (humanCarrierAuto, opzione "portaAuto" della partita)
 const AUTO_THINK := 0.25      # ogni quanto sceglie la direzione (s)
 const AUTO_LOOK := 5.0        # distanza dei punti provati (m)
@@ -440,6 +444,7 @@ func _computeChase(b: R.Ball) -> void:
 	var oppT: Array = [99.0, 99.0]
 	if cross:
 		oppT[1 - b.kick.team] = _firstHeader(b.kick, px, py, ph)
+	var cornerX: bool = cross and cornerLive()
 	for tm in 2:
 		var dir: float = -1.0 if tm else 1.0
 		var best: R.Chase = null
@@ -484,7 +489,7 @@ func _computeChase(b: R.Ball) -> void:
 				if not (absf(r.x) < BOX_W / 2.0 and r.y * dir < -HL + BOX_D):
 					continue
 				# sul cross esce solo se ci arriva prima degli attaccanti e vicino alla porta (o se è già uscito)
-				if gkCross and p.claim != b.kick and not (r.t + GK_CLAIM_MARGIN <= float(oppT[tm]) and C.hyp(r.x, r.y + dir * HL) <= GK_CLAIM_R):
+				if gkCross and p.claim != b.kick and not _gkClaims(r, float(oppT[tm]), dir, cornerX):
 					continue
 			elif bestO == null or r.t < bestO.t:
 				bestO = r
@@ -504,6 +509,14 @@ func _computeChase(b: R.Ball) -> void:
 			chase[tm] = ch
 		else:
 			chase[tm] = null
+
+
+# il portiere esce sul cross: punto di presa r raggiunto in anticipo sul primo attaccante (oppT) e vicino alla porta
+func _gkClaims(r: R.Chase, oppT: float, dir: float, cornerX: bool) -> bool:
+	var d: float = C.hyp(r.x, r.y + dir * HL)
+	if r.t + GK_CLAIM_MARGIN <= oppT and d <= GK_CLAIM_R:
+		return true
+	return cornerX and r.t + CORNER_GK_CLAIM_MARGIN <= oppT and d <= CORNER_GK_CLAIM_R
 
 
 # primo istante (s) in cui un giocatore della squadra che ha crossato (portiere escluso) arriva sul pallone ad altezza
@@ -537,6 +550,7 @@ func think(dt: float) -> void:
 		if possWho >= 0:
 			possT0[b.owner.team] = time
 		possWho = b.owner.team
+	cornerTrack() # angoli.gd (solo con "rifiniture")
 	predT -= dt
 	if predT <= 0.0:
 		predT = 0.1
@@ -597,6 +611,8 @@ func assign(p: R.Player) -> void:
 			p.tx = p.x
 			p.ty = p.y
 			return
+		if cornerMark(p):
+			return
 		humanDefend(p)
 		return
 	if mv != null and mv.sprint:
@@ -632,7 +648,9 @@ func assign(p: R.Player) -> void:
 			p.tx = ch.x2
 			p.ty = ch.y2
 			return
-	if att == tm:
+	if att != tm and cornerMark(p):
+		pass # marcatura sull'angolo avversario (angoli.gd); sotto, la distanza dal pallone nella ripresa
+	elif att == tm:
 		support(p)
 	else:
 		defend(p)

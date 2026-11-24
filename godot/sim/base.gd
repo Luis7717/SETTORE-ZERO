@@ -400,3 +400,11 @@ func headContestable(_p: R.Player) -> bool:
 
 func headContest(p: R.Player) -> R.Player:
 	return p # testa.gd
+
+
+func airDuelR(_q: R.Player) -> float:
+	return 0.95 # angoli.gd: raggio della contesa aerea per l'avversario q
+
+
+func gkClaimBonus(_g: R.Player) -> float:
+	return 0.0 # angoli.gd: portiere sotto il cross dell'angolo

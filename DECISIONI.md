@@ -1623,3 +1623,39 @@ Dettagli in `godot/README.md`, "Altezza e corporatura". File nuovo `godot/script
   brevi. Contro una CPU più forte di 10 punti la persona tira una volta a partita.
 - **Da provare sull'iPhone**: lo Scatto quando il portatore stava proteggendo palla (deve partire in avanti in
   diagonale), le respinte in angolo (niente più pallone altissimo).
+
+## 2026-11-24 — Gol della CPU da calcio d'angolo (obiettivo 3-8% degli angoli, richiesta approvata da Luis)
+- **Prima**: la CPU segnava dal 10% al 15% dei suoi angoli (metà di testa al primo tocco, metà sulla seconda palla).
+  Causa: i nostri difensori sugli angoli restavano a zona sui loro posti; l'attaccante della CPU arrivava sul pallone
+  libero (contesa aerea solo con un difensore entro 0,95 m: 41 volte su 400 angoli) e colpiva di testa da 7-10 m
+  (20% di gol); il portiere usciva solo se in anticipo di 0,3 s.
+- **Correzione** (solo con l'opzione `rifiniture`, che accende il gioco; nuovo file `godot/sim/angoli.gd` tra
+  `riprese.gd` e `ai.gd`; confronti col JS e impronta identici, nessun numero casuale in più):
+  - **Marcatura** (solo la squadra umana, i cui difensori sugli angoli li muove la CPU): all'angolo avversario i
+    difensori di movimento prendono in consegna gli attaccanti più pericolosi entro 20 m dalla porta (colpi di testa
+    meno 2 punti per metro di distanza), 2 restano a zona; stanno a 0,9 m dal lato della porta, di corsa mentre il cross
+    vola, e per 3 s dopo il cross (seconda palla) se il pallone resta entro 25 m e non lo prende chi difende. Chi va sul
+    pallone ci va lo stesso; linee disegnate e dito hanno la precedenza. La CPU sui nostri angoli resta a zona
+    (`CORNER_MARK_CPU`): con la marcatura anche lì i gol della persona da angolo scendevano da 7,5% a 3,8%.
+  - **Contesa aerea** (tutti e due): sul cross dell'angolo il difensore nella propria area si contende il pallone fino
+    a 1,6 m (`AIR_MARK_R`, prima 0,95) con +15% (`CORNER_AIR_EDGE`).
+  - **Portiere** (tutti e due): oltre alle uscite di prima, esce anche se è in anticipo di solo 0,1 s sul primo
+    attaccante quando il cross scende entro 6 m dalla porta (`CORNER_GK_CLAIM_*` in `ai.gd`); sotto il pallone +12%
+    (`CORNER_GK_WIN`). Provato a 7-14 m: il portiere prendeva quasi ogni cross (CPU al 2%, angoli inutili, 4 gol a
+    porta vuota); 0,2-0,3 s di anticipo non cambiano niente (i tempi vanno a passi di 0,1 s).
+  - In `motion.gd` solo due ganci (`airDuelR`, `gkClaimBonus`, segnaposto in `base.gd`), lontano dai contrasti.
+- **Misura**: banco nuovo `godot/tools/banco_angoli.gd` (angoli ripetuti a seme fisso, partita con le opzioni del gioco,
+  persona simulata `dito_motore.gd`, gol = entro 12 s come in `controllo_gameplay`).
+  CPU contro di noi: **10,8% → 3,5%** (semi 1-3001, 400 angoli); altri semi: 14,5% → 5,5% (200 angoli); versione senza
+  la seconda palla su 1000 angoli: 4,3%. Primo tocco di testa degli attaccanti 106 → 56 su 400, portiere che prende o
+  respinge di pugno al primo tocco 7 → 59, gol a porta vuota 0-1. Nostri angoli contro la CPU: **7,5% → 8,0%**
+  (400 angoli, rumore).
+- **Partite** (`controllo_gameplay`, umano 60 contro CPU 60, 180 partite, stessi semi prima e dopo): gol da angolo della
+  CPU **29 su 285 (10%) → 9 su 270 (3%)**; della persona 1/49 → 0/54 (la persona batte pochi angoli: il dato vero è
+  quello del banco); V/N/P 52/85/43 → 79/64/37; gol a partita 0,67-0,54 → 0,76-0,39 (la CPU: −20 gol da angolo;
+  la persona +17 gol, da tiri raso/a giro: non tocca gli angoli, la partita cambia strada dopo il primo angolo e il
+  rumore su ~130 gol è ±11). Fluidità e "bug?" uguali a prima.
+- **Obiettivo raggiunto** nel banco (3-8%). Test: `tests/test_angoli_difesa.gd` (8); `tests/corner_lab.gd` ha
+  l'opzione `rifiniture` e conta il pugno come uscita non a vuoto.
+- **Da provare sull'iPhone**: se sugli angoli della CPU i nostri difensori attaccati agli attaccanti sembrano naturali,
+  se il portiere che esce sui cross corti piace.

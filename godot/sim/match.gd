@@ -1270,6 +1270,8 @@ func substitute(tm: int, idx: int, src: Dictionary) -> bool:
 func dispose() -> void:
 	queued = [null, null]
 	calmP = [null, null]
+	cornerTaker = null
+	cornerKick = null
 	for p: R.Player in players:
 		p.supC = null
 		p.beatBy = null

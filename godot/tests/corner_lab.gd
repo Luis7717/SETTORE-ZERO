@@ -14,7 +14,7 @@ const FAR_OUT := 4.0      # portiere più lontano di così dalla propria linea d
 const EMPTY_NET := 3.0    # gol col portiere più lontano di così dal centro della porta = porta vuota (m)
 
 
-# opt: n, seed, cpu_batte, auto_gk, my, op. Ritorna un dizionario di conteggi.
+# opt: n, seed, cpu_batte, auto_gk, my, op, rifiniture (difesa degli angoli di sim/angoli.gd). Ritorna un dizionario di conteggi.
 static func misura(opt: Dictionary) -> Dictionary:
 	var n: int = opt.get("n", 100)
 	var sd0: int = opt.get("seed", 1)
@@ -22,7 +22,7 @@ static func misura(opt: Dictionary) -> Dictionary:
 	var out := {"angoli": 0, "gol": 0, "uscite": 0, "prese": 0, "respinte": 0, "parate": 0, "teste": 0, "teste_porta": 0,
 		"respinte_testa": 0, "porta_vuota": 0, "uscite_mancate": 0, "gol_testa": 0}
 	for i in n:
-		var r := uno(sd0 + i * 31, cpu, bool(opt.get("auto_gk", false)), float(opt.get("my", 60.0)), float(opt.get("op", 60.0)))
+		var r := uno(sd0 + i * 31, cpu, bool(opt.get("auto_gk", false)), float(opt.get("my", 60.0)), float(opt.get("op", 60.0)), bool(opt.get("rifiniture", false)))
 		for k: String in r:
 			out[k] = int(out.get(k, 0)) + int(r[k])
 		out.angoli += 1
@@ -31,8 +31,8 @@ static func misura(opt: Dictionary) -> Dictionary:
 
 
 # un solo angolo: ritorna i conteggi (0/1) di quell'angolo
-static func uno(sd: int, cpu: bool, autoGk: bool, my: float, op: float) -> Dictionary:
-	var m := H.newMatch(sd, 9999.0, [true, false], H.mkTeam("A", my, sd * 7 + 1), H.mkTeam("B", op, sd * 13 + 5))
+static func uno(sd: int, cpu: bool, autoGk: bool, my: float, op: float, rif: bool = false) -> Dictionary:
+	var m := H.newMatch(sd, 9999.0, [true, false], H.mkTeam("A", my, sd * 7 + 1), H.mkTeam("B", op, sd * 13 + 5), "", {"rifiniture": rif})
 	m.autoGk = [autoGk, false]
 	m.phase = "play"
 	var atk: int = 1 if cpu else 0
@@ -81,6 +81,9 @@ static func uno(sd: int, cpu: bool, autoGk: bool, my: float, op: float) -> Dicti
 							res.prese = 1
 						else:
 							res.respinte = 1
+				"punch":
+					if p == g:
+						gkTouched = true # respinta di pugno: uscita non a vuoto
 				"control":
 					if p == g:
 						gkTouched = true
