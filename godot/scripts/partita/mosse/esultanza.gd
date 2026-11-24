@@ -25,9 +25,14 @@ const POLO_FUORI := Vector3(1, 0.1, 0.2)   # gomito in fuori (mano all'orecchio,
 const POLO_GIU := Vector3(0.5, -1, 0.1)    # gomito in giù e un po' in fuori (mani davanti al petto)
 const SGUARDO := Vector3(0, 1.62, 40)      # punto lontano davanti: lo sguardo resta dritto
 const V_SU := Vector3(0.3, 0.47, 0.05)     # braccia a V verso il cielo
+const SU_DITA := Vector3(0.5, 0.86, 0.08)  # mani in fila col braccio alzato (x in fuori)
+const SU_PALMO := Vector3(-0.3, 0.0, 1.0)  # palmi verso il pubblico, un po' verso dentro
+const GIU_DITA := Vector3(0.05, -1, 0.05)  # mano lungo il fianco
+const GIU_PALMO := Vector3(-1, 0, 0)       # palmo verso la coscia
 const LARGHE := Vector3(0.55, -0.02, 0.02) # braccia larghe orizzontali
 const CAMPIONE_DT := 0.05                  # passo delle chiavi campionate (cerchi, voli, giri)
 const Y := Vector3(0, 1, 0)
+const MANO_PALMO := Vector3(0, -1, 0)      # palmo della mano nella posa di legame (a T, palmi in giù)
 
 static var _cache := {}
 
@@ -42,9 +47,11 @@ class Coreografia:
 	var corsa_k: Array = []                # [Vector2(t, peso)] a tratti lineari
 	var corpo_k: Array = []                # [{t, p: Vector3, a: Vector3(giro, avanti, lato), v?}]
 	var poli_k := {"l": [], "r": []}       # [{t, p: polo del gomito nel petto (x in fuori)}]
+	var mani_k := {"l": [], "r": []}       # [{t, d: dita, n: palmo (nel petto, x in fuori), w: peso}]
 	var _cp: Mossa.Curva = null
 	var _ca: Mossa.Curva = null
 	var _poli := {}
+	var _mani := {}
 
 	func _init(id_: String, tt: float) -> void:
 		id = id_
@@ -76,6 +83,13 @@ class Coreografia:
 	func poli(t: float, p: Vector3) -> Coreografia:
 		return polo("l", t, p).polo("r", t, p)
 
+	## verso della mano (le dita sono rigide: conta solo dove puntano e dove guarda il palmo), nel riferimento del
+	## petto con x verso l'esterno come arm(): dita = da polso a punta delle dita, palmo = verso cui guarda il palmo;
+	## w = peso sopra il clip (0 = la mano segue l'avambraccio come prima)
+	func mano(side: String, t: float, dita: Vector3, palmo: Vector3, w: float = 1.0) -> Coreografia:
+		mani_k[side].append({"t": t, "d": dita.normalized(), "n": palmo.normalized(), "w": w})
+		return self
+
 	## braccia uguali dai due lati
 	func braccia(t: float, off: Vector3) -> Coreografia:
 		mv.arm("l", t, off).arm("r", t, off)
@@ -95,6 +109,18 @@ class Coreografia:
 		for s: String in ["l", "r"]:
 			var kk: Array = Mossa._by_t(poli_k[s])
 			_poli[s] = Mossa.Curva.new(kk) if not kk.is_empty() else null
+			var mk: Array = Mossa._by_t(mani_k[s])
+			if mk.is_empty():
+				_mani[s] = null
+				continue
+			var cd: Array = []
+			var cn: Array = []
+			var cw: Array = []
+			for k: Dictionary in mk:
+				cd.append({"t": k.t, "p": k.d})
+				cn.append({"t": k.t, "p": k.n})
+				cw.append({"t": k.t, "p": Vector3(k.w, 0, 0)})
+			_mani[s] = [Mossa.Curva.new(cd), Mossa.Curva.new(cn), Mossa.Curva.new(cw)]
 		return self
 
 	func corsa_at(t: float) -> float:
@@ -126,6 +152,15 @@ class Coreografia:
 			if _poli[s] != null:
 				pl = (_poli[s] as Mossa.Curva).at(t)
 			fr.arms[s].pole = q3 * Vector3(pl.x * Corpo.SIDE[s], pl.y, pl.z)
+			if _mani[s] != null:
+				var x: float = Corpo.SIDE[s]
+				var cm: Array = _mani[s]
+				var d: Vector3 = (cm[0] as Mossa.Curva).at(t)
+				var n: Vector3 = (cm[1] as Mossa.Curva).at(t)
+				var dd := q3 * Vector3(d.x * x, d.y, d.z)
+				var nn := q3 * Vector3(n.x * x, n.y, n.z)
+				fr.arms[s].hq = Corpo.q_align(Vector3(x, 0, 0), MANO_PALMO, dd, nn)
+				fr.arms[s].hw = clampf(((cm[2] as Mossa.Curva).at(t)).x, 0.0, 1.0)
 		var c := corsa_at(t)
 		var dt := 0.03
 		var v := (_cp.at(minf(T, t + dt)) - _cp.at(maxf(0.0, t - dt))).length() / (2.0 * dt) * SCALA_GIOCO
@@ -180,6 +215,12 @@ static func _passo(c: Coreografia, s: String, t0: float, t1: float, da: Vector2,
 	var m := da.lerp(a, 0.5)
 	c.mv.leg(s, {"t": (t0 + t1) / 2.0, "ankle": Vector3(m.x, Corpo.ANKLE_H + alto, m.y), "fq": Mossa.foot_q(0, 0.2)})
 	c.mv.leg(s, {"t": t1, "plant": a})
+
+
+## mani in fila col braccio alzato e palmi verso il pubblico, dal tempo t0 (ancora libere) a t1 (girate)
+static func _mani_su(c: Coreografia, t0: float, t1: float, lati: Array = ["l", "r"]) -> void:
+	for s: String in lati:
+		c.mano(s, t0, SU_DITA, SU_PALMO, 0.0).mano(s, t1, SU_DITA, SU_PALMO).mano(s, c.T, SU_DITA, SU_PALMO)
 
 
 ## salto sul posto o in avanti: accucciata, stacco, volo (parabola del corpo) e atterraggio con le ginocchia piegate
@@ -254,6 +295,7 @@ static func _ginocchio() -> Coreografia:
 	c.braccia(t_giu, ARMS_REST)
 	c.braccia(t_terra, Vector3(0.48, -0.15, 0.15)).braccia(1.15, V_SU)
 	c.braccia(1.7, Vector3(0.3, 0.38, 0.1)).braccia(1.95, V_SU).braccia(2.35, Vector3(0.3, 0.38, 0.1)).braccia(2.6, V_SU)
+	_mani_su(c, t_terra, 1.15)
 	return c
 
 
@@ -293,6 +335,7 @@ static func _capriola() -> Coreografia:
 	c.braccia(t_st + 0.22, Vector3(0.02, -0.38, 0.38)).braccia(t_at - 0.18, Vector3(0.02, -0.38, 0.38))
 	c.braccia(t_at + 0.1, Vector3(0.35, -0.2, 0.3)).braccia(t_at + 0.5, V_SU).braccia(c.T, V_SU)
 	c.poli(t_st + 0.1, POLO).poli(t_st + 0.22, Vector3(1, -0.4, 0)).poli(t_at - 0.18, Vector3(1, -0.4, 0)).poli(t_at + 0.2, POLO)
+	_mani_su(c, t_at + 0.15, t_at + 0.5)
 	return c
 
 
@@ -311,8 +354,12 @@ static func _pugno() -> Coreografia:
 	c.mv.arm("r", 1.15, Vector3(0.07, 0.55, 0.08)).arm("r", 1.35, Vector3(0.14, 0.22, 0.16))
 	c.mv.arm("r", 1.55, Vector3(0.07, 0.55, 0.08)).arm("r", 2.1, Vector3(0.07, 0.55, 0.08))
 	c.mv.arm("r", 2.3, Vector3(0.14, 0.22, 0.16)).arm("r", 2.5, Vector3(0.07, 0.55, 0.08))
-	c.mv.arm("l", 0.3, Vector3(0.22, -0.33, 0.2)).arm("l", c.T, Vector3(0.22, -0.3, 0.22))
+	# l'altro braccio resta giù, appena piegato lungo il fianco (prima stava teso in avanti)
+	c.mv.arm("l", 0.3, Vector3(0.17, -0.47, 0.1)).arm("l", c.T, Vector3(0.17, -0.47, 0.1))
 	c.polo("l", 0.0, POLO)
+	c.mano("l", 0.0, GIU_DITA, GIU_PALMO, 0.0).mano("l", 0.3, Vector3(0.1, -1, 0.15), GIU_PALMO)
+	c.mano("r", 0.3, Vector3(0.1, 1, 0.1), Vector3(0, 0, 1), 0.0).mano("r", 0.5, Vector3(0.05, 1, 0.05), Vector3(0, 0, 1))
+	c.mano("r", c.T, Vector3(0.05, 1, 0.05), Vector3(0, 0, 1))
 	return c
 
 
@@ -326,10 +373,20 @@ static func _indice() -> Coreografia:
 	var su := Vector3(0.17, 0.52, 0.12)
 	c.braccia(0.25, Vector3(0.22, -0.2, 0.2)).braccia(0.55, su)
 	c.braccia(1.4, su).braccia(1.65, Vector3(0.2, 0.42, 0.16)).braccia(1.9, su).braccia(c.T, su)
+	for s: String in ["l", "r"]:   # dita dritte verso il cielo, palmi in avanti
+		c.mano(s, 0.25, Vector3(0.3, 0.9, 0.3), SU_PALMO, 0.0).mano(s, 0.55, Vector3(0.28, 0.95, 0.12), SU_PALMO)
+		c.mano(s, c.T, Vector3(0.28, 0.95, 0.12), SU_PALMO)
 	return c
 
 
-# ---------------------------------------------------------------- 6. saluto militare: piedi uniti, mano alla fronte
+# ---------------------------------------------------------------- 6. saluto militare: sull'attenti, mano tesa alla tempia
+# Mano destra tesa e dritta (dita in fila con l'avambraccio), punta delle dita al sopracciglio destro, palmo in giù e in
+# avanti, avambraccio inclinato, gomito in fuori all'altezza della spalla; braccio sinistro teso lungo il fianco.
+const SALUTO_POLSO := Vector3(0.088, 0.148, 0.09)    # mano destra rispetto alla spalla (x in fuori)
+const SALUTO_GOMITO := Vector3(1, 0.05, 0.25)        # polo: gomito in fuori, appena avanti
+const SALUTO_DITA := Vector3(-0.8, 0.57, 0.13)       # dal polso alla tempia: verso dentro e in su
+const SALUTO_PALMO := Vector3(0, -1, 0.45)          # palmo in giù e un po' in avanti
+
 static func _saluto() -> Coreografia:
 	var c := Coreografia.new("saluto", 2.8)
 	var uniti := {"l": Vector2(0.085, 0.0), "r": Vector2(-0.085, 0.0)}
@@ -338,22 +395,37 @@ static func _saluto() -> Coreografia:
 	c.mv.pelvis(0.45, Vector3(0, 0.95, -0.04)).pelvis(c.T, Vector3(0, 0.95, -0.04))
 	c.mv.bend(0.45, Vector3(-0.06, 0, 0)).bend(c.T, Vector3(-0.06, 0, 0))
 	c.mv.head(0.5, Vector2(-0.05, 0)).head(c.T, Vector2(-0.05, 0))
-	c.mv.arm("r", 0.35, Vector3(0.1, -0.1, 0.25)).arm("r", 0.6, Vector3(0.06, 0.19, 0.15)).arm("r", c.T, Vector3(0.06, 0.19, 0.15))
-	c.polo("r", 0.3, POLO).polo("r", 0.6, Vector3(1, 0.15, 0.05))
-	c.mv.arm("l", 0.45, Vector3(0.1, -0.56, 0.0)).arm("l", c.T, Vector3(0.1, -0.56, 0.0))
+	c.mv.arm("r", 0.25, Vector3(0.24, -0.4, 0.1)).arm("r", 0.6, SALUTO_POLSO).arm("r", c.T, SALUTO_POLSO)
+	c.polo("r", 0.25, Vector3(1, -0.3, -0.3)).polo("r", 0.5, SALUTO_GOMITO)
+	c.mano("r", 0.25, Vector3(0.2, -1, 0.1), Vector3(-1, 0, 0), 0.0).mano("r", 0.6, SALUTO_DITA, SALUTO_PALMO)
+	c.mano("r", c.T, SALUTO_DITA, SALUTO_PALMO)
+	c.mv.arm("l", 0.45, Vector3(0.06, -0.57, 0.0)).arm("l", c.T, Vector3(0.06, -0.57, 0.0))
+	c.mano("l", 0.0, Vector3(0.1, -1, 0), Vector3(-1, 0, 0), 0.0).mano("l", 0.45, Vector3(0.05, -1, 0.02), Vector3(-1, 0, 0))
 	return c
 
 
 # ---------------------------------------------------------------- 7. cuore con le mani verso il pubblico
+# Le dita del modello non si piegano: il cuore lo fanno le due mani tese e inclinate, punte delle dita che si toccano
+# in alto al centro, pollici verso il basso e verso dentro, palmi verso il pubblico, gomiti larghi; prima davanti al
+# petto, poi spinto un po' in avanti e in alto verso il pubblico.
+const CUORE_POLSO := Vector3(-0.04, -0.155, 0.36)     # mano rispetto alla spalla (x in fuori), davanti al petto
+const CUORE_SU := Vector3(-0.04, -0.095, 0.4)          # poi un po' più su e più avanti
+const CUORE_DITA := Vector3(-0.47, 0.88, 0.0)         # punte verso dentro e in su: si toccano al centro
+const CUORE_PALMO := Vector3(0, 0, 1)                 # palmo verso il pubblico (pollice in giù e verso dentro)
+const CUORE_GOMITO := Vector3(1, -0.8, -0.3)          # gomiti larghi e un po' in giù
+
 static func _cuore() -> Coreografia:
 	var c := Coreografia.new("cuore", 2.8)
 	_passo(c, "r", 0.05, 0.3, STANCE.r, Vector2(-0.17, 0.08))
 	c.mv.pelvis(0.4, Vector3(0, 0.93, -0.04)).pelvis(c.T, Vector3(0, 0.93, -0.04))
 	c.mv.bend(0.5, Vector3(0.05, 0, 0)).bend(1.3, Vector3(-0.06, 0, 0)).bend(c.T, Vector3(-0.06, 0, 0))
 	c.mv.head(0.5, Vector2(0.12, 0)).head(1.3, Vector2(-0.05, 0)).head(c.T, Vector2(-0.05, 0))
-	c.braccia(0.25, Vector3(0.18, -0.3, 0.25)).braccia(0.6, Vector3(0.03, -0.07, 0.35))
-	c.braccia(1.1, Vector3(0.03, -0.07, 0.35)).braccia(1.45, Vector3(0.02, 0.08, 0.38)).braccia(c.T, Vector3(0.02, 0.08, 0.38))
-	c.poli(0.0, POLO).poli(0.5, POLO_GIU).poli(c.T, Vector3(1, -0.6, -0.1))
+	c.braccia(0.25, Vector3(0.2, -0.3, 0.22)).braccia(0.6, CUORE_POLSO)
+	c.braccia(1.1, CUORE_POLSO).braccia(1.45, CUORE_SU).braccia(c.T, CUORE_SU)
+	for s: String in ["l", "r"]:
+		c.mano(s, 0.25, Vector3(0.2, -0.9, 0.4), Vector3(-1, 0, 0), 0.0).mano(s, 0.6, CUORE_DITA, CUORE_PALMO)
+		c.mano(s, c.T, CUORE_DITA, CUORE_PALMO)
+	c.poli(0.0, POLO).poli(0.5, CUORE_GOMITO)
 	return c
 
 
@@ -386,13 +458,22 @@ static func _ballo() -> Coreografia:
 	return c
 
 
+const ORECCHIE_POLSO := Vector3(-0.05, 0.12, 0.04)
+const ORECCHIE_GOMITO := Vector3(1, -0.55, 0.05)
+const ORECCHIE_DITA := Vector3(-0.2, 1, -0.15)
+const ORECCHIE_PALMO := Vector3(-0.35, 0, 0.94)
+
 # ---------------------------------------------------------------- 9. mani alle orecchie ("non vi sento"), busto da una parte e dall'altra
 static func _orecchie() -> Coreografia:
 	var c := Coreografia.new("orecchie", 2.8)
 	_passo(c, "l", 0.05, 0.28, STANCE.l, LARGHI.l)
 	_passo(c, "r", 0.15, 0.38, STANCE.r, LARGHI.r)
-	c.braccia(0.2, Vector3(0.25, -0.15, 0.2)).braccia(0.5, Vector3(-0.02, 0.22, 0.09)).braccia(c.T, Vector3(-0.02, 0.22, 0.09))
-	c.poli(0.0, POLO).poli(0.45, Vector3(1, -0.7, 0.2))
+	# mani a conchiglia dietro le orecchie: dita in su, palmi in avanti, gomiti in fuori (prima coprivano la faccia)
+	c.braccia(0.2, Vector3(0.25, -0.15, 0.2)).braccia(0.5, ORECCHIE_POLSO).braccia(c.T, ORECCHIE_POLSO)
+	c.poli(0.0, POLO).poli(0.45, ORECCHIE_GOMITO)
+	for s: String in ["l", "r"]:
+		c.mano(s, 0.2, Vector3(0.3, 0.6, 0.5), ORECCHIE_PALMO, 0.0).mano(s, 0.5, ORECCHIE_DITA, ORECCHIE_PALMO)
+		c.mano(s, c.T, ORECCHIE_DITA, ORECCHIE_PALMO)
 	c.mv.pelvis(0.4, Vector3(0, 0.91, -0.04))
 	var lati := [[0.8, 1.0], [1.35, -1.0], [1.9, 1.0], [2.45, -1.0]]
 	for k: Array in lati:
@@ -403,6 +484,10 @@ static func _orecchie() -> Coreografia:
 	return c
 
 
+const SILENZIO_POLSO := Vector3(-0.157, 0.025, 0.2)
+const SILENZIO_DITA := Vector3(0.0, 1.0, -0.25)
+const SILENZIO_PALMO := Vector3(-1, 0, 0)
+
 # ---------------------------------------------------------------- 10. dito sulla bocca: passo avanti, silenzio verso il pubblico
 static func _silenzio() -> Coreografia:
 	var c := Coreografia.new("silenzio", 2.8)
@@ -411,8 +496,12 @@ static func _silenzio() -> Coreografia:
 	c.mv.pelvis(0.4, Vector3(0, 0.9, 0.06), -0.1).pelvis(c.T, Vector3(0, 0.9, 0.07), -0.1)
 	c.mv.bend(0.5, Vector3(0.22, 0, 0.1)).bend(1.6, Vector3(0.26, 0, 0.12)).bend(c.T, Vector3(0.22, 0, 0.1))
 	c.mv.head(0.55, Vector2(-0.12, 0)).head(c.T, Vector2(-0.12, 0))
-	c.mv.arm("r", 0.3, Vector3(0.12, -0.25, 0.25)).arm("r", 0.6, Vector3(-0.12, 0.06, 0.26)).arm("r", c.T, Vector3(-0.12, 0.06, 0.26))
+	# mano dritta davanti alla bocca, di taglio: il lato dell'indice sulle labbra (le dita non si piegano)
+	c.mv.arm("r", 0.3, Vector3(0.12, -0.25, 0.25)).arm("r", 0.6, SILENZIO_POLSO).arm("r", c.T, SILENZIO_POLSO)
 	c.polo("r", 0.0, POLO).polo("r", 0.55, POLO_GIU)
+	c.mano("r", 0.3, Vector3(0.2, 0.3, 0.9), SILENZIO_PALMO, 0.0).mano("r", 0.6, SILENZIO_DITA, SILENZIO_PALMO)
+	c.mano("r", c.T, SILENZIO_DITA, SILENZIO_PALMO)
+	c.mano("l", 0.0, GIU_DITA, GIU_PALMO, 0.0).mano("l", 0.6, Vector3(0.4, -0.9, 0.1), GIU_PALMO)
 	c.mv.arm("l", 0.6, Vector3(0.35, -0.38, 0.1)).arm("l", c.T, Vector3(0.38, -0.36, 0.08))
 	return c
 
@@ -443,16 +532,29 @@ static func _salto() -> Coreografia:
 		c.mv.arm("l", t_at + 0.15, Vector3(0.28, -0.35, 0.12))
 		c.mv.head(t_st + 0.1, Vector2(-0.35, 0)).head(t_at + 0.2, Vector2(-0.1, 0))
 	c.mv.arm("r", c.T, Vector3(0.07, 0.55, 0.08)).arm("l", c.T, Vector3(0.25, -0.3, 0.2))
+	c.mano("r", 0.38, Vector3(0.1, 1, 0.1), Vector3(0, 0, 1), 0.0).mano("r", 0.6, Vector3(0.05, 1, 0.05), Vector3(0, 0, 1))
+	c.mano("r", c.T, Vector3(0.05, 1, 0.05), Vector3(0, 0, 1))
 	c.mv.head(c.T, Vector2(-0.3, 0))
 	return c
 
+
+const INCHINO_PANCIA := Vector3(-0.084, -0.325, 0.22)
+const INCHINO_PANCIA_GIU := Vector3(-0.084, -0.22, 0.276)   # nell'inchino il petto gira più della pancia
+const INCHINO_DITA := Vector3(-1, -0.1, 0)
 
 # ---------------------------------------------------------------- 12. inchino: un braccio sulla pancia, l'altro in fuori, poi "eccomi"
 static func _inchino() -> Coreografia:
 	var c := Coreografia.new("inchino", 3.0)
 	_passo(c, "r", 0.05, 0.35, STANCE.r, Vector2(-0.12, -0.2))
 	c.mv.leg("l", {"t": 0.35, "plant": STANCE.l})
-	c.mv.arm("r", 0.5, Vector3(-0.2, -0.38, 0.24)).arm("r", 1.75, Vector3(-0.2, -0.38, 0.24))
+	# mano destra aperta sulla pancia (prima finiva sul fianco), palmo contro la maglia, dita verso sinistra
+	c.mv.arm("r", 0.5, INCHINO_PANCIA).arm("r", 0.6, INCHINO_PANCIA).arm("r", 1.1, INCHINO_PANCIA_GIU)
+	c.mv.arm("r", 1.7, INCHINO_PANCIA_GIU).arm("r", 2.25, INCHINO_PANCIA)
+	c.mano("r", 0.2, GIU_DITA, GIU_PALMO, 0.0).mano("r", 0.5, INCHINO_DITA, Vector3(0, 0, -1)).mano("r", 1.75, INCHINO_DITA, Vector3(0, 0, -1))
+	c.mano("l", 0.2, GIU_DITA, GIU_PALMO, 0.0).mano("l", 0.5, Vector3(0.8, -0.55, -0.25), Vector3(0, 0, 1))
+	c.mano("l", 1.75, Vector3(0.8, -0.55, -0.25), Vector3(0, 0, 1))
+	for s: String in ["l", "r"]:   # "eccomi": braccia aperte, palmi in su verso il pubblico
+		c.mano(s, 2.5, Vector3(0.9, 0.2, 0.3), Vector3(0, 1, 0.4)).mano(s, c.T, Vector3(0.9, 0.2, 0.3), Vector3(0, 1, 0.4))
 	c.polo("r", 0.0, POLO).polo("r", 0.45, POLO_GIU).polo("r", 1.75, POLO_GIU).polo("r", 2.3, POLO)
 	c.mv.arm("l", 0.5, Vector3(0.42, -0.3, -0.12)).arm("l", 1.75, Vector3(0.45, -0.28, -0.15))
 	c.mv.pelvis(0.6, Vector3(0, 0.93, -0.05)).pelvis(1.1, Vector3(0, 0.91, -0.13), 0, 0.3).pelvis(1.7, Vector3(0, 0.91, -0.13), 0, 0.3)
@@ -465,6 +567,13 @@ static func _inchino() -> Coreografia:
 
 
 # ---------------------------------------------------------------- 13. braccia conserte, mento in su, un cenno con la testa
+# Avambracci incrociati davanti al petto (il sinistro sopra e più avanti, il destro sotto e più vicino al corpo), gomiti
+# un po' avanti ai fianchi; mano sinistra aperta sul bicipite destro, mano destra infilata sotto il braccio sinistro.
+const CONSERTE_POLSO := {"l": Vector3(-0.235, -0.15, 0.22), "r": Vector3(-0.235, -0.2, 0.19)}
+const CONSERTE_DITA := {"l": Vector3(-0.72, 0.3, -0.62), "r": Vector3(-0.75, 0.0, -0.65)}
+const CONSERTE_PALMO := {"l": Vector3(0.65, 0, -0.75), "r": Vector3(0.65, 0, -0.75)}
+const CONSERTE_GOMITO := Vector3(0.4, -1, 0.6)
+
 static func _conserte() -> Coreografia:
 	var c := Coreografia.new("conserte", 2.8)
 	_passo(c, "l", 0.05, 0.28, STANCE.l, LARGHI.l)
@@ -473,9 +582,13 @@ static func _conserte() -> Coreografia:
 	c.mv.bend(0.5, Vector3(-0.1, 0, 0)).bend(c.T, Vector3(-0.1, 0, 0))
 	c.mv.head(0.5, Vector2(-0.18, 0)).head(1.4, Vector2(-0.18, 0)).head(1.62, Vector2(0.2, 0)).head(1.85, Vector2(-0.18, 0))
 	c.mv.head(c.T, Vector2(-0.18, 0))
-	c.mv.arm("l", 0.25, Vector3(0.12, -0.3, 0.22)).arm("l", 0.6, Vector3(-0.27, -0.25, 0.27)).arm("l", c.T, Vector3(-0.27, -0.25, 0.27))
-	c.mv.arm("r", 0.25, Vector3(0.12, -0.3, 0.22)).arm("r", 0.6, Vector3(-0.27, -0.21, 0.21)).arm("r", c.T, Vector3(-0.27, -0.21, 0.21))
-	c.poli(0.0, POLO).poli(0.5, Vector3(0.7, -1, 0.15))
+	# prima il destro (sotto), poi il sinistro che gli passa sopra, più avanti: le mani non si attraversano
+	c.mv.arm("l", 0.34, Vector3(0.1, -0.28, 0.27)).arm("l", 0.47, Vector3(-0.08, -0.18, 0.34))
+	for s: String in ["l", "r"]:
+		c.mv.arm(s, 0.25, Vector3(0.14, -0.33, 0.2)).arm(s, 0.6, CONSERTE_POLSO[s]).arm(s, c.T, CONSERTE_POLSO[s])
+		c.mano(s, 0.25, Vector3(0.1, -1, 0.3), Vector3(-1, 0, 0), 0.0).mano(s, 0.6, CONSERTE_DITA[s], CONSERTE_PALMO[s])
+		c.mano(s, c.T, CONSERTE_DITA[s], CONSERTE_PALMO[s])
+	c.poli(0.0, POLO).poli(0.5, CONSERTE_GOMITO)
 	return c
 
 
@@ -501,6 +614,7 @@ static func _giravolta() -> Coreografia:
 	c.mv.bend(t_at + 0.42, Vector3(-0.1, 0, 0)).bend(c.T, Vector3(-0.1, 0, 0))
 	c.braccia(t_st - 0.3, ARMS_REST).braccia(t_st - 0.03, Vector3(0.15, -0.4, 0.28)).braccia(t_st + 0.12, LARGHE)
 	c.braccia(t_at - 0.05, LARGHE).braccia(t_at + 0.15, Vector3(0.45, -0.1, 0.2)).braccia(t_at + 0.5, V_SU).braccia(c.T, V_SU)
+	_mani_su(c, t_at + 0.15, t_at + 0.5)
 	c.mv.head(t_at + 0.5, Vector2(-0.3, 0)).head(c.T, Vector2(-0.3, 0))
 	return c
 

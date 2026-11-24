@@ -267,6 +267,12 @@
   `$G --path godot -- --schermata=shots/x.png --dopo=3` (anche `--vista=vicina|porta|alta`, `--senza-vsync`, `--prova-tocchi`).
 - I **Momenti chiave** sono stati tolti (Luis 2026-11-23): resta solo la partita intera. Il campo `settings.momenti` dei
   salvataggi vecchi resta ma non conta più.
+- **Esultanze del campione** (15, `scripts/partita/mosse/esultanza.gd`, Luis 2026-11-25 "falle giuste"): oltre a
+  braccia e gambe con la IK, ora si gira anche la **mano** (`mano(lato, t, dita, palmo, peso)`: le dita del modello non si
+  piegano, conta dove puntano e dove guarda il palmo; `hq`/`hw` in `figura.applica_mossa`). Saluto con mano tesa e dritta
+  alla tempia, cuore con le punte che si toccano, braccia conserte vere, mani dietro le orecchie, mano di taglio sulla
+  bocca, mano sulla pancia nell'inchino. Prova: `-s res://tests/foto_esultanze.gd -- --busto|--zoom=2 --guarda=1.8
+  --solo=saluto`; misure: `-s res://tools/misura_esultanza.gd -- --id=saluto --t=2`; test `tests/test_esultanze.gd`.
 - Allenamento libero (tiri/punizioni/rigori a punti, record nel campo `prove` del salvataggio): `scripts/partita/prove_tiro*.gd`, menu `scripts/menu/allenamento_libero.gd`, prova `-- --prove=tiri --bot`.
 - Meteo e ora della partita: `scripts/partita/meteo.gd` (prove: `--meteo=sereno|nuvoloso|pioggia|neve`, `--ora=giorno|tramonto|notte`).
 - Build: workflow `.github/workflows/tiro-a-giro-godot-ipa.yml` (push su `tiro-a-giro` che tocca `godot/**`) →
