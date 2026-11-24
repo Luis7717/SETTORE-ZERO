@@ -114,7 +114,15 @@
   `rifiniture`, `dribShow` in `sim/duel.gd`): riuscito = il portatore frena davanti al difensore, finta di lato dal
   lato opposto per `DRIB_SHOW_T` 0,35 s col giochetto a schermo (difensore battuto che si butta verso la finta e
   interviene a vuoto), poi cambia direzione e scatta oltre più veloce (`p.burst`, evento `dribble_go`); fallito = frena (non gli finisce
-  addosso), contrasto del difensore e portatore che inciampa (pose `affondo`/`contrasto`/`inciampo`, `vista.reazione`).
+  addosso), contrasto del difensore e portatore che inciampa (`vista.dribbling` / `vista.dribbling_go`).
+  **Animazioni del dribbling** (Luis 2026-11-24, "animazioni da rivedere"): coreografie calcolate ancorate al campo
+  (`scripts/partita/mosse/coreo.gd` + `coreo_dribbling.gd`, niente file nuovi): piedi fermi a terra finché appoggiano,
+  passi programmati dove sarà il corpo (più un passo da solo se una gamba si allunga troppo), pallone mosso solo dai
+  tocchi (suola, finta, esterno nello scatto; alla fine torna quello del motore), verso del corpo che gira dolce.
+  Giochetti della persona: finta di corpo, doppio passo, elastico; difensore che si butta sulla finta e allunga la gamba
+  a vuoto, contrasto col piede di traverso, inciampo con passo di recupero. I dribbling dell'IA tengono i giochetti di
+  prima. Solo grafica: motore ed esito identici. Test `tests/test_coreo.gd`; prova da vicino a passo fisso:
+  `prova_vista.tscn -- --scena=dribbling_ok|dribbling_ko [--giochetto=elastico] --foto=CARTELLA/x`.
   Esito con la stessa probabilità di prima. Prove: `--scena=dribbling|dribbling_ok|dribbling_ko`. Lato: opposto allo sbilanciamento del
   difensore, verso lo spazio libero, sempre verso il centro entro 8 m dalla linea laterale (`dribSide`); il giochetto va
   da quel lato (`e.side`) e il portatore gli passa accanto senza attraversarlo. Se il duello finisce prima (palla persa,

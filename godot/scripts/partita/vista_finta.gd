@@ -219,8 +219,17 @@ func trick(p: R.Player, _r: float = -1.0, _side: float = 0.0, _dur: float = -1.0
 	return {"id": k, "name": GIOCHETTI[k]}
 
 
+## esito del dribbling: la vista finta mostra solo il nome del giochetto (niente coreografie)
+func dribbling(e: Dictionary, _es: Dictionary) -> Dictionary:
+	return trick(e.p) if e.ok else {}
+
+
+func dribbling_go(_e: Dictionary) -> void:
+	pass
+
+
 ## posa di reazione al dribbling: la vista finta non la disegna
-func reazione(_p: R.Player, _tipo: String, _lato: float, _dur: float) -> void:
+func reazione(_p: R.Player, _tipo: String, _lato: float, _dur: float = 0.0, _show: float = 0.0) -> void:
 	pass
 
 

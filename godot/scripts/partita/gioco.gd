@@ -535,6 +535,8 @@ func _evento(e: Dictionary, adv: bool) -> void:
 			hud.big("Si torna alla punizione", "", 1300)
 		"tackle", "block":
 			audio.kick(9.0)
+		"dribble_go": # scatto dopo il giochetto del dribbling: tocco del pallone e primi passi (vista.dribbling_go)
+			vista.dribbling_go(e)
 		"burst": # tasto Scatto nella fuga: niente giochetto, solo suono e scritta
 			if (e.p as R.Player).team == me:
 				audio.kick(6.0)
@@ -542,12 +544,12 @@ func _evento(e: Dictionary, adv: bool) -> void:
 		"dribble":
 			# riuscito: il giochetto va dal lato scelto dal motore (e.side: +1 = sinistra del portatore) e il difensore
 			# interviene a vuoto; fallito: contrasto del difensore (dribbling_regia.gd → esito)
+			# (coreografie di gambe, busto e pallone: vista.dribbling → mosse/coreo_dribbling.gd)
 			var es := DribblingRegia.esito(e)
 			var nome := "Dribbling fallito"
+			var tk: Dictionary = vista.dribbling(e, es)
 			if e.ok:
-				nome = _nome_giochetto(vista.trick(e.p, -1.0, float(e.get("side", 0.0)), float(es.dur))) + "!"
-			for rz: Array in es.reazioni:
-				vista.reazione(rz[0], rz[1], rz[2], rz[3])
+				nome = _nome_giochetto(tk) + "!"
 			if _opzioni.has("scena"):
 				print("prova dribbling: %s %s" % [nome, "riuscito" if e.ok else "fallito"])
 			if (e.p as R.Player).team == me:
