@@ -8,7 +8,8 @@
 # Opzione "riprese" (predefinita false, la accende il gioco): rimessa, rinvio dal fondo e angolo senza teletrasporto,
 # il battitore va a prendere il pallone (riprese.gd).
 # Opzione "rifiniture" (predefinita false, il gioco la accende): correzioni di gameplay solo Godot (motion.gd
-# deflectBehind: niente "campanili" sulle respinte in angolo da lontano; duel.gd burstDir: Scatto in avanti).
+# deflectBehind: niente "campanili" sulle respinte in angolo da lontano; duel.gd burstDir: Scatto in avanti;
+# kickoffClear: al calcio d'inizio nel cerchio solo il battitore).
 # Opzione "falli" (predefinita false, la accende il gioco): i contrasti da dietro e in ritardo a volte sono fallo
 # (falli.gd): punizioni, vantaggio, cartellini, qualche rigore.
 # Opzione "parata" (predefinita false, la accende il gioco): fermatempo della parata col bersaglio sulla porta e il punto
@@ -252,6 +253,8 @@ func setRestart(type: String, tm: int, x: float, y: float, taker: R.Player = nul
 					taker = p
 		place(taker, 0.0, -dir * 0.6)
 		pushAway(opp, 0.0, 0.0, CIRCLE)
+		if rifiniture:
+			kickoffClear(taker, true)
 	elif type == "throw":
 		x = C.clamp_(x, -HW + 0.3, HW - 0.3)
 		y = C.clamp_(y, -HL + 1.0, HL - 1.0)

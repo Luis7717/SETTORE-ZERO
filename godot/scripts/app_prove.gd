@@ -58,6 +58,12 @@ func _nuova_carriera_se_manca() -> bool:
 func _stagione(nome: String) -> void:
 	if nome == "partita":
 		return
+	# schermata senza script (errore di sintassi): resta solo lo sfondo azzurro fisso (Luis 2026-11-24, dopo partita)
+	var scena: Node = get_tree().current_scene
+	if scena == null or scena.get_script() == null:
+		print("FALLITO schermata %s senza script (errore nello script?)" % nome)
+		get_tree().quit(1)
+		return
 	var u: Dictionary = _app.ultimo_esito
 	if not u.is_empty() and u.res is Dictionary:
 		var e: Dictionary = u.esito

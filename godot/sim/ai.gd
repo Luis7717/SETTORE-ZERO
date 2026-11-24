@@ -669,6 +669,13 @@ func assign(p: R.Player) -> void:
 			p.ty = -dir * 0.5
 	if phase == "restart" and restart.type == "kickoff" and p.ty * dir > -0.3:
 		p.ty = -dir * 0.3
+	# con "rifiniture" anche i compagni del battitore restano fuori dal cerchio (motion.gd kickoffClear)
+	if rifiniture and phase == "restart" and restart.type == "kickoff":
+		var kr: float = CIRCLE + KO_MARGIN
+		var kd: float = C.hyp(p.tx, p.ty)
+		if kd < kr:
+			p.tx = p.tx / C.orf(kd, 1.0) * kr if kd > 0.01 else 0.0
+			p.ty = p.ty / kd * kr if kd > 0.01 else -dir * kr
 
 
 # giocatore mosso dalla persona vicino al pallone (avversario col pallone o pallone libero): l'ultimo tratto va dritto

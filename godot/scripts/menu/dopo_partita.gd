@@ -73,8 +73,8 @@ func costruisci() -> void:
 	righe.add_child(riga_stat("Possesso", ["%d%%" % D._round_js(float(poss[0]) / ps * 100.0), "%d%%" % D._round_js(float(poss[1]) / ps * 100.0)]))
 	righe.add_child(riga_stat("Angoli", stats.get("corners", [0, 0])))
 	righe.add_child(riga_stat("Falli", stats.get("fouls", [0, 0])))
-	for riga: Array in righe_cartellini(stats):
-		righe.add_child(riga_stat(riga[0], riga[1]))
+	for voce: Array in righe_cartellini(stats):
+		righe.add_child(riga_stat(voce[0], voce[1]))
 	corpo.add_child(righe)
 
 	var res: Variant = r.get("res")

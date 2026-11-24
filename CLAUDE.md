@@ -132,6 +132,10 @@
   avversaria (`throw_view` in `camfit.gd`, `_throw_step` in `telecamera_partita.gd`), col battitore in basso al centro;
   dito vicino al battitore = passaggio, lontano = trascinando si gira la visuale (mai verso le tribune). Le
   rimesse della CPU restano con la telecamera normale.
+- **Calcio d'inizio** (Godot, Luis 2026-11-24, opzione `rifiniture`): nel cerchio di centrocampo (9,15 m) solo il
+  battitore; tutti gli altri fuori dal cerchio e nella propria metà finché il pallone non è calciato (anche dopo un gol
+  e nel secondo tempo): `kickoffClear` in `godot/sim/motion.gd` (messi in campo e ogni passo dell'attesa) e bersagli
+  dell'IA in `ai.gd`. Test: `tests/test_calcio_inizio.gd`.
 - **Niente doppio tocco** sui calci da fermo (2026-11-21): chi batte rimessa, angolo, punizione, rinvio, calcio d'inizio o
   rigore non può toccare il pallone finché non l'ha toccato un altro (compagno, avversario o portiere: dopo il palo il
   rigorista no, dopo la parata sì). Niente punizione indiretta: semplicemente non lo tocca (`b.dbl`, `dblBan`). La CPU

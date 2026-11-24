@@ -20,6 +20,8 @@ const CATCH_MAX := 0.97
 const PARRY_SIDE_V := 8.0   # respinta in campo: velocità verso l'esterno (m/s, più fino a 3)...
 const PARRY_FWD_V := 4.0    # ... e lontano dalla porta (m/s, più fino a 3)
 const BLOCK_OUT := 0.4      # tiri ribattuti vicino all'area che finiscono in angolo
+const KO_MARGIN := 0.3 # calcio d'inizio con "rifiniture": gli altri stanno almeno così fuori dal cerchio (m)
+const KO_HALF := 0.3   # ... e almeno così dentro la propria metà (m)
 const DEFLECT_T_MAX := 1.4  # con "rifiniture": volo massimo della respinta mandata in angolo (s; pallone alto al più ~3 m)
 const TACKLE_LOOSE := 0.3   # contrasti vinti in cui la palla schizza via invece di restare al difensore
 const PASS_DEFLECT := 0.3   # passaggi intercettati che vengono solo deviati
@@ -160,6 +162,37 @@ func movePlayers(dt: float) -> void:
 				if c != taker:
 					c.x += dx * k
 					c.y += dy * k
+	# calcio d'inizio con "rifiniture": nel cerchio solo il battitore, ognuno nella propria metà (kickoffClear qui sotto)
+	if rifiniture and phase == "restart" and restart.type == "kickoff":
+		kickoffClear(taker, false)
+
+
+# Calcio d'inizio con "rifiniture" (Luis 2026-11-24): nel cerchio di centrocampo solo il battitore; tutti gli altri,
+# compagni e avversari, fuori dal cerchio (CIRCLE + KO_MARGIN) e ognuno nella propria metà finché il pallone non è
+# calciato. La chiamano setRestart (giocatori appena messi: fermi) e movePlayers a ogni passo dell'attesa.
+func kickoffClear(taker: R.Player, still: bool) -> void:
+	var rr: float = CIRCLE + KO_MARGIN
+	for p: R.Player in players:
+		if p.off or p == taker:
+			continue
+		var d: float = -1.0 if p.team else 1.0
+		var x: float = p.x
+		var y: float = minf(p.y * d, -KO_HALF) * d
+		var r: float = C.hyp(x, y)
+		if r < rr:
+			if r < 0.01:
+				x = 0.0
+				y = -d * rr
+			else:
+				x = x / r * rr
+				y = y / r * rr
+		if x == p.x and y == p.y:
+			continue
+		if still:
+			place(p, x, y)
+		else:
+			p.x = x
+			p.y = y
 
 
 # corsa verso il punto (tx, ty), orientamento, stanchezza (ramo 'play' di movePlayers)
