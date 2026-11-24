@@ -274,7 +274,7 @@
   `$G --headless --path godot --import` · `$G --headless --path godot -- --esci-dopo=4` (niente errori) ·
   `$G --path godot -- --schermata=shots/x.png --dopo=3` (anche `--vista=vicina|porta|alta`, `--senza-vsync`, `--prova-tocchi`).
 - **Stellina del campione** (Luis 2026-11-24): quando il controllato è il campione (`src.champ`) sopra di lui c'è una
-  stellina gialla (`TV.stellina()`, ×`STELLA_K`) al posto del triangolo (`vista.gd` `_aggiorna_segni`).
+  stellina gialla (`TV.stellina()`, ×`STELLA_K` 1,1) al posto del triangolo (`vista.gd` `_aggiorna_segni`).
 - **Maglie di casa e trasferta** (Luis 2026-11-24, `scripts/carriera/divise.gd`, applicate in `app.gd` `_partita`):
   casa = colori della squadra, trasferta = maglia fissa per colore (`TRASFERTA`, chiara per le scure e scura per le
   chiare). La squadra di casa veste quella di casa; l'ospite la sua di casa se si distingue (`SIMILI`), altrimenti la
