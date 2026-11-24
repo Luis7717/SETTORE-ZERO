@@ -10,6 +10,8 @@ const CAM_USER_START := 12.0                   # px in orizzontale prima che il 
 const CAM_USER_RETURN := 2.5                   # finito il rallenty l'angolo torna a 0 con questa velocità (1/s, tempo vero)
 const CAM_USER_GRAB := -1.0                    # −1 = si "afferra" il campo (dito verso destra = la visuale guarda più a sinistra)
 const CAM_USER_GOAL_YAW := deg_to_rad(40.0)    # area di tiro: oltre questo angolo la porta avversaria non si tiene più a schermo
+const CAM_USER_PASS_HOLD := 4.0                # s veri: lasciato il pallone (passaggio a un compagno), la visuale girata resta
+                                               # ancora tanto finché il possesso è nostro, poi torna dritta piano
 
 
 ## il pallone è fermo sulla bandierina per un calcio d'angolo (di chiunque): anche lì la visuale si gira col dito
@@ -40,6 +42,40 @@ static func user_cam_on(m: Object, tm: int) -> bool:
 	if c == null or c.team != tm:
 		return false
 	return m.duelFor(tm) or m.fleeFor(tm) or m.inZone(tm)
+
+
+## pallone nostro in gioco, anche fuori dal rallenty, mentre il portatore corre da solo (Luis 2026-11-24): la visuale
+## si gira col dito per guardarsi intorno e vedere subito il passaggio dopo; il gioco non rallenta
+static func ball_cam_on(m: Object, tm: int) -> bool:
+	if m == null or m.phase != "play":
+		return false
+	var c: Object = m.ball.owner
+	return c != null and c.team == tm
+
+
+## la visuale si può girare trascinando il dito lontano dal portatore: rallenty, riprese, colpo di testa, o semplicemente
+## col pallone nostro in gioco
+static func drag_cam_on(m: Object, tm: int) -> bool:
+	return user_cam_on(m, tm) or ball_cam_on(m, tm)
+
+
+## possesso nostro in gioco: pallone a un nostro giocatore o nostro passaggio (non tiro) in volo
+static func possesso(m: Object, tm: int) -> bool:
+	if m == null or m.phase != "play":
+		return false
+	var b: Object = m.ball
+	if b.owner != null:
+		return b.owner.team == tm
+	return b.kick != null and b.kick.team == tm and b.kick.type != "shot"
+
+
+## la visuale girata resta? same = il pallone ce l'ha ancora chi lo aveva quando si è girata la visuale (restano
+## anche rallenty e riprese, come prima); dopo = secondi veri da quando quel portatore ha lasciato il pallone: finché
+## il possesso è nostro (passaggio a un compagno) resta per CAM_USER_PASS_HOLD, così si vede il passaggio dopo
+static func hold_yaw(m: Object, tm: int, same: bool, dopo: float) -> bool:
+	if same and drag_cam_on(m, tm):
+		return true
+	return possesso(m, tm) and dopo < CAM_USER_PASS_HOLD
 
 
 ## angolo mentre si trascina: parte da yaw0 (angolo quando il dito si è appoggiato) e segue lo spostamento orizzontale

@@ -44,6 +44,20 @@ static func user_cam_on(m: SimMatchScript, tm: int) -> bool:
 	return m.duelFor(tm) or m.fleeFor(tm) or m.inZone(tm)
 
 
+## pallone nostro in gioco, anche fuori dal rallenty, mentre il portatore corre da solo (Luis 2026-11-24): dito
+## lontano dal portatore = trascinando di lato si gira la visuale, senza rallentare il gioco
+static func ball_cam_on(m: SimMatchScript, tm: int) -> bool:
+	if m == null or m.phase != "play":
+		return false
+	var c: R.Player = m.ball.owner
+	return c != null and c.team == tm
+
+
+## la visuale si può girare col dito: rallenty, riprese e colpo di testa (user_cam_on) o pallone nostro in gioco
+static func drag_cam_on(m: SimMatchScript, tm: int) -> bool:
+	return user_cam_on(m, tm) or ball_cam_on(m, tm)
+
+
 ## angolo mentre si trascina: parte da yaw0 e segue lo spostamento orizzontale dx (px) rispetto alla larghezza w (px)
 static func drag_yaw(yaw0: float, dx: float, w: float) -> float:
 	var k := deg_to_rad(CAM_USER_DEG_PER_SCREEN) / maxf(1.0, w)

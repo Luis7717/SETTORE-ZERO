@@ -22,6 +22,8 @@
 #   --scena=testa_difesa|testa_difesa_linea|testa_passaggio|testa_passaggio_linea|testa_fascia   salto conteso di
 #                       testa (sim/testa.gd): in difesa sul cross della CPU, sul nostro lancio alto con un difensore
 #                       attaccato (_linea: il dito disegna il passaggio di testa), lancio sulla fascia senza nessuno
+#   --scena=giro|giro_linea   gioco normale col nostro n. 10 che corre da solo: il dito lontano da lui gira la visuale
+#                       senza rallentare (giro_linea: poi disegna il passaggio al n. 11 con la visuale girata)
 #   --scena=recupero   il nostro n. 4 ruba palla in contrasto frontale: respiro dopo il recupero, rallenty, passaggio
 #   --scena=parata|parata_linea   tiro avversario: fermatempo della parata col bersaglio (parata_linea: dito che disegna)
 #   --scena=fuori_lato|fuori_lato_cpu|fuori_fondo|fuori_fondo_vicino|fuori_rete|fuori_angolo   pallone che esce: scena della ripresa
@@ -1001,6 +1003,8 @@ func _prepara_scena(nome: String) -> void:
 					await get_tree().process_frame
 				await get_tree().create_timer(0.8).timeout
 				_dribbling()
+		"giro", "giro_linea":
+			_scena_giro(att, nome == "giro_linea")
 		"dribbling", "dribbling_ok", "dribbling_ko": # duello col difensore davanti, poi il tasto Dribbling (regia del dribbling)
 			_scena_dribbling(att, nome)
 		"testa", "testa_linea": # cross dalla destra verso il n. 10 in area: fermatempo del colpo di testa
@@ -1287,6 +1291,44 @@ func _scena_testa_contesa(nome: String) -> void:
 		gesti.move_ev(Vector2(a.x, a.y).lerp(Vector2(b.x, b.y), i / 12.0))
 	await get_tree().create_timer(0.6).timeout
 	gesti.up(Vector2(b.x, b.y), Time.get_ticks_msec())
+
+
+## prova della visuale girata in gioco normale (Luis 2026-11-24): n. 10 col pallone nella nostra metà, nessuno vicino;
+## dopo 1,5 s il dito si appoggia lontano da lui e trascina verso destra (la visuale guarda a sinistra), il gioco non
+## rallenta. Con `linea` poi disegna dal pallone al n. 11 (punti dello schermo della telecamera girata) e alza il dito.
+func _scena_giro(att: R.Player, linea: bool) -> void:
+	_metti_in_gioco()
+	var dy := 1.0 if me == 0 else -1.0
+	var cm: R.Player = m.team(me)[10]
+	_sposta(att, 6.0, dy * -12.0)
+	_sposta(cm, -18.0, dy * -2.0)
+	m.ball.owner = att
+	m.ball.last = att
+	m.ball.x = att.x
+	m.ball.y = att.y + 0.6 * dy
+	m.ctrl[me] = att
+	await get_tree().create_timer(1.5).timeout
+	var a := Vector2(70.0, 320.0)
+	gesti.down(a, Time.get_ticks_msec())
+	print("giro: modo del dito = %s" % gesti.mode)
+	for i in range(1, 25):
+		gesti.move_ev(a.lerp(Vector2(300.0, 330.0), i / 24.0))
+		await get_tree().process_frame
+	gesti.up(Vector2(300.0, 330.0), Time.get_ticks_msec())
+	print("giro: visuale girata di %.0f gradi, tempo x%.2f, pallone al n. %d" % [rad_to_deg(vista.user_yaw), ts, m.ball.owner.i + 1 if m.ball.owner != null else -1])
+	if not linea:
+		return
+	await get_tree().create_timer(0.8).timeout
+	var s0: Vector3 = vista.world_to_screen(m.ball.x, m.ball.y, 0.3)
+	gesti.down(Vector2(s0.x, s0.y), Time.get_ticks_msec())
+	for i in range(1, 21):
+		var s1: Vector3 = vista.world_to_screen(cm.x, cm.y, 0.0)
+		gesti.move_ev(Vector2(s0.x, s0.y).lerp(Vector2(s1.x, s1.y), i / 20.0))
+		await get_tree().process_frame
+	var fine: Dictionary = gesti.pts[-1] if not gesti.pts.is_empty() else {}
+	print("giro_linea: fine linea (%.1f, %.1f), n. 11 in (%.1f, %.1f)" % [fine.get("x", NAN), fine.get("y", NAN), cm.x, cm.y])
+	await get_tree().create_timer(0.4).timeout
+	gesti.up(Vector2.ZERO, Time.get_ticks_msec())
 
 
 func _metti_in_gioco() -> void:

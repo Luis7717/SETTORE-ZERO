@@ -6,6 +6,7 @@ extends "test_base.gd"
 const CU := preload("res://scripts/partita/camuser.gd")
 const CF := preload("res://scripts/partita/camfit.gd")
 const TC := preload("test_camfit.gd")
+const Telecamera := preload("res://scripts/partita/telecamera_partita.gd")
 const W := 390.0
 
 
@@ -87,6 +88,75 @@ func test_si_gira_solo_in_gioco_col_pallone_nostro_nel_duello_o_area_di_tiro_e_s
 		r.type = t
 		eq(CU.user_cam_on(m, 0), false, "rimessa " + t)
 	eq(CU.user_cam_on(null, 0), false, "senza partita")
+	return done()
+
+
+# gioco normale col pallone (Luis 2026-11-24): la visuale si gira anche fuori dal rallenty; resta finché lo stesso
+# portatore ha il pallone, dopo un passaggio a un compagno ancora CAM_USER_PASS_HOLD s, perso il possesso torna dritta
+func test_col_pallone_in_gioco_la_visuale_si_gira_e_resta_finche_il_possesso_e_nostro() -> bool:
+	var m := H.scene(1, [true, false])
+	var c: R.Player = m.players[9]
+	var q: R.Player = m.players[10]
+	H.wake(c, 0.0, 0.0)
+	H.wake(q, -12.0, 10.0)
+	H.give(m, c)
+	m.ctrl[0] = c
+	eq(CU.user_cam_on(m, 0), false, "niente rallenty")
+	eq(CU.ball_cam_on(m, 0), true, "pallone nostro in gioco")
+	eq(CU.drag_cam_on(m, 0), true, "si gira col dito")
+	eq(CU.ball_cam_on(m, 1), false, "non per l'altra squadra")
+	eq(CU.drag_cam_on(m, 1), false, "... nemmeno col dito")
+	eq(CU.ball_cam_on(null, 0), false, "senza partita")
+	# stesso portatore: resta sempre
+	check(CU.hold_yaw(m, 0, true, 99.0), "stesso portatore: resta")
+	check(not CU.hold_yaw(m, 0, false, CU.CAM_USER_PASS_HOLD + 0.1), "portatore diverso da troppo: torna")
+	# passaggio in volo: possesso nostro, resta per CAM_USER_PASS_HOLD
+	m.kick(c, {"type": "pass", "tx": q.x, "ty": q.y})
+	check(m.ball.owner == null and m.ball.kick != null, "pallone in volo")
+	eq(CU.possesso(m, 0), true, "il nostro passaggio in volo è possesso nostro")
+	eq(CU.drag_cam_on(m, 0), false, "in volo non si gira (nessun portatore)")
+	check(CU.hold_yaw(m, 0, false, 1.0), "dopo il passaggio resta")
+	check(not CU.hold_yaw(m, 0, false, CU.CAM_USER_PASS_HOLD), "poi torna dritta")
+	# arrivato al compagno: ancora possesso nostro
+	H.give(m, q)
+	check(CU.hold_yaw(m, 0, false, CU.CAM_USER_PASS_HOLD * 0.5), "al compagno resta ancora un po'")
+	# possesso perso: torna subito
+	H.give(m, m.players[14])
+	eq(CU.possesso(m, 0), false, "pallone avversario")
+	check(not CU.hold_yaw(m, 0, false, 0.0), "possesso perso: torna dritta")
+	check(not CU.hold_yaw(m, 0, true, 0.0), "anche se era lo stesso giocatore")
+	# il nostro tiro non è possesso
+	H.give(m, c)
+	m.kick(c, {"type": "shot", "tx": 0.0, "ty": C.HL, "th": 1.0})
+	eq(CU.possesso(m, 0), false, "tiro in volo: non conta")
+	m.phase = "restart"
+	eq(CU.possesso(m, 0), false, "fuori dal gioco: no")
+	return done()
+
+
+# la telecamera vera, in gioco normale (niente visuale larga): girata di yaw intorno al portatore, che resta davanti
+func test_telecamera_in_gioco_normale_gira_intorno_al_portatore() -> bool:
+	var m := H.scene(1, [true, false])
+	var c: R.Player = m.players[9]
+	H.wake(c, 5.0, -10.0)
+	H.give(m, c)
+	m.ctrl[0] = c
+	var cam: Camera3D = Telecamera.new() # fuori dall'albero: schermo dell'iPhone in verticale
+	cam.reset(m.ball.x, m.ball.y)
+	for i in 90:
+		cam.aggiorna(m, 0, DT, DT, false, false, 0.0)
+	var f0 := -cam.transform.basis.z
+	for yaw: float in [0.9, -0.9, CU.CAM_USER_MAX]:
+		cam.aggiorna(m, 0, DT, DT, false, true, yaw)
+		var f1 := -cam.transform.basis.z
+		var a0 := Vector2(f0.x, -f0.z) # direzione orizzontale nelle coordinate del motore
+		var a1 := Vector2(f1.x, -f1.z)
+		near(a0.angle_to(a1), -yaw, 0.03, "girata di %.2f rad (+ = guarda a destra, verso +x)" % yaw)
+		var loc := cam.transform.affine_inverse() * Vector3(c.x, 1.0, -c.y)
+		var mezzo := tan(deg_to_rad(cam.fov / 2.0)) * 390.0 / 844.0
+		check(loc.z < 0.0 and absf(loc.x / -loc.z) < mezzo, "portatore a schermo con la visuale girata di %.2f" % yaw)
+	cam.free()
+	m.dispose()
 	return done()
 
 

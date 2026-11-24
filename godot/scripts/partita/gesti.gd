@@ -183,9 +183,10 @@ func down(p: Vector2, now_ms: int, indice: int = 0) -> void:
 			drawing = true
 			pts = [{"x": b.x, "y": b.y, "h": 0.0, "sx": x, "sy": y}]
 			return
-	# rallenty in attacco (duello, area di tiro): dito lontano dal portatore = trascinando di lato gira la visuale;
-	# il tocco breve (sul campo o su un compagno) non fa niente: il passaggio si disegna sempre
-	if (c != null and b.owner == c and hint == "attack" and VD.user_cam_on(m, T)) or VD.restart_cam_on(m, T):
+	# col pallone nostro (rallenty o gioco normale col portatore che corre da solo, Luis 2026-11-24): dito lontano dal
+	# portatore = trascinando di lato gira la visuale; il tocco breve (sul campo o su un compagno) non fa niente: il
+	# passaggio si disegna sempre
+	if (c != null and b.owner == c and hint == "attack" and VD.drag_cam_on(m, T)) or VD.restart_cam_on(m, T):
 		mode = "cam"
 		cam_on = false
 		yaw0 = vista.user_yaw
@@ -339,7 +340,7 @@ func move_ev(p: Vector2, indice: int = 0) -> void:
 		if not cam_on and VD.is_cam_drag(dx, y - sy):
 			cam_on = true
 			cam_used = true
-		if cam_on and VD.user_cam_on(partita, team):
+		if cam_on and VD.drag_cam_on(partita, team):
 			vista.user_yaw = VD.drag_yaw(yaw0, dx, dim.x)
 			vista.cam_drag = true
 		else:

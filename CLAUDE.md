@@ -142,6 +142,16 @@
   gira la telecamera intorno a lui (si afferra il campo: 150° per schermo, al massimo ±100°, `src/camuser.js`); niente
   più rotazione automatica. Il tocco breve sul campo o su un compagno lì non fa niente. Resta finché dura il rallenty
   con lo stesso portatore, poi torna dritta da sola.
+  **Anche in gioco normale** (Godot, Luis 2026-11-24: "mentre corre da solo vorrei già girare la telecamera"): col
+  pallone nostro in gioco, mentre il portatore corre da solo, il dito appoggiato lontano da lui e dal pallone e
+  trascinato di lato gira la visuale intorno a lui (stessa soglia, sensibilità e limiti, `drag_cam_on` /
+  `ball_cam_on` in `visuale_dito.gd` e `camuser.gd`); il gioco **non rallenta** e il portatore continua da solo; dal
+  pallone resta il calcio disegnato (punti dello schermo → campo con la telecamera vera, quindi anche girata).
+  La visuale girata resta finché lo stesso portatore ha il pallone; dopo un passaggio a un compagno resta ancora
+  `CAM_USER_PASS_HOLD` 4 s finché il possesso è nostro (si vede il passaggio dopo; trascinando di nuovo resta col nuovo
+  portatore), perso il possesso torna subito dritta piano (`hold_yaw` in `camuser.gd`, letto da `vista.gd`). Senza
+  pallone (difesa) niente cambia. Le frecce d'aiuto dell'HUD restano solo nei rallenty. Prova:
+  `res://scenes/partita.tscn -- --scena=giro|giro_linea`.
 - **Scatto** (fuga, Luis 2026-11-21): si divide il campo in linee parallele alle linee di porta. Avversario a meno di
   4 m **alla pari o dietro** il portatore (non più avanti di 0,5 m verso la porta avversaria, `LEVEL_TOL`) = niente duello:
   il tempo rallenta (8%), si può **passare** disegnando (ogni linea è un passaggio, niente corsa) e il tasto in basso è **Scatto**; toccandolo il portatore si stacca (+15% di velocità per 1,2 s,

@@ -485,9 +485,59 @@ func test_visuale_soglia_angolo_e_limiti() -> bool:
 	return done()
 
 
-func test_fuori_dal_rallenty_trascinare_muove() -> bool:
+# gioco normale col pallone (Luis 2026-11-24): il portatore corre da solo e il dito lontano da lui gira la visuale,
+# senza rallentare e senza ordini; vicino al pallone resta il calcio disegnato
+func test_gioco_normale_col_pallone_dito_lontano_gira_la_visuale() -> bool:
 	prepara()
-	check(not VD.user_cam_on(m, 0), "senza duello né area di tiro niente visuale")
+	check(not VD.user_cam_on(m, 0), "niente rallenty (duello, fuga, area di tiro)")
+	check(not m.duelFor(0) and not m.fleeFor(0) and not m.inZone(0), "gioco normale")
+	check(VD.ball_cam_on(m, 0) and VD.drag_cam_on(m, 0), "col pallone nostro la visuale si gira")
+	g.down(Vector2(100.0, 250.0), 1000)
+	eq(g.mode, "cam", "dito lontano dal portatore = visuale")
+	for p in linea(Vector2(100.0, 250.0), Vector2(300.0, 250.0)).slice(1):
+		g.move_ev(p)
+	check(v.cam_drag, "mentre si trascina")
+	check(not g.drawing, "girare non è disegnare (niente rallenty del disegno)")
+	g.update(1300)
+	g.up(Vector2(300.0, 250.0), 1400)
+	check(v.user_yaw < -0.5, "dito verso destra = visuale a sinistra (%s)" % v.user_yaw)
+	near(v.user_yaw, VD.drag_yaw(0.0, 200.0, W), 1e-9, "stessa sensibilità dei rallenty (150° per schermo)")
+	eq(reg.calls.size(), 0, "nessun ordine al portatore: continua da solo")
+	check(m.ball.owner == c, "il pallone resta al portatore")
+	# il dito ripreso parte dall'angolo raggiunto, sempre entro ±100°
+	trascina(linea(Vector2(60.0, 300.0), Vector2(380.0, 300.0)))
+	eq(v.user_yaw, -VD.CAM_USER_MAX, "limite −100°")
+	eq(reg.calls.size(), 0, "ancora nessun ordine")
+	return done()
+
+
+func test_gioco_normale_tocco_breve_lontano_non_fa_niente() -> bool:
+	prepara()
+	tocca(sch(-10.0, 15.0))
+	eq(reg.calls.size(), 0, "tocco sul campo col pallone: niente")
+	tocca(sch(mate.x, mate.y, 0.9))
+	eq(reg.calls.size(), 0, "tocco su un compagno col pallone: niente")
+	eq(v.user_yaw, 0.0, "la visuale non si muove")
+	return done()
+
+
+func test_gioco_normale_dal_pallone_resta_il_calcio_anche_con_la_visuale_girata() -> bool:
+	prepara()
+	trascina(linea(Vector2(100.0, 250.0), Vector2(300.0, 250.0)))
+	check(v.user_yaw < -0.5, "visuale girata")
+	trascina(linea(sch(m.ball.x, m.ball.y, 0.3), sch(mate.x, mate.y)))
+	eq(reg.nomi(), ["kick"], "vicino al pallone = calcio disegnato")
+	near(reg.calls[0][1].tx, mate.x, 0.5, "verso il compagno (x)")
+	near(reg.calls[0][1].ty, mate.y, 0.5, "verso il compagno (y)")
+	return done()
+
+
+func test_senza_pallone_trascinare_muove_come_prima() -> bool:
+	prepara()
+	var porta: R.Player = m.team(1)[9]
+	H.wake(porta, -10.0, 20.0)
+	H.give(m, porta)
+	check(not VD.drag_cam_on(m, 0), "pallone avversario: niente visuale")
 	g.down(Vector2(100.0, 250.0), 1000)
 	for p in linea(Vector2(100.0, 250.0), Vector2(300.0, 250.0)).slice(1):
 		g.move_ev(p)
