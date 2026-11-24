@@ -143,6 +143,13 @@
   dietro la palla nella loro posizione; la linea disegnata ha sempre la precedenza. Contrasto un po' "magnetico" per chi
   muove la persona; un passaggio avversario intercettato dà il possesso. La scivolata del giocatore è stata tolta. Raggio di
   intercetto = difesa del difensore contro passaggio di chi passa.
+- **Falli** (Godot, Luis 2026-11-24, `godot/sim/falli.gd`, opzione `"falli": true` del Match messa dal gioco, spenta in
+  lezioni, prove di tiro e confronti col JS): pochi, circa 2-3 a partita (tempi da 2:30). Solo sui contrasti **da dietro**
+  o **di fianco un po' dietro** (il frontale resta pulito) e **in ritardo** (addosso di corsa a chi ha appena calciato);
+  più falli con più velocità, meno difesa, pioggia; la squadra della persona ×0,3; il portiere mai. Usa `foulCall`
+  (`motion.gd`): giallo (secondo = rosso, espulso), rigore in area (fallo in ritardo sul tiro in area: il tiro va avanti,
+  rigore se non è gol), vantaggio o punizione con barriera. HUD: cartellino disegnato sopra la scritta (`hud.mostra_cartellino`); Ammonizioni/Espulsioni nel tabellino.
+  Prove: `--scena=fallo|rigore|espulso`.
 - **Meteo** (2026-11-21, campo facoltativo `meteo` delle opzioni del motore, senza = come prima): **pioggia** = palla più
   veloce (attrito del rotolamento ×0,75), scivolata ×1,3 e chi perde un contrasto resta fermo ×1,25; **neve** = palla
   più lenta (×1,35). Sereno e nuvoloso non cambiano niente. Il meteo e l'ora (pomeriggio, tramonto, notte coi fari)

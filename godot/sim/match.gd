@@ -9,6 +9,8 @@
 # il battitore va a prendere il pallone (riprese.gd).
 # Opzione "rifiniture" (predefinita false, il gioco la accende): correzioni di gameplay solo Godot (motion.gd
 # deflectBehind: niente "campanili" sulle respinte in angolo da lontano; duel.gd burstDir: Scatto in avanti).
+# Opzione "falli" (predefinita false, la accende il gioco): i contrasti da dietro e in ritardo a volte sono fallo
+# (falli.gd): punizioni, vantaggio, cartellini, qualche rigore.
 # Opzione "parata" (predefinita false, la accende il gioco): fermatempo della parata col bersaglio sulla porta e il punto
 # scelto rispettato (parata.gd).
 class_name SimMatch
@@ -129,6 +131,7 @@ func _init(o: Dictionary) -> void:
 	paraCtl = bool(o.get("parata", false))
 	paraSeed = sd
 	riprese = bool(o.get("riprese", false))
+	falliOn = bool(o.get("falli", false))
 	if riprese:
 		raccattaPrepara() # raccattapalle dietro le porte (raccatta.gd)
 	roll = wx.roll
@@ -153,7 +156,7 @@ func _init(o: Dictionary) -> void:
 	time = 0.0
 	phase = "play"
 	events = []
-	stats = {"shots": [0, 0], "onT": [0, 0], "poss": [0.0, 0.0], "fouls": [0, 0], "corners": [0, 0], "saves": [0, 0], "headers": [0, 0], "volleys": [0, 0]}
+	stats = {"shots": [0, 0], "onT": [0, 0], "poss": [0.0, 0.0], "fouls": [0, 0], "yellows": [0, 0], "reds": [0, 0], "corners": [0, 0], "saves": [0, 0], "headers": [0, 0], "volleys": [0, 0]}
 	var ko: Variant = o.get("kickoff")
 	kickoffTeam = int(ko) if typeof(ko) != TYPE_NIL else (0 if rnd() < 0.5 else 1)
 	setupKickoff(kickoffTeam)
@@ -808,6 +811,8 @@ func step(dt: float) -> void:
 	updateCalm(dt)
 	updateHead(dt)
 	updatePara(dt)
+	if falliOn:
+		falliStep(dt) # rigore in sospeso dopo un fallo in ritardo sul tiro (falli.gd)
 	if phase == "play":
 		contacts(dt)
 		if phase == "play":

@@ -9,7 +9,7 @@
 #   per squadra passaggi tentati e riusciti e km corsi; la mappa dei tiri (posizione di chi tira ed esito: gol,
 #   parato, respinto, fuori); per i giocatori della persona palle perse (contrasto subito o passaggio preso
 #   dall'avversario) e gol subiti mentre erano in campo, e l'elenco di chi è sceso in campo (anche chi entra con
-#   un cambio) con nome, ruolo, numero e campione.
+#   un cambio) con nome, ruolo, numero e campione; cartellini (gialli, rossi) per la pagella.
 extends RefCounted
 
 const R := preload("res://sim/records.gd")
@@ -133,6 +133,12 @@ func _evento(e: Dictionary) -> void:
 			_somma(e.p, "scatti")
 		"aerial":
 			_somma(e.p, "testa")
+		"foul": # cartellini (falli.gd): solo per la pagella, non contano per la crescita
+			var card: Variant = e.get("card")
+			if card == "yellow":
+				_somma(e.by, "gialli")
+			elif card == "red":
+				_somma(e.by, "rossi")
 
 
 # il tiro in volo finisce con questo esito (vale il primo che arriva)

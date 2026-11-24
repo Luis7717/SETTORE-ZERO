@@ -1,6 +1,7 @@
 # Stato della partita e funzioni di servizio usate da tutte le parti del motore (prima metà di src/sim/match.js).
 # In JS i metodi di duel.js, motion.js e ai.js vengono copiati su Match.prototype; GDScript non ha i "mixin",
-# quindi le parti sono una catena di classi: base.gd -> duel.gd -> motion.gd -> ai.gd -> match.gd (SimMatch).
+# quindi le parti sono una catena di classi: base.gd -> duel.gd -> motion.gd -> falli.gd -> testa.gd -> raccatta.gd ->
+# riprese.gd -> ai.gd -> parata.gd -> match.gd (SimMatch).
 # Le poche chiamate "verso l'alto" (es. motion.gd che chiama setRestart di match.gd) sono dichiarate qui sotto
 # come metodi vuoti e ridefinite nel file giusto.
 extends RefCounted
@@ -98,6 +99,9 @@ var portaAuto: bool = true
 # correzioni di gameplay solo della versione Godot (opzione "rifiniture" della partita, la accende il gioco; spenta nei
 # confronti col JS, che restano identici). Controllo del gameplay del 2026-11-23: vedi DECISIONI.md
 var rifiniture: bool = false
+# falli sui contrasti da dietro o in ritardo (opzione "falli" della partita, falli.gd; la accende il gioco, spenta nelle
+# lezioni, nelle prove di tiro e nei confronti col JS)
+var falliOn: bool = false
 var autoSpd: Array = [1.0, 1.0]
 var autoSpr: Array = [false, false]   # fuorigioco: linea comune dei difensori (y nel verso d'attacco della squadra)
 
@@ -372,6 +376,26 @@ func followRun(_p: R.Player, _r: R.Run) -> bool:
 
 func directed(_p: R.Player) -> bool:
 	return false # ai.gd
+
+
+func foulTackle(_o: R.Player, _c: R.Player) -> bool:
+	return false # falli.gd
+
+
+func lateFoul() -> bool:
+	return false # falli.gd
+
+
+func falliStep(_dt: float) -> void:
+	pass # falli.gd
+
+
+func lateAdvantageOk(_on: R.Player) -> bool:
+	return false # falli.gd
+
+
+func afterFoul(_by: R.Player) -> void:
+	pass # falli.gd
 
 
 func endDuel(_reason: String) -> void:

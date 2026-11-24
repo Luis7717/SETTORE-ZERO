@@ -23,6 +23,7 @@ lo stato (pallone e 22 giocatori) è identico al JS a ogni passo, con stessi eve
 | `src/sim/match.js` | `match.gd` (`SimMatch`) | `Match`: calci, pallone, ripartenze, regole, comandi del giocatore (`user*`) |
 | `src/sim.js` | — | in GDScript si usa direttamente `match.gd` |
 | — | `stili.gd` (solo Godot) | stili di gioco (attacco/difesa): parametri, nomi, stile delle squadre della CPU |
+| — | `falli.gd` (solo Godot) | falli sui contrasti da dietro e in ritardo (opzione `falli`): punizioni, vantaggio, cartellini, rigori |
 | — | `testa.gd`, `raccatta.gd`, `riprese.gd` (solo Godot) | colpo di testa controllato; raccattapalle; riprese senza teletrasporto (opzione `riprese`) |
 
 Uso dal gioco: `var m := SimMatch.new({"seed": 7, "halfLen": 150.0, "human": [true, false], "teams": [a, b]})`,

@@ -73,6 +73,8 @@ func costruisci() -> void:
 	righe.add_child(riga_stat("Possesso", ["%d%%" % D._round_js(float(poss[0]) / ps * 100.0), "%d%%" % D._round_js(float(poss[1]) / ps * 100.0)]))
 	righe.add_child(riga_stat("Angoli", stats.get("corners", [0, 0])))
 	righe.add_child(riga_stat("Falli", stats.get("fouls", [0, 0])))
+	for riga: Array in righe_cartellini(stats):
+		righe.add_child(riga_stat(riga[0], riga[1]))
 	corpo.add_child(righe)
 
 	var res: Variant = r.get("res")
@@ -152,6 +154,17 @@ func _squadra(t: Variant, destra: bool) -> Control:
 
 # riga di statistica: valori ai lati, nome al centro, barra divisa sotto (giallo noi, blu loro); la usa anche la
 # schermata delle statistiche. `quote` = numeri per la barra se i valori sono scritte ("78%", "54,2")
+## righe dei cartellini (stats.yellows / stats.reds, falli.gd) solo se in partita ce n'è stato almeno uno:
+## [[nome, [squadra 0, squadra 1]], ...]
+static func righe_cartellini(stats: Dictionary) -> Array:
+	var out: Array = []
+	for voce: Array in [["Ammonizioni", "yellows"], ["Espulsioni", "reds"]]:
+		var v: Variant = stats.get(voce[1])
+		if v is Array and (v as Array).size() == 2 and int(v[0]) + int(v[1]) > 0:
+			out.append([voce[0], [int(v[0]), int(v[1])]])
+	return out
+
+
 static func riga_stat(nome: String, v: Array, quote: Array = []) -> Control:
 	var box := U.vbox(4)
 	var h := U.hbox(10)

@@ -88,6 +88,8 @@ func _numeri() -> Control:
 	righe.add_child(DopoPartita.riga_stat("Passaggi riusciti", [_pct(pas[0]), _pct(pas[1])], [_frazione(pas[0]), _frazione(pas[1])]))
 	righe.add_child(DopoPartita.riga_stat("Angoli", st.get("corners", [0, 0])))
 	righe.add_child(DopoPartita.riga_stat("Falli", st.get("fouls", [0, 0])))
+	for riga: Array in DopoPartita.righe_cartellini(st):
+		righe.add_child(DopoPartita.riga_stat(riga[0], riga[1]))
 	righe.add_child(DopoPartita.riga_stat("Parate", st.get("saves", [0, 0])))
 	righe.add_child(DopoPartita.riga_stat("Km percorsi", [_km(km[0]), _km(km[1])], [float(km[0]), float(km[1])]))
 	return carta
@@ -258,4 +260,8 @@ static func dettaglio(conti: Variant) -> String:
 		var n := int(conti.get(voce[0], 0))
 		if n > 0:
 			parti.append("%d %s" % [n, voce[1] if n == 1 else voce[2]])
+	if int(conti.get("rossi", 0)) > 0:
+		parti.append("espulso")
+	elif int(conti.get("gialli", 0)) > 0:
+		parti.append("ammonito")
 	return " · ".join(parti)
