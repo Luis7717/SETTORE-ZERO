@@ -55,6 +55,8 @@ const BALL_SH_SIZE := BALL_R * 2.85     # lato del disegno dell'ombra del pallon
 const PASS_RECV := 5.0         # linea "pass": compagno entro questa distanza dalla fine = riceve (anello verde)
 const RING_K := 1.9            # anello del controllato: scala, pulsa di ±0,12 a 6 rad/s
 const MARKER_H := 2.75         # segnalino sopra il controllato (m)
+const MARKER_PX := 0.55 / 64.0 # grandezza del segnalino (m per pixel della texture) ...
+const STELLA_K := 1.35         # ... la stellina del campione un po' più grande
 const SHADOW_SIZE := 1.15      # ombra morbida sotto i giocatori (m)
 const SHADOW_FARI := 3.6       # di notte: lato del disegno con le quattro scie dei fari (texture_vista.ombra_fari) (m)
 const NET_FAR := 0.78          # trasparenza della rete: porta avversaria / propria porta (guardata attraverso)
@@ -107,6 +109,8 @@ var _ball_sh_mat: StandardMaterial3D
 var _shadows: MultiMeshInstance3D
 var _ring: MeshInstance3D
 var _marker: Sprite3D
+var _tex_segnalino: Texture2D   # triangolo giallo sopra il controllato ...
+var _tex_stellina: Texture2D    # ... stellina se il controllato è il campione (Luis 2026-11-24)
 var _tex_warn: Texture2D
 var _ctx := {"t": 0.0, "phase": "", "flip": 1.0, "yaw": 0.0, "ball": null, "trick": null, "coreo": null, "m": null}   # riusato per tutti
 var _mano_i := -1              # [mocap] figura col pallone tra le mani (rimessa)
@@ -763,8 +767,10 @@ func _crea_segni() -> void:
 	add_child(_ring)
 	_marker = Sprite3D.new()
 	_marker.name = "Segnalino"
-	_marker.texture = TV.segnalino()
-	_marker.pixel_size = 0.55 / 64.0
+	_tex_segnalino = TV.segnalino()
+	_tex_stellina = TV.stellina()
+	_marker.texture = _tex_segnalino
+	_marker.pixel_size = MARKER_PX
 	_marker.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_marker.no_depth_test = true
 	_marker.render_priority = 20
@@ -785,6 +791,10 @@ func _aggiorna_segni() -> void:
 	var k := RING_K + sin(t * 6.0) * 0.12
 	_ring.scale = Vector3(k, 1.0, k)
 	_marker.visible = true
+	var tex: Texture2D = _tex_stellina if (c.src is Dictionary and c.src.get("champ", false)) else _tex_segnalino
+	if _marker.texture != tex:
+		_marker.texture = tex
+		_marker.pixel_size = MARKER_PX * (STELLA_K if tex == _tex_stellina else 1.0)
 	_marker.position = Vector3(s * c.x, MARKER_H + sin(t * 5.0) * 0.08, -s * c.y)
 
 

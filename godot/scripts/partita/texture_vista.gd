@@ -44,6 +44,8 @@ static func ombra(lato: int = 64, a0: float = 0.55) -> ImageTexture:
 ## ombre dei fari di notte (2026-11-24): la macchia di ombra() più quattro scie leggere verso gli angoli, come
 ## sotto le quattro torri faro (ombre a stella delle partite in notturna). Si legge anche senza luci vere in più.
 ## dir = verso di una scia (le altre sono i suoi simmetrici); a0 = scuro della macchia, scia = scuro delle scie
+const STELLA_R := 30.0      # stellina: raggio delle punte (px su 64) ...
+const STELLA_DENTRO := 0.45 # ... e rientranze (frazione del raggio)
 static var _ombra_fari: ImageTexture = null   # fatta una volta sola (il disegno costa sul telefono)
 
 
@@ -111,6 +113,29 @@ static func segnalino() -> ImageTexture:
 			if dentro:
 				col = GIALLO
 			if d < 1.5:
+				col = Color(0, 0, 0, 1)
+			img.set_pixel(x, y, col)
+	return _tex(img)
+
+
+## stellina sopra il campione quando è il controllato (Luis 2026-11-24): stella a cinque punte gialla col bordo nero
+static func stellina() -> ImageTexture:
+	var img := Image.create(64, 64, false, Image.FORMAT_RGBA8)
+	var pts := PackedVector2Array()
+	for i in 10:
+		var r: float = STELLA_R if i % 2 == 0 else STELLA_R * STELLA_DENTRO
+		var a: float = -PI / 2.0 + float(i) * PI / 5.0
+		pts.append(Vector2(32.0 + cos(a) * r, 33.0 + sin(a) * r))
+	for y in 64:
+		for x in 64:
+			var p := Vector2(x + 0.5, y + 0.5)
+			var d := 1e9
+			for i in 10:
+				d = minf(d, _dist_seg(p, pts[i], pts[(i + 1) % 10]))
+			var col := Color(0, 0, 0, 0)
+			if Geometry2D.is_point_in_polygon(p, pts):
+				col = GIALLO
+			if d < 1.6:
 				col = Color(0, 0, 0, 1)
 			img.set_pixel(x, y, col)
 	return _tex(img)
