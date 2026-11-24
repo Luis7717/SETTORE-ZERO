@@ -1696,3 +1696,23 @@ Proposta approvata da Luis: rimetterli, pochi, sui contrasti da dietro o in rita
   rarissimi (1 ogni ~40 partite): in area i contrasti sono pochissimi. Il fallo non ha un'animazione (niente caduta,
   niente arbitro: le clip `giallo` dell'arbitro restano non usate).
 - Test: `tests/test_falli.gd`. Prove a schermo: `--scena=fallo|rigore|espulso`.
+
+## 2026-11-24 — Godot: giocatori che non si compenetrano, respiro dopo il recupero palla (opzione `contatti`)
+Luis dall'iPhone: "ogni tanto i giocatori si compenetrano" e "quando il mio giocatore recupera la palla sono talmente uno
+sopra l'altro che qualunque passaggio io faccia mi rubano la palla".
+- Causa: il motore teneva i centri ad almeno 0,7 m (separazione rigida in `motion.gd`), ma le figure sono ingrandite
+  ×1,25: a 0,7 m il difensore piegato in avanti entra con la testa nel petto del portatore (prova_vista
+  `--scena=contatto --dist=0.7`); due giocatori stavano sotto 0,85 m il 30% del tempo di gioco. Dopo un recupero
+  l'avversario più vicino era sotto 1 m nel 37% dei casi, il duello/fuga (rallenty che invita a passare) si apriva nel
+  94%, e un passaggio della persona con un avversario entro 1 m veniva intercettato entro 1 s nel 44% dei casi (spesso
+  nello stesso passo del calcio: il pallone parte 0,6 m davanti al portatore, cioè sui piedi di chi ha appena perso palla).
+- Scelte (`godot/sim/contatti.gd`): spinta morbida fino a 0,9 m (il portatore non viene spostato, chi va addosso perde
+  la velocità verso l'altro); respiro dopo il recupero della persona (0,8 s senza contrasti, avversari entro 2,5 m
+  senza contrasto per 1,1 s); passaggio della persona non intercettabile nei primi 3 m da chi stava entro 1,5 m dal
+  pallone, o entro 2,5 m fuori dalla linea del passaggio. Solo per la persona: la CPU non ha il respiro.
+- Misure (controllo_gameplay, 80 partite stessi semi, `--senza-contatti` contro con): sotto 0,85 m 30% → 0% del tempo;
+  distanza minima media 1,44 → 1,53 m; passaggi della persona intercettati entro 1 s 21% → 13% (con avversario entro
+  1 m 44% → 12%); recuperi persi entro 2 s 21% → 19%, di cui per contrasto 12 → 3 (il resto sono dribbling scelti e
+  passaggi più lunghi); V/N/P 35/30/15 → 34/34/12, gol 0,86-0,45 → 0,81-0,38. La CPU resta competitiva.
+- Resta da provare sull'iPhone: se a 0,9 m le figure si toccano ancora nei contrasti di fianco; se il respiro sembra
+  un regalo (eventualmente RESPIRO_PROTECT più corto).

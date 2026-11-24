@@ -115,7 +115,7 @@ class Bot:
 
 # Gioca una partita intera a passi di 1/60 s (playMatch in harness.mjs).
 # opt: seed, my, op, mode ('bot' = umano simulato contro IA, 'ai' = IA contro IA), halfLen, fA, fB, maxSteps,
-# tired ([[squadra, indice, energia iniziale], ...], facoltativo).
+# tired ([[squadra, indice, energia iniziale], ...], facoltativo), extra (altre opzioni della partita, facoltativo).
 # onStep(m) viene chiamato a ogni passo prima che gli eventi vengano svuotati. Ritorna {m, steps}.
 static func playMatch(opt: Dictionary, onStep: Callable = Callable()) -> Dictionary:
 	var sd: int = opt.get("seed", 1)
@@ -124,7 +124,7 @@ static func playMatch(opt: Dictionary, onStep: Callable = Callable()) -> Diction
 	var tb := mkTeam("B", opt.get("op", 60.0), sd * 13 + 5, opt.get("fB", "4-4-2"))
 	for t: Array in opt.get("tired", []): # [squadra, indice, energia iniziale]: giocatori che partono stanchi
 		([ta, tb][int(t[0])].players[int(t[1])] as Dictionary)["energy0"] = float(t[2])
-	var m := newMatch(sd, opt.get("halfLen", 150.0), [true, false] if mode == "bot" else [false, false], ta, tb, String(opt.get("meteo", "")))
+	var m := newMatch(sd, opt.get("halfLen", 150.0), [true, false] if mode == "bot" else [false, false], ta, tb, String(opt.get("meteo", "")), opt.get("extra", {}))
 	m.headCtl = bool(opt.get("testa", false))
 	var bot: Bot = Bot.new(sd + 9) if mode == "bot" else null
 	var maxSteps: int = opt.get("maxSteps", 60 * 60 * 30)

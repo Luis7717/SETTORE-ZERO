@@ -106,6 +106,10 @@ class Kick:
 	var age: float = 0.0
 	var type: String = "ground"
 	var human: bool = false
+	# contatti.gd (opzione "contatti"): avversari vicini al calcio che non lo toccano nei primi metri, e da dove è partito
+	var shield: Array = []
+	var sx: float = 0.0
+	var sy: float = 0.0
 
 	static func make(team_: int, kicker_: Player, type_: String, age_: float = 0.0, off_: Array = [], human_: bool = false) -> Kick:
 		var k := Kick.new()

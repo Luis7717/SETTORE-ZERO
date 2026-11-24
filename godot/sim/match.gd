@@ -11,6 +11,9 @@
 # deflectBehind: niente "campanili" sulle respinte in angolo da lontano; duel.gd burstDir: Scatto in avanti).
 # Opzione "falli" (predefinita false, la accende il gioco): i contrasti da dietro e in ritardo a volte sono fallo
 # (falli.gd): punizioni, vantaggio, cartellini, qualche rigore.
+# Opzione "contatti" (predefinita false, la accende il gioco): i giocatori non si compenetrano (spinta morbida fino a
+# 0,9 m), respiro dopo il recupero palla della persona e passaggio che parte bene non intercettato da chi è addosso
+# (contatti.gd).
 # Opzione "parata" (predefinita false, la accende il gioco): fermatempo della parata col bersaglio sulla porta e il punto
 # scelto rispettato (parata.gd).
 class_name SimMatch
@@ -134,6 +137,7 @@ func _init(o: Dictionary) -> void:
 	paraSeed = sd
 	riprese = bool(o.get("riprese", false))
 	falliOn = bool(o.get("falli", false))
+	contattiOn = bool(o.get("contatti", false))
 	if riprese:
 		raccattaPrepara() # raccattapalle dietro le porte (raccatta.gd)
 	roll = wx.roll
@@ -604,6 +608,8 @@ func kick(p: R.Player, spec: Dictionary) -> void:
 			if m.team == tm and m != p and not m.off and m.y * dir > line + 0.3 and m.y * dir > sy * dir + 0.3 and m.y * dir > 0.0:
 				off.append(m)
 	b.kick = R.Kick.make(tm, p, type, 0.0, off, bool(spec.get("human", false)))
+	if contattiOn and b.kick.human and type != "shot":
+		shieldOf(b.kick, Lc.sx, Lc.sy, Lc.vx, Lc.vy) # contatti.gd
 	b.shot = null
 	detectShot()
 	if b.shot != null and b.shot.team == tm:
@@ -847,6 +853,8 @@ func step(dt: float) -> void:
 			r.t += dt
 			if (r.t >= r.wait) if not human[r.team] else (r.t > 14.0):
 				aiRestart()
+	if contattiOn:
+		respiroStep() # contatti.gd: respiro dopo il recupero palla della persona
 	if riprese:
 		raccattaStep(dt) # raccattapalle (raccatta.gd): fuori dal campo, anche a scena finita torna al posto
 	fireQueued()

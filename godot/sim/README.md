@@ -25,6 +25,7 @@ lo stato (pallone e 22 giocatori) è identico al JS a ogni passo, con stessi eve
 | — | `stili.gd` (solo Godot) | stili di gioco (attacco/difesa): parametri, nomi, stile delle squadre della CPU |
 | — | `falli.gd` (solo Godot) | falli sui contrasti da dietro e in ritardo (opzione `falli`): punizioni, vantaggio, cartellini, rigori |
 | — | `testa.gd`, `raccatta.gd`, `riprese.gd` (solo Godot) | colpo di testa controllato; raccattapalle; riprese senza teletrasporto (opzione `riprese`) |
+| — | `contatti.gd` (solo Godot) | giocatori che non si compenetrano (spinta morbida fino a 0,9 m), respiro dopo il recupero palla della persona, passaggio che parte bene (opzione `contatti`) |
 | — | `angoli.gd` (solo Godot) | difesa sui calci d'angolo con l'opzione `rifiniture`: marcatura, contesa aerea, uscite del portiere |
 
 Uso dal gioco: `var m := SimMatch.new({"seed": 7, "halfLen": 150.0, "human": [true, false], "teams": [a, b]})`,
@@ -35,7 +36,7 @@ A fine partita chiamare **`m.dispose()`** (vedi "Differenze").
 ## Differenze dal JS (tutte senza effetto sul risultato)
 
 - **Mixin → ereditarietà.** In JS `Match` riceve i metodi di `duel.js`, `motion.js`, `ai.js`; qui è una catena
-  `base.gd → duel.gd → motion.gd → ai.gd → match.gd`. I metodi che un file "basso" chiama ma che stanno più in alto
+  `base.gd → duel.gd → contatti.gd → motion.gd → ai.gd → match.gd`. I metodi che un file "basso" chiama ma che stanno più in alto
   (`kick`, `setRestart`, `followPath`, `endDuel`, …) hanno in `base.gd` un segnaposto che `match.gd` ridefinisce.
   Gli script si richiamano con `preload` relativi: funzionano anche senza la cache delle `class_name` (`godot -s`).
 - **Funzioni matematiche.** `sin`, `cos`, `atan2` di Godot usano la libreria C del sistema e differiscono da V8 di
