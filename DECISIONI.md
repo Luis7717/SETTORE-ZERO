@@ -1659,3 +1659,40 @@ Dettagli in `godot/README.md`, "Altezza e corporatura". File nuovo `godot/script
   l'opzione `rifiniture` e conta il pugno come uscita non a vuoto.
 - **Da provare sull'iPhone**: se sugli angoli della CPU i nostri difensori attaccati agli attaccanti sembrano naturali,
   se il portiere che esce sui cross corti piace.
+
+## 2026-11-24 — Godot: tornano i falli (pochi), con punizioni, vantaggio, cartellini e qualche rigore
+Il controllo del gameplay aveva visto **zero falli** in 400+ partite: venivano solo dalle scivolate, tolte il 2026-11-20.
+Proposta approvata da Luis: rimetterli, pochi, sui contrasti da dietro o in ritardo.
+- **Dove**: `godot/sim/falli.gd` (nuovo anello della catena tra `motion.gd` e `testa.gd`), opzione `"falli": true`
+  del Match messa da `gioco.gd` (spenta in lezioni e prove di tiro; spenta nei test di confronto col JS, che restano
+  identici). Il fallo usa `foulCall` di `motion.gd` (prima `foul`, che resta per la scivolata come in JS).
+- **Regole** (costanti in cima a `falli.gd`): angolo = coseno tra dove guarda il portatore e dove sta chi entra.
+  Sotto −0,35 **da dietro** (fallo 90% × fattori, giallo 35%), fino a 0,1 **di fianco** (40%, giallo 10%), sopra
+  **frontale = sempre pulito** (e non consuma numeri casuali). **In ritardo**: entro 0,3 s dal calcio, avversario a
+  meno di 1 m che va addosso a chi ha calciato a più di 3,5 m/s, 18% × fattori (un tentativo a testa per calcio), giallo
+  30%. Fattori: velocità di chi entra (/5 m/s, 0,5-1,5), difesa (±1,5% per punto da 60, 0,5-1,6), pioggia ×1,25,
+  **squadra della persona ×0,3** (la persona difende due terzi del tempo e la sua difesa "magnetica" entra tanto: con
+  ×0,6 i suoi falli erano l'80%). Il portiere non fa falli.
+- **Esito**: secondo giallo = rosso ed espulso (come prima). In area rigore. Vantaggio sul contrasto come prima
+  (`advantageOk`), chi ha fatto fallo si ferma 0,5 s e non contrasta per 1 s. Fallo in ritardo fuori area: vantaggio
+  solo negli ultimi 35 m (se il pallone si perde entro 2,5 s si torna alla punizione), più indietro punizione subito.
+  Fallo in ritardo **sul tiro**: da fuori area non si fischia; in area il tiro va avanti ("Vantaggio!") e se non è gol
+  è **rigore** (`penPend`, `falliStep`, al massimo 3 s; ribattuta presa da un compagno = si gioca).
+- **Numeri** (`tools/controllo_gameplay.gd`, persona simulata, umano 60 contro CPU 60, 120 partite da 2×150 s, stessi
+  semi; prima = codice di partenza, dopo = con l'opzione): falli 0 → **2,2 a partita** (persona 1,4, CPU 0,8; per 90'
+  ~40), gialli 0 → 0,58, rossi 0 → 0 (1 su 60 partite in una prova intermedia), rigori 0 → 0,025 (3 in 120 partite,
+  tutti dopo un fallo sul tiro in area), punizioni 0 → 1,5 (6 gol), vantaggi 0 → 0,94; V/N/P 29/52/39 → 35/44/41,
+  gol 0,46-0,60 → 0,56-0,60, tiri 2,3-8,1 → 2,3-8,7. Come: in ritardo 198, da dietro 39, di fianco 27 (su 264).
+- **Parti rimaste ferme e sistemate**: con un fallo e il vantaggio nello stesso passo la scritta "Ammonito" veniva
+  coperta subito da "Vantaggio!"; sul rigore "RIGORE!" copriva il cartellino. Ora: cartellino disegnato sopra la
+  scritta (`hud.mostra_cartellino`, giallo o rosso, sparisce con la scritta), "Ammonito"/"Espulso!" col nome,
+  "Vantaggio!" col nome e il cartellino, "RIGORE!" col nome e il cartellino. Tabellino: righe Ammonizioni ed Espulsioni
+  (solo se ce ne sono) nel dopo partita, nelle statistiche e nella fine partita di prova; "ammonito"/"espulso" nella
+  pagella (`conta_giocatori` conta `gialli`/`rossi`, fuori dalla crescita). Nuove statistiche `yellows`/`reds` del Match.
+  Punizione con barriera, rigore, espulsione (fuori dal campo, si gioca in 10), vantaggio e ritorno alla punizione
+  verificati da test e schermate.
+- **Non convince / da sapere**: la CPU non fa mai falli da dietro sul portatore della persona (alle spalle si apre la
+  fuga col tasto Scatto e il difensore non contrasta): i falli della CPU sono quasi tutti in ritardo. I rigori restano
+  rarissimi (1 ogni ~40 partite): in area i contrasti sono pochissimi. Il fallo non ha un'animazione (niente caduta,
+  niente arbitro: le clip `giallo` dell'arbitro restano non usate).
+- Test: `tests/test_falli.gd`. Prove a schermo: `--scena=fallo|rigore|espulso`.

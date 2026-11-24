@@ -6,7 +6,7 @@
 # è passato (gli passa sopra, lo prende la difesa o il portiere). Senza fermatempo tutto resta come prima.
 # Solo con l'opzione "testa" della partita (headCtl): le partite di confronto col JS restano identiche.
 # Quanto dura il fermatempo in secondi veri lo decide il gioco (scripts/partita/fermatempo_testa.gd).
-extends "motion.gd"
+extends "falli.gd"
 
 const HEAD_WIN_T := 1.0     # il fermatempo si apre quando il colpo è previsto entro questo tempo di partita (s)
 const HEAD_WIN_MIN := 0.25  # ... ma non se manca meno di così (troppo tardi per disegnare) (s)

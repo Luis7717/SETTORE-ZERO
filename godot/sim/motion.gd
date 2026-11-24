@@ -489,16 +489,28 @@ func deflectBehind(p: R.Player) -> void:
 	predT = 0.0
 
 
+# Fallo della scivolata (come in JS): giallo se entra alle spalle del portatore.
 func foul(by: R.Player, on: R.Player) -> void:
+	foulCall(by, on, by.sdx * on.fx + by.sdy * on.fy > 0.45, "scivolata")
+
+
+# Fallo di `by` su `on`: statistiche, cartellino (giallo; il secondo è rosso = espulso), rigore se in area, altrimenti
+# vantaggio o punizione. how = com'è nato: "scivolata", "dietro", "fianco" (contrasto, falli.gd) o "ritardo" (falli.gd:
+# `on` ha appena calciato, si lascia correre se il pallone è ancora della sua squadra, lateAdvantageOk).
+# held = fallo in ritardo su un tiro in area (falli.gd): solo segnato (cartellino compreso), il gioco va avanti; il
+# rigore lo dà falliStep se il tiro non finisce in gol.
+func foulCall(by: R.Player, on: R.Player, yellow: bool, how: String, held: bool = false) -> void:
 	stats.fouls[by.team] += 1
-	var behind: bool = by.sdx * on.fx + by.sdy * on.fy > 0.45
 	var card := "" # "" = nessun cartellino (null in JS)
-	if behind:
+	if yellow:
 		by.yellow += 1
 		card = "red" if by.yellow >= 2 else "yellow"
+		stats.yellows[by.team] += 1
+		if card == "red":
+			stats.reds[by.team] += 1
 	var dirD: float = -1.0 if by.team else 1.0
 	var inBox: bool = absf(on.x) < BOX_W / 2.0 and on.y * dirD < -HL + BOX_D
-	ev("foul", {"by": by, "on": on, "card": card if card != "" else null, "pen": inBox})
+	ev("foul", {"by": by, "on": on, "card": card if card != "" else null, "pen": inBox and not held, "how": how})
 	var ox: float = on.x
 	var oy: float = on.y
 	if card == "red":
@@ -508,13 +520,16 @@ func foul(by: R.Player, on: R.Player) -> void:
 		by.state = "play"
 		if ctrl[by.team] == by:
 			ctrl[by.team] = null
-	elif not inBox and advantageOk(on, by):
+	if held:
+		return
+	if card != "red" and not inBox and (lateAdvantageOk(on) if how == "ritardo" else advantageOk(on, by)):
 		advantage = R.Advantage.new()
 		advantage.team = on.team
 		advantage.x = ox
 		advantage.y = oy
 		advantage.t = ADV_TIME
 		ev("advantage", {"team": on.team, "p": on})
+		afterFoul(by)
 		return
 	if inBox:
 		setRestart("penalty", on.team, 0.0, 0.0)
@@ -563,6 +578,9 @@ func contacts(dt: float) -> void:
 		return
 	if b.kick != null:
 		b.kick.age += dt
+	# opzione "falli" (falli.gd): chi entra su uno che ha appena calciato (fallo in ritardo)
+	if falliOn and lateFoul() and phase != "play":
+		return
 	var best: R.Player = null
 	var bd: float = 9.0
 	var bestAir := ""
@@ -733,6 +751,9 @@ func _contactsOwned(dt: float, b: R.Ball) -> void:
 			# chi va sul portatore da solo (CPU) ruba più piano di chi muove la persona (controllato, linea, linea appena finita)
 			if ho and not dirH:
 				need *= 2.4
+			# opzione "falli" (falli.gd): il contrasto da dietro a volte è fallo invece di rubare il pallone
+			if o.contact >= need and falliOn and foulTackle(o, c):
+				return
 			if o.contact >= need and rnd() < TACKLE_LOOSE:
 				o.contact = 0.0
 				o.tackleCd = 0.5

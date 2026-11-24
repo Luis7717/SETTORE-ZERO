@@ -15,6 +15,8 @@
 #   --esci-a-fine       a fine partita stampa il riassunto ed esce (codice 0)
 #   --scena=area|duello|fuga|scatto|angolo|rinvio|rilancio|pausa|gol|curva|prima   mette la partita in una situazione da fotografare (gol: tiro a
 #                       porta vuota, per vedere cronaca e replay)
+#   --scena=fallo|rigore|espulso   fallo da dietro sul nostro n. 10 (sim/falli.gd): giallo e punizione con la barriera,
+#                       giallo e rigore, secondo giallo = espulso
 #   --scena=parata|parata_linea   tiro avversario: fermatempo della parata col bersaglio (parata_linea: dito che disegna)
 #   --scena=fuori_lato|fuori_fondo|fuori_fondo_vicino|fuori_rete|fuori_angolo   pallone che esce: scena della ripresa
 #                       (sim/riprese.gd), rimessa, rinvio col raccattapalle (sim/raccatta.gd), rinvio col pallone vicino,
@@ -116,6 +118,8 @@ var cronaca_vista: CronacaVista = null
 var tifo_eventi := TifoEventi.new()   # fatti del motore → pubblico 3D e cori (occasione, parata, palo, fischio)
 var _festa_finita := false    # il motore ha finito la festa del gol ed è trattenuto (aspetta esultanza e replay)
 var _esultanza_in_corso := false
+var _fallo_nel_passo := false     # c'è un fallo tra gli eventi del passo (la scritta del vantaggio la fa _fallo)
+var _cartellino_rigore: Array = [] # fallo in area col cartellino: [colore, nome] da mostrare con "RIGORE!"
 
 var _opzioni := {}
 var _avvio := {}              # opzioni di avvia() (vuoto = partita di prova da sola)
@@ -237,7 +241,9 @@ func _crea_partita() -> void:
 	m = SimMatchScript.new({"seed": seme, "halfLen": tempo, "human": [me == 0, me == 1],
 		"autoGk": [auto_gk and me == 0, auto_gk and me == 1], "teams": squadre, "meteo": meteo.meteo, "testa": true, "parata": true, "rifiniture": true,
 		# lezioni e prove di tiro: il tiratore non parte da solo e le riprese restano immediate
-		"portaAuto": tipo() != "allenamento" and tipo() != "prove", "riprese": tipo() != "allenamento" and tipo() != "prove"})
+		"portaAuto": tipo() != "allenamento" and tipo() != "prove", "riprese": tipo() != "allenamento" and tipo() != "prove",
+		# falli sui contrasti da dietro e in ritardo (sim/falli.gd): non nelle lezioni e nelle prove di tiro
+		"falli": tipo() != "allenamento" and tipo() != "prove"})
 	if tipo() == "allenamento":
 		tempo = Allenamento.HALF_LEN
 		if not avviata_da_app():
@@ -483,9 +489,12 @@ func _aggiorna_hud() -> void:
 func _eventi() -> void:
 	conta.leggi(m)
 	var adv := false
+	_fallo_nel_passo = false
 	for e: Dictionary in m.events:
 		if e.type == "advantage":
 			adv = true
+		elif e.type == "foul":
+			_fallo_nel_passo = true
 	for e: Dictionary in m.events:
 		_evento(e, adv)
 		tifo_eventi.applica(e, vista, audio)
@@ -508,7 +517,8 @@ func _evento(e: Dictionary, adv: bool) -> void:
 			if int(e.team) == me:
 				gesti.cancel() # una linea a metà (es. difesa) non vale: ora si disegna il colpo di testa
 		"advantage":
-			hud.big("Vantaggio!", "", 1100)
+			if not _fallo_nel_passo:
+				hud.big("Vantaggio!", "", 1100)
 		"advantage_back":
 			audio.whistle()
 			hud.big("Si torna alla punizione", "", 1300)
@@ -631,23 +641,40 @@ func _ripartenza(e: Dictionary) -> void:
 	if e.kind == "corner":
 		hud.big("Calcio d'angolo", "", 1300)
 	elif e.kind == "penalty":
-		hud.big("RIGORE!", "g" if e.team == me else "b", 1800)
+		var cr := _cartellino_rigore
+		_cartellino_rigore = []
+		var piccolo := ""
+		if not cr.is_empty():
+			piccolo = String(cr[1]) # il nome (la scritta grande non ha spazio per "Ammonito ..."): il cartellino lo dice
+		hud.big("RIGORE!", "g" if e.team == me else "b", 2000 if piccolo != "" else 1800, piccolo)
+		if not cr.is_empty():
+			hud.mostra_cartellino(cr[0])
 
 
+# Fallo (falli.gd): fischio e scritta; col cartellino anche il cartellino disegnato sopra la scritta e il nome.
+# Col vantaggio niente fischio: "Vantaggio!" (e sotto chi è stato ammonito); in area la scritta la fa il rigore.
 func _fallo(e: Dictionary, adv: bool) -> void:
 	var card: Variant = e.get("card")
 	var chi: String = (e.by as R.Player).name if e.by != null else ""
 	if adv:
 		if card != null:
-			hud.big("Espulso!" if card == "red" else "Ammonito", "b", 1500, chi)
+			hud.big("Vantaggio!", "", 1600, chi) # col cartellino sopra: il nome di chi è ammonito
+			hud.mostra_cartellino(String(card))
+		else:
+			hud.big("Vantaggio!", "", 1100)
 		return
 	audio.whistle()
+	if e.get("pen", false):
+		_cartellino_rigore = [String(card), chi] if card != null else []
+		return
 	var testo := "Fallo"
 	if card == "red":
 		testo = "Espulso!"
 	elif card == "yellow":
 		testo = "Ammonito"
-	hud.big(testo, "b" if card != null else "", 1500, chi if card != null else "")
+	hud.big(testo, "b" if card == "red" else ("g" if card == "yellow" else ""), 1700 if card != null else 1200, chi if card != null else "")
+	if card != null:
+		hud.mostra_cartellino(String(card))
 
 
 # ---------------------------------------------------------------- tocchi (un dito solo)
@@ -780,8 +807,18 @@ func dati_fine() -> Dictionary:
 		"marcatori": marcatori,
 		"statistiche": [["Tiri", st.shots[0], st.shots[1]], ["In porta", st.onT[0], st.onT[1]],
 			["Possesso", "%d%%" % p0, "%d%%" % (100 - p0)], ["Angoli", st.corners[0], st.corners[1]],
-			["Falli", st.fouls[0], st.fouls[1]], ["Parate", st.saves[0], st.saves[1]]],
+			["Falli", st.fouls[0], st.fouls[1]]] + _righe_cartellini(st) + [["Parate", st.saves[0], st.saves[1]]],
 	}
+
+
+## righe dei cartellini per la schermata di fine (solo se ce n'è stato almeno uno)
+static func _righe_cartellini(st: Dictionary) -> Array:
+	var out: Array = []
+	for voce: Array in [["Ammonizioni", "yellows"], ["Espulsioni", "reds"]]:
+		var v: Array = st.get(voce[1], [0, 0])
+		if int(v[0]) + int(v[1]) > 0:
+			out.append([voce[0], int(v[0]), int(v[1])])
+	return out
 
 
 func riassunto() -> String:
@@ -1035,6 +1072,25 @@ func _prepara_scena(nome: String) -> void:
 		"pausa":
 			await get_tree().create_timer(0.8).timeout
 			_mostra_pausa()
+		"fallo", "rigore", "espulso": # fallo da dietro sul nostro n. 10 (sim/falli.gd): giallo e punizione con la
+			# barriera a 24 m dalla porta, giallo e rigore in area, secondo giallo = rosso
+			_metti_in_gioco()
+			var df := 1.0 if me == 0 else -1.0
+			var dif: R.Player = m.team(1 - me)[3]
+			var dal_fondo := 12.0 if nome == "rigore" else 24.0
+			_sposta(att, 5.0, df * (C.HL - dal_fondo))
+			_sposta(dif, 5.0, df * (C.HL - dal_fondo - 0.8))
+			_sposta(m.team(1 - me)[4], 7.5, df * (C.HL - dal_fondo + 1.0)) # un altro addosso: niente vantaggio
+			att.fx = 0.0
+			att.fy = df
+			m.ball.owner = att
+			m.ball.last = att
+			m.ball.x = att.x
+			m.ball.y = att.y + 0.6 * df
+			m.ctrl[me] = att
+			if nome == "espulso":
+				dif.yellow = 1
+			m.foulCall(dif, att, true, "dietro")
 
 
 # dito che disegna un passaggio verso `a` e resta giù (per vedere linea, anteprima e rallenty del disegno)

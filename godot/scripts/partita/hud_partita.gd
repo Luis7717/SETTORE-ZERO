@@ -37,6 +37,11 @@ const FADE_S := 0.35
 const RALLENTY_K := 10.0          # 1/s: il bordo del rallenty si accende e si spegne in ~0,15 s
 const TESTO_CAM := "‹ › Trascina il campo per girare la visuale"
 const FONT_GRASSETTO := 0.7      # quanto si ingrossa il carattere per titoli, punteggio e tasti
+const CARTELLINO := Vector2(34, 48)      # cartellino sopra la scritta grande (punti logici)
+const CARTELLINO_SU := 60.0              # ... quanto sta sopra la scritta
+const CARTELLINO_GIRO := -0.14           # ... un po' inclinato, come alzato dall'arbitro (radianti)
+const CARTELLINO_GIALLO := Color("#ffd400")
+const CARTELLINO_ROSSO := Color("#e8202a")
 
 var vista = null                  # per l'anteprima del calcio e per niente altro (world_to_screen)
 var gesti = null
@@ -65,6 +70,7 @@ var _mappa: Control
 var _big: Label
 var _big_fino := 0
 var _big_tween: Tween = null
+var _cartellino: Panel            # cartellino giallo o rosso sopra la scritta grande (figlio di _big: sparisce con lei)
 var _suggerimento: PanelContainer
 var _suggerimento_l: Label
 var _dribbling: Button
@@ -239,6 +245,13 @@ func _crea_centro() -> void:
 	_big.add_theme_constant_override("outline_size", 10)
 	_big.modulate.a = 0.0
 	add_child(_big)
+	_cartellino = Panel.new()
+	_cartellino.size = CARTELLINO
+	_cartellino.pivot_offset = CARTELLINO / 2.0
+	_cartellino.rotation = CARTELLINO_GIRO
+	_cartellino.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_cartellino.visible = false
+	_big.add_child(_cartellino)
 	_cam_tip = _pillola()
 	_cam_tip.get_child(0).text = TESTO_CAM
 	_cam_tip.visible = false
@@ -332,6 +345,7 @@ func _disponi() -> void:
 	_big.size = Vector2(tutto.x, 0)
 	_big.position = Vector2(0, tutto.y * BIG_TOP)
 	_big.pivot_offset = Vector2(tutto.x / 2.0, 30.0)
+	_cartellino.position = Vector2((tutto.x - CARTELLINO.x) / 2.0, -CARTELLINO_SU)
 	_adatta_pillola(_cam_tip, s.size.x - 12.0 - 96.0)
 	_cam_tip.position = Vector2(s.position.x + 12.0 + (s.size.x - 108.0 - _cam_tip.size.x) / 2.0, top + 52.0)
 	_frecce[0].position = Vector2(s.position.x + 6.0, tutto.y * 0.46)
@@ -490,6 +504,7 @@ func big(testo: String, classe: String = "", ms: int = 1400, piccolo: String = "
 	_big.text = testo + ("\n" + piccolo if piccolo != "" else "")
 	_big.add_theme_color_override("font_color", GIALLO if classe == "g" else (ROSSO if classe == "b" else Color.WHITE))
 	_big_fino = Time.get_ticks_msec() + ms
+	_cartellino.visible = false
 	_big.modulate.a = 0.0
 	_big.scale = Vector2(0.8, 0.8)
 	var tw := _nuovo_tween_big().set_parallel()
@@ -503,6 +518,24 @@ func _nuovo_tween_big() -> Tween:
 		_big_tween.kill()
 	_big_tween = create_tween()
 	return _big_tween
+
+
+## cartellino ("yellow" o "red") sopra la scritta grande appena mostrata con big(); sparisce con lei
+func mostra_cartellino(colore: String) -> void:
+	var s := _stile(CARTELLINO_ROSSO if colore == "red" else CARTELLINO_GIALLO, 4, Color(0, 0, 0, 0.55))
+	s.set_border_width_all(2)
+	s.shadow_color = Color(0, 0, 0, 0.45)
+	s.shadow_size = 6
+	_cartellino.add_theme_stylebox_override("panel", s)
+	_cartellino.visible = true
+
+
+## colore del cartellino mostrato ("" se nessuno), per le prove
+func cartellino_mostrato() -> String:
+	if not _cartellino.visible or _big_fino <= 0:
+		return ""
+	var s := _cartellino.get_theme_stylebox("panel") as StyleBoxFlat
+	return "red" if s != null and s.bg_color == CARTELLINO_ROSSO else "yellow"
 
 
 func testo_big() -> String:

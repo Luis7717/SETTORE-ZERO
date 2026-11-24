@@ -4,7 +4,7 @@
 # Il tempo scorre come nel gioco (rallenty, fermatempo del colpo di testa): si misura anche il tempo VERO.
 #   $G --headless --path godot -s res://tools/controllo_gameplay.gd -- --partite=20 --forza=60 --mia=60 --tempo=150
 #   opzioni: --seme=1 (primo seme) · --stile=<attacco della squadra umana> · --stilecpu=att/dif|caso|base
-#            --meteo=caso|sereno|pioggia|neve · --righe (una riga per partita)
+#            --meteo=caso|sereno|pioggia|neve · --righe (una riga per partita) · --senza-falli (opzione "falli" spenta)
 # Stampa una tabella per gruppi: risultati, tiri, meccaniche della persona, riprese, fluidità, possibili bug.
 extends SceneTree
 
@@ -92,7 +92,8 @@ func _partita(sd: int, opz: Dictionary) -> void:
 	var meteo: String = opz.get("meteo", "caso")
 	if meteo == "caso":
 		meteo = ["sereno", "sereno", "nuvoloso", "pioggia", "neve"][sd % 5]
-	var m := H.newMatch(sd, tempo, [true, false], ta, tb, meteo, {"portaAuto": true, "testa": true, "rifiniture": not opz.has("senza-rifiniture")})
+	var m := H.newMatch(sd, tempo, [true, false], ta, tb, meteo, {"portaAuto": true, "testa": true, "rifiniture": not opz.has("senza-rifiniture"),
+		"falli": not opz.has("senza-falli")})
 	var dito := Dito.new(sd * 31 + 7)
 	var st := {"ts": 1.0, "testa_reale": -1.0, "last_restart": ["", ""], "last_restart_t": [-99.0, -99.0],
 		"pass": null, "owner_prev": null, "fermo_t": 0.0, "libera_t": 0.0, "slow": false, "ultimo_calcio": {},
@@ -272,8 +273,11 @@ func _conta(m, st: Dictionary, sdt: float) -> void:
 					st.pass = null
 			"foul":
 				_add("fallo")
+				_add("fallo" + _chi(e.by))
+				_add("fallo_come:" + String(e.get("how", "?")) + _chi(e.by))
 				if e.get("card", null) != null:
 					_add("cartellino")
+					_add("giallo" if e.card == "yellow" else "rosso")
 				if e.get("pen", false):
 					_add("rigore")
 			"offside":
@@ -333,6 +337,12 @@ func _conta(m, st: Dictionary, sdt: float) -> void:
 				var on: R.Player = e.get("on", null)
 				if on != null:
 					_add("contrasto_su" + _chi(on))
+					var tp: R.Player = e.p
+					var dx := tp.x - on.x
+					var dy := tp.y - on.y
+					var dn := maxf(0.01, C.hyp(dx, dy) * maxf(0.01, C.hyp(on.fx, on.fy)))
+					var dot := (on.fx * dx + on.fy * dy) / dn
+					_add("contrasto_angolo:" + ("dietro" if dot < -0.35 else ("fianco" if dot < 0.1 else "fronte")))
 			"head_win":
 				if int(e.team) == 0:
 					_add("testa_fermatempo")
@@ -347,6 +357,8 @@ func _conta(m, st: Dictionary, sdt: float) -> void:
 				_add("aereo")
 			"advantage":
 				_add("vantaggio")
+			"advantage_back":
+				_add("vantaggio_indietro")
 	# passaggi: completati / persi al primo controllo
 	var o: R.Player = b.owner
 	if o != null and st.pass != null and m.phase == "play":
@@ -445,9 +457,13 @@ func _stampa(n: int, opz: Dictionary) -> void:
 		_v("vinte"), _v("pari"), _v("perse"), _v("gf") / N, _v("gs") / N, _v("tiri_u") / N, _v("tiri_c") / N, _v("inporta_u") / N, _v("inporta_c") / N, 100.0 * _v("poss_u") / N])
 	print("PARATE     umano %.1f (prese %s) · CPU %.1f (prese %s) · pali %.2f · tuffi del dito %.1f" % [_v("parata_u") / N, _pct(_v("presa_u"), _v("parata_u")),
 		_v("parata_c") / N, _pct(_v("presa_c"), _v("parata_c")), _v("palo") / N, _v("tuffo_u") / N])
-	print("RIPRESE    a partita: rimesse %.1f · angoli %.1f-%.1f · rinvii %.1f · punizioni %.1f · rigori %.2f · falli %.1f · cartellini %.2f · fuorigioco %.2f/%.2f · vantaggi %.2f" % [
+	print("RIPRESE    a partita: rimesse %.1f · angoli %.1f-%.1f · rinvii %.1f · punizioni %.1f · rigori (fallo in area) %.2f · falli %.1f · cartellini %.2f · fuorigioco %.2f/%.2f · vantaggi %.2f" % [
 		_v("ripresa:throw") / N, _v("angoli_u") / N, _v("angoli_c") / N, _v("ripresa:goalkick") / N, _v("ripresa:freekick") / N, _v("rigore") / N,
 		_v("fallo") / N, _v("cartellino") / N, _v("fuorigioco_u") / N, _v("fuorigioco_c") / N, _v("vantaggio") / N])
+	print("FALLI      a partita %.2f (umano %.2f, CPU %.2f) · per 90' %.1f · gialli %.2f · rossi %.3f · rigori %.3f · vantaggi %.2f (tornati indietro %d) · come %s · gol da punizione %d, da rigore %d" % [
+		_v("fallo") / N, _v("fallo_u") / N, _v("fallo_c") / N, _v("fallo") / N * 5400.0 / (2.0 * float(opz.get("tempo", "150"))), _v("giallo") / N, _v("rosso") / N, _v("ripresa:penalty") / N,
+		_v("vantaggio") / N, _v("vantaggio_indietro"), _elenco("fallo_come:"), _v("gol_da_u:freekick") + _v("gol_da_c:freekick"), _v("gol_da_u:penalty") + _v("gol_da_c:penalty")])
+	print("CONTRASTI  angolo dei contrasti riusciti %s" % _elenco("contrasto_angolo:"))
 	print("ANGOLI     gol da angolo umano %d su %d angoli (%s) · CPU %d su %d (%s)" % [_v("gol_da_u:corner"), _v("angoli_u"), _pct(_v("gol_da_u:corner"), _v("angoli_u")),
 		_v("gol_da_c:corner"), _v("angoli_c"), _pct(_v("gol_da_c:corner"), _v("angoli_c"))])
 	print("FLUIDITA'  tempo vero %.0f s a partita (gioco %.0f s) · rallenty %s del tempo vero, %.1f volte a partita, %.1f s veri l'uno · fermatempo testa %.1f s · gioco fermo (riprese) %s del tempo di gioco · pallone libero più lungo %.1f s" % [
