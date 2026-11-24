@@ -27,6 +27,7 @@ lo stato (pallone e 22 giocatori) è identico al JS a ogni passo, con stessi eve
 | — | `testa.gd`, `raccatta.gd`, `riprese.gd` (solo Godot) | colpo di testa controllato; raccattapalle; riprese senza teletrasporto (opzione `riprese`) |
 | — | `contatti.gd` (solo Godot) | giocatori che non si compenetrano (spinta morbida fino a 0,9 m), respiro dopo il recupero palla della persona, passaggio che parte bene (opzione `contatti`) |
 | — | `angoli.gd` (solo Godot) | difesa sui calci d'angolo con l'opzione `rifiniture`: marcatura, contesa aerea, uscite del portiere |
+| — | `difesa.gd` (solo Godot) | fase difensiva con l'opzione `rifiniture`: rientri degli esterni, a uomo per zona e ruolo col libero, linea del fuorigioco che sale, secondo pressatore che chiude la linea di passaggio |
 
 Uso dal gioco: `var m := SimMatch.new({"seed": 7, "halfLen": 150.0, "human": [true, false], "teams": [a, b]})`,
 poi `m.step(dt)` a ogni fotogramma, `m.events` da leggere e svuotare, i comandi `m.userPath(...)`, `m.userKick(...)`, ….

@@ -90,6 +90,26 @@ const UOMO_GAP := 1.3          # distanza dall'avversario, dal lato della propri
 # Fuorigioco
 const OFF_LINE := 0.02         # linea più alta (frazione del campo)
 const OFF_BALL := 6.0          # la linea dei difensori resta almeno così dietro il pallone (m)
+# Con l'opzione "rifiniture" (difesa.gd, 2026-11-24, misure in DECISIONI.md): le difese degli stili rifatte
+const PRESS_LINE_R := 0.08     # pressing: linea ancora più alta
+const PRESS_FROM_R := -22.0    # ... il secondo pressatore esce già da qui (m nel verso d'attacco di chi pressa)
+const PRESS2_ENGAGED := 2.5    # primo pressatore entro tanto dal portatore = il secondo chiude la linea di passaggio (m) ...
+const PRESS2_LANE_R := 20.0    # ... verso il compagno del portatore più vicino entro tanto (m) ...
+const PRESS2_LANE_K := 0.3     # ... mettendosi a questa frazione della linea, dal lato del portatore
+const PRESS2_LANE_MIN := 2.5   # ... ma almeno a tanto dal portatore (m)
+const UOMO_K_R := 0.78         # a uomo: quanto si sta sull'avversario (il resto = posto in squadra)
+const UOMO_LEASH := 20.0       # ... al massimo tanto lontano dal proprio posto (m)
+const UOMO_KEEP := 5.0         # nel riabbinare, la coppia di prima conta come più vicina di tanto (m): niente scambi continui
+const UOMO_ROLE := 8.0         # penalità (m) per un difensore su un centrocampista o un centrocampista su una punta
+const UOMO_LIBERO := 4.0       # il libero sta tanto dietro il proprio posto e dietro l'attaccante più avanzato (m)
+const UOMO_BEHIND_D := 2.0     # a uomo i difensori restano almeno tanto dietro il pallone (m) ...
+const UOMO_BEHIND_C := -2.0    # ... e i centrocampisti al massimo 2 m davanti
+const OFF_LINE_R := 0.06       # fuorigioco: linea alta davvero
+const OFF_BALL_R := 4.0        # ... almeno tanto dietro il pallone (m)
+const OFF_STEP_V := 3.0        # pallone che va verso la porta avversaria più veloce di così (m/s) = la linea sale ...
+const OFF_STEP_M := 5.0        # ... di tanti metri in più, tutti insieme e di corsa
+const OFF_SPRINT := 2.0        # difensore più lontano di tanto dalla linea: ci va di corsa (m)
+const CAT_MARK_R := 10.0       # catenaccio: si prende in consegna l'avversario più vicino al proprio posto fino a tanto (base 7,5 m)
 
 
 class Att:

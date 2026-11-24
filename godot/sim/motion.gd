@@ -55,6 +55,7 @@ const HUM_REACH_FREE := 0.25 # pallone libero (non calciato da nessuno) aggancia
 # Portiere sui cross: contro un attaccante sul pallone alto vince con GK_CLAIM_WIN (+ GK_CLAIM_POR per punto di
 # "por" sopra 60, tra MIN e MAX), poi blocca o, con un avversario addosso, a volte respinge di pugno
 const GK_CLAIM_WIN := 0.7
+const MATE_SHOT_T := 0.3     # con "rifiniture": per tanto dopo il tiro i compagni non toccano il pallone (s)
 const GK_CLAIM_POR := 0.01
 const GK_CLAIM_MIN := 0.5
 const GK_CLAIM_MAX := 0.9
@@ -628,6 +629,10 @@ func contacts(dt: float) -> void:
 		var d: float = C.hyp(p.x - b.x, p.y - b.y)
 		# palla appena calciata che si allontana: non si può toccare
 		if b.kick != null and b.kick.age < 0.3 and b.kick.team != p.team and (p.x - b.x) * b.vx + (p.y - b.y) * b.vy < 0.0:
+			continue
+		# con "rifiniture": il tiro appena partito passa accanto ai compagni (prima un compagno davanti lo "stoppava"
+		# nello stesso passo e tirava a sua volta: due attaccanti si tiravano addosso all'infinito, 400 tiri a partita)
+		if rifiniture and b.kick != null and b.kick.type == "shot" and b.kick.team == p.team and b.kick.age < MATE_SHOT_T:
 			continue
 		if d >= (GK_BOX_REACH if isGk else reachOf(p)) or d >= bd:
 			continue

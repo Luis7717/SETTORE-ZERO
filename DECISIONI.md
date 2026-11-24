@@ -1716,3 +1716,56 @@ sopra l'altro che qualunque passaggio io faccia mi rubano la palla".
   passaggi più lunghi); V/N/P 35/30/15 → 34/34/12, gol 0,86-0,45 → 0,81-0,38. La CPU resta competitiva.
 - Resta da provare sull'iPhone: se a 0,9 m le figure si toccano ancora nei contrasti di fianco; se il respiro sembra
   un regalo (eventualmente RESPIRO_PROTECT più corto).
+
+## 2026-11-24 — Godot: fase difensiva della CPU e dei compagni CPU (Luis: "fai tutte le modifiche che ritieni sensate")
+- **Dove**: `godot/sim/difesa.gd` (nuovo, nella catena tra `angoli.gd` e `ai.gd`), agganci in `ai.gd` (`defend`,
+  `humanDefend`, `computeLines`, `_defLine`, `_styleDefPos`), `base.gd` (`anchor`: linea di pressing e fuorigioco),
+  `match.gd` (rinvio dal fondo), `motion.gd` (tiro e compagno), regolazioni con nome in `stili.gd` (`*_R`) e in cima a
+  `difesa.gd`. Tutto solo con l'opzione `rifiniture` (la accende `gioco.gd`): senza, motore identico (tracce del JS,
+  `test_stili.gd`). Test: `tests/test_difesa_stili.gd` (7). Le linee disegnate e il dito della persona restano prima di
+  tutto; la difesa "magnetica" non è toccata.
+- **Cosa**: 1) rinvio dal fondo avversario: il portiere di chi difende resta in porta (prima andava al suo posto di
+  squadra, ~33 m fuori, e con le riprese ci correva e poi tornava). 2) A uomo: abbinamenti rifatti ogni 0,1 s per zona e
+  ruolo (prima i difensori sulle punte, poi i centrocampisti sui centrocampisti, poi gli avanzi; nessuno sui difensori
+  avversari; la coppia di prima vale 5 m in meno per non scambiarsi di continuo), il difensore più centrale fa il libero
+  dietro a tutti, sull'avversario al 78% (non più 88%) e al massimo 20 m dal proprio posto, difensori 2 m dietro la palla,
+  centrocampisti al massimo 2 m davanti. 3) Fuorigioco: linea +6% (non più +2%), 4 m dietro il pallone (non 6), e quando
+  il pallone va verso la porta avversaria a più di 3 m/s (passaggio indietro, rinvio) sale di 5 m tutta insieme, di corsa.
+  4) Pressing: linea +8%, il secondo pressatore esce da 22 m prima della metà campo (non 12), corre; finché il primo
+  non è addosso al portatore raddoppia, poi chiude la linea di passaggio verso il compagno più vicino (squadra della
+  persona: lo stesso per il secondo dei suoi pressatori). 5) Rientri: col pallone nella propria metà gli esterni
+  scendono (del tutto dal 25% del campo): i quinti della difesa a tre fino alla linea dei difensori, ali ed esterni
+  alti fino a quella dei centrocampisti (regola su ruolo e posto, vale anche per le formazioni nuove). 6) Catenaccio:
+  si prende in consegna l'avversario vicino al proprio posto fino a 10 m (non 7,5).
+- **Bug trovato misurando**: un attaccante con un compagno proprio davanti tirava, il compagno "stoppava" il tiro nello
+  stesso passo e tirava a sua volta: in una partita 400 tiri (studio, pressing 3-5-2, seme 7). Con `rifiniture` per
+  0,3 s il tiro passa accanto ai compagni (`MATE_SHOT_T` in `motion.gd`).
+- **Misura** (`tools/studio_stili.gd`, 8 partite per configurazione, stessi semi, CPU con lo stile contro CPU
+  equilibrata 4-4-2, media delle 4 formazioni; prima > dopo):
+
+  | Stile | linea (m) | larghezza | lunghezza | punte-centroc. | uomo vicino (m) | liberi | pressing 6 m | tiri subiti | gol subiti |
+  |---|---|---|---|---|---|---|---|---|---|
+  | Equilibrata | 25,5 > 25,1 | 35,4 > 35,2 | 30,3 > 30,1 | 12,9 > 12,8 | 8,1 > 8,1 | 2,4 > 2,5 | 0,7 > 0,7 | 8,0 > 7,6 | 0,4 > 0,5 |
+  | Pressing | 31,2 > 33,5 | 34,8 > 34,7 | 30,3 > 30,2 | 12,9 > 12,5 | 6,5 > 6,3 | 2,0 > 1,8 | 0,9 > 1,0 | 3,3 > 1,7 | 0,3 > 0,1 |
+  | Catenaccio | 15,7 > 15,7 | 32,2 > 31,5 | 31,2 > 31,9 | 13,1 > 14,6 | 9,7 > 9,0 | 3,3 > 3,2 | 0,6 > 0,6 | 5,6 > 6,7 | 0,5 > 0,8 |
+  | A uomo | 42,2 > 28,3 | 51,5 > 44,9 | 28,0 > 35,0 | −0,3 > 8,0 | 4,6 > 7,0 | 0,4 > 1,7 | 1,0 > 0,9 | 2,7 > 6,3 | 0,2 > 0,6 |
+  | Fuorigioco | 27,8 > 32,7 | 34,9 > 34,4 | 28,2 > 26,9 | 13,1 > 12,6 | 7,1 > 6,6 | 2,5 > 2,3 | 0,7 > 0,8 | 4,6 > 1,2 | 0,2 > 0,2 |
+
+  Portiere fuori posto (oltre 18 m) mentre si difende: 1-3% del tempo > 0 in tutte le configurazioni. Rientri (media di
+  tutta la fase difensiva): quinti del 3-5-2 44 > 39 m (difensori a 25), ali del 4-3-3 49,5 > 46,7; tiri subiti col
+  4-3-3 equilibrato 13,9 > 10,8. A uomo la squadra ora è ordinata (mappa: linea a 28 m, libero dietro, centrocampisti
+  davanti, punte sopra; prima difensori a metà campo e centrocampisti alla pari delle punte) e resta la più vicina agli
+  avversari dopo il pressing (7,0 m contro 8,1 dell'equilibrata), ma non più incollata: subisce come una difesa normale
+  (prima teneva gli avversari bassi perché era tutta nella loro metà campo).
+- **Non raggiunto**: il pressing "a 6 m" sale poco (0,9 > 1,0 giocatori vicino al portatore): il secondo pressatore chiude
+  la linea a 2,5-4 m invece di stare addosso; l'effetto si vede nei tiri subiti (dimezzati), non nel conteggio. Il
+  fuorigioco fischiato resta ~0: gli attaccanti dell'IA non rischiano (lo fa l'altro lavoro sull'attacco). Catenaccio:
+  gli avversari liberi nella propria metà restano 3,2 (blocco basso: quelli tra 25 e 50 m sono lontani per forza).
+- **Equilibrio** (`tools/controllo_gameplay.gd`, forza 60 contro 60): stili della CPU a caso, 48 partite (semi 1-41):
+  persona V/N/P 19/22/7 > 12/21/15, gol 0,75-0,48 > 0,54-0,69, tiri 2,1-7,0 > 2,3-7,7. CPU equilibrata, 24 partite:
+  2/11/11 > 8/7/9. Cioè le modifiche generali non peggiorano la persona; il calo con gli stili viene dagli stili che
+  prima difendevano male (a uomo, fuorigioco) e ora difendono come l'equilibrata. Rumore grande (stessi semi, gruppi di 8
+  partite da 0/4/4 a 5/2/1).
+- **Da provare sull'iPhone**: se contro una squadra "A uomo" la partita si apre (prima c'erano 40 m vuoti dietro), se
+  con "Fuorigioco" la linea che sale insieme si vede e non sembra un difetto, se il pressing della CPU risulta fastidioso
+  ma giusto, se gli esterni che rientrano a cinque si notano.

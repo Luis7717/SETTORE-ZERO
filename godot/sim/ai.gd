@@ -1,5 +1,5 @@
 # IA: tiro, passaggi, portatore, rimesse, posizioni in attacco e difesa, portiere (porting di src/sim/ai.js).
-extends "angoli.gd"
+extends "difesa.gd"
 
 # Regolazioni dell'IA (misurate con test/balance.mjs e test/diag-flow.mjs)
 const CLEAR_ZONE := 30.0     # metri dalla propria linea di fondo in cui un difensore pressato può spazzare
@@ -343,7 +343,9 @@ func aiRestart() -> void:
 func computeLines() -> void:
 	for tm in 2:
 		offLine[tm] = maxf(0.0, lineOf(tm))
-		if stD[tm].uomo:
+		if rifiniture:
+			defLinesUpdate(tm) # difesa.gd: rientri, abbinamenti a uomo
+		if stD[tm].uomo and not rifiniture:
 			_computeMarks(tm)
 		elif stD[tm].fuorigioco:
 			offLineD[tm] = _defLine(tm)
@@ -723,16 +725,22 @@ func humanDefend(p: R.Player) -> void:
 			p.ty = ch.y2
 			return
 	elif hPress != null and hPress[tm].has(p):
+		var hp: Array = hPress[tm]
+		if rifiniture and stD[tm].pressing and hp.find(p) > 0:
+			var q2 := press2Pos(p, c, hp[0]) # difesa.gd: chi pressa per secondo raddoppia o chiude la linea
+			p.tx = q2[0]
+			p.ty = q2[1]
+			return
 		p.tx = b.x + c.vx * 0.25
 		p.ty = b.y + c.vy * 0.25
 		return
-	var an := anchor(p)
+	var an := defAnchor(p)
 	var ax: float = an[0]
 	var ay: float = an[1]
 	var tx: float = ax
 	var ty: float = ay
 	var mo: R.Player = null
-	var md: float = HUM_MARK_R
+	var md: float = defMarkR(tm, HUM_MARK_R)
 	for o: R.Player in players:
 		if o.team != tm and not o.off and o.pos != "P" and o != c:
 			var d: float = C.hyp(o.x - ax, o.y - ay)
@@ -898,7 +906,7 @@ func defend(p: R.Player) -> void:
 	var dir: float = -1.0 if tm else 1.0
 	var own: float = -dir * HL
 	var hum: bool = human[tm]
-	var an := anchor(p)
+	var an := defAnchor(p)
 	var ax: float = an[0]
 	var ay: float = an[1]
 	var tx: float = ax
@@ -923,9 +931,17 @@ func defend(p: R.Player) -> void:
 				# niente scivolate (tolte anche all'IA il 2026-11-20): il pressatore ruba palla solo col contatto
 				p.tx = b.x + c.vx * 0.25
 				p.ty = b.y + c.vy * 0.25
+				if rifiniture and stD[tm].pressing:
+					p.sprint = true # pressing: si va sul portatore di corsa
 			return
-		if not hum and presser2[tm] == p and c.y * dir > Stili.PRESS_FROM:
-			# pressing alto: il secondo pressatore va anche lui sul portatore
+		if not hum and presser2[tm] == p and c.y * dir > (Stili.PRESS_FROM_R if rifiniture else Stili.PRESS_FROM):
+			# pressing alto: il secondo pressatore va anche lui sul portatore (con "rifiniture" poi chiude la linea, difesa.gd)
+			if rifiniture:
+				var q2 := press2Pos(p, c, presser[tm])
+				p.tx = q2[0]
+				p.ty = q2[1]
+				p.sprint = true
+				return
 			p.tx = b.x + c.vx * 0.25
 			p.ty = b.y + c.vy * 0.25
 			return
@@ -937,7 +953,7 @@ func defend(p: R.Player) -> void:
 			p.ty = c.y + uy2 / n2 * 3.2
 			return
 	var mo: R.Player = null
-	var md: float = 7.5
+	var md: float = defMarkR(tm, 7.5)
 	for o: R.Player in players:
 		if o.team != tm and not o.off and o.pos != "P" and o != b.owner:
 			var d: float = C.hyp(o.x - ax, o.y - ay)
@@ -1045,6 +1061,8 @@ func _defLine(tm: int) -> float:
 	for p: R.Player in players:
 		if p.team == tm and not p.off and p.pos == "D":
 			hi = maxf(hi, anchor(p)[1] * dir)
+	if rifiniture:
+		return offStepUp(tm, hi) # difesa.gd: più alta e sale insieme quando il pallone va avanti
 	return C.clamp_(minf(hi, ball.y * dir - Stili.OFF_BALL), -HL + 6.0, 0.0)
 
 
@@ -1054,6 +1072,8 @@ func _styleDefPos(p: R.Player, ax: float, ay: float, tx: float, ty: float) -> Pa
 	var sd: Stili.Dif = stD[tm]
 	var dir: float = -1.0 if tm else 1.0
 	var key: int = tm * 11 + p.i
+	if sd.uomo and rifiniture:
+		return uomoPos(p, ax, ay, tx, ty) # difesa.gd
 	if sd.uomo and marks[tm].has(key):
 		var o: R.Player = players[marks[tm][key]]
 		if not o.off and o != ball.owner:
@@ -1064,6 +1084,8 @@ func _styleDefPos(p: R.Player, ax: float, ay: float, tx: float, ty: float) -> Pa
 			ty = ay * (1.0 - Stili.UOMO_K) + (o.y + uy / n * Stili.UOMO_GAP) * Stili.UOMO_K
 	elif sd.fuorigioco and p.pos == "D" and att != tm:
 		ty = float(offLineD[tm]) * dir
+		if rifiniture and absf(p.y - ty) > Stili.OFF_SPRINT:
+			p.sprint = true # la linea sale (o scende) tutta insieme, di corsa
 	return PackedFloat64Array([tx, ty])
 
 
