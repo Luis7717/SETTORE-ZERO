@@ -93,9 +93,13 @@ class Bot:
 			if headAt < 0.0:
 				headAt = m.time + r.next() * 0.3
 			elif m.time >= headAt:
-				var g0 := m.gk(1)
-				var side: float = -1.0 if g0.x > 0.0 else 1.0
-				m.userHeader(0, {"goal": true, "tx": side * (C.GW / 2.0 - 0.6 - r.next() * 1.2), "th": 0.3 + r.next() * 1.4})
+				if m.headCanShoot():
+					var g0 := m.gk(1)
+					var side: float = -1.0 if g0.x > 0.0 else 1.0
+					m.userHeader(0, {"goal": true, "tx": side * (C.GW / 2.0 - 0.6 - r.next() * 1.2), "th": 0.3 + r.next() * 1.4})
+				else: # salto conteso senza tiro (difesa, passaggio lontano dalla porta): di testa al compagno più avanti
+					var q: Array = m.headMateTarget()
+					m.userHeader(0, {"goal": false, "tx": q[0], "ty": q[1]})
 				headAt = -1.0
 		else:
 			headAt = -1.0

@@ -100,7 +100,7 @@ func _partita(sd: int, opz: Dictionary) -> void:
 	var st := {"ts": 1.0, "testa_reale": -1.0, "last_restart": ["", ""], "last_restart_t": [-99.0, -99.0],
 		"pass": null, "owner_prev": null, "fermo_t": 0.0, "libera_t": 0.0, "slow": false, "ultimo_calcio": {},
 		"sub_dito": "", "duel_t": -1.0, "burst_t": -1.0, "drib_t": -1.0, "burst_p": null, "causa": "", "storia": [], "alta": false, "owner_step": null, "duel_o": null, "booked": false, "tiro": "",
-		"poss": -1, "rec": null, "hk": null, "fase_prev": "play"}
+		"poss": -1, "rec": null, "hk": null, "fase_prev": "play", "ceduto": "", "lancio": false}
 	st.regia = Regia.new() # regia del dribbling (rallenty dal tasto alla fine del giochetto), come gioco.gd
 	dito.on_kick = func(sub: String) -> void: st.sub_dito = sub
 	var frames := 0
@@ -234,6 +234,15 @@ func _conta(m, st: Dictionary, sdt: float) -> void:
 				var p: R.Player = e.p
 				var k: String = e.kind
 				var sub: String = k
+				if st.ceduto != "" and p.team == 1:
+					_add("testa_ceduta:" + String(st.ceduto) + ":" + ("tiro" if (m.ball.kick != null and m.ball.kick.type == "shot") else ("respinta" if e.get("clear", false) else ("sponda" if e.get("sponda", false) else k))))
+				st.ceduto = ""
+				if st.lancio:
+					_add("lancio_esito:calcio_" + ("nostro" if p.team == 0 else "loro"))
+					st.lancio = false
+				if k == "loft" and p.team == 0 and m.phase == "play":
+					st.lancio = true
+					_add("lanci")
 				if p.team == 0 and st.sub_dito != "":
 					sub = st.sub_dito
 					st.sub_dito = ""
@@ -246,7 +255,7 @@ func _conta(m, st: Dictionary, sdt: float) -> void:
 				if st.tiro != "":
 					_add("tiro_esito:" + String(st.tiro) + ":altro_tocco")
 					st.tiro = ""
-				if p.team == 0 and (k == "shot" or ((k == "header" or k == "volley") and not e.get("clear", false))):
+				if p.team == 0 and (k == "shot" or ((k == "header" or k == "volley") and not e.get("clear", false) and not e.get("sponda", false))):
 					st.tiro = ("testa_dito" if e.get("guidato", false) else k) if sub == k else sub
 					_add("tiro_fatto:" + String(st.tiro))
 					if st.get("drib_ok_p") != null:
@@ -370,10 +379,23 @@ func _conta(m, st: Dictionary, sdt: float) -> void:
 			"head_win":
 				if int(e.team) == 0:
 					_add("testa_fermatempo")
+					_add("testa_fermatempo:" + String(e.get("kind", "att")))
+					if st.lancio:
+						_add("lancio_esito:fermatempo_" + String(e.get("kind", "att")))
+						st.lancio = false
+			"aerial_pre": # salto conteso deciso prima (testa.gd)
+				var pw: R.Player = e.p
+				_add("testa_salto:" + String(e.kind) + (":vinto" if pw.team == 0 else ":perso"))
+			"head_give":
+				if int(e.team) == 0:
+					st.ceduto = String(e.kind)
 			"head_end":
 				if int(e.team) == 0:
 					_add("testa_fine:" + String(e.reason))
 			"control":
+				if st.lancio:
+					_add("lancio_esito:" + ("controllato" if (e.p as R.Player).team == 0 else "perso"))
+					st.lancio = false
 				if st.tiro != "":
 					_add("tiro_esito:" + String(st.tiro) + ":controllato")
 					st.tiro = ""
@@ -636,6 +658,9 @@ func _stampa(n: int, opz: Dictionary) -> void:
 	for sub in ["tiro_raso", "tiro_giro"]:
 		print("  %-17s fatti %5.1f · gol %d (%s)" % [sub, _v("dito_" + sub) / N, _v("gol_tipo_u:" + sub), _pct(_v("gol_tipo_u:" + sub), _v("dito_" + sub))])
 	print("  di prima          preparati %.1f · calciati %.1f · gol %d" % [_v("dito_prima") / N, _v("prima_calci") / N, _v("gol_tipo_u:prima")])
+	print("  testa contesa     fermatempo in difesa %.1f · sui passaggi alti %.1f · salti decisi prima %s · dopo il salto ceduto l'avversario %s" % [
+		_v("testa_fermatempo:def") / N, _v("testa_fermatempo:pass") / N, _elenco("testa_salto:"), _elenco("testa_ceduta:")])
+	print("  lanci alti nostri (non tiri): %.1f a partita · esito %s" % [_v("lanci") / N, _elenco("lancio_esito:")])
 	print("  colpo di testa    fermatempo %.1f · linee %.1f · saltati apposta %.1f · scaduti %.1f · gol di testa col dito %d · esiti %s" % [
 		_v("testa_fermatempo") / N, _v("dito_testa") / N, _v("dito_testa_saltata") / N, _v("testa_scaduta") / N, _v("gol_tipo_u:testa_dito"), _elenco("testa_fine:")])
 	print("  duello            aperti %.1f · Dribbling %.1f (riusciti %s) · esiti %s" % [_v("duello") / N, _v("dito_dribbling") / N,

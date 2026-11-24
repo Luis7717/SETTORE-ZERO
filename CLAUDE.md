@@ -208,6 +208,19 @@
   (portiere compreso) arriva sul pallone chiaramente prima; il difensore che arriva insieme se lo contende in salto
   (chi ha già disegnato la linea ha un piccolo vantaggio, `HEAD_DUEL_EDGE`); con la linea il colpo parte anche se il
   pallone arriva un po' più basso (al volo).
+  **Salto conteso** (Luis 2026-11-24, `kind` "def" / "pass" di `HeadWin`): stesso fermatempo (tempo fermo 3 s, stessa
+  visuale e cerchio) anche **in difesa** sui palloni alti della CPU (cross, lanci) a più di `HEAD_DEF_ZONE` 15 m dalla
+  metà campo verso la nostra porta e **sui nostri passaggi alti** (da 1,7 m in su, `HEAD_PASS_LO`) a più di
+  `HEAD_PASS_ZONE` 15 m nella metà avversaria (a centrocampo il salto resta automatico come prima), ma solo se un avversario è **attaccato** a chi colpisce (`headRival`: entro `HEAD_ATT_NEAR`
+  2,5 m da lui, arriva entro `HEAD_ATT_R` 1,5 m dal punto al più `HEAD_ATT_T` 0,3 s dopo di lui e non dopo il pallone)
+  e il nostro **vince il salto**, deciso col seme prima di aprire (`headDuelRoll`: come `aerialDuel`, `tes` più
+  anticipo). In difesa la scritta è "Respingi!" e la linea è sempre un passaggio/rinvio di testa (anche se finisce in
+  porta, `headCanShoot`); sul passaggio si tira solo entro 17 m dalla porta. Passaggio di testa lungo al massimo
+  `HEAD_PASS_MAX` 30 m. **Senza linea entro 3 s, o col salto perso, colpisce l'avversario** (`headGive`: lui di testa
+  con la sua IA, tiro o respinta se può, altrimenti `headRivalHit` a un compagno libero più avanti; il nostro non tocca
+  il pallone). Senza avversario attaccato tutto come prima: il lancio sulla fascia si controlla e si corre. I cross in
+  attacco (`kind` "att") restano identici. Prove: `--scena=testa_difesa|testa_difesa_linea|testa_passaggio|
+  testa_passaggio_linea|testa_fascia`; test `godot/tests/test_testa_contesa.gd`.
   Nel motore vale solo con l'opzione `"testa": true` (la mette il gioco; i confronti col JS restano identici).
 - **Riprese senza teletrasporto** (Godot, Luis 2026-11-23, `godot/sim/riprese.gd`, opzione `"riprese": true` del Match
   messa dal gioco, spenta in allenamento/prove e nei confronti col JS): rimessa, rinvio dal fondo e angolo non hanno più

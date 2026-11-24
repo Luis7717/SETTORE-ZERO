@@ -88,6 +88,7 @@ var goalT: float = 0.0
 # colpo di testa controllato (testa.gd): solo se l'opzione "testa" della partita è vera (il gioco sì, i confronti col JS no)
 var headCtl: bool = false
 var headWin: R.HeadWin = null
+var headGive: R.HeadWin = null # testa.gd: salto conteso ceduto all'avversario (ha vinto lui, o la persona non ha disegnato)
 var nextKick: int = 0
 # stili di gioco (campi facoltativi "stileAtt" / "stileDif" della squadra, stili.gd): con .on = false il motore
 # non entra in nessun ramo degli stili ed è identico a prima
@@ -420,6 +421,14 @@ func endHead(_reason: String) -> void:
 
 func headStrike(_p: R.Player, _kind: String) -> void:
 	pass # testa.gd
+
+
+func headRivalHit(_p: R.Player) -> void:
+	pass # testa.gd
+
+
+func headGiven(_p: R.Player) -> bool:
+	return false # testa.gd
 
 
 func headDuelEdge(_p: R.Player, _o: R.Player) -> float:

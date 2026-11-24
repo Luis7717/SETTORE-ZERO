@@ -67,6 +67,11 @@ func _decidi(g, now: int) -> void:
 	var c: R.Player = m.ctrl[me]
 	var b: R.Ball = m.ball
 	var dir := 1.0 if me == 0 else -1.0
+	if m.headFor(me) and not m.headCanShoot(): # salto conteso in difesa o lontano dalla porta: al compagno più avanti
+		var hq: R.Player = m.headWin.p
+		var q: Array = m.headMateTarget()
+		_linea(g, now, _sch(g, hq.x, hq.y, 1.0), _sch(g, q[0], q[1], 0.0), "testa", Vector3(q[0], q[1], 0.0))
+		return
 	if m.headFor(me): # colpo di testa controllato: linea dal giocatore verso un punto della porta
 		var hp: R.Player = m.headWin.p
 		var porta := Vector3((r.next() - 0.5) * 5.0, dir * C.HL, 0.4 + r.next() * 1.6)

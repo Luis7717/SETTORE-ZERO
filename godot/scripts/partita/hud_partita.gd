@@ -503,10 +503,12 @@ func mostra_dribbling(si: bool, scatto: bool = false) -> void:
 
 
 ## cerchio del colpo di testa intorno al punto `c` dello schermo, pieno per la frazione `f`; f < 0 = nascosto
-func cerchio_testa(c: Vector2, f: float) -> void:
+## testo = scritta sopra il cerchio ("" = quella di sempre, "Di testa!")
+func cerchio_testa(c: Vector2, f: float, testo: String = "") -> void:
 	if f < 0.0:
 		_cerchio.nascondi()
 	else:
+		_cerchio.testo = testo if testo != "" else CerchioTesta.TESTO
 		_cerchio.mostra(c, f)
 
 

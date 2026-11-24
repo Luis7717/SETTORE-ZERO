@@ -1296,6 +1296,8 @@ func substitute(tm: int, idx: int, src: Dictionary) -> bool:
 # Fine partita: rompe i riferimenti circolari tra giocatori (supC, beatBy) che il conteggio dei riferimenti
 # di Godot non libera da solo. Da chiamare quando la partita non serve più (in JS ci pensa il garbage collector).
 func dispose() -> void:
+	headWin = null
+	headGive = null
 	queued = [null, null]
 	calmP = [null, null]
 	cornerTaker = null

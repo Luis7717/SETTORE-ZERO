@@ -395,14 +395,14 @@ func show_head() -> void:
 	pts[0].x = hp.x
 	pts[0].y = hp.y
 	var e: Dictionary = pts[-1]
-	vista.show_path(_xy([pts[0], e]), "shot" if e.get("goal", false) else "pass")
+	vista.show_path(_xy([pts[0], e]), "shot" if (e.get("goal", false) and m.headCanShoot()) else "pass")
 
 
 ## ordine del colpo di testa dalla linea: in porta {goal, tx, th}, altrimenti sponda verso il compagno vicino alla fine
 ## della linea (entro PASS_SNAP) o verso il punto del campo
 func head_spec() -> Dictionary:
 	var e: Dictionary = pts[-1]
-	if e.get("goal", false):
+	if e.get("goal", false) and partita.headCanShoot(): # in difesa o lontano dalla porta la linea è un passaggio
 		return {"goal": true, "tx": e.x, "th": e.h}
 	var q := mate_at(e.x, e.y)
 	if q != null and (partita.headWin == null or q != partita.headWin.p):

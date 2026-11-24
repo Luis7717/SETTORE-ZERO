@@ -19,6 +19,9 @@
 #                       dribbling_regia.gd); _ok / _ko con statistiche estreme (l'esito resta a caso col seme)
 #   --scena=fallo|rigore|espulso   fallo da dietro sul nostro n. 10 (sim/falli.gd): giallo e punizione con la barriera,
 #                       giallo e rigore, secondo giallo = espulso
+#   --scena=testa_difesa|testa_difesa_linea|testa_passaggio|testa_passaggio_linea|testa_fascia   salto conteso di
+#                       testa (sim/testa.gd): in difesa sul cross della CPU, sul nostro lancio alto con un difensore
+#                       attaccato (_linea: il dito disegna il passaggio di testa), lancio sulla fascia senza nessuno
 #   --scena=recupero   il nostro n. 4 ruba palla in contrasto frontale: respiro dopo il recupero, rallenty, passaggio
 #   --scena=parata|parata_linea   tiro avversario: fermatempo della parata col bersaglio (parata_linea: dito che disegna)
 #   --scena=fuori_lato|fuori_lato_cpu|fuori_fondo|fuori_fondo_vicino|fuori_rete|fuori_angolo   pallone che esce: scena della ripresa
@@ -371,7 +374,7 @@ func _cerchio_testa() -> void:
 	if s.z < 0.5:
 		hud.cerchio_testa(Vector2.ZERO, -1.0)
 		return
-	hud.cerchio_testa(Vector2(s.x, s.y), FermatempoTesta.frazione(_testa_reale))
+	hud.cerchio_testa(Vector2(s.x, s.y), FermatempoTesta.frazione(_testa_reale), FermatempoTesta.scritta(m.headWin.kind))
 
 
 ## timer del rallenty col pallone (Luis 2026-11-23): dopo TimerRallenty.RALLENTY_MAX_S secondi veri senza linea né
@@ -520,7 +523,9 @@ func _evento(e: Dictionary, adv: bool) -> void:
 			audio.kick(float(e.get("v", 15.0)))
 			var p: R.Player = e.p
 			if not e.get("clear", false) and p.team == me and (e.kind == "header" or e.kind == "volley"):
-				if e.get("sponda", false):
+				if e.get("difesa", false):
+					hud.big("Respinta!", "", 800)
+				elif e.get("sponda", false):
 					hud.big("Sponda!", "", 800)
 				else:
 					hud.big("Colpo di testa!" if e.kind == "header" else "Al volo!", "", 900)
@@ -1019,6 +1024,8 @@ func _prepara_scena(nome: String) -> void:
 				gesti.down(Vector2(a.x, a.y), Time.get_ticks_msec())
 				for i in range(1, 13):
 					gesti.move_ev(Vector2(a.x, a.y).lerp(Vector2(b.x, b.y), i / 12.0))
+		"testa_difesa", "testa_difesa_linea", "testa_passaggio", "testa_passaggio_linea", "testa_fascia":
+			_scena_testa_contesa(nome)
 		"curva", "prima": # curva: passaggio curvo disegnato e tenuto (volo alto a effetto); prima: calcio di prima in attesa
 			_metti_in_gioco()
 			var dy := 1.0 if me == 0 else -1.0
@@ -1208,6 +1215,77 @@ func _pallone_fuori(nome: String) -> void:
 	b.owner = null
 	if replay != null:
 		replay.buffer.svuota()
+
+
+## salto conteso del colpo di testa (sim/testa.gd): testa_difesa = cross della CPU verso il suo attaccante col nostro
+## difensore attaccato; testa_passaggio = nostro lancio alto al n. 10 a 30 m dalla porta con un difensore attaccato;
+## testa_fascia = lancio sulla fascia senza nessuno vicino (si controlla e si corre). _linea: il dito disegna il
+## passaggio di testa al compagno più avanti. Bravura di testa estrema perché il salto lo vinca quasi sempre il nostro
+## (resta deciso dal seme)
+func _scena_testa_contesa(nome: String) -> void:
+	_metti_in_gioco()
+	var dt_ := 1.0 if me == 0 else -1.0
+	var difesa := nome.begins_with("testa_difesa")
+	var tira: R.Player
+	var mio: R.Player
+	var suo: R.Player
+	var tx: float
+	var ty: float
+	if difesa:
+		tira = m.team(1 - me)[7]
+		suo = m.team(1 - me)[9]
+		mio = m.team(me)[3]
+		_sposta(suo, 1.0, -dt_ * (C.HL - 10.0))
+		_sposta(tira, -24.0, -dt_ * (C.HL - 12.0))
+		_sposta(mio, 1.8, -dt_ * (C.HL - 10.6))
+		tx = suo.x - 1.5
+		ty = suo.y - dt_ * 1.0
+	else:
+		var fascia := nome == "testa_fascia"
+		tira = m.team(me)[6]
+		mio = m.team(me)[9]
+		suo = m.team(1 - me)[3]
+		var x := -25.0 if fascia else -6.0
+		var y := dt_ * (24.0 if fascia else 20.0)
+		_sposta(tira, x + 4.0, y - dt_ * 24.0)
+		_sposta(mio, x, y)
+		if fascia: # nessun avversario vicino al punto del lancio
+			for o: R.Player in m.team(1 - me):
+				if o.pos != "P" and C.hyp(o.x - x, o.y - y) < 14.0:
+					_sposta(o, o.x + 18.0, o.y)
+			_sposta(suo, x + 16.0, y + dt_ * 12.0)
+		else:
+			_sposta(suo, x + 0.9, y + dt_ * 0.9)
+		tx = x
+		ty = y + dt_ * 1.5
+	mio.st.tes = 99.0
+	suo.st.tes = 20.0
+	m.ball.owner = tira
+	m.ball.last = tira
+	m.ball.x = tira.x
+	m.ball.y = tira.y
+	m.ctrl[me] = mio if difesa else tira
+	m.kick(tira, {"type": "loft", "tx": tx, "ty": ty})
+	if not nome.ends_with("_linea"):
+		return
+	var attesa := 0
+	while not m.headFor(me):
+		await get_tree().process_frame
+		attesa += 1
+		if attesa > 240:
+			return # salto perso (o niente salto): nessuna linea da disegnare
+	await get_tree().create_timer(0.8).timeout
+	if not m.headFor(me):
+		return
+	var hp: R.Player = m.headWin.p
+	var q: Array = m.headMateTarget()
+	var a: Vector3 = vista.world_to_screen(hp.x, hp.y, 1.0)
+	var b: Vector3 = vista.world_to_screen(q[0], q[1], 0.0)
+	gesti.down(Vector2(a.x, a.y), Time.get_ticks_msec())
+	for i in range(1, 13):
+		gesti.move_ev(Vector2(a.x, a.y).lerp(Vector2(b.x, b.y), i / 12.0))
+	await get_tree().create_timer(0.6).timeout
+	gesti.up(Vector2(b.x, b.y), Time.get_ticks_msec())
 
 
 func _metti_in_gioco() -> void:

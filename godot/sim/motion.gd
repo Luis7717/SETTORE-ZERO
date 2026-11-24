@@ -39,6 +39,7 @@ const RECOVER_RATE := 0.004 # energia recuperata al secondo camminando o da ferm
 const ADV_TIME := 2.5       # vantaggio: entro questo tempo, se la squadra perde palla, si torna alla punizione (s)
 const HEAD_LO := 1.3        # da questa altezza in su il pallone si colpisce di testa (m)
 const HEAD_HI := 2.6        # altezza massima raggiungibile di testa, saltando (m)
+const HEAD_GIVE_REACH := 1.3 # testa.gd: chi ha il salto conteso ceduto arriva al pallone da tanto (salta) (m)
 const VOLLEY_LO := 0.5      # sotto HEAD_LO e sopra questa altezza: colpo al volo (m)
 const AIR_SHOT_RANGE := 17.0 # distanza massima dalla porta per colpire di testa o al volo verso la porta (m)
 const HEAD_CLEAR_ZONE := 32.0 # un difensore entro questa distanza dalla propria porta respinge di testa (m)
@@ -290,9 +291,12 @@ func airHit(p: R.Player, kind: String) -> void:
 	b.noT = 0.3
 	predT = 0.0
 	p.kickAnim = 0.35
-	# colpo di testa controllato con la linea già disegnata (testa.gd)
-	if kind != "clear" and headWin != null and headWin.aimed and headWin.p == p:
+	# colpo di testa controllato con la linea già disegnata (testa.gd; "clear" = nostro difensore col fermatempo)
+	if headWin != null and headWin.aimed and headWin.p == p:
 		headStrike(p, kind)
+		return
+	if kind == "rival": # salto ceduto all'avversario senza tiro né respinta (testa.gd)
+		headRivalHit(p)
 		return
 	if kind == "clear":
 		# respinta: lontano dalla propria porta, alta, verso l'esterno
@@ -634,9 +638,15 @@ func contacts(dt: float) -> void:
 		# nello stesso passo e tirava a sua volta: due attaccanti si tiravano addosso all'infinito, 400 tiri a partita)
 		if rifiniture and b.kick != null and b.kick.type == "shot" and b.kick.team == p.team and b.kick.age < MATE_SHOT_T:
 			continue
-		if d >= (GK_BOX_REACH if isGk else reachOf(p)) or d >= bd:
+		var given: bool = headGive != null and headGiven(p) and not isGk
+		if d >= (GK_BOX_REACH if isGk else (maxf(reachOf(p), HEAD_GIVE_REACH) if given else reachOf(p))) or d >= bd:
 			continue
 		var air: String = "" if isGk else airPlay(p)
+		if air == "" and b.h >= VOLLEY_LO and b.h <= HEAD_HI and b.shot == null:
+			if given:
+				air = "rival" # salto ceduto (testa.gd): l'avversario colpisce lui, a qualunque altezza di testa
+			elif headWin != null and headWin.kind != "att" and headWin.aimed and headWin.p == p:
+				air = "header" if b.h >= HEAD_LO else "volley" # salto conteso vinto con la linea
 		if air != "" or b.h < (gkReach(p) if isGk else 1.7):
 			bd = d
 			best = p
@@ -655,7 +665,7 @@ func contacts(dt: float) -> void:
 				return # vinto il salto ma senza linea: nessuno tocca il pallone
 			best = hw.p
 			bestAir = "header" if b.h >= HEAD_LO else "volley"
-	elif b.h >= HEAD_LO and not (best.pos == "P" and inOwnBox(best)):
+	elif b.h >= HEAD_LO and not (best.pos == "P" and inOwnBox(best)) and not headGiven(best):
 		var w := aerialDuel(best)
 		if w != best:
 			best = w

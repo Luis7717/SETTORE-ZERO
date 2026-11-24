@@ -383,6 +383,11 @@ func _testa(m) -> void:
 		conti.testa_saltata += 1
 		react = 99.0 # non disegna: il fermatempo finisce da solo
 		return
+	if not m.headCanShoot(): # salto conteso in difesa o lontano dalla porta: di testa al compagno più avanti
+		var q: Array = m.headMateTarget()
+		_disegna("head", {"k": "head", "spec": {"goal": false, "tx": q[0], "ty": q[1]}})
+		busy = _rng([0.3, 0.5])
+		return
 	var gk: R.Player = m.gk(1 - tm)
 	var side: float = -1.0 if gk.x > 0.0 else 1.0
 	var tx := side * (C.GW / 2.0 - 0.6 - r.next() * 1.2)

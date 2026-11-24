@@ -221,6 +221,10 @@ class HeadWin:
 	var ax: float = 0.0      # punto mirato: in porta (x, altezza ah) o nel campo (x, y)
 	var ay: float = 0.0
 	var ah: float = 0.0
+	var kind: String = "att" # "att" cross in attacco (come prima), "pass" passaggio alto conteso, "def" pallone alto
+	                         # avversario conteso in difesa (testa.gd)
+	var rival: Player = null # "pass"/"def": l'avversario attaccato che se lo contendeva (ha perso il salto, o lo vince
+	                         # se la persona non disegna: headGive)
 
 
 class Restart:

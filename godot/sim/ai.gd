@@ -589,7 +589,7 @@ func assign(p: R.Player) -> void:
 		p.tx = p.wall.x
 		p.ty = p.wall.y
 		return
-	if headWin != null and headRun(p):
+	if (headWin != null or headGive != null) and headRun(p):
 		return
 	var mv: R.Move = move[tm] if (hum and ctrl[tm] == p) else null
 	if mv != null and mv.path != null:

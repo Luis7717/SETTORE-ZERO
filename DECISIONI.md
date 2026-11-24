@@ -1812,3 +1812,35 @@ largo), non sui nomi delle formazioni: valgono anche per le formazioni nuove.
 - Test: `tests/test_attacco.gd` (10). Strumenti: `--senza-attacco` in `studio_stili.gd` e `controllo_gameplay.gd`.
 - Da provare sull'iPhone: le corse sul primo e secondo palo quando si arriva sul fondo (si vede a chi crossare?), i
   fuorigioco della CPU (pochi e credibili?), il terzino che si sovrappone nelle Fasce.
+
+## 2026-11-24 — Godot: colpo di testa conteso in difesa e sui passaggi alti (salto conteso, `sim/testa.gd`)
+- **Prima, in difesa sui cross**: nessun fermatempo e nessun comando. Il nostro difensore entro 32 m dalla nostra
+  porta (`HEAD_CLEAR_ZONE`) col pallone sopra 1,3 m respingeva **da solo** ("clear": alta, verso l'esterno, a caso,
+  spesso agli avversari), oppure perdeva il contrasto aereo automatico (`aerialDuel`) e l'attaccante tirava di testa;
+  più lontano dalla porta un pallone sopra 1,7 m gli passava sopra (non lo toccava proprio) e sotto lo stoppava. La
+  linea disegnata in difesa non contava. Per questo non si capiva se colpiva da solo o no.
+- **Ora** (`kind` "def" e "pass" di `HeadWin`): fermatempo come quello del cross (tempo fermo 3 s, visuale vicina,
+  cerchio; in difesa scritta "Respingi!") quando un avversario è **attaccato** a chi colpisce per noi e **il nostro
+  vince il salto**. Attaccato (`headRival`): entro `HEAD_ATT_NEAR` 2,5 m da lui adesso, arriva entro `HEAD_ATT_R` 1,5 m
+  dal punto del colpo al più `HEAD_ATT_T` 0,3 s dopo di lui e non dopo il pallone. L'esito si decide col seme prima di
+  aprire (`headDuelRoll`: 0,5 + 1,5 × differenza di `tes` + 1 per secondo di anticipo, tra 0,15 e 0,85): il fermatempo
+  si apre solo se vince il nostro. Linea = passaggio/rinvio di testa (in difesa mai tiro, anche se la linea finisce in
+  porta; sul passaggio tiro solo entro 17 m), lungo al massimo 30 m. **Senza linea entro 3 s, o col salto perso,
+  colpisce l'avversario** (`headGive`, richiesta di Luis durante il lavoro: "chi ha il diritto e non lo usa lo passa
+  all'altro"): tiro o respinta di testa se la sua IA li fa lì, altrimenti di testa a un compagno libero più avanti
+  (`headRivalHit`); il nostro non tocca il pallone. Senza avversario attaccato tutto come prima (lancio sulla fascia:
+  controllo e corsa). I cross in attacco (`kind` "att") identici a prima.
+- **Momento speciale**: con la sola definizione di "attaccato" i fermatempo erano 9-12 a partita (la CPU marca stretta
+  e la persona simulata lancia alto quando la linea è chiusa): 8,2 → 6,3 con l'avversario entro 2,5 m (prima 4); il
+  limite 1,7 m sul passaggio non cambiava quasi niente. Deciso: solo negli ultimi 35 m (`HEAD_PASS_ZONE` /
+  `HEAD_DEF_ZONE` 15 m oltre la metà campo); a centrocampo il salto resta automatico come prima.
+- **Numeri** (controllo_gameplay, 10 partite 2×150 s, forza 60, seme 1): fermatempo in difesa 2,5 a partita, sui
+  passaggi alti 1,3, cross 0,4; tempo vero fermo per la testa 7,1 s a partita. Salti decisi prima: difesa 25 vinti / 25
+  persi, passaggi 13/12. Salto ceduto all'avversario: sponda 27, tiro 3, respinta 2. Nostri lanci alti (19 a partita):
+  controllati 107 su 188, fermatempo 17. Risultati e resto come prima (V/N/P 2/6/2, nessun "BUG?").
+- Test: `tests/test_testa_contesa.gd` (12). Strumenti: contatori `testa_fermatempo:def|pass`, `testa_salto:*`,
+  `testa_ceduta:*`, `lancio_esito:*` in `controllo_gameplay.gd`; la persona simulata (`dito_motore.gd`, `harness.gd`,
+  `bot_dito.gd`) nei salti contesi senza tiro disegna al compagno più avanti (`headMateTarget`). Scene:
+  `--scena=testa_difesa|testa_difesa_linea|testa_passaggio|testa_passaggio_linea|testa_fascia`.
+- Da provare sull'iPhone: si capisce subito perché il tempo si ferma in difesa (scritta "Respingi!")? 3 s bastano per
+  disegnare il rinvio? Il salto ceduto all'avversario quando non si disegna è chiaro o sembra un errore?
