@@ -132,6 +132,12 @@
   avversaria (`throw_view` in `camfit.gd`, `_throw_step` in `telecamera_partita.gd`), col battitore in basso al centro;
   dito vicino al battitore = passaggio, lontano = trascinando si gira la visuale (mai verso le tribune). Le
   rimesse della CPU restano con la telecamera normale.
+  Luis 2026-11-24 (`riprese.gd`): il battitore (di tutte e due le squadre) aspetta col pallone sopra la testa
+  `THROW_STAND` 1,2 m **oltre** la linea laterale (`throwStand`); al lancio fa i passi fino alla linea (`r.rinc`/`r.pend`,
+  `THROW_STEP_SPD`) e il pallone parte da lì, dentro il campo. Con `rifiniture`, mentre si aspetta la rimessa gli altri
+  restano dentro il campo (`throwRoom`, dopo `assign`): almeno `THROW_ROOM_MIN` 4,5 m dalla linea, +0,1 m per metro di
+  distanza lungo la linea fino a 7 m; i compagni d'appoggio si smarcano a 8-11 m dal battitore (`offerSupport`).
+  Misura: `-s res://tools/misura_rimesse.gd -- --partite=40`; prova: `--scena=fuori_lato_cpu` (rimessa della CPU).
 - **Calcio d'inizio** (Godot, Luis 2026-11-24, opzione `rifiniture`): nel cerchio di centrocampo (9,15 m) solo il
   battitore; tutti gli altri fuori dal cerchio e nella propria metà finché il pallone non è calciato (anche dopo un gol
   e nel secondo tempo): `kickoffClear` in `godot/sim/motion.gd` (messi in campo e ogni passo dell'attesa) e bersagli
@@ -175,7 +181,7 @@
 - **Riprese senza teletrasporto** (Godot, Luis 2026-11-23, `godot/sim/riprese.gd`, opzione `"riprese": true` del Match
   messa dal gioco, spenta in allenamento/prove e nei confronti col JS): rimessa, rinvio dal fondo e angolo non hanno più
   il nero né il battitore messo sul posto. Il pallone esce e si ferma poco fuori; il battitore corre a prenderlo, si
-  china, lo raccoglie e lo porta al posto (rimessa: sulla linea, dove l'ha raccolto entro 3 m dall'uscita). Rinvio e
+  china, lo raccoglie e lo porta al posto (rimessa: 1-2 passi oltre la linea, dove l'ha raccolto entro 3 m dall'uscita). Rinvio e
   angolo col pallone lontano (oltre 9 m dal posto) o dietro la rete: lo prende il **raccattapalle** di quel fondo
   (`godot/sim/raccatta.gd`, due ragazzini in tuta giallo fluo, uno dietro ogni porta davanti ai cartelloni, grafica in
   `scripts/partita/raccattapalle_vista.gd`): corre al pallone sempre fuori dal campo girando intorno alla rete, si

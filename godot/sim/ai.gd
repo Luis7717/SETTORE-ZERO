@@ -562,6 +562,8 @@ func think(dt: float) -> void:
 		p.spdF = 1.0
 		p.sprint = false
 		assign(p)
+		if rifiniture and phase == "restart" and restart.type == "throw":
+			throwRoom(p) # riprese.gd: nella rimessa gli altri restano lontani dalla linea
 
 
 # la squadra T è senza palla: possesso avversario, oppure pallone libero che non viene da un nostro passaggio o tiro

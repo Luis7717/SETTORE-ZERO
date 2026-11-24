@@ -48,6 +48,15 @@ const BALL_REST_V := 0.6       # pallone fermo sotto questa velocità (m/s)
 const SCENE_MAX := 9.0         # sicurezza: scena più lunga di così = tutti al loro posto subito (s)
 const SCENE_WAIT := 0.5        # finita la scena la CPU batte dopo così (s): l'attesa l'ha già fatta la scena
 const CORNER_PAS_M := 0.3      # angolo: un punto di passaggio in più vale tanti metri di distanza dalla bandierina
+# rimessa laterale (Luis 2026-11-24: "il battitore si mette in piedi sulla linea, dovrebbe fare 1-2 passi indietro")
+const THROW_STAND := 1.2       # il battitore aspetta tanto oltre la linea laterale (m) ...
+const THROW_STEP_SPD := 0.35   # ... e al lancio fa i passi fino alla linea camminando (frazione della velocità massima)
+# rimessa laterale con l'opzione "rifiniture" (Luis 2026-11-24: "i giocatori si mettono troppo sulla linea"): mentre si
+# aspetta, gli altri restano dentro il campo almeno a THROW_ROOM_MIN dalla linea della rimessa, di più (THROW_ROOM_K per
+# metro) quanto più sono lontani lungo la linea dal punto della rimessa, fino a THROW_ROOM_MAX
+const THROW_ROOM_MIN := 4.5    # m
+const THROW_ROOM_K := 0.1      # m in più per metro di distanza lungo la linea
+const THROW_ROOM_MAX := 7.0    # m
 
 var riprese: bool = false      # opzione "riprese" della partita
 var sceneNoCut: bool = false   # setRestart chiamato per una scena: niente taglio di scena (evento "restart" senza cut)
@@ -143,9 +152,10 @@ func _sceneTaker(p: R.Player, r: R.Restart) -> void:
 				p.ty = r.sy
 			p.sprint = C.hyp(p.tx - p.x, p.ty - p.y) > SPRINT_FAR # da lontano scatta
 		"porta":
+			var sp := throwStand(r)
 			p.spdF = CARRY_SPD
-			p.tx = r.sx
-			p.ty = r.sy
+			p.tx = sp.x
+			p.ty = sp.y
 		"indietro":
 			var bk := runupBack(r)
 			p.spdF = BACK_SPD
@@ -154,7 +164,7 @@ func _sceneTaker(p: R.Player, r: R.Restart) -> void:
 		"":
 			if r.pend != null:
 				var h := runupHit(r)
-				p.spdF = RUNUP_SPD
+				p.spdF = THROW_STEP_SPD if r.type == "throw" else RUNUP_SPD
 				p.tx = h.x
 				p.ty = h.y
 
@@ -187,8 +197,18 @@ func sceneBallboyWanted(r: R.Restart, q: Vector2) -> bool:
 	return rete or C.hyp(q.x - r.sx, q.y - r.sy) >= FETCH_NEAR
 
 
-## punto da cui parte il calcio dopo la rincorsa: dietro il pallone, sulla linea del calcio chiesto
+## rimessa: dove il battitore aspetta col pallone in mano, THROW_STAND oltre il suo posto sulla linea; altre riprese: il posto
+func throwStand(r: R.Restart) -> Vector2:
+	if r.type != "throw":
+		return Vector2(r.sx, r.sy)
+	return Vector2(r.sx + (1.0 if r.sx >= 0.0 else -1.0) * THROW_STAND, r.sy)
+
+
+## punto da cui parte il calcio dopo la rincorsa: dietro il pallone, sulla linea del calcio chiesto (rimessa: il posto
+## sulla linea, dove il battitore arriva coi passi dal punto in cui aspettava)
 func runupHit(r: R.Restart) -> Vector2:
+	if r.type == "throw":
+		return Vector2(r.sx, r.sy)
 	var spec: Dictionary = r.pend
 	var ux: float = float(spec.tx) - r.kx
 	var uy: float = float(spec.ty) - r.ky
@@ -264,12 +284,14 @@ func sceneStep(dt: float) -> void:
 				r.posato = false
 				_sceneStage(r, "porta")
 		"porta":
-			if C.hyp(p.x - r.sx, p.y - r.sy) < SPOT_R:
+			var sp := throwStand(r)
+			if C.hyp(p.x - sp.x, p.y - sp.y) < SPOT_R:
 				_sceneStage(r, "posa")
 		"posa":
 			_sceneTurn(p, r, dt)
 			if r.type == "throw":
 				if r.st >= TURN_S:
+					r.rinc = true # al lancio fa i passi fino alla linea
 					_sceneEnd(r)
 			elif r.st >= TURN_S and not r.posato:
 				r.posato = true
@@ -403,7 +425,8 @@ func sceneSkip() -> void:
 	for p: R.Player in players:
 		if p.rgo and not p.off:
 			place(p, p.rtx, p.rty)
-	place(tk, r.sx, r.sy)
+	var sp := throwStand(r)
+	place(tk, sp.x, sp.y)
 	tk.fx = r.sfx
 	tk.fy = r.sfy
 	b.owner = tk
@@ -414,7 +437,7 @@ func sceneSkip() -> void:
 	b.vy = 0.0
 	b.vh = 0.0
 	r.posato = r.type != "throw"
-	r.rinc = false
+	r.rinc = r.type == "throw"
 	_sceneEnd(r)
 
 
@@ -431,3 +454,18 @@ func sceneCornerTaker(outf: Array, x: float, y: float) -> R.Player:
 			bs = s
 			best = p
 	return best if best != null else outf[0]
+
+
+## rimessa laterale (opzione "rifiniture", da think dopo assign): chi aspetta resta dentro il campo, lontano dalla linea
+## della rimessa (THROW_ROOM_*); non il battitore, non il portiere, non chi la persona sta muovendo col dito. I compagni
+## d'appoggio (helpers) col pallone già in mano al battitore si smarcano a distanza di rimessa (offerSupport)
+func throwRoom(p: R.Player) -> void:
+	var r := restart
+	if p == r.taker or p.pos == "P" or (human[p.team] and ctrl[p.team] == p and move[p.team] != null):
+		return
+	if p.team == r.team and ball.owner == r.taker and helpers[p.team].has(p):
+		offerSupport(p, r.taker)
+	var side: float = 1.0 if r.x >= 0.0 else -1.0
+	var inset: float = minf(THROW_ROOM_MAX, THROW_ROOM_MIN + THROW_ROOM_K * absf(p.ty - r.y))
+	if p.tx * side > HW - inset:
+		p.tx = side * (HW - inset)
