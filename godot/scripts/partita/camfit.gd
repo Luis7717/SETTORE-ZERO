@@ -63,6 +63,16 @@ const THROW_MAX_BACK := 7.0    # non oltre tanti metri all'indietro (le tribune 
 const THROW_FOV_MAX := 80.0    # campo visivo verticale massimo (gradi)
 const THROW_MARGIN := {"l": 0.08, "r": 0.08, "t": 0.2, "b": 0.42}  # in basso più aria: anello e piedi del battitore a schermo
 
+# Dribbling della persona (Luis 2026-11-24, dribbling_regia.gd): telecamera girata di ~45° intorno al portatore dal lato
+# del dribbling, più bassa e più vicina della visuale larga; portatore e difensore sempre a schermo.
+const DRIB_PITCH := 0.62       # inclinazione verso il basso (rad, ~36°: il difensore dietro resta più in alto a schermo)
+const DRIB_DIST := 12.0        # distanza minima dal punto guardato (m)
+const DRIB_MAX_DIST := 17.0    # ... massima (si allontana solo se portatore e difensore non stanno a schermo)
+const DRIB_AHEAD := 0.45       # guarda tra portatore e difensore: a questa frazione della distanza ...
+const DRIB_AHEAD_MAX := 3.0    # ... ma al massimo tanti metri davanti al portatore
+const DRIB_FOV_MAX := 80.0     # campo visivo verticale massimo (gradi)
+const DRIB_MARGIN := {"l": 0.1, "r": 0.1, "t": 0.22, "b": 0.3}
+
 const NEAR := 1.0   # ogni punto almeno a tanti metri davanti alla telecamera
 
 
@@ -259,6 +269,25 @@ static func head_view(head: Vector2, yaw: float, fov: float) -> Dictionary:
 	var f: Vector3 = basis(yaw, WIDE_PITCH)[0]
 	var look := Vector3(head.x + sin(yaw) * HEAD_AHEAD, 0, head.y + cos(yaw) * HEAD_AHEAD)
 	return {"pos": look - f * WIDE_MIN_DIST, "look": look, "fov": fov}
+
+
+## Visuale del dribbling (spazio orientato). carrier, defender = Vector2(x, y); yaw = angolo della telecamera (rad, +
+## = guarda verso destra; dribbling_regia.gd → giro_camera): guarda tra i due, prima il portatore poi il difensore.
+static func dribble_view(carrier: Vector2, defender: Vector2, yaw: float, aspect: float, fov: float) -> Dictionary:
+	var f: Vector3 = basis(yaw, DRIB_PITCH)[0]
+	var u := defender - carrier
+	var a := minf(u.length() * DRIB_AHEAD, DRIB_AHEAD_MAX)
+	var mid := carrier + (u.normalized() * a if u.length() > 0.1 else Vector2.ZERO)
+	var look := Vector3(mid.x, 0, mid.y)
+	var c0 := look - f * DRIB_DIST
+	var cx := carrier.x
+	var cy := carrier.y
+	return fit_view({
+		"c0": c0, "yaw": yaw, "pitch": DRIB_PITCH, "aspect": aspect, "fov": fov, "fovMax": maxf(fov, DRIB_FOV_MAX),
+		"m": DRIB_MARGIN, "tMin": 0.0, "tMax": DRIB_MAX_DIST - DRIB_DIST, "keep": 1, "centerX": true,
+		"groups": [[Vector3(cx, 0, cy), Vector3(cx, 2.2, cy)],
+			[Vector3(defender.x, 0, defender.y), Vector3(defender.x, 2.2, defender.y)]],
+	})
 
 
 ## Visuale del calcio d'angolo. ball = Vector2(x, y) della bandierina da cui si batte; yaw = visuale girata col dito

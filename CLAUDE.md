@@ -98,9 +98,18 @@
   della squadra del Match e del salvataggio; senza, motore identico a prima.
 - **Duello** (portatore a 7 m da un difensore davanti, anche "per linee": vedi Scatto): visuale bassa, tempo all'8%. Si
   passa a qualunque compagno **solo disegnando** fino al compagno (il tocco sul compagno non passa più, 2026-11-20);
-  oppure tasto **Dribbling** in basso. Il tasto **prenota** il dribbling (2026-11-21): sparisce, il tempo torna normale e
-  il portatore corre verso il difensore puntando il lato scelto; il dribbling vero (esito, giochetto) parte solo a 2 m
-  dal difensore (`DRIB_NEAR`, al massimo 1,2 s dopo il tocco, `DRIB_BOOK_MAX`). Lato: opposto allo sbilanciamento del
+  oppure tasto **Dribbling** in basso. Il tasto **prenota** il dribbling (2026-11-21): sparisce e il portatore corre
+  verso il difensore puntando il lato scelto; il dribbling vero (esito, giochetto) parte solo a 2 m
+  dal difensore (`DRIB_NEAR`, al massimo 1,2 s dopo il tocco, `DRIB_BOOK_MAX`). **Regia del dribbling** (Godot, Luis
+  2026-11-24, `scripts/partita/dribbling_regia.gd`): dal tocco alla fine il tempo resta in rallenty (40% nella corsa,
+  30% nel giochetto e nel sorpasso, poi torna normale piano, `USCITA_K`), la telecamera gira di 45° intorno al
+  portatore dal lato del dribbling, più bassa e vicina (`dribble_view` in `camfit.gd`, `_drib_step` in
+  `telecamera_partita.gd`), poi torna dritta da sola; il timer del rallenty non conta. Nel motore (solo con
+  `rifiniture`, `dribShow` in `sim/duel.gd`): riuscito = il portatore frena davanti al difensore, finta di lato dal
+  lato opposto per `DRIB_SHOW_T` 0,35 s col giochetto a schermo (difensore battuto che si butta verso la finta e
+  interviene a vuoto), poi cambia direzione e scatta oltre più veloce (`p.burst`, evento `dribble_go`); fallito = frena (non gli finisce
+  addosso), contrasto del difensore e portatore che inciampa (pose `affondo`/`contrasto`/`inciampo`, `vista.reazione`).
+  Esito con la stessa probabilità di prima. Prove: `--scena=dribbling|dribbling_ok|dribbling_ko`. Lato: opposto allo sbilanciamento del
   difensore, verso lo spazio libero, sempre verso il centro entro 8 m dalla linea laterale (`dribSide`); il giochetto va
   da quel lato (`e.side`) e il portatore gli passa accanto senza attraversarlo. Se il duello finisce prima (palla persa,
   passaggio, difensore lontano) la prenotazione si annulla. L'IA dribbla subito, a 3,2 m, come prima.

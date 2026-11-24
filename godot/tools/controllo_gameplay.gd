@@ -15,6 +15,7 @@ const R := preload("res://sim/records.gd")
 const SimMatchScript := preload("res://sim/match.gd")
 const Stili := preload("res://sim/stili.gd")
 const Dito := preload("res://tools/dito_motore.gd")
+const Regia := preload("res://scripts/partita/dribbling_regia.gd")
 
 const TEMPO_K := 14.0
 const RALLENTY_SOTTO := 0.6
@@ -100,6 +101,7 @@ func _partita(sd: int, opz: Dictionary) -> void:
 		"pass": null, "owner_prev": null, "fermo_t": 0.0, "libera_t": 0.0, "slow": false, "ultimo_calcio": {},
 		"sub_dito": "", "duel_t": -1.0, "burst_t": -1.0, "drib_t": -1.0, "burst_p": null, "causa": "", "storia": [], "alta": false, "owner_step": null, "duel_o": null, "booked": false, "tiro": "",
 		"poss": -1, "rec": null, "hk": null, "fase_prev": "play"}
+	st.regia = Regia.new() # regia del dribbling (rallenty dal tasto alla fine del giochetto), come gioco.gd
 	dito.on_kick = func(sub: String) -> void: st.sub_dito = sub
 	var frames := 0
 	var cap := 60 * 60 * 40
@@ -113,6 +115,9 @@ func _partita(sd: int, opz: Dictionary) -> void:
 		var sdt: float = FRAME * float(st.ts)
 		if sdt > 0.0:
 			m.step(sdt)
+		st.regia.passo(m, 0, sdt, st.ts)
+		for e: Dictionary in m.events:
+			st.regia.evento(e, 0)
 		if m.phase == "half":
 			m.startSecondHalf()
 		_conta(m, st, sdt)
@@ -166,7 +171,10 @@ func _tempo(m, dito, st: Dictionary) -> void:
 		return
 	st.testa_reale = -1.0
 	var target: float = dito.velocita_voluta(m)
-	st.ts += (target - st.ts) * minf(1.0, FRAME * TEMPO_K)
+	var rv: float = st.regia.velocita()
+	if rv >= 0.0 and dito.draw_mode == "" and not (m.diveWin(0) and not m.autoGk[0]):
+		target = rv # dribbling della persona: rallenty della regia (gioco.velocita_voluta)
+	st.ts += (target - st.ts) * minf(1.0, FRAME * st.regia.k_tempo(TEMPO_K))
 
 
 func _causa(m, st: Dictionary) -> String:
@@ -176,6 +184,8 @@ func _causa(m, st: Dictionary) -> String:
 		return "disegno_" + String(st.dm)
 	if m.diveWin(0):
 		return "parata"
+	if st.regia.velocita() >= 0.0:
+		return "dribbling"
 	if m.duelFor(0):
 		return "duello"
 	if m.fleeFor(0):
@@ -204,6 +214,12 @@ func _conta(m, st: Dictionary, sdt: float) -> void:
 	else:
 		st.causa = ""
 	st.slow = slow
+	# esito del dribbling riuscito della persona 3 s dopo (tenuto, compagno, perso, libero, fermo; con tiro nel frattempo)
+	if st.get("drib_ok_p") != null and m.time - float(st.drib_ok_t) >= 3.0:
+		var bo2: R.Player = b.owner
+		var es2 := "tenuto" if bo2 == st.drib_ok_p else ("compagno" if (bo2 != null and bo2.team == 0) else ("perso" if (bo2 != null) else ("fermo" if m.phase != "play" else "libero")))
+		_add("dribbling_dopo:" + ("tiro" if st.get("drib_tiro", false) else es2))
+		st.drib_ok_p = null
 	# esito dello Scatto 3 s dopo
 	if st.burst_p != null and m.time - float(st.burst_t) >= 3.0:
 		var bo: R.Player = b.owner
@@ -233,6 +249,8 @@ func _conta(m, st: Dictionary, sdt: float) -> void:
 				if p.team == 0 and (k == "shot" or ((k == "header" or k == "volley") and not e.get("clear", false))):
 					st.tiro = ("testa_dito" if e.get("guidato", false) else k) if sub == k else sub
 					_add("tiro_fatto:" + String(st.tiro))
+					if st.get("drib_ok_p") != null:
+						st.drib_tiro = true
 				if k == "ground" or k == "loft":
 					st.pass = {"team": p.team, "sub": sub, "from": p}
 					_add("pass" + _chi(p))
@@ -312,6 +330,10 @@ func _conta(m, st: Dictionary, sdt: float) -> void:
 			"dribble":
 				if (e.p as R.Player).team == 0:
 					_add("dribbling_u_ok" if e.ok else "dribbling_u_ko")
+					if e.ok:
+						st.drib_ok_p = e.p
+						st.drib_ok_t = m.time
+						st.drib_tiro = false
 					if not e.ok:
 						st.drib_t = m.time
 				else:
@@ -618,6 +640,7 @@ func _stampa(n: int, opz: Dictionary) -> void:
 		_v("testa_fermatempo") / N, _v("dito_testa") / N, _v("dito_testa_saltata") / N, _v("testa_scaduta") / N, _v("gol_tipo_u:testa_dito"), _elenco("testa_fine:")])
 	print("  duello            aperti %.1f · Dribbling %.1f (riusciti %s) · esiti %s" % [_v("duello") / N, _v("dito_dribbling") / N,
 		_pct(_v("dribbling_u_ok"), _v("dribbling_u_ok") + _v("dribbling_u_ko")), _elenco("duello_fine:")])
+	print("  dopo il dribbling riuscito, 3 s dopo: %s" % _elenco("dribbling_dopo:"))
 	print("  perse nel duello  %s · calci ribattuti subito (stesso passo) %.1f" % [_elenco("persa_duello:"), _v("ribattuto_subito_u") / N])
 	print("  fuga              aperte %.1f · Scatto %.1f · esiti %s" % [_v("fuga") / N, _v("scatto") / N, _elenco("fuga_fine:")])
 	print("  dopo lo Scatto    verso %s · vicino alla linea laterale %d · 3 s dopo %s" % [_elenco("scatto_verso:"), _v("scatto_vicino_linea"), _elenco("scatto_esito:")])

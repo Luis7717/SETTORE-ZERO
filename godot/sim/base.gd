@@ -63,6 +63,9 @@ var advantage: R.Advantage = null
 var duel: R.Duel = null
 var duelCd: Array = [0.0, 0.0]
 var duelCdP: Array = [null, null]
+# giochetto del dribbling prenotato riuscito (solo con "rifiniture", duel.gd → dribShowStep): il portatore rallenta, fa la
+# finta dal lato opposto e poi scatta oltre il difensore. Campi del duello: p, o, side, t = tempo che resta (s)
+var dribShow: R.Duel = null
 var flee: R.Duel = null # fuga: avversario alla pari o dietro (per linee), tasto Scatto; stessi campi del duello
 var fleeCd: Array = [0.0, 0.0]
 var fleeCdP: Array = [null, null]
@@ -250,6 +253,7 @@ func place(p: R.Player, x: float, y: float) -> void:
 
 
 func resetStates() -> void:
+	dribShow = null
 	for p: R.Player in players:
 		p.wall = null
 	for p: R.Player in players:

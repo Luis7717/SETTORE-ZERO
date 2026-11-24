@@ -65,6 +65,17 @@ const SIDE_LEAN_T := 0.3  # ... in cui conta anche dove sta andando il difensore
 const SIDE_FREE := 0.25   # ... peso dello spazio libero da altri avversari oltre il difensore (per m)
 const SIDE_FREE_MAX := 8.0 # ... spazio contato fino a tanto (m)
 const SIDE_EDGE := 8.0    # ... entro tanto dalla linea laterale si va sempre verso il centro (m)
+# Giochetto del dribbling prenotato riuscito (Luis 2026-11-24: "falli vedere bene"), solo con "rifiniture" e solo per
+# il tasto della persona: invece di partire subito di corsa oltre il difensore, il portatore rallenta col pallone al
+# piede, sposta peso e pallone dal lato opposto (la finta: il difensore si sbilancia da quella parte) e dopo
+# DRIB_SHOW_T cambia direzione e scatta dal lato scelto (la corsa di prima). L'esito è già deciso: stessa probabilità.
+const DRIB_SHOW_T := 0.35   # durata del giochetto prima dello scatto (s di partita)
+const DRIB_SHOW_V := 2.5    # ... il portatore va a questa velocità (m/s) ...
+const DRIB_SHOW_DEC := 24.0 # ... frenando così (m/s²: da uno scatto pieno in ~0,25 s)
+const DRIB_FEINT := 1.0     # ... di lato verso il lato opposto a quello scelto (la finta) ...
+const DRIB_FEINT_FWD := 0.45 # ... e un po' in avanti, ma solo finché resta lontano dal difensore più di DRIB_SHOW_GAP
+const DRIB_SHOW_GAP := 1.5  # (m: più vicino i due corpi a schermo si compenetrerebbero)
+const DRIB_LEAN_V := 1.2    # il difensore si sbilancia verso la finta a questa velocità (m/s), poi resta fermo
 
 
 func duelFor(tm: int) -> bool:
@@ -187,8 +198,8 @@ func updateDuel(dt: float) -> void:
 		return
 	if duelCd[c.team] > 0.0 and duelCdP[c.team] == c:
 		return
-	if calmed(c):
-		return
+	if calmed(c) or (dribShow != null and dribShow.p == c):
+		return # (giochetto del dribbling in corso: niente duello nuovo finché non è passato)
 	var o := frontOpp(c, DUEL_R, true)
 	if o == null:
 		return
@@ -258,7 +269,7 @@ func updateFlee(dt: float) -> void:
 	var c := b.owner
 	if c == null or not human[c.team] or ctrl[c.team] != c or c.state != "play" or c.burst > 0.0:
 		return
-	if (fleeCd[c.team] > 0.0 and fleeCdP[c.team] == c) or calmed(c):
+	if (fleeCd[c.team] > 0.0 and fleeCdP[c.team] == c) or calmed(c) or (dribShow != null and dribShow.p == c):
 		return
 	var o := sideOpp(c, FLEE_R)
 	if o == null:
@@ -397,95 +408,232 @@ func dribbleChance(p: R.Player, o: R.Player) -> float:
 # Tentativo di dribbling del portatore p contro o (stessa regola per umano e IA). Ritorna true se riesce.
 # side_: lato già scelto (dribbling prenotato dal tasto), altrimenti lo sceglie dribSide.
 func dribble(p: R.Player, o: R.Player, side_: float = 0.0) -> bool:
-	var b := ball
 	var tm := p.team
 	var side: float = side_
 	var ok: bool = rnd() < dribbleChance(p, o)
 	p.dribCd = DRIB_CD
+	# dribbling prenotato dal tasto della persona, con "rifiniture": frena davanti al difensore (riuscito: giochetto e poi
+	# scatto; fallito: non gli finisce addosso)
+	var booked: bool = rifiniture and side_ != 0.0 and human[tm] and ctrl[tm] == p
+	var show: bool = ok and booked
+	if booked:
+		dribBrake(p, o)
+	if show:
+		dribShowStart(p, o, side)
+	elif ok:
+		side = dribbleRun(p, o, side)
+	else:
+		dribbleLost(p, o)
+	if ok:
+		wearDown(p, "dri", WEAR_DRI, WEAR_DRI_MIN)
+	# side va anche alla grafica: il giochetto va da quel lato (+1 = sinistra del portatore)
+	# show = durata del giochetto prima dello scatto (dribShowStart), 0 = corsa subito (IA, o senza "rifiniture")
+	ev("dribble", {"p": p, "o": o, "ok": ok, "side": side if side != 0.0 else dribSide(p, o), "show": DRIB_SHOW_T if show else 0.0})
+	if duel != null and duel.p == p:
+		endDuel("dribbling" if ok else "palla persa")
+	return ok
+
+
+# dribbling riuscito: il portatore corre oltre il difensore dal lato `side` (0 = lo sceglie dribSide), il difensore
+# resta sbilanciato. Ritorna il lato usato.
+func dribbleRun(p: R.Player, o: R.Player, side_: float) -> float:
+	var tm := p.team
+	var side: float = side_
 	var dx: float = o.x - p.x
 	var dy: float = o.y - p.y
 	var d: float = C.orf(C.hyp(dx, dy), 1.0)
 	var ux: float = dx / d
 	var uy: float = dy / d
-	if ok:
-		if side == 0.0:
-			side = dribSide(p, o)
-		var nx: float = -uy * side
-		var ny: float = ux * side
-		var lat: float = maxf(DRIB_SIDE, DRIB_WIDE * (d + DRIB_PAST) / d)
-		var tx: float = C.clamp_(p.x + ux * (d + DRIB_PAST) + nx * lat, -HW + 1.0, HW - 1.0)
-		var ty: float = C.clamp_(p.y + uy * (d + DRIB_PAST) + ny * lat, -HL + 1.0, HL - 1.0)
-		var wx: float = tx - p.x
-		var wy: float = ty - p.y
-		var wn: float = C.orf(C.hyp(wx, wy), 1.0)
-		var sp: float = vmax(p) * 1.05
-		p.vx = wx / wn * sp
-		p.vy = wy / wn * sp
-		p.fx = wx / wn
-		p.fy = wy / wn
-		p.tx = tx
-		p.dx = tx
-		p.ty = ty
-		p.dy = ty
-		p.aiT = maxf(p.aiT, 0.35)
-		p.protect = maxf(p.protect, DRIB_PROTECT)
-		# il tasto si può toccare appena si apre il duello (difensore a 7 m): lo sbilanciamento conta da quando il portatore
-		# arriva addosso al difensore, altrimenti finiva prima e il difensore, ancora davanti, gli si attaccava addosso
-		o.stun = DRIB_STUN + maxf(0.0, d - DRIB_REACH) / sp
+	if side == 0.0:
+		side = dribSide(p, o)
+	var nx: float = -uy * side
+	var ny: float = ux * side
+	var lat: float = maxf(DRIB_SIDE, DRIB_WIDE * (d + DRIB_PAST) / d)
+	var tx: float = C.clamp_(p.x + ux * (d + DRIB_PAST) + nx * lat, -HW + 1.0, HW - 1.0)
+	var ty: float = C.clamp_(p.y + uy * (d + DRIB_PAST) + ny * lat, -HL + 1.0, HL - 1.0)
+	var wx: float = tx - p.x
+	var wy: float = ty - p.y
+	var wn: float = C.orf(C.hyp(wx, wy), 1.0)
+	var sp: float = vmax(p) * 1.05
+	p.vx = wx / wn * sp
+	p.vy = wy / wn * sp
+	p.fx = wx / wn
+	p.fy = wy / wn
+	p.tx = tx
+	p.dx = tx
+	p.ty = ty
+	p.dy = ty
+	p.aiT = maxf(p.aiT, 0.35)
+	p.protect = maxf(p.protect, DRIB_PROTECT)
+	# il tasto si può toccare appena si apre il duello (difensore a 7 m): lo sbilanciamento conta da quando il portatore
+	# arriva addosso al difensore, altrimenti finiva prima e il difensore, ancora davanti, gli si attaccava addosso
+	o.stun = DRIB_STUN + maxf(0.0, d - DRIB_REACH) / sp
+	o.contact = 0.0
+	o.vx *= 0.3
+	o.vy *= 0.3
+	o.beat = o.stun + DRIB_BEAT
+	o.beatBy = p
+	if o.state == "prep":
+		o.state = "play"
+		o.warn = false
+	if human[tm] and ctrl[tm] == p:
+		var mv := R.Move.new()
+		mv.x = tx
+		mv.y = ty
+		mv.ttl = maxf(0.6, wn / sp + 0.15) # la corsa dura finché il portatore non arriva oltre il difensore
+		move[tm] = mv
+	return side
+
+
+# dribbling fallito: il portatore resta fermo un attimo; il difensore vicino prende il pallone, sennò lo devia
+func dribbleLost(p: R.Player, o: R.Player) -> void:
+	var b := ball
+	var tm := p.team
+	var dx: float = o.x - p.x
+	var dy: float = o.y - p.y
+	var d: float = C.orf(C.hyp(dx, dy), 1.0)
+	var ux: float = dx / d
+	var uy: float = dy / d
+	p.stun = maxf(p.stun, 0.35)
+	p.tackleCd = 0.6
+	if human[tm] and ctrl[tm] == p:
+		move[tm] = null
+	if d < DRIB_STEAL_R and rnd() < DRIB_STEAL:
+		b.owner = o
+		b.prev = b.last
+		b.last = o
+		b.kick = null
+		lastPass = null
+		o.protect = 0.5
 		o.contact = 0.0
-		o.vx *= 0.3
-		o.vy *= 0.3
-		o.beat = o.stun + DRIB_BEAT
-		o.beatBy = p
-		if o.state == "prep":
-			o.state = "play"
-			o.warn = false
-		wearDown(p, "dri", WEAR_DRI, WEAR_DRI_MIN)
-		if human[tm] and ctrl[tm] == p:
-			var mv := R.Move.new()
-			mv.x = tx
-			mv.y = ty
-			mv.ttl = maxf(0.6, wn / sp + 0.15) # la corsa dura finché il portatore non arriva oltre il difensore
-			move[tm] = mv
+		o.aiT = 0.25
+		o.dx = o.x
+		o.dy = o.y
+		o.holdN = 0
+		ev("tackle", {"p": o, "on": p, "dribble": true})
 	else:
-		p.stun = maxf(p.stun, 0.35)
-		p.tackleCd = 0.6
-		if human[tm] and ctrl[tm] == p:
-			move[tm] = null
-		if d < DRIB_STEAL_R and rnd() < DRIB_STEAL:
-			b.owner = o
-			b.prev = b.last
-			b.last = o
-			b.kick = null
-			lastPass = null
-			o.protect = 0.5
-			o.contact = 0.0
-			o.aiT = 0.25
-			o.dx = o.x
-			o.dy = o.y
-			o.holdN = 0
-			ev("tackle", {"p": o, "on": p, "dribble": true})
-		else:
-			# deviato: il pallone schizza verso il difensore, un po' di lato
-			var a: float = F.atan2_(uy, ux) + (rnd() - 0.5) * 1.4
-			var v: float = 5.0 + rnd() * 3.0
-			b.owner = null
-			b.vx = F.cos_(a) * v
-			b.vy = F.sin_(a) * v
-			b.vh = 0.8
-			b.h = 0.05
-			b.ct = 0.0
-			b.kick = null
-			b.shot = null
-			b.noP = p
-			b.noT = 0.4
-			lastPass = null
-			predT = 0.0
-	# side va anche alla grafica: il giochetto va da quel lato (+1 = sinistra del portatore)
-	ev("dribble", {"p": p, "o": o, "ok": ok, "side": side if side != 0.0 else dribSide(p, o)})
-	if duel != null and duel.p == p:
-		endDuel("dribbling" if ok else "palla persa")
-	return ok
+		# deviato: il pallone schizza verso il difensore, un po' di lato
+		var a: float = F.atan2_(uy, ux) + (rnd() - 0.5) * 1.4
+		var v: float = 5.0 + rnd() * 3.0
+		b.owner = null
+		b.vx = F.cos_(a) * v
+		b.vy = F.sin_(a) * v
+		b.vh = 0.8
+		b.h = 0.05
+		b.ct = 0.0
+		b.kick = null
+		b.shot = null
+		b.noP = p
+		b.noT = 0.4
+		lastPass = null
+		predT = 0.0
+
+
+# giochetto del dribbling prenotato riuscito (solo con "rifiniture"): il difensore, già battuto, si sbilancia verso la
+# finta (lato opposto a `side`) e resta fermo; il portatore è protetto finché non è passato. Lo scatto lo fa dribShowStep.
+func dribShowStart(p: R.Player, o: R.Player, side: float) -> void:
+	var f := R.Duel.new()
+	f.team = p.team
+	f.p = p
+	f.o = o
+	f.side = side
+	f.t = DRIB_SHOW_T
+	dribShow = f
+	var dx: float = o.x - p.x
+	var dy: float = o.y - p.y
+	var d: float = C.orf(C.hyp(dx, dy), 1.0)
+	# verso la finta: alla destra del portatore se il lato scelto è la sinistra (+1), e viceversa
+	var lx: float = dy / d * side
+	var ly: float = -dx / d * side
+	o.stun = DRIB_SHOW_T + DRIB_STUN
+	o.contact = 0.0
+	o.vx = lx * DRIB_LEAN_V
+	o.vy = ly * DRIB_LEAN_V
+	o.beat = o.stun + DRIB_BEAT
+	o.beatBy = p
+	if o.state == "prep":
+		o.state = "play"
+		o.warn = false
+	p.protect = maxf(p.protect, DRIB_SHOW_T + DRIB_PROTECT)
+	p.aiT = maxf(p.aiT, DRIB_SHOW_T + 0.35)
+	dribShowSteer(f, 0.0)
+
+
+# frenata davanti al difensore: della corsa verso di lui resta al massimo DRIB_SHOW_V (il giochetto a schermo parte adesso)
+func dribBrake(p: R.Player, o: R.Player) -> void:
+	var dx: float = o.x - p.x
+	var dy: float = o.y - p.y
+	var d: float = C.orf(C.hyp(dx, dy), 1.0)
+	var ux: float = dx / d
+	var uy: float = dy / d
+	var vu: float = p.vx * ux + p.vy * uy
+	if vu > DRIB_SHOW_V:
+		p.vx -= ux * (vu - DRIB_SHOW_V)
+		p.vy -= uy * (vu - DRIB_SHOW_V)
+
+
+# a ogni passo durante il giochetto: il portatore frena e va piano verso la finta; finito il tempo cambia direzione e
+# scatta oltre il difensore dal lato scelto (dribbleRun). Se perde il pallone o il gioco si ferma, finisce lì.
+func dribShowStep(dt: float) -> void:
+	var f := dribShow
+	var p := f.p
+	if phase != "play" or ball.owner != p or p.off or p.state != "play" or f.o.off:
+		dribShow = null
+		return
+	f.t -= dt
+	if f.t > 0.0:
+		dribShowSteer(f, dt)
+		return
+	dribShow = null
+	f.o.stun = 0.0 # dribbleRun lo rimette: sbilanciato da adesso fino a quando il portatore lo ha superato
+	dribbleRun(p, f.o, f.side)
+	# lo scatto dopo il giochetto è più veloce (come lo Scatto, BURST_SPD per BURST_T): recupera il tempo del giochetto,
+	# altrimenti gli altri difensori arrivavano a chiudere (controllo del gameplay: gol della persona da 0,9 a 0,4)
+	p.burst = maxf(p.burst, BURST_T)
+	ev("dribble_go", {"p": p, "o": f.o, "side": f.side})
+
+
+# passo lento verso la finta: velocità portata (frenando) a DRIB_SHOW_V, un po' di lato dalla parte opposta al lato scelto
+func dribShowSteer(f: R.Duel, dt: float) -> void:
+	var p := f.p
+	var o := f.o
+	var dx: float = o.x - p.x
+	var dy: float = o.y - p.y
+	var d: float = C.orf(C.hyp(dx, dy), 1.0)
+	var ux: float = dx / d
+	var uy: float = dy / d
+	var fw: float = DRIB_FEINT_FWD * C.clamp_(d - DRIB_SHOW_GAP, 0.0, 1.0)
+	var wx: float = ux * fw + uy * f.side * DRIB_FEINT
+	var wy: float = uy * fw - ux * f.side * DRIB_FEINT
+	var wn: float = C.orf(C.hyp(wx, wy), 1.0)
+	wx = wx / wn * DRIB_SHOW_V
+	wy = wy / wn * DRIB_SHOW_V
+	var ex: float = wx - p.vx
+	var ey: float = wy - p.vy
+	var e: float = C.hyp(ex, ey)
+	var acc: float = DRIB_SHOW_DEC * dt
+	if e <= acc:
+		p.vx = wx
+		p.vy = wy
+	else:
+		p.vx += ex / e * acc
+		p.vy += ey / e * acc
+	# il motore lo muove verso un punto vicino (velocità bassa: min(vmax, distanza · 3,2)), sempre più avanti
+	var tx: float = C.clamp_(p.x + wx * 0.3, -HW + 0.5, HW - 0.5)
+	var ty: float = C.clamp_(p.y + wy * 0.3, -HL + 0.5, HL - 0.5)
+	p.tx = tx
+	p.ty = ty
+	p.dx = tx
+	p.dy = ty
+	var tm := f.team
+	if human[tm] and ctrl[tm] == p:
+		var mv := R.Move.new()
+		mv.x = tx
+		mv.y = ty
+		mv.ttl = 0.2
+		mv.held = false
+		mv.sprint = false
+		move[tm] = mv
 
 
 # l'IA (e l'umano simulato) col pallone e un avversario davanti a volte prova il dribbling

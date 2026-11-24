@@ -213,7 +213,8 @@ usa `scripts/partita/vista_finta.gd`, che ha le stesse firme):
 |---|---|---|
 | `gioco.gd` | `setup(m, 0)` | una volta, dopo aver creato la partita |
 | `gioco.gd` | `drawing = gesti.drawing`, poi `update_view(dt_game, dt_real)` | a ogni fotogramma, dopo motore ed eventi (in pausa: 0, 0) |
-| `gioco.gd` | `trick(p)` → `{name, ...}` (o una stringa) | evento `dribble`: nome del giochetto nella scritta grande |
+| `gioco.gd` | `trick(p, -1, side, dur)` → `{name, ...}` (o una stringa), `reazione(p, tipo, lato, dur)` | evento `dribble`: giochetto e pose di reazione (`dribbling_regia.gd → esito`), nome nella scritta grande |
+| `gioco.gd` | `dribbling_cam = regia.camera()` | a ogni fotogramma: visuale girata di 45° del dribbling della persona (`{}` = nessuna) |
 | `gioco.gd` | `dispose()` | uscendo dalla scena (anche "Nuova partita") |
 | `gesti.gd` | `world_to_screen(x, y, h)` → `Vector3(x_px, y_px, visibile)` | presa di pallone, portatore, giocatori; omografia della porta |
 | `gesti.gd` | `screen_to_field(p)` → `Vector2` (non finito = cielo) | punti di strade, linee di difesa, "tieni premuto" |
@@ -760,7 +761,9 @@ Contratto di `PartitaVista` (`scripts/partita/vista.gd`, radice di `scenes/vista
 | `set_zoom(z)` | zoom come `setZoom` del web (senza chiamarla lo calcola la vista con le stesse regole) |
 | `show_path(points, kind, end_h := 0.0, recv := null)` / `clear_path()` | linea a nastro: "run", "pass" (anello verde sul compagno entro 5 m), "shot" (gialla col mirino), "def" |
 | `show_preview(points, offside_y := NAN)` | puntini del volo e linea del fuorigioco (facoltativo: nel gioco li fa l'interfaccia) |
-| `trick(p, r := -1.0) -> Dictionary` | giochetto del dribbling per p (solo grafica): {id, name, dur} |
+| `trick(p, r := -1.0, side := 0.0, dur := -1.0) -> Dictionary` | giochetto del dribbling per p (solo grafica): {id, name, dur}; `dur` > 0 = lo fa durare tanto (dribbling della persona) |
+| `reazione(p, tipo, lato, dur)` | posa di reazione al dribbling (solo grafica): "affondo" (difensore a vuoto), "contrasto", "inciampo" |
+| `dribbling_cam` | `{p, o, yaw}` della regia del dribbling (`dribbling_regia.gd`) o `{}`: la telecamera entra e torna piano |
 | `tifo(tipo: String, squadra: int)` | reazione del pubblico: "gol", "occasione" (tiro), "parata", "palo", "fischio"; squadra = chi segna / tira / para / prende il palo / subisce il fischio. Il gol la vista lo vede da sola dal punteggio (festa una volta per gol: tifosi, maxischermo, coriandoli). In partita vera la chiama `gioco.gd` (`_eventi`) tramite `scripts/partita/tifo_eventi.gd`: tiro (anche di testa o al volo) = occasione, parata, palo, fallo; sul tiro salgono anche i cori (`audio.occasione()`) |
 | `set_rallenty(k: float)` | facoltativa: 0..1 quanto è "rallenty" (profondità di campo); < 0 = la vista lo ricava da `dt_game / dt_real` |
 | `set_qualita(l: int)` | livello grafico 3 alto, 2 medio, 1 basso, 0 minimo; `qualita_auto` (vero) lo abbassa da sola sotto 58 fps, `livello_qualita` dice quello in uso |

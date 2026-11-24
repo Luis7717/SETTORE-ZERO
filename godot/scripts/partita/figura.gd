@@ -31,6 +31,8 @@ const HEAD_H := 1.3            # palla sopra questa altezza al momento del colpo
 const IDLE_FIX_LEGS := 0.12    # rad: nel clip "fermo" si chiudono un po' le gambe...
 const IDLE_FIX_ARMS := -0.05   # ... e si aprono appena le braccia
 const TRICK_BLEND := 0.12      # s: entrata e uscita dal movimento calcolato del giochetto
+const REAZ_IN := 0.22          # reazione al dribbling (ctx.reazione): frazione della durata per entrare nella posa ...
+const REAZ_OUT := 0.35         # ... e per uscirne
 # raggio del pallone a schermo (m del gioco; vista.gd BALL_R). 2026-11-22: da 0,21 a 0,16 (Luis: "palla leggermente
 # troppo grande rispetto ai giocatori", alti 2,3 m a schermo). I giochetti restano misurati col pallone del web (0,21,
 # mosse/giochetti.gd MATCH_R: stesse pose del JS), cambia solo quanto è grande quello disegnato
@@ -203,6 +205,7 @@ func posa(p: Object, dt: float, ctx: Dictionary) -> void:
 	var near_ball: bool = b != null and Vector2(b.x - p.x, b.y - p.y).length() < 2.2
 	var header: bool = p.kickAnim > 0.0 and near_ball and b.h > HEAD_H and p.pos != "R"   # R = raccattapalle: lancia
 	var trick: Variant = ctx.get("trick")
+	var reaz: Variant = ctx.get("reazione") if st == "play" else null   # {tipo, q, lato}: dribbling (vista.reazione)
 	var m: Object = ctx.get("m")
 	var in_mano := palla_in_mano(p, m)
 	mano_gk = move_toward(mano_gk, 1.0 if in_mano else 0.0, dt / (MANO_ENTRA if in_mano else MANO_ESCE)) if dt > 0.0 else (1.0 if in_mano else mano_gk)
@@ -220,7 +223,12 @@ func posa(p: Object, dt: float, ctx: Dictionary) -> void:
 	_anim.advance(dt)
 	_gcache.clear()
 	var s := Coord.SCALE
-	if mocap.al_posto_delle_pose():   # [mocap] la clip fa tutto il corpo: niente pose calcolate, solo il giro
+	if reaz != null and not cele:   # reazione al dribbling: sopra il clip (la clip mocap della difesa la toglie mocap)
+		var r4 := _posa_reazione(reaz, s)
+		bx = r4.x
+		bz = r4.y
+		py = r4.z
+	elif mocap.al_posto_delle_pose():   # [mocap] la clip fa tutto il corpo: niente pose calcolate, solo il giro
 		by = mocap.yaw
 	elif st == "slide":
 		bx = -1.2
@@ -292,6 +300,45 @@ func posa(p: Object, dt: float, ctx: Dictionary) -> void:
 		_giochetto(trick)
 	if mano_gk > 0.0 and mc <= 0.0:
 		_tieni_palla(mano_gk)
+
+
+## Posa di reazione al dribbling (rz = {tipo, q 0..1, lato}; lato +1 = verso la sua sinistra, −1 destra, 0 davanti):
+## "affondo" = si butta di lato con la gamba tesa sul pallone che non c'è più (intervento a vuoto), "contrasto" = allunga
+## la gamba sul pallone, "inciampo" = fermato, perde l'equilibrio all'indietro con le braccia larghe.
+## Mette le rotazioni delle ossa e ritorna Vector3(bx, bz, py) del corpo.
+func _posa_reazione(rz: Dictionary, s: float) -> Vector3:
+	var q: float = rz.q
+	var w := smoothstep(0.0, 1.0, clampf(q / REAZ_IN, 0.0, 1.0)) * smoothstep(0.0, 1.0, clampf((1.0 - q) / REAZ_OUT, 0.0, 1.0))
+	var lato: float = rz.lato
+	var gamba := "l" if lato > 0.0 else "r"     # gamba che va verso il pallone (davanti: la destra)
+	var altra := "r" if gamba == "l" else "l"
+	var fuori := 1.0 if gamba == "l" else -1.0  # segno di AX_Z che apre quella gamba (e quel braccio) verso l'esterno
+	match String(rz.tipo):
+		"affondo":
+			_rot("thigh_" + gamba, AX_Z, fuori * 0.8 * w * absf(lato))
+			_rot("thigh_" + gamba, AX_X, -0.35 * w)
+			_rot("calf_" + gamba, AX_X, 0.1 * w)
+			_rot("thigh_" + altra, AX_X, -0.45 * w)
+			_rot("calf_" + altra, AX_X, 0.85 * w)
+			_rot("spine_02", AX_X, 0.3 * w)
+			_rot("upperarm_l", AX_Z, 0.95 * w); _rot("upperarm_r", AX_Z, -0.95 * w)
+			return Vector3(0.12 * w, -lato * 0.42 * w, -0.16 * w / s)
+		"contrasto":
+			_rot("thigh_" + gamba, AX_X, -1.05 * w)
+			_rot("thigh_" + gamba, AX_Z, fuori * 0.3 * w * absf(lato))
+			_rot("calf_" + gamba, AX_X, 0.15 * w)
+			_rot("thigh_" + altra, AX_X, -0.35 * w)
+			_rot("calf_" + altra, AX_X, 0.8 * w)
+			_rot("spine_02", AX_X, 0.35 * w)
+			_rot("upperarm_l", AX_Z, 0.7 * w); _rot("upperarm_r", AX_Z, -0.7 * w)
+			return Vector3(0.1 * w, -lato * 0.15 * w, -0.14 * w / s)
+		"inciampo":
+			_rot("spine_02", AX_X, -0.3 * w)
+			_rot("calf_l", AX_X, 0.45 * w); _rot("thigh_l", AX_X, -0.25 * w)
+			_rot("upperarm_l", AX_Z, 1.25 * w); _rot("upperarm_r", AX_Z, -1.25 * w)
+			_rot("lowerarm_l", AX_Z, 0.5 * w); _rot("lowerarm_r", AX_Z, -0.5 * w)
+			return Vector3(-0.22 * w, 0.0, -0.05 * w / s)
+	return Vector3.ZERO
 
 
 ## portiere col pallone in mano: rilancio dalle mani (ripresa "gk" del motore) finché non calcia

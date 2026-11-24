@@ -27,6 +27,7 @@ const GIOCHETTI := ["Finta di corpo", "Doppio passo", "Elastico", "Veronica", "S
 var user_yaw := 0.0
 var cam_drag := false
 var drawing := false
+var dribbling_cam := {}   # (visuale del dribbling: la vista finta non la usa)
 
 var _m: SimMatchScript = null
 var _me := 0
@@ -210,12 +211,17 @@ func clear_path() -> void:
 
 
 ## dribbling tentato da p: nome del giochetto (più bello col dribbling alto, come chooseTrick di src/tricks.js)
-func trick(p: R.Player, _r: float = -1.0, _side: float = 0.0) -> Dictionary:
+func trick(p: R.Player, _r: float = -1.0, _side: float = 0.0, _dur: float = -1.0) -> Dictionary:
 	var top := clampi(int(floor((p.st.dri - 35.0) / 10.0)), 0, GIOCHETTI.size() - 1)
 	var r := randf()
 	var giu := 0 if r < 0.6 else (1 if r < 0.9 else 2)
 	var k := maxi(0, top - giu)
 	return {"id": k, "name": GIOCHETTI[k]}
+
+
+## posa di reazione al dribbling: la vista finta non la disegna
+func reazione(_p: R.Player, _tipo: String, _lato: float, _dur: float) -> void:
+	pass
 
 
 func dispose() -> void:

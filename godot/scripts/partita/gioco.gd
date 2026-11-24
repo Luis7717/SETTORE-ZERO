@@ -15,6 +15,8 @@
 #   --esci-a-fine       a fine partita stampa il riassunto ed esce (codice 0)
 #   --scena=area|duello|fuga|scatto|angolo|rinvio|rilancio|pausa|gol|curva|prima   mette la partita in una situazione da fotografare (gol: tiro a
 #                       porta vuota, per vedere cronaca e replay)
+#   --scena=dribbling|dribbling_ok|dribbling_ko   duello col difensore e tasto Dribbling (regia del dribbling,
+#                       dribbling_regia.gd); _ok / _ko con statistiche estreme (l'esito resta a caso col seme)
 #   --scena=fallo|rigore|espulso   fallo da dietro sul nostro n. 10 (sim/falli.gd): giallo e punizione con la barriera,
 #                       giallo e rigore, secondo giallo = espulso
 #   --scena=recupero   il nostro n. 4 ruba palla in contrasto frontale: respiro dopo il recupero, rallenty, passaggio
@@ -78,6 +80,7 @@ const TifoEventi := preload("res://scripts/partita/tifo_eventi.gd")
 const FermatempoTesta := preload("res://scripts/partita/fermatempo_testa.gd")
 const ParataRegia := preload("res://scripts/partita/parata_regia.gd")
 const TimerRallenty := preload("res://scripts/partita/timer_rallenty.gd")
+const DribblingRegia := preload("res://scripts/partita/dribbling_regia.gd")
 const SCENA_VISTA := "res://scenes/vista_partita.tscn"
 
 # velocità del tempo (rallenty), come src/main.js
@@ -135,6 +138,7 @@ var _anteprima_viva := false
 var _inizio_ms := 0
 var _seme_partita := 0
 var _rallenty := TimerRallenty.new()  # timer di 10 s veri del rallenty col pallone (timer_rallenty.gd)
+var _drib := DribblingRegia.new()     # regia del dribbling della persona: rallenty e telecamera girata (dribbling_regia.gd)
 var _testa_reale := -1.0       # secondi veri dall'apertura del fermatempo del colpo di testa (−1 = chiuso)
 var _parata := ParataRegia.new() # fermatempo della parata col bersaglio (portiere manuale, sim/parata.gd)
 var _scena_veloce := false     # un tocco durante la scena della ripresa la fa andare più veloce (fino alla fine)
@@ -327,6 +331,7 @@ func _process(delta: float) -> void:
 		hud.aggiorna_anteprima() # anche un fotogramma dopo la fine del disegno, per toglierla
 	_anteprima_viva = gesti.drawing
 	vista.drawing = gesti.drawing
+	vista.dribbling_cam = _drib.camera()
 	var dt_reale := 0.0 if paused else dt
 	esultanza.aggiorna(dt_reale, m)
 	vista.update_view(0.0 if paused else dt * maxf(ts, 0.25), dt_reale)
@@ -373,7 +378,7 @@ func _cerchio_testa() -> void:
 ## tasto il rallenty finisce (m.userCalm) e il portatore continua da solo. Non nelle lezioni e nelle prove di tiro.
 func _passo_rallenty(dt: float) -> void:
 	var p: Object = null
-	if allenamento == null and prove == null:
+	if allenamento == null and prove == null and not _drib.attiva(): # il dribbling non si chiude a metà
 		p = TimerRallenty.portatore_in_rallenty(m, me)
 	if _rallenty.passo(dt, p, gesti.drawing):
 		m.userCalm(me)
@@ -396,8 +401,9 @@ func _cerchio_rallenty() -> void:
 ## velocità del tempo voluta adesso (rallenty)
 func velocita_voluta() -> float:
 	var dive: bool = m.diveWin(me) and not m.autoGk[me]
-	# dribbling prenotato: il portatore corre verso il difensore a tempo normale (duel.gd → dribBookStep)
+	# dribbling prenotato: il portatore corre verso il difensore, poi il giochetto (rallenty della regia del dribbling)
 	var booked: bool = m.dribBooked(me)
+	var drib := _drib.velocita()
 	var duel: bool = not booked and m.duelFor(me)
 	var flee: bool = not duel and m.fleeFor(me)
 	var zone: bool = not booked and not duel and not flee and m.inZone(me)
@@ -407,6 +413,8 @@ func velocita_voluta() -> float:
 		return PASS_DRAW_SLOW # col pallone ogni linea è un passaggio o un tiro (niente più strada da correre)
 	if dive:
 		return GK_SLOW
+	if drib >= 0.0:
+		return drib
 	if duel:
 		return DUEL_SLOW
 	if flee:
@@ -430,7 +438,7 @@ func _passi_motore(dt: float) -> void:
 	if testa >= 0.0:
 		ts = testa # fermatempo del colpo di testa: fermo o normale, niente passaggio dolce
 	else:
-		ts += (target - ts) * minf(1.0, dt * TEMPO_K)
+		ts += (target - ts) * minf(1.0, dt * _drib.k_tempo(TEMPO_K)) # fine del dribbling: torna normale piano
 	var sdt := dt * ts * _velocita
 	if in_scena():
 		sdt *= velocita_scena(m.restart.type, _scena_veloce)
@@ -445,6 +453,7 @@ func _passi_motore(dt: float) -> void:
 		if replay != null and replay.trattieni(m, sdt / n): # fine della festa del gol: motore fermo
 			break
 		m.step(sdt / n)
+	_drib.passo(m, me, sdt, ts)
 	if replay != null and replay.festa_finita():
 		_fine_festa_gol()
 	if allenamento != null:
@@ -497,6 +506,7 @@ func _eventi() -> void:
 		elif e.type == "foul":
 			_fallo_nel_passo = true
 	for e: Dictionary in m.events:
+		_drib.evento(e, me)
 		_evento(e, adv)
 		tifo_eventi.applica(e, vista, audio)
 		if cronaca != null:
@@ -530,10 +540,18 @@ func _evento(e: Dictionary, adv: bool) -> void:
 				audio.kick(6.0)
 				hud.big("Scatto!", "g", 800)
 		"dribble":
-			# il giochetto va dal lato scelto dal motore (e.side: +1 = sinistra del portatore)
-			var nome := _nome_giochetto(vista.trick(e.p, -1.0, float(e.get("side", 0.0))))
+			# riuscito: il giochetto va dal lato scelto dal motore (e.side: +1 = sinistra del portatore) e il difensore
+			# interviene a vuoto; fallito: contrasto del difensore (dribbling_regia.gd → esito)
+			var es := DribblingRegia.esito(e)
+			var nome := "Dribbling fallito"
+			if e.ok:
+				nome = _nome_giochetto(vista.trick(e.p, -1.0, float(e.get("side", 0.0)), float(es.dur))) + "!"
+			for rz: Array in es.reazioni:
+				vista.reazione(rz[0], rz[1], rz[2], rz[3])
+			if _opzioni.has("scena"):
+				print("prova dribbling: %s %s" % [nome, "riuscito" if e.ok else "fallito"])
 			if (e.p as R.Player).team == me:
-				hud.big(nome + ("!" if e.ok else ""), "g" if e.ok else "", 1000)
+				hud.big(nome, "g" if e.ok else "", 1000)
 		"goal":
 			_gol(e)
 		"restart":
@@ -975,6 +993,8 @@ func _prepara_scena(nome: String) -> void:
 					await get_tree().process_frame
 				await get_tree().create_timer(0.8).timeout
 				_dribbling()
+		"dribbling", "dribbling_ok", "dribbling_ko": # duello col difensore davanti, poi il tasto Dribbling (regia del dribbling)
+			_scena_dribbling(att, nome)
 		"testa", "testa_linea": # cross dalla destra verso il n. 10 in area: fermatempo del colpo di testa
 			_metti_in_gioco()
 			var dt_ := 1.0 if me == 0 else -1.0
@@ -1198,6 +1218,34 @@ func _metti_in_gioco() -> void:
 	b.vx = 0.0
 	b.vy = 0.0
 	b.vh = 0.0
+
+
+## prova del dribbling: n. 10 col pallone e un difensore 6,5 m davanti; aperto il duello si tocca Dribbling.
+## dribbling_ok / dribbling_ko: statistiche estreme (riesce o fallisce quasi sempre: il motore resta a caso col seme)
+func _scena_dribbling(att: R.Player, nome: String) -> void:
+	_metti_in_gioco()
+	var dy := 1.0 if me == 0 else -1.0
+	var dif: R.Player = m.team(1 - me)[3]
+	_sposta(att, 4.0, dy * 8.0)
+	_sposta(dif, 4.6, dy * 14.5)
+	dif.fx = 0.0
+	dif.fy = -dy
+	if nome == "dribbling_ok":
+		att.st.dri = 99.0
+		dif.st.dif = 1.0
+	elif nome == "dribbling_ko":
+		att.st.dri = 1.0
+		dif.st.dif = 99.0
+	m.ball.owner = att
+	m.ball.last = att
+	m.ball.x = att.x
+	m.ball.y = att.y + 0.6 * dy
+	m.ctrl[me] = att
+	while not m.duelFor(me):
+		await get_tree().process_frame
+	await get_tree().create_timer(0.6).timeout
+	_dribbling()
+	print("prova dribbling: prenotato=%s" % m.dribBooked(me))
 
 
 func _sposta(p: R.Player, x: float, y: float) -> void:

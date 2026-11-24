@@ -76,7 +76,7 @@ Attenzione: con `-s`, un errore di script blocca Godot senza uscire; in automati
 | `test_defense.gd` | `defense-help`, `defense-runs`, `defense-shape` | linee corte, contrasto magnetico, intercetto, raggio difensivo, pressing, rientro |
 | `test_attack.gd` | `attack-spacing`, `sprint` | smarcamento, profondità sul fuorigioco, scatto ed energia |
 | `test_duel.gd` | `duel`, `dribble-beat` | duello, dribbling, difensore saltato, colpi di testa e `tes`, stanchezza, area di tiro |
-| `test_dribbling.gd` | `dribble-book`, `no-double-touch` | dribbling prenotato (parte vicino, tempo massimo, annullato col duello, lato), niente doppio tocco sui calci da fermo |
+| `test_dribbling.gd` | `dribble-book`, `no-double-touch` | dribbling prenotato (parte vicino, tempo massimo, annullato col duello, lato), giochetto con "rifiniture" (frena, finta, scatto; stesso esito), niente doppio tocco sui calci da fermo |
 | `test_sprint.gd` | `flee` (fuga e Scatto) | fuga con l'avversario alla pari o dietro "per linee", duello solo davanti, chiusure (tempo, alla pari, passaggio), Scatto dritto senza contrasti, squadra 1 |
 | `test_rules.gd` | `out-of-play`, `advantage`, `wall`, `path`, `preview`, `sanity`, `air` | portiere e respinte, spazzata, contrasti, vantaggio, barriera, strada disegnata, anteprima, fuorigioco, partita senza NaN |
 

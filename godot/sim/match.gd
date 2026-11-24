@@ -824,6 +824,8 @@ func step(dt: float) -> void:
 	movePlayers(dt)
 	updateBall(dt)
 	updateDuel(dt)
+	if dribShow != null:
+		dribShowStep(dt) # giochetto del dribbling prenotato (solo con "rifiniture")
 	updateFlee(dt)
 	updateCalm(dt)
 	updateHead(dt)

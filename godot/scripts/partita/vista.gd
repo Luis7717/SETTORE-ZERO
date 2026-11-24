@@ -11,7 +11,10 @@
 #   show_path(points, kind[, end_h, recv]) / clear_path()   linea disegnata ("run", "pass", "shot", "def")
 #   show_preview(points, offside_y)    puntini del volo vero (m.predictKick) e linea del fuorigioco (facoltativa:
 #                                      nel gioco l'anteprima la disegna l'interfaccia in 2D)
-#   trick(p[, r])                      parte un giochetto del dribbling per p (solo grafica); ritorna {id, name, dur}
+#   trick(p[, r, side, dur])           parte un giochetto del dribbling per p (solo grafica); ritorna {id, name, dur}
+#   reazione(p, tipo, lato, dur)       posa di reazione al dribbling: "affondo" (difensore che interviene a vuoto),
+#                                      "contrasto" (difensore che prende il pallone), "inciampo" (portatore fermato)
+#   dribbling_cam                      {p, o, yaw} della regia del dribbling (dribbling_regia.gd) o {}: visuale girata
 #   dispose()                          via tutto (la partita la chiude chi l'ha creata); va bene anche da _exit_tree
 #   tifo(tipo, squadra)                reazione del pubblico: "gol", "occasione", "parata", "palo", "fischio"
 #   set_rallenty(k)                    quanto è forte il rallenty (0..1) per la profondità di campo; −1 = la vista lo
@@ -73,6 +76,8 @@ var cam_drag := false
 var drawing := false
 ## replay del gol in corso (replay.gd): la telecamera la muove il replay; niente anello, segnalino né linee di corsa
 var replay := false
+## visuale del dribbling della persona: {p, o, yaw} (dribbling_regia.gd → camera()), {} = nessuna
+var dribbling_cam := {}
 
 var m: Object = null           # SimMatch
 var me := 0
@@ -82,6 +87,7 @@ var t := 0.0
 var _figs: Array = []          # Figura per ogni m.players[i]
 var _srcs: Array = []          # src del giocatore che la figura rappresenta (cambio = figura nuova)
 var _tricks := {}              # indice in m.players → {id, name, dur, t, side}
+var _reazioni := {}            # indice in m.players → {tipo, t, dur, lato} (reazione())
 var _rng := RandomNumberGenerator.new()
 var _yaw_owner: Object = null
 var _ball: MeshInstance3D
@@ -91,7 +97,7 @@ var _shadows: MultiMeshInstance3D
 var _ring: MeshInstance3D
 var _marker: Sprite3D
 var _tex_warn: Texture2D
-var _ctx := {"t": 0.0, "phase": "", "flip": 1.0, "yaw": 0.0, "ball": null, "trick": null, "m": null}   # riusato per tutti
+var _ctx := {"t": 0.0, "phase": "", "flip": 1.0, "yaw": 0.0, "ball": null, "trick": null, "reazione": null, "m": null}   # riusato per tutti
 var _mano_i := -1              # [mocap] figura col pallone tra le mani (rimessa)
 var _zoom_t := -1.0            # zoom voluto dal gioco (set_zoom); < 0 = lo calcola la telecamera
 ## il livello grafico scende da solo se gli FPS restano sotto 58 (qualita.gd)
@@ -157,6 +163,7 @@ func setup(match_: SimMatch, me_: int) -> void:
 	flip = -1.0 if me == 1 else 1.0
 	_nastri.flip = flip
 	_tricks.clear()
+	_reazioni.clear()
 	_yaw_owner = null
 	user_yaw = 0.0
 	_zoom_t = -1.0
@@ -188,6 +195,11 @@ func update_view(dt_game: float, dt_real: float) -> void:
 		tk.t += dt_game
 		if tk.t >= tk.dur:
 			_tricks.erase(k)
+	for k: int in _reazioni.keys():
+		var rz: Dictionary = _reazioni[k]
+		rz.t += dt_game
+		if rz.t >= rz.dur:
+			_reazioni.erase(k)
 	var mm := _shadows.multimesh
 	for i in m.players.size():
 		var p: Object = m.players[i]
@@ -233,7 +245,7 @@ func update_view(dt_game: float, dt_real: float) -> void:
 	var hold: bool = (CU.user_cam_on(m, me) and b.owner == _yaw_owner) or drawing
 	user_yaw = CU.relax_yaw(user_yaw, hold, dt_real)
 	if not replay:
-		cam.aggiorna(m, me, dt_game, dt_real, drawing, cam_drag, user_yaw, _zoom_t)
+		cam.aggiorna(m, me, dt_game, dt_real, drawing, cam_drag, user_yaw, _zoom_t, dribbling_cam)
 	_nastri.mostra_corse(m.runs[me] if m.runs != null and not replay else [])
 	if dt_game > 0.0:
 		_aggiorna_reti(b, dt_game)
@@ -312,8 +324,9 @@ func show_preview(points: Array, offside_y: float = NAN) -> void:
 ## dribbling tentato da p: parte un giochetto, più bello se il dribbling di p è alto (solo grafica).
 ## r = numero casuale 0..1 (−1 = lo sceglie la vista). side = lato scelto dal motore (evento 'dribble': +1 = sinistra
 ## del portatore, −1 = destra): il giochetto porta il pallone da quel lato (+1 col destro, −1 col sinistro, specchiato)
-## e il portatore poi passa di lì; 0 = a caso. Ritorna {id, name, dur} del giochetto.
-func trick(p: Object, r: float = -1.0, side: float = 0.0) -> Dictionary:
+## e il portatore poi passa di lì; 0 = a caso. dur > 0 = il giochetto dura tanto (s di partita: più veloce o più lento
+## del suo tempo naturale; dribbling della persona, sim/duel.gd → dribShowStart). Ritorna {id, name, dur} del giochetto.
+func trick(p: Object, r: float = -1.0, side: float = 0.0, dur_voluta: float = -1.0) -> Dictionary:
 	if m == null:
 		return {}
 	if r < 0.0:
@@ -322,8 +335,27 @@ func trick(p: Object, r: float = -1.0, side: float = 0.0) -> Dictionary:
 	var tk := Giochetti.choose_trick(dri, r)
 	var dur := Giochetti.duration(tk.id)
 	var sd: float = side if absf(side) == 1.0 else (1.0 if fmod(r * 1000.0, 2.0) < 1.0 else -1.0)
+	if dur_voluta > 0.0:
+		dur = dur_voluta # q = t / dur va comunque da 0 a 1 su tutto il movimento
 	_tricks[m.players.find(p)] = {"id": tk.id, "name": tk.name, "dur": dur, "t": 0.0, "side": sd}
 	return {"id": tk.id, "name": tk.name, "dur": dur}
+
+
+## posa di reazione al dribbling per p (solo grafica, dribbling_regia.gd → reazioni): tipo "affondo" | "contrasto" |
+## "inciampo"; lato = verso cui si butta (+1 = sua sinistra, −1 = destra, 0 = in avanti); dur in s di partita
+func reazione(p: Object, tipo: String, lato: float, dur: float) -> void:
+	if m == null or p == null:
+		return
+	_reazioni[m.players.find(p)] = {"tipo": tipo, "t": 0.0, "dur": maxf(0.05, dur), "lato": lato}
+
+
+func _reazione_di(p: Object) -> Variant:
+	if _reazioni.is_empty():
+		return null
+	var k: Variant = _reazioni.get(m.players.find(p))
+	if k == null:
+		return null
+	return {"tipo": k.tipo, "q": minf(1.0, k.t / k.dur), "lato": k.lato}
 
 
 ## via figure e riferimenti alla partita (la partita la chiude chi l'ha creata, con m.dispose()).
@@ -333,6 +365,7 @@ func dispose() -> void:
 	m = null
 	_yaw_owner = null
 	_tricks.clear()
+	_reazioni.clear()
 	_zoom_t = -1.0
 	if is_instance_valid(_nastri) and _nastri.is_node_ready():
 		_nastri.nascondi_linea()
@@ -446,6 +479,7 @@ func _posa(i: int, p: Object, dt: float) -> void:
 	_ctx.ball = m.ball
 	_ctx.m = m   # [mocap] figura_mocap.gd legge gol, rimesse e portatore
 	_ctx.trick = null if tk.is_empty() else tk
+	_ctx.reazione = _reazione_di(p)
 	f.posa(p, dt, _ctx)
 
 
