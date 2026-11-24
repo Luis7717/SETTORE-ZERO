@@ -4,12 +4,13 @@ extends "test_base.gd"
 
 const SALTO_GIOCATORE := 0.5 # m in un passo da 1/60 s: oltre è un teletrasporto (correndo si fanno ~0,15 m)
 const SALTO_PALLONE := 1.0   # m in un passo per il pallone
+const THROW_MIN_NOTE := 4.2  # THROW_ROOM_MIN - 0,3 (solo per i messaggi)
 
 
 ## partita CPU contro CPU (o con la squadra 0 umana) giocata per 3 s, poi pallone libero che rotola da (x, y) a
 ## velocità (vx, vy), toccato per ultimo dalla squadra `ultimo`
-func uscita(sd: int, x: float, y: float, vx: float, vy: float, ultimo: int, riprese := true, umano := false) -> SimMatchScript:
-	var m := H.newMatch(sd, 9999.0, [umano, false], H.mkTeam("A", 65.0, sd * 7 + 1), H.mkTeam("B", 65.0, sd * 13 + 5), "", {"riprese": riprese})
+func uscita(sd: int, x: float, y: float, vx: float, vy: float, ultimo: int, riprese := true, umano := false, rifiniture := false) -> SimMatchScript:
+	var m := H.newMatch(sd, 9999.0, [umano, false], H.mkTeam("A", 65.0, sd * 7 + 1), H.mkTeam("B", 65.0, sd * 13 + 5), "", {"riprese": riprese, "rifiniture": rifiniture})
 	H.run(m, 3.0)
 	m.phase = "play"
 	m.restart = null
@@ -75,10 +76,10 @@ func test_rimessa_il_battitore_va_a_prendere_il_pallone() -> bool:
 	check(r.tempo > 1.0 and r.tempo < 5.0, "scena breve: %.1f s" % r.tempo)
 	var tk: R.Player = m.restart.taker
 	eq(tk.team, 1, "batte la squadra che non l'ha toccato per ultima")
-	near(absf(tk.x), C.HW - 0.3, 0.3, "il battitore è sulla linea laterale")
+	near(absf(tk.x), C.HW - 0.3 + m.THROW_STAND, 0.3, "il battitore aspetta 1-2 passi oltre la linea laterale")
 	near(tk.y, 10.0, m.THROW_SLIDE + 1.5, "vicino al punto d'uscita")
 	eq(m.ball.owner, tk, "col pallone in mano")
-	check(not m.restart.rinc, "nella rimessa niente rincorsa")
+	check(m.restart.rinc, "al lancio fa i passi fino alla linea")
 	note("rimessa: %.1f s, fasi %s" % [r.tempo, str(r.fasi)])
 	var evs := H.run(m, 3.0)
 	check(hasEvent(evs, "kick", func(k: Dictionary) -> bool: return k.p == tk), "poi la CPU batte la rimessa")
@@ -257,6 +258,76 @@ func test_persona_batte_solo_a_scena_finita() -> bool:
 	H.run(m, 0.4)
 	m.ctrl[0] = m.restart.taker
 	check(m.userKick(0, {"type": "ground", "tx": m.restart.taker.x * 0.5, "ty": -6.0}), "poi la rimessa si batte")
+	return done()
+
+
+func test_rimessa_passi_fino_alla_linea_poi_lancio() -> bool:
+	# Luis 2026-11-24: il battitore aspetta 1-2 passi fuori dal campo e al lancio cammina fino alla linea
+	var m := uscita(4, -30.0, -6.0, -9.0, 0.0, 1, true, true)
+	check(fino_a_fine_scena(m, 10.0).ok, "scena della rimessa finita")
+	var tk: R.Player = m.restart.taker
+	check(absf(tk.x) > C.HW + 0.6, "aspetta fuori dal campo (|x| %.2f, linea %.1f)" % [absf(tk.x), C.HW])
+	check(m.restart.sulPosto(), "al posto: visuale e gesti della rimessa")
+	eq(m.hint(0), "restart", "tocca alla persona")
+	H.run(m, 0.4)
+	m.ctrl[0] = tk
+	check(m.userKick(0, {"type": "ground", "tx": -20.0, "ty": -4.0}), "la persona batte")
+	check(m.restart != null and m.restart.pend != null, "prima i passi verso la linea")
+	eq(m.hint(0), "wait", "durante i passi niente altri gesti")
+	var calcio: Variant = null
+	var t := 0.0
+	var bx := 0.0
+	while t < 3.0 and calcio == null:
+		m.step(DT)
+		t += DT
+		calcio = findEvent(m.events, "kick")
+		bx = m.ball.x
+		m.events.clear()
+	check(calcio != null and calcio.p == tk, "poi la rimessa parte")
+	check(t > 0.2 and t < m.RUNUP_MAX_S + 0.1, "dopo i passi (%.2f s)" % t)
+	near(absf(tk.x), C.HW - 0.3, m.SPOT_R + 0.15, "lancia dalla linea")
+	check(absf(bx) <= C.HW, "il pallone parte dentro il campo (|x| %.2f)" % absf(bx))
+	eq(m.phase, "play", "si gioca")
+	return done()
+
+
+## giocatori (non il battitore né i portieri) più vicini di `lim` metri alla linea della rimessa, e il compagno libero più
+## vicino al battitore; durante l'attesa della rimessa della squadra 0 (umana, aspetta)
+func attesa_rimessa(sd: int, rif: bool) -> Dictionary:
+	var m := uscita(sd, 30.0, 8.0, 9.0, 0.5, 1, true, true, rif)
+	var r := fino_a_fine_scena(m, 10.0)
+	var tk: R.Player = m.restart.taker
+	var side: float = 1.0 if m.restart.x >= 0.0 else -1.0
+	var minimo := 99.0
+	var vicini := 0
+	var opp := 99.0
+	var compagno := 99.0
+	var scena_min := 99.0
+	H.run(m, 3.0)
+	for p: R.Player in m.players:
+		if p == tk or p.pos == "P" or p.off:
+			continue
+		var dl: float = C.HW - p.x * side
+		minimo = minf(minimo, dl)
+		if dl < m.THROW_ROOM_MIN - 0.3:
+			vicini += 1
+		var dt: float = Vector2(p.x - tk.x, p.y - tk.y).length()
+		if p.team != tk.team:
+			opp = minf(opp, dt)
+		else:
+			compagno = minf(compagno, dt)
+	return {"ok": r.ok and m.phase == "restart", "minimo": minimo, "vicini": vicini, "opp": opp, "compagno": compagno}
+
+
+func test_rimessa_gli_altri_lontani_dalla_linea() -> bool:
+	for sd in [5, 6, 7]:
+		var a := attesa_rimessa(sd, true)
+		check(a.ok, "seme %d: si aspetta la rimessa" % sd)
+		eq(a.vicini, 0, "seme %d: nessuno a meno di %.1f m dalla linea (il più vicino a %.1f m)" % [sd, THROW_MIN_NOTE, a.minimo])
+		check(a.opp >= 2.0, "seme %d: avversari ad almeno 2 m dal battitore (%.1f m)" % [sd, a.opp])
+		check(a.compagno < 16.0, "seme %d: un compagno a distanza di rimessa (%.1f m)" % [sd, a.compagno])
+		var b := attesa_rimessa(sd, false)
+		note("seme %d: più vicino alla linea %.1f m (senza rifiniture %.1f m), compagno a %.1f m" % [sd, a.minimo, b.minimo, a.compagno])
 	return done()
 
 

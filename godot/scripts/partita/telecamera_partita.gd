@@ -224,8 +224,8 @@ func _throw_step(m: Object, me: int, dir: float, rdt: float, pk: float, user_yaw
 		_throw_p = null
 		return 0.0
 	if on:
-		var r: Object = m.restart
-		_throw_p = _smooth(_throw_p, CF.throw_view(Vector2(r.x * dir, r.y * dir), user_yaw, _aspect(), base_fov), pk)
+		var tk: Object = m.restart.taker # alle spalle del battitore (aspetta 1-2 passi oltre la linea, sim/riprese.gd)
+		_throw_p = _smooth(_throw_p, CF.throw_view(Vector2(tk.x * dir, tk.y * dir), user_yaw, _aspect(), base_fov), pk)
 	return _throw_k if _throw_p != null else 0.0
 
 

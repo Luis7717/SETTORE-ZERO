@@ -374,6 +374,10 @@ func followRun(_p: R.Player, _r: R.Run) -> bool:
 	return false # match.gd
 
 
+func offerSupport(_p: R.Player, _c: R.Player) -> void:
+	pass # ai.gd (usata dalla rimessa in riprese.gd)
+
+
 func directed(_p: R.Player) -> bool:
 	return false # ai.gd
 
