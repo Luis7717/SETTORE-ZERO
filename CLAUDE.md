@@ -239,7 +239,11 @@
   `--scena=fuori_lato|fuori_fondo|fuori_fondo_vicino|fuori_rete|fuori_angolo`, sequenze con `--schermata=... --ogni=0.5 --dopo=6`.
 - **Portiere** (Luis 2026-11-23): **predefinito automatico** (`gkManuale` false nelle Impostazioni, chiave nuova del
   salvataggio; la vecchia `autoGk` resta ma non conta, `Carriera.portiere_auto`): para il motore di sempre, secondo
-  tiro e precisione del tiratore contro la bravura del portiere (misure: `tests/parate_fasce.gd`). Nelle lezioni guidate
+  tiro e precisione del tiratore contro la bravura del portiere (misure: `tests/parate_fasce.gd`).
+  Con `parata` il portiere automatico e quello della CPU sul tiro, dopo la reazione, vanno a passi laterali e si
+  tuffano solo quando al pallone mancano `PARA_LEAD` 0,45 s (o il tempo che serve alla mano), come quello manuale
+  (`_gkAutoTimed`, Luis 2026-11-24: "tirando dal centrocampo il portiere si butta a terra e la palla va in rete";
+  prima da 48 m ne parava 5/12, ora 12/12). Nelle lezioni guidate
   sempre manuale. **Manuale (prova)**: sul tiro la visuale va dietro la propria porta e il tempo **si ferma** per 3 s
   veri (`scripts/partita/fermatempo_parata.gd`, `parata_regia.gd`, cerchio "Para!"), con un **bersaglio** rosso
   sulla porta (`bersaglio_tiro.gd`: ellisse che contiene il punto vero, centro spostato col seme, più grande con

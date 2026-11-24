@@ -280,3 +280,66 @@ func test_portiere_automatico_predefinito() -> bool:
 	check(not Carriera.portiere_auto({"gkManuale": true}, "campionato"), "Manuale scelto: manuale")
 	check(not Carriera.portiere_auto({"gkManuale": false}, "allenamento"), "lezioni guidate: manuale")
 	return done()
+
+
+# Luis 2026-11-24: "tirando dal centrocampo il portiere si butta a terra e la palla va in rete". Il portiere automatico
+# (e quello della CPU) sul tiro lungo non si tuffa appena reagisce: aspetta che il pallone sia vicino, poi si tuffa
+func test_tiro_da_lontano_il_portiere_automatico_non_si_tuffa_troppo_presto() -> bool:
+	var parate := 0
+	var tot := 0
+	for sd in range(1, 21):
+		var tx: float = [-2.2, -1.2, 1.2, 2.2][sd % 4]
+		var a := tiro(sd, 0.0, 48.0, tx, 0.8, 70.0, true, 70.0, true)
+		var m: SimMatchScript = a[0]
+		var s: R.Shot = m.ball.shot
+		if s == null or not s.on:
+			continue
+		tot += 1
+		var g := m.gk(0)
+		var tc: float = s.tc
+		var t := 0.0
+		var tuffo := -1.0
+		var finito := ""
+		while t < tc + 1.0 and finito == "":
+			m.step(DT)
+			t += DT
+			if tuffo < 0.0 and g.state == "dive":
+				tuffo = t
+			for e: Dictionary in m.events:
+				if e.type == "save" and e.p.team == 0:
+					finito = "parata"
+				elif e.type == "goal":
+					finito = "gol"
+			m.events.clear()
+		if finito == "parata":
+			parate += 1
+		if tuffo >= 0.0:
+			check(tc - tuffo <= 1.0, "seme %d: tuffo %.2f s prima del pallone (volo %.2f s), non subito" % [sd, tc - tuffo, tc])
+	note("tiri da 48 m nel mezzo della porta, portiere automatico: parati %d/%d" % [parate, tot])
+	check(tot >= 10, "abbastanza tiri in porta (%d)" % tot)
+	check(parate >= int(tot * 0.7), "il portiere para quasi sempre i tiri da lontano a mezza porta (%d/%d)" % [parate, tot])
+	return done()
+
+
+# il portiere della CPU (squadra 1) sul tiro da centrocampo della persona: stessa regola
+func test_tiro_da_centrocampo_il_portiere_cpu_aspetta() -> bool:
+	var m := H.scene(4, [true, false])
+	m.paraCtl = true
+	var k: R.Player = m.team(0)[9]
+	H.wake(k, 0.0, 0.0)
+	k.fx = 0.0
+	k.fy = 1.0
+	var g := m.gk(1)
+	H.wake(g, 0.0, C.HL - 0.6)
+	H.give(m, k)
+	m.kick(k, {"type": "shot", "tx": 2.4, "ty": C.HL, "th": 1.0})
+	var s: R.Shot = m.ball.shot
+	check(s != null, "tiro rilevato")
+	if s == null:
+		return done()
+	var t := 0.0
+	while t < s.tc - 0.05 and g.state == "play":
+		m.step(DT)
+		t += DT
+	check(s.tc - t <= 1.0, "il portiere della CPU si tuffa solo vicino all'arrivo (%.2f s prima, volo %.2f s)" % [s.tc - t, s.tc])
+	return done()

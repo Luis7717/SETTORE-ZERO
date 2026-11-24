@@ -43,6 +43,7 @@ var paraShot: R.Shot = null   # tiro seguito adesso
 var paraAge: float = 0.0      # tempo di partita da quando è partito (s)
 var paraAim: Array = [null, null]   # per squadra: {x, h, wait} punto scelto (wait = reazione che resta, s)
 var paraExp: Array = [false, false] # per squadra: fermatempo finito senza linea (il portiere fa da solo)
+var paraGkDone: Array = [false, false] # per squadra: il portiere automatico ha già deciso il tuffo su questo tiro
 
 
 ## si può parare: tiro avversario in volo verso la porta della squadra T, portiere in piedi (come il web)
@@ -204,6 +205,7 @@ func _paraSync() -> bool:
 	paraAge = 0.0
 	paraAim = [null, null]
 	paraExp = [false, false]
+	paraGkDone = [false, false]
 	return true
 
 
@@ -238,6 +240,9 @@ func gkAI(p: R.Player) -> void:
 	var tm := p.team
 	var am: Variant = paraAim[tm] if paraCtl else null
 	var s := ball.shot
+	if paraCtl and am == null and s != null and s.team != tm and phase == "play" and not paraOn(tm):
+		_gkAutoTimed(p, s)
+		return
 	if am == null or float(am.wait) > 0.0 or s == null or s.team == tm or phase != "play":
 		super(p)
 		return
@@ -247,3 +252,35 @@ func gkAI(p: R.Player) -> void:
 	p.ty = -dir * HL + dir * 0.6
 	p.sprint = false
 	p.spdF = PARA_SHUFFLE_K
+
+
+## portiere automatico o della CPU sul tiro (Luis 2026-11-24, "tirando dal centrocampo il portiere si butta a terra e
+## la palla va in rete"): prima si tuffava appena finita la reazione, anche con 2 s di volo davanti, e il pallone
+## arrivava col portiere già a terra. Ora dopo la reazione va a passi laterali verso il punto e si tuffa al momento
+## giusto, come quello manuale (al pallone manca PARA_LEAD, o il tempo che serve alla mano per arrivarci)
+func _gkAutoTimed(p: R.Player, s: R.Shot) -> void:
+	_paraSync()
+	var tm := p.team
+	var dir: float = -1.0 if tm else 1.0
+	var gx: float = C.clamp_(s.cx, -GW / 2.0, GW / 2.0)
+	p.ty = -dir * HL + dir * 0.6
+	if not p.decided:
+		p.reactT -= dtT
+		p.tx = p.x
+		if p.reactT > 0.0:
+			return
+		p.decided = true
+	if paraGkDone[tm]:
+		p.tx = gx
+		return
+	var vs: float = GK_AI_SPEED + p.st.por * 0.025
+	var need: float = absf(s.cx - p.x) / vs + PARA_MARGIN
+	if paraLeft() > maxf(PARA_LEAD, need):
+		p.tx = C.clamp_(s.gx0 + C.clamp_(s.cx - s.gx0, -PARA_STEP, PARA_STEP), -GW / 2.0, GW / 2.0)
+		p.sprint = false
+		p.spdF = PARA_SHUFFLE_K
+		return
+	paraGkDone[tm] = true
+	p.tx = gx
+	if absf(s.cx - p.x) > 1.0 or s.ch > 2.0:
+		startDive(p, s.cx, s.ch)
