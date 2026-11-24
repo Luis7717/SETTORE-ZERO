@@ -50,7 +50,9 @@ func _draw() -> void:
 		if s.z < 0.5:
 			return
 		bordo.append(Vector2(s.x, s.y))
-	draw_colored_polygon(bordo.slice(0, PUNTI), RIEMPI)
+	var giro := bordo.slice(0, PUNTI)
+	if not Geometry2D.triangulate_polygon(giro).is_empty(): # ellisse schiacciata (tutta a terra): niente riempimento
+		draw_colored_polygon(giro, RIEMPI)
 	draw_polyline(bordo, OMBRA, 4.5, true)
 	draw_polyline(bordo, BORDO, 2.5, true)
 	var c: Vector3 = v.world_to_screen(float(dati.x), gy, maxf(0.0, float(dati.h)))

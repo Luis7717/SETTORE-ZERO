@@ -237,6 +237,10 @@
   andare ×3 (`SCENA_VELOCE` in `gioco.gd`, vale anche per il raccattapalle). Rinvio e angolo vanno da soli al doppio della velocità
   (`SCENA_FONDO`, Luis 2026-11-23: metà del tempo): rimessa ~2,7 s, rinvio ~2,5 s, angolo e raccattapalle 2-4 s. Prove:
   `--scena=fuori_lato|fuori_fondo|fuori_fondo_vicino|fuori_rete|fuori_angolo`, sequenze con `--schermata=... --ogni=0.5 --dopo=6`.
+  "Tutto nero" (Luis 2026-11-24): la meta del raccattapalle non sta mai dentro il rettangolo della rete
+  (`raccattaFuoriRete`; prima, col pallone fermo nel fondo della rete, diventava NaN e trascinava pallone e telecamera);
+  la telecamera scarta pose non finite (`posa_valida` in `telecamera_partita.gd`). Controllo a schermo spento, partite
+  vere col dito finto: `-s res://tools/controllo_telecamera.gd -- --semi=4 --da=100 --nodi`; test `tests/test_nero.gd`.
 - **Portiere** (Luis 2026-11-23): **predefinito automatico** (`gkManuale` false nelle Impostazioni, chiave nuova del
   salvataggio; la vecchia `autoGk` resta ma non conta, `Carriera.portiere_auto`): para il motore di sempre, secondo
   tiro e precisione del tiratore contro la bravura del portiere (misure: `tests/parate_fasce.gd`). Nelle lezioni guidate

@@ -28,6 +28,8 @@ const NET_D := 2.0             # profondità della rete dietro la linea di porta
 const NET_X := GW / 2.0 + 0.15 # il raccattapalle non entra in questo rettangolo (rete + il suo corpo) ...
 const NET_Y := NET_D + 0.15    # ... profondo tanto dalla linea di porta
 const NET_PATH := 0.25         # ... e ci gira intorno con questo margine in più (m)
+const BB_NET_OUT := 0.1        # meta spostata fuori da quel rettangolo di tanto (m), come il punto di giro
+const BB_STEP_MIN := 1e-6      # sotto tanti metri dal punto verso cui va non si muove (niente divisione per 0)
 
 var raccatte: Array = []       # R.Raccatta: [0] dietro la porta in basso (y < 0), [1] in alto
 
@@ -97,6 +99,8 @@ func raccattaStep(dt: float) -> void:
 				_bbFerma(bb)
 				_bbGira(bb, 0.0, -C.sign_(bb.hy), dt)
 		_bbFuori(bb)
+		if not (is_finite(bb.x) and is_finite(bb.y) and is_finite(bb.fx) and is_finite(bb.fy)):
+			_bbACasa(bb) # sicurezza: un conto andato storto non deve mai arrivare al pallone (né alla telecamera)
 		if bb.palla:
 			_bbTieni(bb)
 
@@ -133,7 +137,22 @@ func raccattaMeta(bb: R.Raccatta) -> Vector2:
 	tx = C.clamp_(tx, -BB_MAX_X, BB_MAX_X)
 	if absf(ty) < HL + BB_MIN_OUT or ty * s < 0.0:
 		ty = s * (HL + BB_MIN_OUT)
-	return Vector2(tx, ty)
+	return raccattaFuoriRete(tx, ty, s)
+
+
+## meta mai dentro il rettangolo della rete che il raccattapalle gira (Luis 2026-11-24, "tutto nero" al 49'): il
+## pallone spinto fuori dalla rete si ferma a HL + NET_D + NET_OUT (riprese.gd), ancora dentro HL + NET_Y, e la meta
+## "di lato" restava dentro il rettangolo; il raccattapalle arrivava al punto di giro dietro la rete, ci restava a
+## distanza 0 e il passo divideva per 0 (posizione NaN, poi pallone e telecamera NaN). Si sposta sul lato più vicino.
+func raccattaFuoriRete(tx: float, ty: float, s: float) -> Vector2:
+	var bx: float = NET_X + NET_PATH
+	var fondo: float = HL + NET_Y + NET_PATH
+	var ay: float = ty * s
+	if absf(tx) >= bx or ay <= HL or ay >= fondo:
+		return Vector2(tx, ty)
+	if bx - absf(tx) < fondo - ay:
+		return Vector2((1.0 if tx >= 0.0 else -1.0) * (bx + BB_NET_OUT), ty)
+	return Vector2(tx, s * (fondo + BB_NET_OUT))
 
 
 ## passo verso (tx, ty) con velocità massima vmx, girando intorno alla rete; true se è arrivato
@@ -146,6 +165,9 @@ func _bbMuovi(bb: R.Raccatta, tx: float, ty: float, vmx: float, dt: float) -> bo
 	if finale and d < BB_ARRIVE:
 		_bbFerma(bb)
 		return true
+	if d < BB_STEP_MIN: # già sul punto di giro (sicurezza: niente divisione per 0)
+		_bbFerma(bb)
+		return finale
 	var vw: float = minf(vmx, d * BB_BRAKE_K) if finale else vmx
 	bb.spd = move_toward(bb.spd, vw, BB_ACC * dt)
 	var step: float = minf(bb.spd * dt, d)
@@ -170,7 +192,7 @@ func _bbVia(bb: R.Raccatta, tx: float, ty: float) -> Vector2:
 	var lato: float = C.sign_(tx if dietro else bb.x)
 	if lato == 0.0:
 		lato = 1.0
-	return Vector2(lato * (bx + 0.1), s * (HL + NET_Y + NET_PATH + 0.1))
+	return Vector2(lato * (bx + BB_NET_OUT), s * (HL + NET_Y + NET_PATH + BB_NET_OUT))
 
 
 ## il segmento (x0, y0)-(x1, y1) tocca il rettangolo [minx, maxx] × [miny, maxy] (Liang-Barsky)
@@ -235,6 +257,17 @@ func _bbGira(bb: R.Raccatta, dx: float, dy: float, dt: float) -> void:
 		m = 1.0
 	bb.fx = fx / m
 	bb.fy = fy / m
+
+
+## di nuovo al suo posto, fermo e senza pallone
+func _bbACasa(bb: R.Raccatta) -> void:
+	bb.x = bb.hx
+	bb.y = bb.hy
+	bb.fx = 0.0
+	bb.fy = -C.sign_(bb.hy)
+	bb.palla = false
+	_bbFerma(bb)
+	_bbStato(bb, "fermo")
 
 
 func _bbFerma(bb: R.Raccatta) -> void:

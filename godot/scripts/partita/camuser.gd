@@ -57,6 +57,8 @@ static func is_cam_drag(dx: float, dy: float) -> bool:
 ## angolo a ogni fotogramma: nel rallenty (o mentre si disegna) resta quello scelto; fuori torna dolcemente a 0
 ## (rdt = tempo vero in secondi), e del tutto: al rallenty dopo si riparte dritti
 static func relax_yaw(yaw: float, hold: bool, rdt: float) -> float:
+	if not is_finite(yaw): # sicurezza: un angolo NaN resterebbe per sempre (e la telecamera con lui)
+		return 0.0
 	if hold:
 		return clampf(yaw, -CAM_USER_MAX, CAM_USER_MAX)
 	var y := yaw * exp(-CAM_USER_RETURN * maxf(0.0, rdt))
