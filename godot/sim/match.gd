@@ -605,6 +605,7 @@ func kick(p: R.Player, spec: Dictionary) -> void:
 		b.prev = b.last
 		b.last = p
 	var exempt := false
+	var rsType: String = restart.type if phase == "restart" else ""
 	# calcio da fermo (il portiere che rilancia dalle mani no): il battitore non può ritoccare il pallone (dblBan)
 	b.dbl = p if (phase == "restart" and restart.type != "gk") else null
 	b.dblT = 0.0
@@ -621,6 +622,9 @@ func kick(p: R.Player, spec: Dictionary) -> void:
 			if m.team == tm and m != p and not m.off and m.y * dir > line + 0.3 and m.y * dir > sy * dir + 0.3 and m.y * dir > 0.0:
 				off.append(m)
 	b.kick = R.Kick.make(tm, p, type, 0.0, off, bool(spec.get("human", false)))
+	b.kick.x0 = Lc.sx
+	b.kick.y0 = Lc.sy
+	b.kick.rs = rsType
 	if contattiOn and b.kick.human and type != "shot":
 		shieldOf(b.kick, Lc.sx, Lc.sy, Lc.vx, Lc.vy) # contatti.gd
 	b.shot = null

@@ -265,6 +265,8 @@ func airPlay(p: R.Player) -> String:
 		if k.kicker == p or k.type != "loft":
 			return ""
 		if C.hyp(p.x, p.y - dir * HL) < AIR_SHOT_RANGE:
+			if headCtl and human[p.team] and not headCross(k, p.x, p.y):
+				return "" # filtrante della persona (testa.gd): si controlla e si va avanti
 			return "header" if head else "volley"
 		return ""
 	return "clear" if (head and C.hyp(p.x, p.y + dir * HL) < HEAD_CLEAR_ZONE) else ""

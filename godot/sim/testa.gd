@@ -40,6 +40,8 @@ const HEAD_DEF_ZONE := 15.0 # ... in difesa solo oltre tanto dalla metà campo v
 const HEAD_PRE_ETA_K := 1.0 # esito deciso prima: probabilità in più per secondo di anticipo sull'avversario
 const HEAD_AUTO_LEFT := 0.08 # motore da solo (nessun gioco che ferma il tempo): senza linea a tanto dal colpo il salto
                             # passa all'avversario (s)
+const HEAD_CROSS_X := 17.0  # lancio partito oltre tanto dal centro (fascia) = cross (m) ...
+const HEAD_CROSS_ANG := 35.0 # ... o che arriva di traverso, più di tanto dalla direzione della porta (gradi)
 const HEAD_PASS_MAX := 30.0 # passaggio di testa della persona nel salto conteso: lungo al massimo tanto (m)
 const HEAD_RIVAL_PASS := 24.0 # colpo dell'avversario senza tiro né respinta: di testa a un compagno entro tanto (m) ...
 const HEAD_RIVAL_FREE := 3.0 # ... che non ha avversari entro tanto (m), altrimenti avanti verso la fascia ...
@@ -145,6 +147,8 @@ func updateHead(dt: float) -> void:
 			_headDuel(k, 1 - k.team, "def")
 		return
 	var w := headFind(k.team)
+	if w != null and not headCross(k, w.x, w.y):
+		w = null # passaggio alto filtrante, non un cross: l'attaccante lo controlla e va avanti (salto conteso a parte)
 	if w == null:
 		_headDuel(k, k.team, "pass")
 		return
@@ -159,6 +163,23 @@ func updateHead(dt: float) -> void:
 	ctrl[k.team] = w.p
 	move[k.team] = null
 	ev("head_win", {"team": k.team, "p": w.p, "t": w.tc, "h": w.h})
+
+
+## il lancio k della squadra umana, che arriva a testa in (x, y), è un CROSS (si apre il colpo di testa verso la porta)
+## o un passaggio alto FILTRANTE (Luis 2026-11-24: "l'attaccante la riceverebbe, la controllerebbe e andrebbe avanti")?
+## Cross = da calcio d'angolo o punizione, oppure partito dalla fascia (oltre HEAD_CROSS_X dal centro), oppure che
+## arriva di traverso (più di HEAD_CROSS_ANG dalla direzione della porta). Il lancio dritto verso la porta dal centro è
+## filtrante: niente fermatempo "att" e niente colpo di testa automatico verso la porta, si controlla
+func headCross(k: R.Kick, x: float, y: float) -> bool:
+	if k == null or k.kicker == null:
+		return true
+	if k.rs == "corner" or k.rs == "freekick":
+		return true
+	if absf(k.x0) >= HEAD_CROSS_X:
+		return true
+	var dx: float = x - k.x0
+	var dy: float = absf(y - k.y0)
+	return atan2(absf(dx), maxf(dy, 0.01)) > deg_to_rad(HEAD_CROSS_ANG)
 
 
 var _headSeen: R.Kick = null # ultimo lancio già valutato (un fermatempo solo per lancio)
