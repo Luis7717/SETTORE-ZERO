@@ -3,6 +3,8 @@
 # scambiandola col giocatore scelto (verde/rosso). Bordo per fascia di valutazione; scelta = gialla, confronto =
 # bianca che pulsa, appena scambiata = lampo giallo che si spegne. Stato fisico (solo Godot, fisico()): croce rossa
 # sugli infortunati e barretta della forma in basso quando non è piena (verde, gialla, rossa).
+# In partita (Rosa e tattica dalla pausa, in_partita()): "USCITO" su chi è già uscito (grigia, non rientra) ed
+# "ESPULSO" col cartellino rosso sull'espulso.
 # Disegnata tutta in _draw (un nodo per carta: la Rosa ne ha fino a 24 e si ridisegna a ogni tocco).
 # Un tocco (dito giù e su senza spostarsi) manda `toccata`; trascinando, il movimento passa a chi sta sotto
 # (la panchina scorre di lato).
@@ -41,6 +43,7 @@ var appena := false
 var faccia_svg := ""
 var forma := 100                 # 0..100
 var infortunio := 0              # giornate che mancano (0 = sano)
+var stato_partita := ""          # in partita: "uscito", "espulso" o ""
 
 var _t := 0.0
 var _giu := Vector2.INF
@@ -78,6 +81,14 @@ func fisico(forma_: int, infortunio_: int) -> void:
 	infortunio = infortunio_
 	if infortunio > 0:
 		tooltip_text += " · infortunato (%d)" % infortunio
+	queue_redraw()
+
+
+## in partita: "uscito" (già sostituito), "espulso" o "" (normale)
+func in_partita(stato: String) -> void:
+	stato_partita = stato
+	if stato != "":
+		tooltip_text += " · " + stato
 	queue_redraw()
 
 
@@ -175,6 +186,22 @@ func _draw() -> void:
 	var tw := fn.get_string_size(testo, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
 	draw_string(fn, Vector2((W - tw) / 2.0, 63), testo, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, T.TXT)
 	_disegna_fisico()
+	_disegna_partita()
+
+
+# in partita: velo scuro e fascia "USCITO" / "ESPULSO" (col cartellino rosso)
+func _disegna_partita() -> void:
+	if stato_partita == "":
+		return
+	_rett(Rect2(0, 0, W, H), Color(0.02, 0.03, 0.06, 0.62), 12)
+	var espulso := stato_partita == "espulso"
+	var testo := "ESPULSO" if espulso else "USCITO"
+	var f := T.font(900)
+	_rett(Rect2(3, 27, W - 6, 15), T.BAD if espulso else Color(0.42, 0.46, 0.55), 4)
+	var tw := f.get_string_size(testo, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
+	draw_string(f, Vector2((W - tw) / 2.0, 38), testo, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color.WHITE)
+	if espulso:
+		_rett(Rect2(W - 15, 5, 10, 14), Color("#e8202a"), 2)
 
 
 # croce rossa (infortunato) a sinistra del ritratto; barretta della forma sotto il nome

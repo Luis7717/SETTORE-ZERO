@@ -15,6 +15,7 @@ const Coord := preload("res://scripts/coord.gd")
 const PAUSA := 4.0             # s veri tra una frase qualunque e una frase "piccola"
 const PAUSA_FORTE := 2.0       # s veri tra una frase e una importante (il gol non aspetta)
 const TIRO_RICORDO := 3.0      # s: un tiro si ricorda per dire com'è finito (parata, palo, fuori, respinta)
+const CAMBI_INSIEME := 1.0     # s veri: cambi così vicini vanno nella stessa riga
 const ZONA_TIRO := 20.0        # m dalla porta: un colpo di testa o al volo da qui è un tiro
 # probabilità di dire qualcosa per le cose piccole (passata la pausa)
 const PROB := {"dribbling": 0.9, "contrasto": 0.55, "angolo": 0.85, "fallo": 0.8}
@@ -56,6 +57,7 @@ var categoria := ""
 
 var _ultima := -INF            # quando è stata detta l'ultima frase (s veri)
 var _tiro: Dictionary = {}     # ultimo tiro: {p, ora}
+var _ultimo_cambio := ""      # ultima riga dei cambi (più cambi insieme si aggiungono)
 var _ultimo_indice := {}       # categoria → ultima frase usata (per non ripeterla subito)
 
 
@@ -133,7 +135,24 @@ func leggi(e: Dictionary, ora: float) -> String:
 			return ""
 		"foul":
 			return _fallo(e, ora)
+		"sub":
+			return _cambio(e, ora)
 	return ""
+
+
+# sostituzione (Rosa e tattica dalla pausa): si dice sempre; più cambi insieme in una riga sola
+func _cambio(e: Dictionary, ora: float) -> String:
+	var p: Object = e.get("p")
+	if p == null:
+		return ""
+	var frase := "entra %s, esce %s" % [p.name, String(e.get("fuori", "?"))]
+	if categoria == "cambio" and ora - _ultima < CAMBI_INSIEME and _ultimo_cambio != "":
+		_ultimo_cambio += " · " + frase
+	else:
+		_ultimo_cambio = "Cambio: " + frase
+	categoria = "cambio"
+	_ultima = ora
+	return _ultimo_cambio
 
 
 ## il calcio è un tiro? (tiro vero, o colpo di testa / al volo vicino alla porta avversaria, non un rinvio)

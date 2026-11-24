@@ -227,6 +227,8 @@ func _fine_partita(esito: Dictionary, titolo: String) -> void:
 		vai(ALLENAMENTO_LIBERO)
 		return
 	if tipo == "amichevole" and esito.abbandonata:
+		if carriera.tieniCampione():
+			carriera.save()
 		ultimo_esito = {}
 		vai(PRINCIPALE)
 		return
@@ -241,6 +243,8 @@ func _fine_partita(esito: Dictionary, titolo: String) -> void:
 		else:
 			res = carriera.dopoPartita(res, esito)
 	ultimo_esito = {"esito": esito, "res": res, "titolo": titolo + (" · abbandonata" if esito.abbandonata else ""), "tipo": tipo}
+	if carriera.tieniCampione(): # sostituito in partita (Rosa e tattica): fuori partita torna titolare
+		carriera.save()
 	if esito.abbandonata:
 		_continua()
 

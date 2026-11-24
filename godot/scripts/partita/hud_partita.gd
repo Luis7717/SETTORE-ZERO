@@ -11,6 +11,7 @@ signal riprendi
 signal secondo_tempo
 signal esci
 signal nuova_partita
+signal rosa_premuta               # "Rosa e tattica" nella pausa / nell'intervallo (cambi, formazione, stili)
 
 const C := preload("res://sim/core.gd")
 const R := preload("res://sim/records.gd")
@@ -719,13 +720,16 @@ func nascondi_overlay() -> void:
 	_overlay.visible = false
 
 
-## menu di pausa: riprendi, esci (con conferma: "Tocca di nuovo per confermare", come nel web)
-func mostra_pausa(testo_esci: String) -> void:
+## menu di pausa: riprendi, (rosa e tattica), esci (con conferma: "Tocca di nuovo per confermare", come nel web).
+## con_rosa = partita della carriera: c'è il tasto "Rosa e tattica" (rosa_premuta)
+func mostra_pausa(testo_esci: String, con_rosa := false) -> void:
 	_svuota_overlay()
 	_spazio(_sicura.size.y * 0.06)
 	_titolo("Pausa")
 	_spazio(8)
 	_tasto("Riprendi", true, func() -> void: riprendi.emit())
+	if con_rosa:
+		_tasto("Rosa e tattica", false, func() -> void: rosa_premuta.emit())
 	var b_esci := _tasto(testo_esci, false, Callable())
 	b_esci.pressed.connect(func() -> void:
 		if b_esci.get_meta("ok", false):
@@ -737,13 +741,15 @@ func mostra_pausa(testo_esci: String) -> void:
 	_nota("Attacco: il portatore corre da solo; ogni linea dal pallone è un calcio: in porta = tiro, altrimenti passaggio. Dritta = rasoterra, curva = alta a effetto.\nDifesa: disegna linee dai tuoi giocatori, oppure tieni premuto per muovere il difensore.\nPortiere: tira una linea dal portiere al punto della porta.")
 
 
-func mostra_intervallo(gol0: int, gol1: int) -> void:
+func mostra_intervallo(gol0: int, gol1: int, con_rosa := false) -> void:
 	_svuota_overlay()
 	_spazio(_sicura.size.y * 0.06)
 	_titolo("Intervallo")
 	_titolo("%d – %d" % [gol0, gol1], 40, GIALLO)
 	_spazio(8)
 	_tasto("Secondo tempo", true, func() -> void: secondo_tempo.emit())
+	if con_rosa:
+		_tasto("Rosa e tattica", false, func() -> void: rosa_premuta.emit())
 
 
 ## schermata di fine partita: d = {titolo, sigle, colori, gol, marcatori: [[squadra, testo]], statistiche: [[nome, a, b]],

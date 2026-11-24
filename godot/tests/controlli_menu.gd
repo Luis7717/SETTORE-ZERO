@@ -85,14 +85,15 @@ func test_rosa_due_tocchi_scambiano_titolare_e_panchina() -> bool:
 	var c := _carriera()
 	_inizia(c)
 	var n := _apri("rosa")
-	var titolare: Variant = c.s.lineup[9]
+	var posto := 9 if not c.player(c.s.lineup[9]).get("champ", false) else 10   # il campione non va in panchina
+	var titolare: Variant = c.s.lineup[posto]
 	var riserva: Variant = MenuRosa.bench_order(c.bench())[0].id
 	n._tocca(titolare)
 	eq(n.sel, titolare, "primo tocco: scelto")
 	n._tocca(riserva)
 	eq(n.tgt, riserva, "secondo tocco: confronto")
 	n._tocca(riserva)   # terzo tocco sullo stesso = scambia (come il web)
-	eq(c.s.lineup[9], riserva, "la riserva entra al posto del titolare")
+	eq(c.s.lineup[posto], riserva, "la riserva entra al posto del titolare")
 	check(not c.s.lineup.has(titolare), "il titolare va in panchina")
 	_finisci(n)
 	return done()
@@ -120,6 +121,74 @@ func test_aspetto_solo_del_campione() -> bool:
 		_finisci(e)
 		_inizia(c)
 	_finisci(null)
+	return done()
+
+
+# Rosa e tattica dalla pausa (modo partita): niente Aspetto né Vendi (neanche sul campione), "Torna alla partita",
+# cambi rimasti in alto, chi è uscito non rientra
+func test_rosa_in_partita_senza_aspetto_e_vendi() -> bool:
+	var c := _carriera()
+	_inizia(c)
+	var cambi = load("res://scripts/partita/cambi_partita.gd").new()
+	var ch: Variant = c.campione()
+	var tornata := [false]
+	for chi: Variant in [ch.id, c.s.lineup[9]]:
+		var n := _apri("rosa", {"in_partita": true, "cambi": cambi, "carriera": c, "sel": chi})
+		eq(_bottoni_con(n, "Aspetto"), 0, "in partita niente Aspetto")
+		var vendi := 0
+		for b: Node in n.find_children("*", "Button", true, false):
+			if (b as Button).text.begins_with("Vendi"):
+				vendi += 1
+		eq(vendi, 0, "in partita niente Vendi")
+		eq(_bottoni_con(n, "Torna alla partita"), 1, "c'è Torna alla partita")
+		eq(n.pillola, "Cambi 5/5", "cambi rimasti in alto")
+		_finisci(n)
+		_inizia(c)
+	var n := _apri("rosa", {"in_partita": true, "cambi": cambi, "carriera": c})
+	n.chiusa.connect(func() -> void: tornata[0] = true)
+	var tit: Variant = c.s.lineup[9]
+	var riserva: Variant = MenuRosa.bench_order(c.bench())[0].id
+	n._tocca(tit)
+	n._tocca(riserva)
+	n._tocca(riserva)
+	eq(c.s.lineup[9], riserva, "sostituzione fatta")
+	eq(n.pillola, "Cambi 4/5", "un cambio in meno")
+	n._tocca(tit)
+	eq(n.sel, null, "chi è uscito non si sceglie")
+	check(not c.s.lineup.has(tit), "e non rientra")
+	if ch != null and c.s.lineup.has(ch.id):
+		var r2: Variant = MenuRosa.bench_order(c.bench())[1].id
+		n._tocca(ch.id)
+		n._tocca(r2)
+		n._tocca(r2)
+		check(not c.s.lineup.has(ch.id), "in partita il campione si può sostituire")
+	for b: Node in n.find_children("*", "Button", true, false):
+		if (b as Button).text == "Torna alla partita":
+			(b as Button).pressed.emit()
+	check(tornata[0], "Torna alla partita chiude")
+	_finisci(n)
+	return done()
+
+
+# Luis 2026-11-24: nella Rosa del menu il campione non va in panchina (scambi tra titolari sì)
+func test_rosa_menu_campione_resta_in_campo() -> bool:
+	var c := _carriera()
+	_inizia(c)
+	var ch: Variant = c.campione()
+	check(ch != null and c.s.lineup.has(ch.id), "il campione è titolare")
+	var n := _apri("rosa")
+	var riserva: Variant = MenuRosa.bench_order(c.bench())[0].id
+	n._tocca(ch.id)
+	n._tocca(riserva)
+	n._tocca(riserva)
+	check(c.s.lineup.has(ch.id) and not c.s.lineup.has(riserva), "non va in panchina")
+	var altro: Variant = c.s.lineup[0] if c.s.lineup[0] != ch.id else c.s.lineup[1]
+	var i_ch: int = c.s.lineup.find(ch.id)
+	n._tocca(ch.id)
+	n._tocca(altro)
+	n._tocca(altro)
+	check(c.s.lineup.find(ch.id) != i_ch and c.s.lineup.has(ch.id), "tra titolari cambia posto")
+	_finisci(n)
 	return done()
 
 

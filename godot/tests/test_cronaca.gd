@@ -138,3 +138,16 @@ func test_cronaca_di_una_partita_vera() -> bool:
 	for f: String in frasi:
 		check(not f.contains("{") and f.strip_edges() != "", "frase pulita: %s" % f)
 	return done()
+
+
+# Rosa e tattica: "Cambio: entra X, esce Y", più cambi insieme nella stessa riga
+func test_cambio() -> bool:
+	var c := Cronaca.new(3, ["Rossi", "Blu"])
+	var p := R.Player.new()
+	p.name = "Lodi"
+	var q := R.Player.new()
+	q.name = "Neri"
+	eq(c.leggi({"type": "sub", "p": p, "fuori": "Pedretti"}, 10.0), "Cambio: entra Lodi, esce Pedretti", "un cambio")
+	eq(c.leggi({"type": "sub", "p": q, "fuori": "Bianchi"}, 10.0), "Cambio: entra Lodi, esce Pedretti · entra Neri, esce Bianchi", "due cambi insieme")
+	eq(c.leggi({"type": "sub", "p": q, "fuori": "Verdi"}, 30.0), "Cambio: entra Neri, esce Verdi", "un cambio dopo")
+	return done()

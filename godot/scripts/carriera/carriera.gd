@@ -326,6 +326,8 @@ func _calendario_valido(st: Dictionary) -> bool:
 func upgrade() -> void:
 	if s is Dictionary and s.get("squad") is Array:
 		ensureNums()
+		if s.get("lineup") is Array and s.lineup.size() > 0:
+			tieniCampione() # salvataggi vecchi col campione in panchina
 
 
 func ensureNums() -> void:
@@ -565,6 +567,7 @@ func autoLineup() -> void:
 		used[best.id] = true
 	s.lineup = l
 	schieraSani()
+	tieniCampione()
 
 
 ## dopo vendite e acquisti: riempie i buchi della formazione
@@ -597,6 +600,7 @@ func fixLineup() -> void:
 			s.lineup[i] = best.id
 			used[best.id] = true
 	schieraSani()
+	tieniCampione()
 
 
 func bench() -> Array:
@@ -607,9 +611,12 @@ func bench() -> Array:
 	return out
 
 
-## scambia due giocatori (titolare/titolare o titolare/panchina)
-func swap(a: int, b: int) -> void:
+## scambia due giocatori (titolare/titolare o titolare/panchina). Il campione non va in panchina (Luis 2026-11-24),
+## tranne in partita (in_partita: sostituzione dalla pausa; alla partita dopo torna titolare, tieniCampione)
+func swap(a: int, b: int, in_partita := false) -> void:
 	if not canSwap(s.lineup, a, b) or entraInfortunato(a, b):
+		return
+	if not in_partita and campioneInPanchina(a, b):
 		return
 	s.lineup = swapLineup(s.lineup, a, b)
 	save()
@@ -1052,6 +1059,47 @@ func entraInfortunato(a: Variant, b: Variant) -> bool:
 	return false
 
 
+## lo scambio a⇄b manderebbe in panchina il campione? (fuori partita non si può, Luis 2026-11-24)
+func campioneInPanchina(a: Variant, b: Variant) -> bool:
+	var ch: Variant = campione()
+	if ch == null:
+		return false
+	if ch.id == a:
+		return s.lineup.has(a) and not s.lineup.has(b)
+	if ch.id == b:
+		return s.lineup.has(b) and not s.lineup.has(a)
+	return false
+
+
+## il campione è sempre titolare (Luis 2026-11-24: "il giocatore principale non può essere sostituito dalla rosa";
+## in partita sì, ma alla partita dopo è di nuovo in campo). Se è in panchina (sostituito in partita, salvataggio
+## vecchio) prende il posto del titolare più debole del suo ruolo (sennò del più debole di movimento; il portiere
+## solo se è portiere). Non se è infortunato. Ritorna true se ha cambiato la formazione.
+func tieniCampione() -> bool:
+	var ch: Variant = campione()
+	if ch == null or not s.get("lineup") is Array or s.lineup.has(ch.id) or infortunio(ch.id) > 0:
+		return false
+	var F: Array = FORMATIONS.get(s.formation, FORMATIONS["4-4-2"])
+	var best := -1
+	var bo := 1 << 30
+	for giro in 2: # prima i posti del suo ruolo, poi qualunque posto (il portiere solo per un portiere)
+		for i in mini(F.size(), s.lineup.size()):
+			var r: String = F[i][0]
+			if (giro == 0 and r != ch.pos) or (giro == 1 and (r == "P") != (ch.pos == "P")):
+				continue
+			var q: Variant = player(s.lineup[i])
+			var o := overallAs(q, r) if q != null else -1
+			if o < bo:
+				bo = o
+				best = i
+		if best >= 0:
+			break
+	if best < 0:
+		return false
+	s.lineup[best] = ch.id
+	return true
+
+
 ## titolari infortunati → il miglior sostituto sano per quel posto (la CPU fa i cambi). Ritorna [{fuori, dentro}]
 func schieraSani() -> Array:
 	var cambi: Array = []
@@ -1083,6 +1131,7 @@ func schieraSani() -> Array:
 ## I giocatori sono copie: lo stato della carriera non cambia.
 func squadraPartita() -> Dictionary:
 	schieraSani()
+	tieniCampione() # sostituito nella partita prima: torna titolare
 	var t := myMatchTeam()
 	var gioc: Array = []
 	for p: Variant in t.players:

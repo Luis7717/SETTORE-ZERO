@@ -39,6 +39,14 @@
 #   --allenamento       allenamento guidato (tipo "allenamento", scripts/partita/allenamento.gd) invece dell'amichevole;
 #                       con --lezione=N [--prova=K] parte da lì, con --scheda mostra la scheda della lezione N
 #   --prove=tiri|punizioni|rigori   allenamento libero a punti (tipo "prove", scripts/partita/prove_tiro_regia.gd)
+#   --pausa-rosa        amichevole con una carriera di prova (file user://prova_pausa_rosa.json, mai il salvataggio vero):
+#                       dopo un attimo pausa e "Rosa e tattica" aperta (cambi, formazione e stili a partita in corso)
+#   --scena=cambio      stessa carriera di prova: due sostituzioni dalla pausa e scena del cambio (cambio_regia.gd)
+#
+# Rosa e tattica (Luis 2026-11-24): nelle partite della carriera (campionato, amichevole) la pausa e l'intervallo hanno
+# il tasto "Rosa e tattica": la Rosa del menu (rosa.gd in modo partita) si apre sopra la partita ferma; chiudendola i
+# cambi valgono subito nel motore (cambi_partita.gd → SimMatch.cambiaSquadra) e a "Riprendi" / "Secondo tempo" parte
+# la scena del cambio (cambio_regia.gd) col tempo fermo. Non nelle lezioni, nelle prove di tiro né senza carriera.
 #
 # Dall'app (scripts/app.gd): chi crea la scena chiama `avvia(opz)` prima di aggiungerla o entro il primo fotogramma,
 # con opz = {squadra_a, squadra_b, me, tipo: "campionato"|"amichevole"|"allenamento", durata_tempo, seme,
@@ -84,6 +92,10 @@ const FermatempoTesta := preload("res://scripts/partita/fermatempo_testa.gd")
 const ParataRegia := preload("res://scripts/partita/parata_regia.gd")
 const TimerRallenty := preload("res://scripts/partita/timer_rallenty.gd")
 const DribblingRegia := preload("res://scripts/partita/dribbling_regia.gd")
+const CambiPartita := preload("res://scripts/partita/cambi_partita.gd")
+const CambioRegia := preload("res://scripts/partita/cambio_regia.gd")
+const SCENA_ROSA := "res://scenes/menu/rosa.tscn"
+const SALVA_PROVA_ROSA := "user://prova_pausa_rosa.json"   # carriera di prova di --pausa-rosa e --scena=cambio
 const SCENA_VISTA := "res://scenes/vista_partita.tscn"
 
 # velocità del tempo (rallenty), come src/main.js
@@ -146,6 +158,13 @@ var _testa_reale := -1.0       # secondi veri dall'apertura del fermatempo del c
 var _parata := ParataRegia.new() # fermatempo della parata col bersaglio (portiere manuale, sim/parata.gd)
 var _scena_veloce := false     # un tocco durante la scena della ripresa la fa andare più veloce (fino alla fine)
 var meteo := {"meteo": "sereno", "ora": "giorno"}  # scripts/partita/meteo.gd: avvio.meteo/ora o a caso col seme
+var cambi: CambiPartita = null  # cambi a partita in corso (null = niente "Rosa e tattica": senza carriera, lezioni, prove)
+var carriera_prova: Object = null  # carriera da usare al posto di quella dell'App (prove, test)
+var _cambio: CambioRegia = null    # scena del cambio
+var _rosa_layer: CanvasLayer = null
+var _rosa: Control = null           # Rosa e tattica aperta (rosa.gd in modo partita)
+var _menu_sotto := ""               # menu da rimettere chiusa la Rosa: "pausa" o "intervallo"
+var _testo_esci := ""               # tasto "Esci" della pausa (per rimetterla uguale)
 
 
 ## avvio dall'app: da chiamare prima di aggiungere la scena all'albero o entro il primo fotogramma
@@ -187,7 +206,33 @@ func _ready() -> void:
 	_leggi_opzioni()
 	if _avvio.is_empty():
 		await get_tree().process_frame # chi ha creato la scena può ancora chiamare avvia()
+	if _avvio.is_empty() and (_opzioni.has("pausa-rosa") or _opzioni.get("scena", "") == "cambio"):
+		_avvio_carriera_prova()
 	_parti()
+
+
+## carriera della partita per "Rosa e tattica": quella di prova, o dell'App nelle partite della carriera; null = niente
+func carriera_partita() -> Object:
+	if tipo() != "campionato" and tipo() != "amichevole":
+		return null
+	if carriera_prova != null:
+		return carriera_prova
+	if not avviata_da_app():
+		return null
+	var app := get_node_or_null("/root/App")
+	var c: Variant = app.get("carriera") if app != null else null
+	return c if c is Object and c.get("s") is Dictionary else null
+
+
+# --pausa-rosa / --scena=cambio: amichevole con una carriera nuova su un file di prova (mai il salvataggio vero)
+func _avvio_carriera_prova() -> void:
+	var c := Carriera.new()
+	c.percorso = SALVA_PROVA_ROSA
+	c.create("Prova", 1, 4242)
+	carriera_prova = c
+	var avv: Dictionary = c.team(c.s.divs[2][1])
+	_avvio = {"squadra_a": c.squadraPartita(), "squadra_b": c.avversarioPartita(avv), "me": 0, "tipo": "amichevole",
+		"durata_tempo": TEMPO_PREDEFINITO, "seme": int(_opzioni.get("seme", "7")), "titolo": "Amichevole"}
 
 
 func _parti() -> void:
@@ -207,6 +252,12 @@ func _parti() -> void:
 	hud.secondo_tempo.connect(_secondo_tempo)
 	hud.esci.connect(_esci_dalla_pausa)
 	hud.nuova_partita.connect(_nuova_partita)
+	hud.rosa_premuta.connect(_apri_rosa)
+	if carriera_partita() != null:
+		cambi = CambiPartita.new()
+	_cambio = CambioRegia.new()
+	add_child(_cambio)
+	_cambio.finita.connect(_fine_cambio)
 	audio = AudioPartita.new()
 	add_child(audio)
 	esultanza = EsultanzaRegia.new()
@@ -290,7 +341,9 @@ func _exit_tree() -> void:
 		m.dispose()
 	# partita aperta da sola (prova della build, scena di prova): nessuna App lascia le risorse grafiche condivise a
 	# fine programma, lo fa la partita (sul Mac della build, senza, uno shader risulta "leaked", 2026-11-23)
-	if not avviata_da_app():
+	if carriera_prova != null and carriera_prova.percorso == SALVA_PROVA_ROSA:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(SALVA_PROVA_ROSA))
+	if not avviata_da_app() or carriera_prova != null:
 		Uscita.libera_cache_grafiche()
 
 
@@ -302,6 +355,9 @@ func _process(delta: float) -> void:
 	_fotogrammi += 1
 	var dt := _dt_fisso if _dt_fisso > 0.0 else minf(DT_MAX, delta)
 	gesti.dim = get_viewport().get_visible_rect().size
+	if _cambio != null and _cambio.attiva: # scena del cambio: tempo di partita fermo, la scena muove vista e telecamera
+		_cambio.fotogramma(dt)
+		return
 	if paused and bot != null and m.phase == "half":
 		_secondo_tempo() # il dito finto preme "Secondo tempo"
 	elif paused and bot != null and _all_hud != null and _all_hud.scheda_aperta():
@@ -710,6 +766,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	var now := Time.get_ticks_msec()
 	if event is InputEventScreenTouch:
 		var e := event as InputEventScreenTouch
+		if _cambio != null and _cambio.attiva: # un tocco salta la scena del cambio
+			if e.pressed:
+				_cambio.salta()
+			return
 		if e.pressed and esultanza != null and esultanza.attiva and not paused and not hud.tocca_hud(e.position):
 			esultanza.salta() # un tocco salta l'esultanza del campione
 			return
@@ -763,25 +823,87 @@ func _mostra_pausa() -> void:
 		esci = "Esci dall'allenamento"
 	elif avviata_da_app() and tipo() == "campionato":
 		esci = "Abbandona (sconfitta 0–3)"
-	hud.mostra_pausa(esci)
+	_menu_sotto = "pausa"
+	_testo_esci = esci
+	hud.mostra_pausa(esci, cambi != null)
 
 
 func _riprendi() -> void:
 	hud.nascondi_overlay()
-	paused = false
+	if not _avvia_cambio():
+		paused = false
 
 
 func _mostra_intervallo() -> void:
 	paused = true
 	gesti.cancel()
 	hud.mostra_dribbling(false)
-	hud.mostra_intervallo(m.score[0], m.score[1])
+	_menu_sotto = "intervallo"
+	hud.mostra_intervallo(m.score[0], m.score[1], cambi != null)
 
 
 func _secondo_tempo() -> void:
 	hud.nascondi_overlay()
-	paused = false
 	m.startSecondHalf()
+	if not _avvia_cambio():
+		paused = false
+
+
+# ---------------------------------------------------------------- rosa e tattica a partita ferma, scena del cambio
+## apre la Rosa in modo partita sopra la partita ferma (dalla pausa o dall'intervallo)
+func _apri_rosa() -> void:
+	var c := carriera_partita()
+	if cambi == null or c == null or not paused or _rosa != null:
+		return
+	cambi.leggi_espulsi(m, me)
+	hud.nascondi_overlay()
+	_rosa_layer = CanvasLayer.new()
+	_rosa_layer.layer = 8
+	add_child(_rosa_layer)
+	_rosa = (load(SCENA_ROSA) as PackedScene).instantiate()
+	_rosa.apri({"in_partita": true, "cambi": cambi, "carriera": c})
+	_rosa.chiusa.connect(_chiudi_rosa)
+	_rosa_layer.add_child(_rosa)
+
+
+## "Torna alla partita": i cambi valgono subito nel motore, si torna al menu di prima (pausa o intervallo)
+func _chiudi_rosa() -> void:
+	if _rosa == null:
+		return
+	var c := carriera_partita()
+	if c != null and cambi.applica(m, me, c) == null:
+		push_warning("Rosa e tattica: cambi non applicati alla partita")
+	_rosa_layer.queue_free()
+	_rosa_layer = null
+	_rosa = null
+	if _menu_sotto == "intervallo":
+		hud.mostra_intervallo(m.score[0], m.score[1], true)
+	else:
+		hud.mostra_pausa(_testo_esci, true)
+
+
+## Rosa e tattica aperta (per le prove), o null
+func rosa_aperta() -> Control:
+	return _rosa
+
+
+## scena del cambio se ci sono cambi da mostrare (il tempo resta fermo finché non finisce). false = niente
+func _avvia_cambio() -> bool:
+	if cambi == null or cambi.da_mostrare.is_empty() or _cambio == null:
+		return false
+	var lista: Array = cambi.da_mostrare
+	cambi.da_mostrare = []
+	gesti.cancel()
+	return _cambio.avvia(m, me, vista, lista)
+
+
+func _fine_cambio() -> void:
+	paused = false
+
+
+## scena del cambio in corso (per le prove)
+func cambio_in_corso() -> bool:
+	return _cambio != null and _cambio.attiva
 
 
 func _finisci(forfait: bool) -> void:
@@ -942,6 +1064,8 @@ func _leggi_opzioni() -> void:
 func _avvia_prove() -> void:
 	if _opzioni.has("scena"):
 		_prepara_scena(_opzioni["scena"])
+	if _opzioni.has("pausa-rosa"):
+		_prova_pausa_rosa(String(_opzioni["pausa-rosa"]))
 	if _opzioni.has("schermata"):
 		if _opzioni.has("alla-fine"):
 			while stato != "fine":
@@ -964,6 +1088,46 @@ func _avvia_prove() -> void:
 		await get_tree().create_timer(float(_opzioni["esci-dopo"])).timeout
 		print(riassunto())
 		_esci()
+
+
+## prove: con la Rosa e tattica aperta, n sostituzioni coi tocchi veri (attaccante n. 10 e un difensore con il
+## migliore della panchina del loro ruolo)
+func sostituzioni_di_prova(n: int) -> void:
+	if _rosa == null:
+		return
+	var c := carriera_partita()
+	var s: Dictionary = c.s
+	var F: Array = C.FORMATIONS[s.formation]
+	for slot: int in [9, 2, 6].slice(0, n):
+		var tit: Variant = s.lineup[slot]
+		var scelto: Variant = null
+		for q: Dictionary in MenuRosa.bench_order(c.bench()):
+			if not cambi.uscito(q.id) and c.infortunio(q.id) <= 0 and (scelto == null or q.pos == F[slot][0]):
+				if scelto == null or c.player(scelto).pos != F[slot][0]:
+					scelto = q.id
+		if scelto == null:
+			continue
+		_rosa._tocca(tit)
+		_rosa._tocca(scelto)
+		_rosa._tocca(scelto)
+
+
+# --pausa-rosa[=giocatore|formazione|cambi]: pausa e Rosa e tattica aperta (giocatore = pannello del n. 10 scelto,
+# formazione = menu Formazione aperto, cambi = due sostituzioni fatte: in panchina i due "USCITO")
+func _prova_pausa_rosa(come: String) -> void:
+	await get_tree().create_timer(1.2).timeout
+	_mostra_pausa()
+	if come == "pausa":
+		return
+	_apri_rosa()
+	await get_tree().process_frame
+	match come:
+		"giocatore":
+			_rosa._tocca(carriera_partita().s.lineup[9])
+		"formazione":
+			_rosa._apri_menu("formazione")
+		"cambi":
+			sostituzioni_di_prova(2)
 
 
 func _salva_schermata(percorso: String) -> void:
@@ -1103,6 +1267,15 @@ func _prepara_scena(nome: String) -> void:
 		"pausa":
 			await get_tree().create_timer(0.8).timeout
 			_mostra_pausa()
+		"cambio": # due sostituzioni dalla pausa (Rosa e tattica), poi la scena del cambio
+			await get_tree().create_timer(2.0).timeout
+			_mostra_pausa()
+			_apri_rosa()
+			await get_tree().process_frame
+			sostituzioni_di_prova(2)
+			_rosa.chiusa.emit()
+			await get_tree().create_timer(0.3).timeout
+			_riprendi()
 		"recupero": # il nostro n. 4 ruba il pallone in contrasto frontale al n. 10 avversario che gli corre addosso
 			# (Luis 2026-11-24: "quando recupero palla me la rubano subito"): si vede chi ha perso il pallone e il rallenty
 			_metti_in_gioco()

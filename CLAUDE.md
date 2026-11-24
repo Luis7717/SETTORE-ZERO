@@ -98,6 +98,22 @@
   **8 formazioni** in `sim/core.gd`: le 4 del web (prime, identiche) + 4-5-1, 3-4-3, 5-3-2, 4-1-4-1. La CPU sorteggia
   come il JS tra le 4 del web (`aiMatchTeam`), poi metà squadre usa la "cugina" nuova (`FORMAZIONE_CUGINA`,
   `formazioneDi`, in partita con `avversarioPartita`). Test: `tests/test_formazioni.gd`.
+- **Rosa e tattica nella pausa** (Godot, Luis 2026-11-24): nelle partite della carriera (campionato, amichevole) la
+  pausa e l'intervallo hanno il tasto **Rosa e tattica**: la Rosa del menu (`rosa.gd` con `{"in_partita": true, "cambi",
+  "carriera"}`) si apre sopra la partita ferma, senza Aspetto, Vendi né altre schermate, con "Cambi N/5" (quanti restano)
+  e **Torna alla partita**. Regole in `scripts/partita/cambi_partita.gd`: al massimo 5 sostituzioni (intervallo
+  compreso), chi è uscito resta in panchina "USCITO", l'espulso non si tocca, chi entra ha energia piena; scambi tra
+  titolari, formazione (gli stessi 11 nei posti nuovi, `formazione_stessi_11`) e stili liberi. Chiusa la Rosa i cambi
+  vanno subito nel motore (`SimMatch.cambiaSquadra`: stesso giocatore = stesso src, posti e ruoli della formazione, stili;
+  evento `sub` con `fuori`, cronaca "Cambio: entra X, esce Y") e si salvano nella carriera. A Riprendi / Secondo tempo
+  la **scena del cambio** (`cambio_regia.gd`, 3,4 s veri, tempo fermo, un tocco la salta): chi esce cammina verso la
+  linea laterale a centrocampo, chi entra corre al suo posto, targhette ▲ verde / ▼ rossa e riquadro CAMBIO in basso,
+  telecamera dal lato opposto. Non nelle lezioni, nelle prove di tiro né senza carriera. **Campione sempre titolare**
+  fuori partita: nella Rosa del menu non va in panchina (`Carriera.swap`, `campioneInPanchina`), `autoLineup`/`fixLineup`
+  lo tengono; in partita si può sostituire, ma `tieniCampione` lo rimette titolare a fine partita, all'avvio della
+  successiva (`squadraPartita`) e al caricamento. Prove: `-- --pausa-rosa[=pausa|giocatore|formazione|cambi]`,
+  `--scena=cambio` (carriera di prova su `user://prova_pausa_rosa.json`); test `tests/test_cambi_partita.gd`,
+  `-s res://tests/prova_cambio.gd`, controlli in `controlli_menu.gd`.
 - **Stili di gioco** (Fase D, `godot/sim/stili.gd`): nella Rosa, tasti **Attacco** e **Difesa**: attacco (Equilibrato, Contropiede,
   Possesso, Fasce, Lanci lunghi) e difesa (Equilibrata, Pressing, Catenaccio, A uomo, Fuorigioco). Valgono per i
   compagni della CPU e per gli avversari (stile fisso per squadra, mostrato nell'hub). Campi `stileAtt`/`stileDif`
