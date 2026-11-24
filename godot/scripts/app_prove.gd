@@ -262,7 +262,7 @@ func _giro_impostazioni_editor(dir: String) -> void:
 	_controlla(not AudioServer.is_bus_mute(master), "audio acceso: bus principale attivo")
 	st.sound = suono
 	_app.impostazioni()
-	var p: Dictionary = _app.carriera.s.squad[0]
+	var p: Dictionary = _app.carriera.campione() if _app.carriera.campione() != null else _app.carriera.s.squad[0]
 	for prova: Array in [["hair", 9, "editor_capelli"], ["boots", 13, "editor_corpo"], ["hair", 10, "editor_capelli_colori"]]:
 		_app.vai("editor", {"flow": "look", "id": p.id, "tab": prova[0]})
 		var ed: Node = get_tree().current_scene

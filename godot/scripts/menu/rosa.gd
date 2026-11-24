@@ -400,10 +400,13 @@ func _pannello_giocatore(p: Dictionary, F: Array) -> Control:
 		g.add_child(cella)
 	v.add_child(g)
 	v.add_child(U.riempi())
-	var bt := U.griglia(2, 8, 8)
-	var asp := U.bottone("Aspetto", "", func() -> void: vai("editor", {"flow": "look", "id": p.id}), 44)
-	asp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bt.add_child(asp)
+	# solo il campione creato all'inizio si può modificare (Luis 2026-11-24): gli altri hanno solo Vendi
+	var mio: bool = p.get("champ", false)
+	var bt := U.griglia(2 if mio else 1, 8, 8)
+	if mio:
+		var asp := U.bottone("Aspetto", "", func() -> void: vai("editor", {"flow": "look", "id": p.id}), 44)
+		asp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bt.add_child(asp)
 	var vendi := U.bottone("Vendi per %s" % D.fmt_money(c.sellPrice(p)), "BtnFantasma", Callable(), 44)
 	vendi.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vendi.pressed.connect(func() -> void:

@@ -98,6 +98,39 @@ func test_rosa_due_tocchi_scambiano_titolare_e_panchina() -> bool:
 	return done()
 
 
+# Luis 2026-11-24: si modifica solo il campione creato all'inizio. Nella Rosa il tasto Aspetto c'è solo per lui;
+# l'editor non apre l'aspetto degli altri giocatori
+func test_aspetto_solo_del_campione() -> bool:
+	var c := _carriera()
+	_inizia(c)
+	var ch: Variant = c.campione()
+	check(ch != null, "la carriera di prova ha il campione")
+	var altro: Variant = null
+	for p: Dictionary in c.s.squad:
+		if not p.get("champ", false):
+			altro = p
+			break
+	for caso: Array in [[ch, true, "campione"], [altro, false, "altro giocatore"]]:
+		var n := _apri("rosa", {"sel": caso[0].id})
+		eq(_bottoni_con(n, "Aspetto"), 1 if caso[1] else 0, "%s: tasto Aspetto" % caso[2])
+		_finisci(n)
+		_inizia(c)
+		var e := _apri("editor", {"flow": "look", "id": caso[0].id})
+		eq(e.mode == "look", caso[1], "%s: editor dell'aspetto" % caso[2])
+		_finisci(e)
+		_inizia(c)
+	_finisci(null)
+	return done()
+
+
+func _bottoni_con(n: Node, testo: String) -> int:
+	var k := 0
+	for b: Node in n.find_children("*", "Button", true, false):
+		if (b as Button).text == testo:
+			k += 1
+	return k
+
+
 # i tre tasti in alto (Formazione, Attacco, Difesa) aprono il loro menu; una scelta si salva e chiude il menu
 func test_rosa_menu_formazione_e_stili() -> bool:
 	var c := _carriera()

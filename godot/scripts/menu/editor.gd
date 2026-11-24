@@ -84,8 +84,8 @@ func _apri_nuova(club: String, kit: int) -> void:
 func _apri_aspetto(id: Variant) -> bool:
 	var c := carriera()
 	var p: Variant = c.player(id) if c != null and id != null else null
-	if not p is Dictionary:
-		return false
+	if not p is Dictionary or not p.get("champ", false):
+		return false # solo il campione creato all'inizio si modifica (Luis 2026-11-24)
 	mode = "look"
 	tab = "face"
 	var s := stato()

@@ -38,7 +38,7 @@ const TUTTE := [
 	["19_come_si_gioca_5", "come_si_gioca", 4, ""],
 	["20_dopo_partita", "dopo_partita", "PROVA", ""],
 	["21_fine_stagione", "fine_stagione", {"pos": 2, "prize": 504, "bonus": 210, "outcome": "up", "div": 2, "newDiv": 1}, ""],
-	["22_editor_aspetto", "editor", {"flow": "look", "id": "rosa:0"}, ""],
+	["22_editor_aspetto", "editor", {"flow": "look", "id": "campione"}, ""],
 	["23_editor_divisa", "editor", {"flow": "kit"}, ""],
 	["24_uno_contro_uno", "uno_contro_uno", null, ""],
 	["25_statistiche", "statistiche", "STATISTICHE", ""],
@@ -156,6 +156,9 @@ func _risolvi_valore(v: Variant) -> Variant:
 	if not (v is String) or carriera == null:
 		return v
 	var s: Dictionary = carriera.s
+	if v == "campione":
+		var ch: Variant = carriera.campione()
+		return ch.id if ch != null else s.squad[0].id
 	if v.begins_with("rosa:"):
 		return s.squad[int(v.substr(5))].id
 	if v.begins_with("titolare:"):
