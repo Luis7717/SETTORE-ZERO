@@ -1769,3 +1769,46 @@ sopra l'altro che qualunque passaggio io faccia mi rubano la palla".
 - **Da provare sull'iPhone**: se contro una squadra "A uomo" la partita si apre (prima c'erano 40 m vuoti dietro), se
   con "Fuorigioco" la linea che sale insieme si vede e non sembra un difetto, se il pressing della CPU risulta fastidioso
   ma giusto, se gli esterni che rientrano a cinque si notano.
+
+## 2026-11-24 — Godot: fase d'attacco della CPU (opzione `attacco`, dopo lo studio degli stili)
+Luis: "Fai tutte le modifiche che ritieni sensate" sullo studio degli stili (`tools/studio_stili.gd`). Tutto in
+`godot/sim/attacco.gd` (nella catena tra `ai.gd` e `parata.gd`, metodi che ridefiniscono `anchor`, `support`,
+`computeChasers`, `passOptions`, `_styleScore` e chiamano `super()`), solo con l'opzione nuova `attacco` del Match
+(la accende `gioco.gd`; spenta nei confronti col JS: impronte identiche). Regole sui ruoli e sui posti (bx/by, chi è
+largo), non sui nomi delle formazioni: valgono anche per le formazioni nuove.
+- **1. Nessuno entrava in area**: col pallone nostro sulla trequarti (oltre il 60% del campo) o sulla fascia (|x| > 14 m
+  dal 50%) uno o due compagni (prima le punte, poi i centrocampisti; mai i compagni d'appoggio) vanno verso primo e
+  secondo palo; finché il pallone è del portatore restano sulla linea del fuorigioco (o all'altezza del pallone se è più
+  avanti), quando parte il nostro passaggio entrano di corsa. Il portatore della CPU crossa anche verso chi sta
+  arrivando (in gioco adesso, arriva sul punto entro il volo del pallone + 0,6 s, punto libero 1,5 m; Fasce 1,0 m).
+  Vale anche per i compagni CPU della persona (che decide lei se crossare).
+- **2. Fuorigioco**: un attaccante della CPU vicino alla linea a volte anticipa il taglio (2 m oltre per 2 s; più spesso
+  con più spazio dietro la difesa, contro la difesa Fuorigioco ×1,4, con squadre meno brave) e il portatore della CPU a
+  volte non se ne accorge e gli passa il pallone (anche a una punta rimasta appena oltre, meno spesso). I compagni della
+  persona non lo fanno (i suoi passaggi non diventano fuorigioco per colpa della CPU).
+- **3. Contropiede**: in attacco non più basso (CONTRO_LOW veniva applicato quando attaccava), in difesa più basso
+  (−4% del campo) e più stretto (×0,93); nella ripartenza centrocampisti e punte salgono di corsa. Con −6% e ×0,88 la
+  squadra subiva il doppio dei tiri: ridotto.
+- **4. Fasce**: con un esterno davanti sulla stessa fascia, sul lato del pallone dalla metà campo il terzino sale in
+  sovrapposizione (+20% del campo) e l'esterno si stringe (72% della larghezza); la mezzala del 4-3-3 non va più sulla
+  riga se c'è già l'ala.
+- **5. Lanci lunghi / Contropiede**: nel contropiede il pallonetto vale meno (−0,35 e premio d'avanzamento ×0,2),
+  nei lanci lunghi il lancio alto +0,25.
+- **6. Terzino ed esterno sulla stessa riga**: il più arretrato sta all'80% della larghezza (24 m invece di 30).
+- **Numeri** (studio_stili, stessi semi, 8 partite CPU contro CPU per stile e formazione, media delle 4 formazioni,
+  prima → dopo): giocatori in area col pallone sulla trequarti: equilibrato 0,24 → 0,46, contropiede 0,11 → 0,38,
+  possesso 0,17 → 0,57, fasce 0,08 → 0,77, lanci 0,70 → 0,69; cross a partita: 0,97 → 1,81, 0,78 → 1,84, 0,50 → 1,28,
+  1,66 → 2,47, 1,81 → 2,72; azioni in cui il portatore entra in area (fasce) 0,9% → 7,0%. Fuorigioco: 0 → 1,35 a
+  partita (le due squadre insieme); contro la persona simulata la CPU ne prende 0,2-2,2 a partita. Contropiede: linea
+  difensiva in difesa 23,9 → ~21,2 m, in attacco 31,9 → ~35,4 m; palloni alti contropiede ~20% → ~13%, lanci lunghi
+  27% → 37% (ora ben distinti). Larghezza in attacco ~54 → ~51 m. Giocatori fermi e ammassati: come prima (~0).
+- **Equilibrio** (controllo_gameplay, persona 60 contro CPU 60, 40 partite stessi semi, `--senza-attacco` → con):
+  V/N/P 15/19/6 → 16/21/3, gol 0,72-0,50 → 0,82-0,42, tiri 2,0-6,9 → 2,7-7,8, possesso umano 35% → 34%, fuorigioco
+  della CPU 0 → 1,1 a partita. Il resto (rallenty, riprese, falli) uguale.
+- **Non convince / da sapere**: le Fasce perdono più palloni (passaggi riusciti ~83% → ~75%: tanti cross contesi). Nel
+  contropiede le ripartenze che arrivano negli ultimi 30 m entro 10 s calano (~28% → ~20%): meno pallonetti, squadra
+  più bassa. Una prova con pallonetto meno penalizzato (0,15) non è stata misurata (misure fermate per memoria bassa).
+  Nel controllo "portatore umano fuori" 1 → 4 in 40 partite (codice della persona non toccato, da tenere d'occhio).
+- Test: `tests/test_attacco.gd` (10). Strumenti: `--senza-attacco` in `studio_stili.gd` e `controllo_gameplay.gd`.
+- Da provare sull'iPhone: le corse sul primo e secondo palo quando si arriva sul fondo (si vede a chi crossare?), i
+  fuorigioco della CPU (pochi e credibili?), il terzino che si sovrappone nelle Fasce.

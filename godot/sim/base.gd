@@ -1,7 +1,7 @@
 # Stato della partita e funzioni di servizio usate da tutte le parti del motore (prima metà di src/sim/match.js).
 # In JS i metodi di duel.js, motion.js e ai.js vengono copiati su Match.prototype; GDScript non ha i "mixin",
 # quindi le parti sono una catena di classi: base.gd -> duel.gd -> motion.gd -> falli.gd -> testa.gd -> raccatta.gd ->
-# riprese.gd -> ai.gd -> parata.gd -> match.gd (SimMatch).
+# riprese.gd -> angoli.gd -> ai.gd -> attacco.gd -> parata.gd -> match.gd (SimMatch).
 # Le poche chiamate "verso l'alto" (es. motion.gd che chiama setRestart di match.gd) sono dichiarate qui sotto
 # come metodi vuoti e ridefinite nel file giusto.
 extends RefCounted
