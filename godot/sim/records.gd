@@ -17,6 +17,33 @@ class Stats:
 	var fis: float = 0.0
 	var por: float = 0.0
 	var tes: float = 0.0
+	## sotto-statistiche (sottostat.gd) già col malus del ruolo, solo se il giocatore le ha (sennò vuoto)
+	var sub: Dictionary = {}
+
+	## valore della sotto-statistica k (es. "fin"): senza `sub` quello della sua grande, come prima
+	func sv(k: String) -> float:
+		if sub.has(k):
+			return float(sub[k])
+		return float(get(GRANDE_DI[k]))
+
+	## quanto la sotto-statistica k si scosta dalla sua grande (0 senza `sub`): serve dove la formula di prima usa
+	## un'altra grande (es. accelerazione con `fis`), così con sotto-statistiche uguali alle grandi niente cambia
+	func scarto(k: String) -> float:
+		if sub.has(k):
+			return float(sub[k]) - float(get(GRANDE_DI[k]))
+		return 0.0
+
+
+## sotto-statistica → sua grande (come Sotto.GRUPPI, al contrario)
+const GRANDE_DI := {
+	"acc": "vel", "vmax": "vel",
+	"fin": "tir", "pot": "tir", "lon": "tir", "vol": "tir", "rig": "tir",
+	"pco": "pas", "plu": "pas", "cro": "pas", "eff": "pas", "pun": "pas",
+	"agi": "dri", "ctl": "dri", "drb": "dri", "equ": "dri",
+	"int": "dif", "ctr": "dif",
+	"ele": "fis", "res": "fis", "frz": "fis", "agg": "fis",
+	"tuf": "por", "rif": "por", "pre": "por", "pia": "por",
+}
 
 
 # tuffo del portiere in corso

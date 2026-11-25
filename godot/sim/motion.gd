@@ -76,7 +76,7 @@ func reachOf(p: R.Player) -> float:
 	if k.type == "shot":
 		return SHOT_BLOCK_R
 	var pas: float = k.kicker.st.pas if (k.kicker != null and k.kicker.st != null) else 60.0
-	return C.clamp_(INT_BASE + (p.st.dif - INT_REF) * INT_DIF - (pas - INT_REF) * INT_PAS, INT_MIN, INT_MAX)
+	return C.clamp_(INT_BASE + (p.st.sv("int") - INT_REF) * INT_DIF - (pas - INT_REF) * INT_PAS, INT_MIN, INT_MAX)
 
 
 func movePlayers(dt: float) -> void:
@@ -206,13 +206,13 @@ func _moveRunning(p: R.Player, dt: float, b: R.Ball) -> void:
 	var dx: float = p.tx - p.x
 	var dy: float = p.ty - p.y
 	var d: float = C.hyp(dx, dy)
-	var vm: float = vmax(p) * ((0.86 + p.st.dri * 0.001) if b.owner == p else 1.0) * p.spdF * ((1.0 + SPRINT_BONUS * (0.3 + 0.7 * p.energy)) if p.sprint else 1.0) * (DRIB_BEAT_SPD if p.beat > 0.0 else 1.0) * (BURST_SPD if p.burst > 0.0 else 1.0) # saltato col dribbling: corre piano; Scatto: più veloce
+	var vm: float = vmax(p) * ((0.86 + p.st.sv("ctl") * 0.001) if b.owner == p else 1.0) * p.spdF * ((1.0 + SPRINT_BONUS * (0.3 + 0.7 * p.energy)) if p.sprint else 1.0) * (DRIB_BEAT_SPD if p.beat > 0.0 else 1.0) * (BURST_SPD if p.burst > 0.0 else 1.0) # saltato col dribbling: corre piano; Scatto: più veloce
 	var sp: float = 0.0 if p.stun > 0.0 else minf(vm, d * 3.2)
 	if d < 0.15:
 		sp = 0.0
 	var wx: float = dx / d * sp if d > 0.0 else 0.0
 	var wy: float = dy / d * sp if d > 0.0 else 0.0
-	var acc: float = (11.0 + p.st.fis * 0.06) * dt
+	var acc: float = (11.0 + (p.st.fis + p.st.scarto("acc")) * 0.06) * dt # accelerazione: `fis` + scarto di `acc` da `vel`
 	var ex: float = wx - p.vx
 	var ey: float = wy - p.vy
 	var e: float = C.hyp(ex, ey)
@@ -240,7 +240,7 @@ func _moveRunning(p: R.Player, dt: float, b: R.Ball) -> void:
 		else:
 			lx = p.fx
 			ly = p.fy
-	var k: float = minf(1.0, dt * ((8.0 + p.st.dri * 0.05) if b.owner == p else 12.0))
+	var k: float = minf(1.0, dt * ((8.0 + p.st.sv("agi") * 0.05) if b.owner == p else 12.0))
 	p.fx += (lx - p.fx) * k
 	p.fy += (ly - p.fy) * k
 	var n: float = C.orf(C.hyp(p.fx, p.fy), 1.0)
@@ -251,7 +251,7 @@ func _moveRunning(p: R.Player, dt: float, b: R.Ball) -> void:
 	if v < RECOVER_V:
 		p.energy = minf(1.0, p.energy + RECOVER_RATE * dt)
 	else:
-		p.energy = maxf(0.2, p.energy - (v / 8.0) * (v / 8.0) * dt * 0.0022 * (1.3 - p.st.fis * 0.006) * (SPRINT_DRAIN if p.sprint else 1.0))
+		p.energy = maxf(0.2, p.energy - (v / 8.0) * (v / 8.0) * dt * 0.0022 * (1.3 - p.st.sv("res") * 0.006) * (SPRINT_DRAIN if p.sprint else 1.0))
 
 
 # Pallone alto che arriva a p: 'header' / 'volley' = colpo verso la porta (attaccante su un lancio o cross
@@ -321,7 +321,7 @@ func airHit(p: R.Player, kind: String) -> void:
 	var head: bool = kind == "header"
 	var g := gk(1 - tm)
 	var gy: float = dir * HL
-	var skill: float = p.st.tes if head else p.st.tir
+	var skill: float = p.st.tes if head else p.st.sv("vol")
 	var side: float = (-1.0 if g.x > b.x else 1.0) * (1.0 if rnd() < 0.75 else -1.0)
 	var tx: float = side * (GW / 2.0 - 0.7)
 	var th0: float = (0.2 + rnd() * 1.2) if head else (0.3 + rnd() * 1.4)
@@ -358,6 +358,11 @@ func airHit(p: R.Player, kind: String) -> void:
 
 # Contrasto aereo: `p` è il più vicino al pallone alto; se un avversario può arrivarci anche lui, vince chi ha più
 # colpi di testa (e chi è più vicino), con un po' di caso. Ritorna chi prende il pallone.
+## forza nei salti contesi: colpo di testa `tes` + scarto dell'elevazione `ele` da `fis` (senza sotto-statistiche: `tes`)
+static func aereo(p: R.Player) -> float:
+	return p.st.tes + p.st.scarto("ele")
+
+
 func aerialDuel(p: R.Player) -> R.Player:
 	var b := ball
 	var dp: float = C.hyp(p.x - b.x, p.y - b.y)
@@ -372,7 +377,7 @@ func aerialDuel(p: R.Player) -> R.Player:
 			o = q
 	if o == null:
 		return p
-	var win: float = C.clamp_(0.5 + AIR_TES_K * (p.st.tes - o.st.tes) / 100.0 + (dO - dp) * AIR_DIST_K + headDuelEdge(p, o), AIR_WIN_MIN, AIR_WIN_MAX)
+	var win: float = C.clamp_(0.5 + AIR_TES_K * (aereo(p) - aereo(o)) / 100.0 + (dO - dp) * AIR_DIST_K + headDuelEdge(p, o), AIR_WIN_MIN, AIR_WIN_MAX)
 	var w: R.Player = p
 	var l: R.Player = o
 	if not (rnd() < win):
@@ -443,7 +448,7 @@ func diveStep(p: R.Player, dt: float) -> void:
 	var hm: bool = human[p.team] and not autoGk[p.team]
 	var b := ball
 	var d := p.dive
-	var vs: float = minf((GK_HUMAN_SPEED + p.st.por * 0.03) if hm else (GK_AI_SPEED + p.st.por * 0.025), (30.0 if hm else 22.0) * (p.t + dt))
+	var vs: float = minf((GK_HUMAN_SPEED + p.st.sv("tuf") * 0.03) if hm else (GK_AI_SPEED + p.st.sv("tuf") * 0.025), (30.0 if hm else 22.0) * (p.t + dt))
 	d.hx += C.clamp_(d.tx - d.hx, -vs * dt, vs * dt)
 	d.hh += C.clamp_(d.th - d.hh, -vs * 0.7 * dt, vs * 0.7 * dt)
 	var bt: float = (d.hx - d.dirx * 0.75) if absf(d.hx - d.x0) > 0.75 else d.x0
@@ -452,7 +457,7 @@ func diveStep(p: R.Player, dt: float) -> void:
 	if phase == "play" and b.owner == null and not (b.noP == p and b.noT > 0.0) and not dblBan(p) and absf(b.y - p.y) < 0.9 + absf(b.vy) * dt:
 		var prog: float = C.clamp_(p.t / 0.4, 0.0, 1.0)
 		var dd: float = C.segInfo(b.x, b.h, d.x0, 1.0 - prog * 0.3, d.hx, d.hh)[0]
-		if dd < 0.72 + p.st.por * 0.002:
+		if dd < 0.72 + p.st.sv("tuf") * 0.002:
 			save(p, absf(b.x - d.x0) < 1.3)
 	if p.t > 0.8 and p.state == "dive":
 		p.state = "down"
@@ -492,7 +497,7 @@ func save(p: R.Player, central: bool) -> void:
 # Probabilità che il portiere blocchi il pallone invece di respingerlo: alta sui tiri lenti, centrali e bassi
 # (colpi di testa deboli compresi), bassa su quelli forti, angolati (tuffo lontano dal corpo) o alti; sale con "por".
 func catchChance(p: R.Player, sp: float, central: bool, h: float) -> float:
-	var c: float = CATCH_BASE + (p.st.por - 60.0) * CATCH_POR - maxf(0.0, sp - CATCH_V0) * CATCH_SPD
+	var c: float = CATCH_BASE + (p.st.sv("pre") - 60.0) * CATCH_POR - maxf(0.0, sp - CATCH_V0) * CATCH_SPD
 	if not central:
 		c -= CATCH_WIDE
 	if h > CATCH_HIGH_H:
@@ -700,7 +705,7 @@ func contacts(dt: float) -> void:
 		give(p)
 		return
 	var fresh: bool = b.kick != null and b.kick.age < 0.22 and sp > 6.0
-	if not isGk2 and not mate and ((b.shot != null and sp > 14.0) or sp > 22.0 + p.st.dri * 0.06 or fresh):
+	if not isGk2 and not mate and ((b.shot != null and sp > 14.0) or sp > 22.0 + p.st.sv("ctl") * 0.06 or fresh):
 		var hard: bool = b.shot != null
 		if hard and not mate and absf(b.y) > HL - BOX_D - 4.0 and rnd() < BLOCK_OUT:
 			deflectBehind(p)
@@ -757,7 +762,7 @@ func gkContest(p: R.Player) -> R.Player:
 		return null
 	if C.hyp(g.x - b.x, g.y - b.y) >= GK_BOX_REACH or b.h >= gkReach(g):
 		return null
-	var win: float = C.clamp_(GK_CLAIM_WIN + (g.st.por - 60.0) * GK_CLAIM_POR + gkClaimBonus(g), GK_CLAIM_MIN, GK_CLAIM_MAX)
+	var win: float = C.clamp_(GK_CLAIM_WIN + (g.st.sv("pia") - 60.0) * GK_CLAIM_POR + gkClaimBonus(g), GK_CLAIM_MIN, GK_CLAIM_MAX)
 	if rnd() < win:
 		ev("aerial", {"p": g, "o": p})
 		return g
@@ -800,9 +805,11 @@ func _contactsOwned(dt: float, b: R.Ball) -> void:
 		var hc: bool = human[c.team]
 		var ho: bool = human[o.team]
 		var dirH: bool = ho and directed(o)
-		if d < 0.85 + o.st.dif * 0.0025 + (HUM_TACKLE_R if dirH else 0.0):
+		# contrasto: `ctr` (+ scarto di `agg` da `fis`: chi è aggressivo entra un po' più da lontano)
+		if d < 0.85 + (o.st.sv("ctr") + o.st.scarto("agg")) * 0.0025 + (HUM_TACKLE_R if dirH else 0.0):
 			o.contact += dt
-			var need: float = 0.10 + 0.22 * c.st.dri / (c.st.dri + o.st.dif)
+			var tenuta: float = c.st.sv("equ") + c.st.scarto("frz") # equilibrio (+ forza) del portatore
+			var need: float = 0.10 + 0.22 * tenuta / (tenuta + o.st.sv("ctr"))
 			if hc and not ho:
 				need *= 2.5 - 1.3 * float(teams[o.team].skill)
 			# chi va sul portatore da solo (CPU) ruba più piano di chi muove la persona (controllato, linea, linea appena finita)

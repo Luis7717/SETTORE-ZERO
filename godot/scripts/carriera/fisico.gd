@@ -15,6 +15,7 @@ extends RefCounted
 const JS := preload("res://scripts/carriera/js.gd")
 const Asp := preload("res://scripts/carriera/aspetto.gd")
 const C := preload("res://sim/core.gd")
+const Sotto := preload("res://sim/sottostat.gd")
 
 const ALTEZZE := ["Basso", "Medio", "Alto"]
 const CORPORATURE := ["Snello", "Normale", "Robusto"]
@@ -92,6 +93,7 @@ static func applica(p: Variant) -> Variant:
 	q["altezza"] = f.altezza
 	q["corporatura"] = f.corporatura
 	var mods := modificatori(f)
+	var sub: Dictionary = (p.sub as Dictionary).duplicate() if p.get("sub") is Dictionary else {}
 	for k: String in mods:
 		var d := int(mods[k])
 		var base: float
@@ -103,6 +105,13 @@ static func applica(p: Variant) -> Variant:
 			continue
 		if d != 0:
 			q[k] = clampi(int(round(base)) + d, STAT_MIN, STAT_MAX)
+			# le sotto-statistiche di quella grande si spostano dello stesso passo (la media resta coerente)
+			var passo := int(q[k]) - int(round(base))
+			for sk: String in Sotto.GRUPPI.get(k, []):
+				if sub.has(sk):
+					sub[sk] = clampi(int(sub[sk]) + passo, STAT_MIN, STAT_MAX)
+	if p.get("sub") is Dictionary:
+		q["sub"] = sub
 	return q
 
 

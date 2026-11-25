@@ -24,6 +24,12 @@ extends "parata.gd"
 
 # Calci da fermo (Luis 2026-11-21): chi batte non può toccare il pallone una seconda volta finché non l'ha toccato un altro.
 const GK_GOALKICK_Y := 1.2 # rinvio dal fondo avversario con "rifiniture": l'altro portiere sta a tanto dalla sua linea (m, come gkAI a gioco fermo)
+# statistiche dettagliate (sottostat.gd) nei calci (subCalcio)
+const SUB_TIRO_VICINO := 18.0 # tiro fino a tanto dal bersaglio = Finalizzazione `fin`, oltre = Tiri da lontano `lon` (m)
+const SUB_PASS_CORTO := 20.0  # passaggio fino a tanto = Passaggio corto `pco`, oltre = Passaggio lungo `plu` (m)
+const GIRATA_VOL_K := 0.02    # tiro girato: ogni punto di `vol` sopra `tir` toglie il 2% del malus (e sotto lo aggiunge)
+const GIRATA_VOL_MIN := 0.5   # ... al massimo metà malus in meno ...
+const GIRATA_VOL_MAX := 1.5   # ... o metà in più
 const DBL_FREE := 6.0 # sicurezza: dopo tanto tempo di pallone libero senza che nessun altro lo tocchi, il battitore può riprenderlo (s)
 # Meteo: campo facoltativo "meteo" delle opzioni della partita ("sereno" | "nuvoloso" | "pioggia" | "neve").
 # Senza il campo (o sereno, nuvoloso, valori sconosciuti) il motore resta identico a prima. Come src/sim/match.js.
@@ -324,8 +330,8 @@ func setRestart(type: String, tm: int, x: float, y: float, taker: R.Player = nul
 		taker = null
 		var bp: float = -1.0
 		for p: R.Player in outf:
-			if p.pos != "D" and p.st.pas > bp:
-				bp = p.st.pas
+			if p.pos != "D" and p.st.sv("cro") > bp:
+				bp = p.st.sv("cro")
 				taker = p
 		if sceneNoCut: # scena (riprese.gd): batte uno bravo e vicino, che alla bandierina ci va di corsa
 			taker = sceneCornerTaker(outf, x, y)
@@ -349,8 +355,8 @@ func setRestart(type: String, tm: int, x: float, y: float, taker: R.Player = nul
 		taker = null
 		var bt: float = -1.0
 		for p: R.Player in mine:
-			if p.pos != "P" and p.st.tir > bt:
-				bt = p.st.tir
+			if p.pos != "P" and p.st.sv("rig") > bt:
+				bt = p.st.sv("rig")
 				taker = p
 		var k: int = 0
 		for p: R.Player in players:
@@ -476,15 +482,20 @@ func launch(p: R.Player, spec: Dictionary, noise: bool) -> Dictionary:
 	var sig: float
 	# tiro da girato (2026-11-25, base.gd GIRATA_*): più debole e meno preciso; i calci da fermo no (il battitore si prepara)
 	var gir: float = girataK(p.fx, p.fy, dx, dy) if (rifiniture and type == "shot" and phase == "play") else 0.0
-	var vShot: float = (SHOT_V0 + p.st.tir * 0.14) * (1.0 - GIRATA_V * gir)
+	# statistiche dettagliate (sottostat.gd): quale sotto-statistica conta per questo calcio (senza `sub` = la grande)
+	var abil: float = abilCalcio(p, subCalcio(p, spec, type, sx, D, curved, gir), type)
+	if gir > 0.0:
+		# chi è bravo al volo e in girata (scarto di `vol` da `tir`) perde un po' meno
+		gir *= C.clamp_(1.0 - p.st.scarto("vol") * GIRATA_VOL_K, GIRATA_VOL_MIN, GIRATA_VOL_MAX)
+	var vShot: float = (SHOT_V0 + p.st.sv("pot") * 0.14) * (1.0 - GIRATA_V * gir)
 	if type == "shot":
-		sig = (0.5 + (100.0 - p.st.tir) * 0.04) * (1.5 if press < 2.0 else 1.0) * (1.0 + GIRATA_SIG * gir)
+		sig = (0.5 + (100.0 - abil) * 0.04) * (1.5 if press < 2.0 else 1.0) * (1.0 + GIRATA_SIG * gir)
 	else:
-		sig = (0.3 + (100.0 - p.st.pas) * 0.025) * (1.4 if type == "loft" else 1.0)
+		sig = (0.3 + (100.0 - abil) * 0.025) * (1.4 if type == "loft" else 1.0)
 	if spec.get("human", false):
 		sig *= 0.75
 	if spec.get("first", false):
-		sig *= FIRST_SIG + (100.0 - (p.st.tir if type == "shot" else p.st.pas)) * FIRST_SIG_STAT
+		sig *= FIRST_SIG + (100.0 - abil) * FIRST_SIG_STAT
 	var a: float = (gauss() if noise else 0.0) * sig * PI / 180.0
 	var ca: float = F.cos_(a)
 	var sa: float = F.sin_(a)
@@ -504,11 +515,11 @@ func launch(p: R.Player, spec: Dictionary, noise: bool) -> Dictionary:
 		var arrive: float = GROUND_ARRIVE
 		if tratto and mateNear(tm, p, spec.tx, spec.ty, MATE_AT_END) == null:
 			arrive = GROUND_ARRIVE_SPACE
-		v0 = minf(17.0 + p.st.pas * 0.13, sqrt(arrive * arrive + 2.0 * rollKick * D))
+		v0 = minf(17.0 + abil * 0.13, sqrt(arrive * arrive + 2.0 * rollKick * D))
 		var disc: float = v0 * v0 - 2.0 * rl * D
 		Tt = (v0 - sqrt(disc)) / rl if disc > 0.0 else v0 / rl
 	elif type == "loft":
-		var vm: float = 15.0 + p.st.pas * 0.11
+		var vm: float = 15.0 + abil * 0.11
 		Tt = C.clamp_(D / 14.0, 0.75, 2.6)
 		if curved:
 			Tt = C.clamp_(D / 14.0, CURVE_T_MIN, 2.6) + CURVE_T_EXTRA * k
@@ -546,6 +557,40 @@ func launch(p: R.Player, spec: Dictionary, noise: bool) -> Dictionary:
 	var ac: float = C.clamp_(-8.0 * c / (Tt * Tt), -14.0, 14.0)
 	var lv: float = -ac * Tt / 2.0
 	return {"type": type, "sx": sx, "sy": sy, "v0": v0, "vx": ux * v0 + nx * lv, "vy": uy * v0 + ny * lv, "vh": vh, "cax": nx * ac, "cay": ny * ac, "ct": Tt if ac != 0.0 else 0.0, "curved": curved}
+
+
+## bravura di p nel calcio (launch) con la sotto-statistica k: senza `sub` è `tir` nei tiri e `pas` nei passaggi,
+## come prima; il tiro a giro o su punizione (`eff`, `pun` sono di Passaggi) = `tir` + scarto di k dalla sua grande
+static func abilCalcio(p: R.Player, k: String, type: String) -> float:
+	var g: String = "tir" if type == "shot" else "pas"
+	if R.GRANDE_DI[k] == g:
+		return p.st.sv(k)
+	return float(p.st.get(g)) + p.st.scarto(k)
+
+
+## sotto-statistica che conta per il calcio di p (launch): tiri = rigore `rig`, punizione `pun`, di prima o girato `vol`,
+## a giro `eff`, poi `fin` fin entro SUB_TIRO_VICINO e `lon` oltre; passaggi = punizione `pun`, cross `cro` (angolo o
+## pallone alto dalla fascia verso l'area), a giro `eff`, poi `pco` fino a SUB_PASS_CORTO e `plu` oltre
+func subCalcio(p: R.Player, spec: Dictionary, type: String, sx: float, D: float, curved: bool, gir: float) -> String:
+	var rs: String = restart.type if (phase == "restart" and restart != null) else ""
+	if type == "shot":
+		if rs == "penalty":
+			return "rig"
+		if rs == "freekick":
+			return "pun"
+		if spec.get("first", false) or gir > 0.0:
+			return "vol"
+		if curved:
+			return "eff"
+		return "fin" if D <= SUB_TIRO_VICINO else "lon"
+	if rs == "freekick":
+		return "pun"
+	var dir: float = -1.0 if p.team else 1.0
+	if rs == "corner" or (type == "loft" and absf(sx) >= HEAD_CROSS_X and absf(float(spec.tx)) < BOX_W / 2.0 and float(spec.ty) * dir > HL - BOX_D - 6.0):
+		return "cro"
+	if curved:
+		return "eff"
+	return "pco" if D <= SUB_PASS_CORTO else "plu"
 
 
 ## un avversario sta sulla curva rasoterra da (x1, y1) a (x2, y2) con curvatura c (m, col segno del lato, come launch:
@@ -713,7 +758,7 @@ func detectShot() -> void:
 				if paraCtl:
 					paraMark(sh) # bersaglio sulla porta (parata.gd)
 				b.shot = sh
-				g.reactT = maxf(0.06, GK_REACT - g.st.por * 0.0026) * (1.25 - 0.35 * float(teams[defT].skill))
+				g.reactT = maxf(0.06, GK_REACT - g.st.sv("rif") * 0.0026) * (1.25 - 0.35 * float(teams[defT].skill))
 				g.decided = false
 			return
 		if absf(s.x) > HW + 2.0:

@@ -5,6 +5,7 @@
 #   $G --headless --path godot -s res://tools/controllo_gameplay.gd -- --partite=20 --forza=60 --mia=60 --tempo=150
 #   opzioni: --seme=1 (primo seme) · --stile=<attacco della squadra umana> · --stilecpu=att/dif|caso|base
 #            --meteo=caso|sereno|pioggia|neve · --righe (una riga per partita) · --senza-falli (opzione "falli" spenta)
+#            --sotto (giocatori con le statistiche dettagliate, sottostat.gd)
 #            --senza-contatti (opzione "contatti" spenta: giocatori a 0,7 m, niente respiro dopo il recupero)
 # Stampa una tabella per gruppi: risultati, tiri, meccaniche della persona, riprese, fluidità, possibili bug.
 extends SceneTree
@@ -14,6 +15,8 @@ const C := preload("res://sim/core.gd")
 const R := preload("res://sim/records.gd")
 const SimMatchScript := preload("res://sim/match.gd")
 const Stili := preload("res://sim/stili.gd")
+const Sotto := preload("res://sim/sottostat.gd")
+const JS := preload("res://scripts/carriera/js.gd")
 const Dito := preload("res://tools/dito_motore.gd")
 const Regia := preload("res://scripts/partita/dribbling_regia.gd")
 
@@ -79,6 +82,10 @@ func _partita(sd: int, opz: Dictionary) -> void:
 	var tempo := float(opz.get("tempo", "150"))
 	var ta := H.mkTeam("A", float(opz.get("mia", "60")), sd * 7 + 1)
 	var tb := H.mkTeam("B", float(opz.get("forza", "60")), sd * 13 + 5, String(opz.get("formazione", "4-4-2")))
+	if opz.has("sotto"): # statistiche dettagliate (sim/sottostat.gd) sparse intorno alle grandi, col seme della partita
+		for t: Dictionary in [ta, tb]:
+			for i in (t.players as Array).size():
+				Sotto.crea(t.players[i], JS.rng32(sd * 1009 + (0 if t == ta else 500) + i))
 	if opz.has("stile"):
 		ta["stileAtt"] = opz.stile
 	var sc: String = opz.get("stilecpu", "caso")

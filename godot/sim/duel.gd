@@ -406,7 +406,7 @@ func dribBookStep(d: R.Duel, dt: float) -> void:
 
 
 func dribbleChance(p: R.Player, o: R.Player) -> float:
-	return C.clamp_(DRIB_BASE + DRIB_SKILL * (p.st.dri - o.st.dif) / 100.0, DRIB_MIN, DRIB_MAX)
+	return C.clamp_(DRIB_BASE + DRIB_SKILL * (p.st.sv("drb") - o.st.sv("ctr")) / 100.0, DRIB_MIN, DRIB_MAX)
 
 
 # Tentativo di dribbling del portatore p contro o (stessa regola per umano e IA). Ritorna true se riesce.
@@ -671,7 +671,7 @@ func aiDribble(p: R.Player) -> bool:
 	var o := frontOpp(p, AI_DRIB_R)
 	if o == null:
 		return false
-	if rnd() >= C.clamp_(AI_DRIB_TRY + (p.st.dri - o.st.dif) / 100.0, 0.05, 0.6):
+	if rnd() >= C.clamp_(AI_DRIB_TRY + (p.st.sv("drb") - o.st.sv("ctr")) / 100.0, 0.05, 0.6):
 		return false
 	dribble(p, o)
 	return true
@@ -684,4 +684,8 @@ func wearDown(p: R.Player, key: String, step_: float, mn: float) -> void:
 	if nw >= old:
 		return
 	p.st.set(key, float(p.st.get(key)) * (nw / old))
+	# le sotto-statistiche di quella grande calano nello stesso modo
+	for sk: String in p.st.sub:
+		if R.GRANDE_DI.get(sk, "") == key:
+			p.st.sub[sk] = float(p.st.sub[sk]) * (nw / old)
 	p.wear[key] = nw

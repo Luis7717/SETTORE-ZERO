@@ -22,6 +22,7 @@
 extends "duel.gd"
 
 const SEP_R := 0.9            # due giocatori più vicini di così (centri, m) si spingono via (figure ×1,25)
+const FRZ_SPINTA := 0.02     # Forza (`frz`, sotto-statistica): ogni punto di differenza sposta il 2% della spinta sull'altro
 const SEP_RATE := 18.0        # ... togliendo a ogni passo min(1, dt × SEP_RATE) della sovrapposizione (metà per uno)
 const RESPIRO_PROTECT := 0.8  # recupero palla della persona: per tanto tempo di partita nessuno gli ruba il pallone (s)
 const RESPIRO_R := 2.5        # ... gli avversari entro tanto da lui (m) ...
@@ -62,6 +63,11 @@ func softSeparate(dt: float) -> void:
 			# chi ha il pallone non viene spostato (lo spostamento lo fa tutto l'altro): niente portatore spinto fuori
 			var pa: float = 0.0 if a == own else (2.0 if c == own else 1.0)
 			var pc: float = 2.0 - pa if (a == own or c == own) else 1.0
+			if a != own and c != own:
+				# il più forte (scarto di `frz` da `fis`) sposta di più l'altro; senza sotto-statistiche metà per uno
+				var fz: float = C.clamp_((c.st.scarto("frz") - a.st.scarto("frz")) * FRZ_SPINTA, -0.5, 0.5)
+				pa = 1.0 + fz
+				pc = 1.0 - fz
 			var push: float = (SEP_R - d) * k
 			a.x -= ux * push * pa
 			a.y -= uy * push * pa

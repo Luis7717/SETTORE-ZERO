@@ -140,7 +140,7 @@ func gauss() -> float:
 
 # velocità massima: cresce con `vel` e cala con la stanchezza (p.energy 1 → 0,2 durante la partita, più piano con più `fis`)
 func vmax(p: R.Player) -> float:
-	return (5.0 + p.st.vel * 0.036) * (SPEED_TIRED + (1.0 - SPEED_TIRED) * p.energy)
+	return (5.0 + p.st.sv("vmax") * 0.036) * (SPEED_TIRED + (1.0 - SPEED_TIRED) * p.energy)
 
 
 # evento della partita: {type, ...dati}
