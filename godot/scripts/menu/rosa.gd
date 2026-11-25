@@ -23,6 +23,7 @@ const C := preload("res://sim/core.gd")
 const Fisico := preload("res://scripts/carriera/fisico.gd")
 const Stili := preload("res://sim/stili.gd")
 const Scelte := preload("res://scripts/menu/rosa_scelte.gd")
+const Mercato := preload("res://scripts/carriera/mercato_squadre.gd")
 const ALTEZZA_SOPRA := 150.0       # .sqtop
 const MENU := ["formazione", "attacco", "difesa"]
 const RIGA_CAMPO := Color(1, 1, 1, 0.11)
@@ -31,7 +32,6 @@ const TASTO_TORNA := 52.0
 var sel: Variant = null
 var tgt: Variant = null
 var just: Variant = null
-var _vendi_ok: Variant = null      # id del giocatore con "Conferma vendita" già mostrato
 var _menu := ""                    # menu a comparsa aperto: "" o uno di MENU
 var _velo: Control = null
 var _campo: Control
@@ -320,7 +320,6 @@ func _tocca(id: Variant) -> void:
 	sel = nuovo.sel
 	tgt = nuovo.tgt
 	just = nuovo.just
-	_vendi_ok = null
 	_aggiorna()
 
 
@@ -360,22 +359,12 @@ func _formazione(f: String) -> void:
 	_chiudi()
 
 
-func _vendi(id: Variant, b: Button) -> void:
-	if _vendi_ok != id:
-		_vendi_ok = id
-		b.text = "Conferma vendita"
-		b.theme_type_variation = "BtnAvviso"
-		return
-	var err := D.errore(carriera().sell(id))
-	sel = null
-	tgt = null
-	just = null
-	_vendi_ok = null
-	_scorri_panchina = 0
-	if err != "":
-		toast(err)
-	else:
-		ridisegna()
+## "Cerca acquirenti" (mercato con le squadre): il giocatore va in lista e alla giornata dopo arriva un'offerta
+## (Mercato → Offerte); toccato di nuovo, esce dalla lista
+func _cerca_acquirenti(id: int) -> void:
+	var s := stato()
+	var ora := Mercato.cerca_acquirenti(carriera(), id, not Mercato.in_vendita(s, id))
+	toast("In vendita: dopo la prossima partita arriva un'offerta" if ora else "Tolto dalla vendita")
 
 
 # ---------------------------------------------------------------- pannelli in alto
@@ -505,7 +494,7 @@ func _pannello_giocatore(p: Dictionary, F: Array) -> Control:
 		v.add_child(U.testo(nota, 12.5, T.BAD if st != "" else T.DIM, T.PESO_FORTE, HORIZONTAL_ALIGNMENT_CENTER))
 		return pann
 	# solo il campione creato all'inizio si può modificare (Luis 2026-11-24) e lui non si vende mai (2026-11-25):
-	# il campione ha solo Aspetto, gli altri solo Vendi
+	# il campione ha solo Aspetto, gli altri solo Cerca acquirenti (mercato con le squadre, 2026-11-25)
 	var mio: bool = p.get("champ", false)
 	var bt := U.griglia(1, 8, 8)
 	if mio:
@@ -514,12 +503,9 @@ func _pannello_giocatore(p: Dictionary, F: Array) -> Control:
 		bt.add_child(asp)
 		v.add_child(bt)
 		return pann
-	var vendi := U.bottone("Vendi per %s" % D.fmt_money(c.sellPrice(p)), "BtnFantasma", Callable(), 44)
+	var gia := Mercato.in_vendita(stato(), p.id)
+	var vendi := U.bottone("In vendita · togli dalla lista" if gia else "Cerca acquirenti", "BtnFantasma", _cerca_acquirenti.bind(int(p.id)), 44)
 	vendi.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	vendi.pressed.connect(func() -> void:
-		if U.al_tocco.is_valid():
-			U.al_tocco.call()
-		_vendi(p.id, vendi))
 	bt.add_child(vendi)
 	v.add_child(bt)
 	return pann

@@ -33,6 +33,7 @@ const Dirigenza := preload("res://scripts/carriera/dirigenza.gd")
 const Esultanze := preload("res://scripts/partita/esultanze.gd")
 const Fisico := preload("res://scripts/carriera/fisico.gd")
 const Stili := preload("res://sim/stili.gd")
+const Mercato := preload("res://scripts/carriera/mercato_squadre.gd")
 
 const FORMATIONS := C.FORMATIONS
 const DIV_NAMES := ["Prima Divisione", "Seconda Divisione", "Terza Divisione"]
@@ -64,7 +65,7 @@ const STAT_KEYS := ["vel", "fis", "dri", "tir", "dif", "pas", "por"]
 ## chiavi dello stato che ha solo la versione Godot (fase B): semeB = seme dei numeri casuali delle novità,
 ## forma/infortuni/progressi = per id del giocatore (testo), obiettivo = {stagione, div, tipo, posto}, rivale = id
 const CHIAVI_GODOT := ["semeB", "forma", "infortuni", "progressi", "obiettivo", "rivale", "stileAtt", "stileDif",
-	"voti", "progVoti", "metaStagione"]
+	"voti", "progVoti", "metaStagione", "ceduti", "trattative", "offerte", "inVendita"]
 
 ## stato della carriera (null = nessuna carriera): stesse chiavi di `career.s` nel web
 var s: Variant = null
@@ -676,6 +677,19 @@ func sellPrice(p: Dictionary) -> int:
 
 ## vende un giocatore della rosa: "" se fatto, altrimenti il motivo
 func sell(id: int) -> String:
+	var err := motivoNonVendibile(id)
+	if err != "":
+		return err
+	var p: Dictionary = player(id)
+	s.money += sellPrice(p)
+	s.squad = s.squad.filter(func(q: Dictionary) -> bool: return q.id != id)
+	fixLineup()
+	save()
+	return ""
+
+
+## perché questo giocatore non si può vendere ("" = si può): stesse regole per sell e per le offerte ricevute
+func motivoNonVendibile(id: int) -> String:
 	var p: Variant = player(id)
 	if p == null:
 		return "Giocatore non trovato"
@@ -690,10 +704,6 @@ func sell(id: int) -> String:
 				portieri += 1
 		if portieri <= 1:
 			return "Serve almeno un portiere"
-	s.money += sellPrice(p)
-	s.squad = s.squad.filter(func(q: Dictionary) -> bool: return q.id != id)
-	fixLineup()
-	save()
 	return ""
 
 
@@ -989,6 +999,7 @@ func novita() -> void:
 	for k: Variant in s.progVoti.keys():
 		if not ids.has(k) or not (s.progVoti[k] is float or s.progVoti[k] is int):
 			s.progVoti.erase(k)
+	Mercato.pulisci(s) # mercato con le squadre: ceduti, trattative, offerte, inVendita
 	var d := div()
 	if d < 0:
 		return
@@ -1035,9 +1046,10 @@ func setFisico(id: Variant, altezza: Variant, corporatura: Variant) -> bool:
 	return true
 
 
-## squadra del computer per la partita (al posto di aiMatchTeam): statistiche col fisico (Fisico.applicaSquadra)
+## squadra del computer per la partita (al posto di aiMatchTeam): chi le ho comprato è sostituito da un rimpiazzo
+## (mercato_squadre.gd), statistiche col fisico (Fisico.applicaSquadra)
 func avversarioPartita(t: Dictionary) -> Dictionary:
-	var sq: Dictionary = Fisico.applicaSquadra(aiMatchTeam(t, formazioneDi(t)))
+	var sq: Dictionary = Fisico.applicaSquadra(Mercato.rimpiazza(self, t, aiMatchTeam(t, formazioneDi(t))))
 	var st := stileDi(t)
 	sq["stileAtt"] = st.att
 	sq["stileDif"] = st.dif
@@ -1245,6 +1257,7 @@ func obiettivo() -> Dictionary:
 ## dopo finishMatch (partita di campionato): premio del derby, crescita del campione, forma e infortuni,
 ## e a fine stagione l'obiettivo della dirigenza (premio o penalità) e quello nuovo. Aggiunge a res:
 ## derby (soldi), crescita {nome, righe}, infortuni [{id, name, giornate}], cambi [{fuori, dentro}],
+## offerte [{id, squadra, soldi, scade}] (nuove offerte per i miei giocatori, mercato_squadre.gd),
 ## obiettivo {tipo, testo, riuscito, soldi, messaggio} (anche in res.season). esito = quello della partita
 ## ({gol_a, gol_b, me, derby, conteggi}). Ritorna res.
 func dopoPartita(res: Dictionary, esito: Dictionary) -> Dictionary:
@@ -1277,9 +1290,11 @@ func dopoPartita(res: Dictionary, esito: Dictionary) -> Dictionary:
 			s.money += int(val.soldi)
 			res["obiettivo"] = val
 			stagione["obiettivo"] = val
+		Mercato.nuova_stagione(s) # le squadre si riprendono i giocatori comprati
 		novita() # obiettivo e rivale della stagione nuova
 	else:
 		res["infortuni"] = Forma.giornata(s.squad, s.lineup.duplicate(), s.forma, s.infortuni, _rng_novita("infortuni"))
 		res["cambi"] = schieraSani()
+	res["offerte"] = Mercato.ricevi(self, _rng_novita("offerte")) # offerte delle squadre per i miei giocatori
 	save()
 	return res

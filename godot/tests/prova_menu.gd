@@ -29,6 +29,7 @@ const TUTTE := [
 	["10_rosa_confronto", "rosa", {"sel": "titolare:9", "tgt": "panchina:0"}, ""],
 	["11_mercato", "mercato", null, ""],
 	["12_mercato_aperto", "mercato", {"aperto": 0, "filtro": "A"}, ""],
+	["12_mercato_offerte", "mercato", {"scheda": "offerte"}, ""],
 	["13_classifica", "classifica", null, ""],
 	["14_classifica_prima", "classifica", {"div": 0}, ""],
 	["15_calendario", "calendario", null, ""],

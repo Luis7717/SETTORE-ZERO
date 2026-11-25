@@ -13,6 +13,7 @@ const SCHERMATE := ["principale", "nuova_carriera", "hub", "rosa", "mercato", "c
 	"uno_contro_uno", "impostazioni", "come_si_gioca", "editor", "dopo_partita", "fine_stagione", "statistiche"]
 const ProvaMenu := preload("res://tests/prova_menu.gd")
 const Stili := preload("res://sim/stili.gd")
+const MercatoSquadre := preload("res://scripts/carriera/mercato_squadre.gd")
 
 var _andate: Array = []
 var _app_carriera: Variant = null
@@ -239,24 +240,52 @@ static func _bottoni(n: Node) -> Array:
 	return out
 
 
-func test_mercato_compra_al_secondo_tocco() -> bool:
+func test_mercato_offerta_alla_squadra() -> bool:
 	var c := _carriera()
 	_inizia(c)
+	c.s.money = 100000
 	var n := _apri("mercato", {"aperto": 0, "filtro": "T"})
-	var id: Variant = n.aperto
+	var k: Variant = n.aperto
+	check(k is String, "scheda aperta sul primo giocatore")
+	var parti: PackedStringArray = str(k).split(":")
+	var g: Variant = MercatoSquadre.trova(c, parti[0], int(parti[1]))
+	check(g != null, "giocatore di una squadra della CPU")
 	var soldi: int = c.s.money
-	var p: Dictionary = c.s.market.filter(func(q: Dictionary) -> bool: return q.id == id)[0]
-	var prezzo := int(p.price)   # buy toglie il campo price
-	var b := n._bottone_compra(p, c.s) as Button
-	check(b != null, "c'è il pulsante Compra")
-	b.pressed.emit()
-	eq(b.text, "Conferma", "primo tocco: chiede conferma")
-	eq(c.s.money, soldi, "primo tocco: niente spesa")
-	b.pressed.emit()
-	eq(c.s.money, soldi - prezzo, "secondo tocco: pagato")
-	check(c.player(id) != null, "il giocatore è in rosa")
-	b.free()
+	var n0: int = c.s.squad.size()
+	n._passo(-0.05)
+	n._passo(-0.05)
+	near(n.parte, 0.9, 1e-6, "due passi in giù = 90%")
+	n._offri(parti[0], int(parti[1]), MercatoSquadre.importo(g.prezzo, n.parte), str(g.p.name))
+	eq(c.s.money, soldi, "al 90% controfferta: niente spesa")
+	eq(MercatoSquadre.trattativa(c.s, parti[0], int(parti[1])).esito, "contro", "controfferta registrata")
+	eq(MercatoSquadre.accetta_contro(c, parti[0], int(parti[1])), "", "controfferta accettata")
+	eq(c.s.squad.size(), n0 + 1, "il giocatore è in rosa")
+	eq(c.s.money, soldi - int(g.prezzo), "pagato il prezzo chiesto")
 	_finisci(n)
+	# scheda delle offerte: Accetta vende
+	var p: Dictionary = c.s.squad[4]
+	c.s.offerte = [{"id": p.id, "squadra": parti[0], "soldi": 321, "scade": MercatoSquadre.giorno(c.s) + 2}]
+	_inizia(c) # _finisci ha tolto la carriera di prova
+	var n2 := _apri("mercato", {"scheda": "offerte"})
+	eq(n2.vista, "offerte", "si apre sulle offerte")
+	var soldi2: int = c.s.money
+	n2._accetta(0, str(p.name))
+	eq(c.s.money, soldi2 + 321, "offerta accettata: incassato")
+	check(c.player(p.id) == null, "venduto")
+	_finisci(n2)
+	# dopo la partita: riga dell'offerta e tasto per andare a vederle
+	_inizia(c)
+	var q: Dictionary = c.s.squad[5]
+	var dp := _apri("dopo_partita", {"esito": {"gol_a": 1, "gol_b": 0, "me": 0}, "res": null, "titolo": "Prova"})
+	var carta: Variant = dp._offerte_mercato({"offerte": [{"id": q.id, "squadra": parti[0], "soldi": 222, "scade": 99}]})
+	check(carta is Control, "c'è la carta delle offerte")
+	if carta is Control:
+		var testi := (carta as Control).find_children("*", "RichTextLabel", true, false).map(func(l: Node) -> String: return (l as RichTextLabel).get_parsed_text())
+		check(str(testi).contains("offre") and str(testi).contains(str(q.name)), "riga dell'offerta: %s" % str(testi))
+		check(_bottoni(carta).any(func(x: Button) -> bool: return x.text == "Vedi le offerte"), "tasto Vedi le offerte")
+		(carta as Control).free()
+	check(dp._offerte_mercato({}) == null, "senza offerte niente carta")
+	_finisci(dp)
 	return done()
 
 

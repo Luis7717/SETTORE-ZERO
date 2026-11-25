@@ -62,7 +62,7 @@ func costruisci() -> void:
 	g.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var tiles := [
 		["squad", "Rosa", "Formazione e titolari", "rosa"],
-		["market", "Mercato", "Compra e vendi", "mercato"],
+		["market", "Mercato", _sotto_mercato(s), "mercato"],
 		["table", "Classifica", "%d° su 10" % pos, "classifica"],
 		["calendar", "Calendario", "Risultati e prossime", "calendario"],
 		["friendly", "Amichevole", "Allenati senza rischi", "amichevole"],
@@ -78,6 +78,14 @@ func costruisci() -> void:
 	corpo.add_child(m)
 	# allenamento libero (tiri, punizioni, rigori a punti): casella larga sotto le otto
 	corpo.add_child(_casella("goal", "Allenamento libero", "Tiri, punizioni, rigori: batti il record", "allenamento_libero", cs[0]))
+
+
+## sottotitolo della casella Mercato: quante offerte aspettano risposta (mercato con le squadre)
+static func _sotto_mercato(s: Dictionary) -> String:
+	var n: int = s.get("offerte").size() if s.get("offerte") is Array else 0
+	if n > 0:
+		return "● %d %s per i tuoi" % [n, "offerta" if n == 1 else "offerte"]
+	return "Offerte alle squadre"
 
 
 func stemma_squadra(t: Dictionary, misura: Vector2) -> MenuStemma:
@@ -208,7 +216,7 @@ func _casella(icona: String, titolo_t: String, sotto: String, dove: String, k1: 
 	v.offset_bottom = -14
 	v.alignment = BoxContainer.ALIGNMENT_END
 	v.add_child(U.testo(titolo_t, 16, T.TXT, T.PESO_NERO))
-	var s := U.corto(sotto, 12.5, T.DIM, T.PESO_MEDIO)
+	var s := U.corto(sotto, 12.5, T.GOLD if sotto.begins_with("●") else T.DIM, T.PESO_MEDIO) # ● = offerte in attesa
 	v.add_child(s)
 	b.add_child(v)
 	b.resized.connect(func() -> void: ic.position = Vector2(b.size.x - 44.0, 10))
