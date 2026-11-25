@@ -26,6 +26,8 @@ const Stemma := preload("res://scripts/carriera/stemma_dati.gd")
 const Salv := preload("res://scripts/carriera/salvataggio.gd")
 const C := preload("res://sim/core.gd")
 const Crescita := preload("res://scripts/carriera/crescita.gd")
+const CrescitaVoti := preload("res://scripts/carriera/crescita_voti.gd")
+const Voti := preload("res://scripts/partita/voti.gd")
 const Forma := preload("res://scripts/carriera/forma.gd")
 const Dirigenza := preload("res://scripts/carriera/dirigenza.gd")
 const Esultanze := preload("res://scripts/partita/esultanze.gd")
@@ -61,15 +63,17 @@ const MARKET_SIZE := 20
 const STAT_KEYS := ["vel", "fis", "dri", "tir", "dif", "pas", "por"]
 ## chiavi dello stato che ha solo la versione Godot (fase B): semeB = seme dei numeri casuali delle novità,
 ## forma/infortuni/progressi = per id del giocatore (testo), obiettivo = {stagione, div, tipo, posto}, rivale = id
-const CHIAVI_GODOT := ["semeB", "forma", "infortuni", "progressi", "obiettivo", "rivale", "stileAtt", "stileDif"]
+const CHIAVI_GODOT := ["semeB", "forma", "infortuni", "progressi", "obiettivo", "rivale", "stileAtt", "stileDif",
+	"voti", "progVoti", "metaStagione"]
 
 ## stato della carriera (null = nessuna carriera): stesse chiavi di `career.s` nel web
 var s: Variant = null
 ## file del salvataggio (le prove ne usano un altro)
 var percorso := Salv.PERCORSO
-## true = come il web: a fine partita crescono a caso i giovani della rosa (solo i confronti col JS). Nel gioco
-## (false) cresce solo il campione (Luis 2026-11-25: "l'unico che migliora le proprie statistiche a fine partita
-## deve essere il campione"); i numeri casuali si usano lo stesso, così il resto della carriera non cambia
+## true = come il web: a fine partita crescono a caso i giovani della rosa e a fine stagione tutti invecchiano
+## (solo i confronti col JS). Nel gioco (false) la rosa cresce e cala coi voti in pagella e invecchia a metà
+## stagione, il campione cresce giocando e non invecchia (crescita_voti.gd, Luis 2026-11-25); i numeri casuali
+## di _crescita si usano lo stesso
 var crescitaRosa := false
 ## obiettivo della stagione appena chiusa da endSeason (per il giudizio in dopoPartita; non si salva)
 var _obiettivo_finito := {}
@@ -934,6 +938,8 @@ func endSeason() -> Dictionary:
 	s.divs = nd
 	s.season += 1
 	for p: Dictionary in s.squad:
+		if not crescitaRosa:
+			break # nel gioco l'età e il calo arrivano a metà stagione (crescita_voti.gd), il campione non invecchia
 		p.age += 1
 		if p.age > 30:
 			for k: String in STAT_KEYS:
@@ -955,9 +961,11 @@ func novita() -> void:
 		return
 	if not JS.is_integer(s.get("semeB")):
 		s["semeB"] = Asp.hash32("novita", s.club, s.get("seed", 0))
-	for k: String in ["forma", "infortuni", "progressi"]:
+	for k: String in ["forma", "infortuni", "progressi", "voti", "progVoti"]:
 		if not s.get(k) is Dictionary:
 			s[k] = {}
+	if not JS.is_integer(s.get("metaStagione")):
+		s["metaStagione"] = 0
 	# stili di gioco della mia squadra (fase D): mancanti o sconosciuti = equilibrati, come prima
 	s["stileAtt"] = Stili.valido_att(s.get("stileAtt"))
 	s["stileDif"] = Stili.valido_dif(s.get("stileDif"))
@@ -975,6 +983,12 @@ func novita() -> void:
 	for k: Variant in s.progressi.keys():
 		if not ids.has(k) or not s.progressi[k] is Dictionary:
 			s.progressi.erase(k)
+	for k: Variant in s.voti.keys():
+		if not ids.has(k) or not s.voti[k] is Array or s.voti[k].size() < 2:
+			s.voti.erase(k)
+	for k: Variant in s.progVoti.keys():
+		if not ids.has(k) or not (s.progVoti[k] is float or s.progVoti[k] is int):
+			s.progVoti.erase(k)
 	var d := div()
 	if d < 0:
 		return
@@ -1033,6 +1047,26 @@ func avversarioPartita(t: Dictionary) -> Dictionary:
 ## numeri casuali delle novità per questa giornata (stessa carriera = stessi numeri)
 func _rng_novita(nome: String) -> Callable:
 	return JS.rng32(Asp.hash32(s.get("semeB", 0), nome, s.season, s.day))
+
+
+## voti della partita (pagella di voti.gd) → crescita a voti della rosa (campione escluso); dopo la 9ª giornata
+## la metà stagione (età +1 e salita/discesa con la media dei voti). Aggiunge res.voti_crescita e res.meta_stagione
+func _crescita_voti(res: Dictionary, esito: Dictionary, mie: int, loro: int) -> void:
+	if crescitaRosa:
+		return
+	var tab: Variant = esito.get("tabellino")
+	var gioc: Variant = tab.get("giocatori") if tab is Dictionary else null
+	if gioc is Array and not gioc.is_empty():
+		var pagella := Voti.calcola(gioc, mie, loro)
+		res["voti_crescita"] = CrescitaVoti.dopo_partita(s.squad, pagella, s.voti, s.progVoti, _rng_novita("voti"))
+	if res.get("season") == null and int(s.day) >= ROUNDS / 2 and int(s.metaStagione) != int(s.season):
+		s.metaStagione = int(s.season)
+		res["meta_stagione"] = CrescitaVoti.meta_stagione(s.squad, s.voti, _rng_novita("meta"))
+
+
+## media dei voti in pagella di id da metà stagione (null se non ha giocato): per le offerte del mercato
+func media_voti(id: Variant) -> Variant:
+	return CrescitaVoti.media(s.get("voti", {}) if s.get("voti") is Dictionary else {}, id)
 
 
 ## il giocatore principale (creato nell'editor iniziale), o null
@@ -1234,7 +1268,8 @@ func dopoPartita(res: Dictionary, esito: Dictionary) -> Dictionary:
 	var cont: Variant = esito.get("conteggi", {})
 	if ch != null and cont is Dictionary and cont.get(str(ch.id)) is Dictionary:
 		res["crescita"] = {"nome": ch.name, "righe": Crescita.applica(ch, cont[str(ch.id)], s.progressi)}
-		s.teams.me.rating = myRating()
+	_crescita_voti(res, esito, mie, loro)
+	s.teams.me.rating = myRating()
 	if stagione is Dictionary:
 		Forma.estate(s.forma, s.infortuni)
 		if not ob.is_empty() and int(ob.get("stagione", -1)) == int(s.season) - 1:
