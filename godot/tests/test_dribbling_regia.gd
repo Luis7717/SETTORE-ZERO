@@ -66,7 +66,7 @@ func test_rallenty_dal_tasto_alla_fine_del_giochetto() -> bool:
 	# Assert: uscita dolce
 	eq(rg.fase, "uscita", "poi si esce")
 	eq(rg.velocita(), -1.0, "in uscita decide il resto del gioco ...")
-	near(rg.k_tempo(14.0), Regia.USCITA_K, 1e-6, "... ma il tempo torna normale piano")
+	near(rg.k_tempo(14.0), Regia.USCITA_K_OK, 1e-6, "... e dopo il dribbling riuscito il tempo torna normale in fretta")
 	check(rg.camera().is_empty(), "la telecamera torna dritta")
 	rg.passo(m, 0, DT, 0.99)
 	eq(rg.fase, "", "tempo tornato normale: regia finita")

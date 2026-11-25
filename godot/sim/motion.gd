@@ -99,6 +99,8 @@ func movePlayers(dt: float) -> void:
 			p.beat -= dt
 		if p.burst > 0.0:
 			p.burst -= dt
+		if p.slancio > 0.0:
+			p.slancio -= dt
 		if p.state == "play":
 			_moveRunning(p, dt, b)
 		elif p.state == "prep":

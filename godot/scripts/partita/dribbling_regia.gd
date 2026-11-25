@@ -11,9 +11,13 @@ extends RefCounted
 
 const TS_CORSA := 0.4        # velocità del tempo mentre il portatore va verso il difensore
 const TS_GIOCHETTO := 0.3    # ... durante il giochetto, lo scatto oltre il difensore o il contrasto
-const DOPO_OK := 0.4         # riuscito: dopo lo scatto il rallenty resta ancora tanto (s di partita: si vede il sorpasso)
+# riuscito: dopo lo scatto il rallenty resta ancora tanto (s di partita). Era 0,4 (1,3 s veri al 30%) e poi il tempo
+# tornava normale piano: a schermo il portatore sembrava fermarsi dopo il dribbling (Luis 2026-11-25, "è migliorato
+# ma sembra ancora che si fermi"); ora il sorpasso si vede appena e si riparte di corsa (USCITA_K_OK)
+const DOPO_OK := 0.12
 const DOPO_KO := 0.65        # fallito: il contrasto si guarda per tanto (s di partita)
 const USCITA_K := 2.2        # 1/s: alla fine il tempo torna normale con questa dolcezza (TEMPO_K del gioco è 14)
+const USCITA_K_OK := 7.0     # 1/s: ... dopo il dribbling riuscito invece in fretta (il portatore scatta via)
 const USCITA_FINE := 0.97    # tempo tornato quasi normale: la regia ha finito ...
 const USCITA_MAX := 1.0      # ... o comunque dopo tanto tempo di partita (se dopo c'è un altro rallenty, es. area di tiro)
 const GIRO := deg_to_rad(45.0)  # la telecamera gira di tanto intorno al portatore, dal lato del dribbling
@@ -90,7 +94,9 @@ func velocita() -> float:
 
 ## dolcezza del passaggio da una velocità del tempo all'altra (1/s); tk = quella normale del gioco
 func k_tempo(tk: float) -> float:
-	return USCITA_K if fase == "uscita" else tk
+	if fase != "uscita":
+		return tk
+	return USCITA_K_OK if ok else USCITA_K
 
 
 ## regia in corso (anche mentre il tempo torna normale): il timer del rallenty non conta

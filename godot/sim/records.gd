@@ -63,6 +63,7 @@ class Player:
 	var beat: float = 0.0 # saltato col dribbling: tempo che resta prima di riprendersi (s)
 	var beatBy: Player = null # ... da chi
 	var burst: float = 0.0 # Scatto riuscito: tempo che resta di corsa più veloce (s)
+	var slancio: float = 0.0 # dopo il dribbling riuscito della persona: tempo che resta senza rallentare (s)
 	var wear: Dictionary = {"dri": 1.0, "tes": 1.0}
 	var wall: Variant = null  # {x, y} in barriera, altrimenti null
 	var yellow: int = 0

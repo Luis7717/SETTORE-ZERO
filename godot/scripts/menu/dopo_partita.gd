@@ -237,6 +237,38 @@ func _voce(nome: String, val: String, col: Color, riga_sopra: bool) -> Control:
 	return box
 
 
+## righe della crescita a voti (res.voti_crescita: "Rossi (voto 7,5): Passaggio +1") e della metà stagione
+## (res.meta_stagione: un anno in più, chi sale e chi scende con la media dei voti), crescita_voti.gd
+static func righe_voti(res: Dictionary) -> Array:
+	var out: Array = []
+	var per_nome := {}
+	var ordine: Array = []
+	for r: Dictionary in res.get("voti_crescita", []):
+		var n := str(r.nome)
+		if not per_nome.has(n):
+			per_nome[n] = {"voto": float(r.voto), "pezzi": []}
+			ordine.append(n)
+		var su := int(r.su) > 0
+		var testo := "%s %s1" % [Crescita.NOMI.get(r.stat, r.stat), "+" if su else "−"]
+		per_nome[n].pezzi.append("[color=%s]%s[/color]" % ["#4aeb9f" if su else "#ff7079", U.esc(testo)])
+	for n: String in ordine:
+		var voto := ("%.1f" % float(per_nome[n].voto)).replace(".", ",").replace(",0", "")
+		out.append("[b]%s[/b] (voto %s): %s" % [U.esc(n), voto, " · ".join(per_nome[n].pezzi)])
+	var meta: Variant = res.get("meta_stagione")
+	if meta is Array:
+		var pezzi: Array = []
+		for r: Dictionary in meta:
+			var pt := int(r.punti)
+			if pt == 0:
+				continue
+			pezzi.append("[color=%s]%s %s%d[/color]" % ["#4aeb9f" if pt > 0 else "#ff7079", U.esc(str(r.nome)), "+" if pt > 0 else "−", absi(pt)])
+		var testo := "[color=#ffd93d][b]Metà stagione:[/b][/color] un anno in più per tutti (il campione no)."
+		if not pezzi.is_empty():
+			testo += " Con la media dei voti e l'età: " + " · ".join(pezzi)
+		out.append(testo)
+	return out
+
+
 ## crescita del campione ("Tiro +1"), derby, infortuni e cambi della CPU (Carriera.dopoPartita); null se niente
 func _novita(res: Dictionary) -> Control:
 	var righe: Array = []
@@ -250,6 +282,7 @@ func _novita(res: Dictionary) -> Control:
 				su.append(U.esc(Crescita.testo(r)))
 		if not su.is_empty():
 			righe.append("[b]%s cresce:[/b] %s" % [U.esc(str(cr.nome)), " · ".join(su)])
+	righe.append_array(righe_voti(res))
 	if res.has("derby"):
 		righe.append("[color=#ffd93d][b]Derby vinto![/b][/color] Premio in più dalla società." if int(res.derby) > 0 else "Derby perso o pareggiato: niente premio in più.")
 	for inf: Dictionary in res.get("infortuni", []):

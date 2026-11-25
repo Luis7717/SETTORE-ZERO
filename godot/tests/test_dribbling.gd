@@ -376,7 +376,8 @@ func test_dopo_il_dribbling_riuscito_non_si_ferma() -> bool:
 		if m.ball.owner != p:
 			break
 	check(m.ball.owner == p, "ha ancora il pallone")
-	check(vmin > 3.0, "non frena dopo il dribbling: velocità minima %.2f m/s (prima ~2)" % vmin)
+	check(vmin > 4.5, "non frena dopo il dribbling: velocità minima %.2f m/s (prima ~2, poi ~3,7 finito lo scatto)" % vmin)
+	check(p.slancio > 0.0, "slancio ancora attivo dopo 3 s (DRIB_SLANCIO)")
 	check(not fuga, "la fuga col difensore battuto non riapre il rallenty")
 	check(p.y - y0 > 10.0, "va avanti: %.1f m in 3 s" % (p.y - y0))
 	m.dispose()

@@ -1116,6 +1116,8 @@ func humanCarrierAuto(p: R.Player) -> void:
 	p.sprint = bool(autoSpr[tm])
 	if rifiniture and p.burst > 0.0:
 		p.spdF = maxf(p.spdF, AUTO_SPD) # slancio dello Scatto o del dribbling: non rallenta finché dura
+	elif rifiniture and p.slancio > 0.0 and nearOpp(p.x, p.y, tm) >= PRESS_NEAR:
+		p.spdF = maxf(p.spdF, AUTO_SPD) # dopo il dribbling riuscito non aspetta i compagni (duel.gd DRIB_SLANCIO)
 
 
 # sceglie verso e andatura del portatore umano automatico (ogni AUTO_THINK s)

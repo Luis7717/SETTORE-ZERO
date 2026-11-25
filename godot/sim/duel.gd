@@ -52,7 +52,10 @@ const BURST_SIDE := 0.6    # ... con tanto di lato per metro in avanti (~31°), 
 # automatica secondo lo stile; e la fuga non si riapre per BURST_FLEE_CD s di partita (prima tornava dopo FLEE_CD,
 # quando il portatore fermo sulla meta veniva ripreso, e il rallenty lo lasciava lì).
 const BURST_FLEE_CD := 3.5
-const DRIB_CARRY := 6.0   # dopo il giochetto (portaAuto) la corsa punta così più avanti, per non frenare (m)
+const DRIB_CARRY := 6.0     # dopo il giochetto (portaAuto) la corsa punta così più avanti, per non frenare (m)
+# ... e per tanto (s) dopo lo scatto la guida automatica non rallenta ad aspettare i compagni (finito lo slancio
+# scendeva a ~3,7 m/s e sembrava fermarsi, Luis 2026-11-25 "sembra ancora che si fermi"); pressato protegge palla
+const DRIB_SLANCIO := 2.5
 # Rallenty scaduto (userCalm: il gioco lo chiama dopo 10 s veri senza linea né tasto): per lo stesso portatore duello e
 # fuga non si riaprono per tanto tempo di partita (s); l'area di tiro, se è scaduta lì, finché non perde il pallone.
 const CALM_CD := 4.0
@@ -613,6 +616,7 @@ func dribCarry(p: R.Player, tm: int) -> void:
 		p.dx = mv.x
 		p.dy = mv.y
 	p.aiT = 0.0
+	p.slancio = BURST_T + DRIB_SLANCIO
 	fleeCd[tm] = BURST_FLEE_CD
 	fleeCdP[tm] = p
 

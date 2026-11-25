@@ -120,8 +120,15 @@
   Il **campione non si vende** (Luis 2026-11-25): `Carriera.sell` lo rifiuta e nella Rosa ha solo il tasto Aspetto.
   Il **campione parte sempre al 100%** (Luis 2026-11-25): in partita si stanca come gli altri, ma tra le partite la
   sua forma torna a 100 (`Forma.giornata`) e in `squadraPartita` non ha mai `energy0`.
-  A fine partita **migliora solo il campione** (Luis 2026-11-25): la crescita a caso dei giovani del web (`_crescita`)
-  vale solo per lui (`crescitaRosa` false; true solo nei confronti col JS di `test_carriera.gd`).
+  **Crescita coi voti** (Luis 2026-11-25, `scripts/carriera/crescita_voti.gd`, chiamata da `dopoPartita`): dopo ogni
+  partita di campionato chi ha un voto in pagella (`voti.gd`) sopra 6 cresce e sotto 6 cala, di più o di meno secondo
+  l'età (giovani crescono tanto e calano poco, vecchi il contrario; progresso decimale in `s.progVoti`, a ±1 una
+  statistica del ruolo sale/scende di 1). **Metà stagione** (dopo la 9ª giornata, `s.metaStagione`): tutti tranne il
+  campione +1 anno e statistiche su/giù con la media dei voti (`s.voti`, da metà a metà) più la spinta dell'età.
+  Il campione cresce solo giocando (`crescita.gd`) e **non invecchia**; a fine stagione nessuno invecchia più
+  (`endSeason` lo fa solo con `crescitaRosa`, che vale true solo nei confronti col JS di `test_carriera.gd`, dove resta
+  anche la crescita a caso dei giovani del web). `media_voti(id)` serve al mercato. Righe nel dopo partita
+  (`righe_voti`). Test `tests/test_crescita_voti.gd`.
 - **Stili di gioco** (Fase D, `godot/sim/stili.gd`): nella Rosa, tasti **Attacco** e **Difesa**: attacco (Equilibrato, Contropiede,
   Possesso, Fasce, Lanci lunghi) e difesa (Equilibrata, Pressing, Catenaccio, A uomo, Fuorigioco). Valgono per i
   compagni della CPU e per gli avversari (stile fisso per squadra, mostrato nell'hub). Campi `stileAtt`/`stileDif`
@@ -185,7 +192,11 @@
   Lo stesso dopo il **dribbling riuscito** (Luis 2026-11-25, "dopo una skill il giocatore si ferma", `dribCarry` in
   `sim/duel.gd`): la corsa oltre il difensore punta `DRIB_CARRY` 6 m più avanti (niente frenata sulla meta), la guida
   automatica riparte subito, la fuga non si riapre per `BURST_FLEE_CD`; finché dura `p.burst` l'andatura automatica
-  non scende sotto `AUTO_SPD`. Test `test_dopo_il_dribbling_riuscito_non_si_ferma`.
+  non scende sotto `AUTO_SPD`, e dopo ancora per `DRIB_SLANCIO` 2,5 s (`p.slancio`) non rallenta ad aspettare i
+  compagni (se non è pressato). La regia del dribbling dopo lo scatto resta in rallenty solo `DOPO_OK` 0,12 s e torna
+  normale in fretta (`USCITA_K_OK`): prima 1,3 s veri al 30% e ritorno lento, a schermo sembrava fermo ("è migliorato
+  ma sembra ancora che si fermi"). Test `test_dopo_il_dribbling_riuscito_non_si_ferma`; misura in partite vere:
+  `-s res://tools/diag_dopo_dribbling.gd -- --partite=3 --solo-dribbling [--righe]`.
 - La finta è stata tolta (2026-11-20).
 - Calcio d'angolo: telecamera alle spalle del battitore; dito vicino al battitore = cross, lontano = trascinando si gira la visuale.
 - **Rimessa laterale nostra** (Godot, Luis 2026-11-23): quando il battitore è sulla linea (`restart.sulPosto()`) la
