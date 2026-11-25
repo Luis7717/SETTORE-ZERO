@@ -46,8 +46,17 @@ static func senza_campi_godot(v: Variant) -> Variant:
 	return v
 
 
+## copia della squadra senza le sotto-statistiche `sub` dei giocatori (solo Godot, sim/sottostat.gd)
+static func _senza_sub(sq: Dictionary) -> Dictionary:
+	var c: Dictionary = sq.duplicate(true)
+	for p: Variant in c.get("players", []) + c.get("bench", []):
+		if p is Dictionary:
+			p.erase("sub")
+	return c
+
+
 ## stato della carriera senza quello che il web non ha: impostazioni music, vibra, momenti e gkManuale, chiavi della fase B
-## (CHIAVI_GODOT: forma, infortuni, obiettivo, rivale, ...)
+## (CHIAVI_GODOT: forma, infortuni, obiettivo, rivale, ...) e le sotto-statistiche `sub` dei giocatori
 static func come_web(s: Dictionary) -> Dictionary:
 	var c: Dictionary = s.duplicate(true)
 	c.settings.erase("music")
@@ -56,6 +65,9 @@ static func come_web(s: Dictionary) -> Dictionary:
 	c.settings.erase("gkManuale")
 	for k: String in CarrieraScript.CHIAVI_GODOT:
 		c.erase(k)
+	for p: Variant in c.get("squad", []): # statistiche dettagliate (sim/sottostat.gd): solo Godot
+		if p is Dictionary:
+			p.erase("sub")
 	return c
 
 
@@ -151,7 +163,7 @@ func _scenario(idx: int) -> bool:
 		ok = same(res, want.res, "giornata %d: finishMatch" % i) and ok
 		ok = same(_digest(c), want.digest, "giornata %d: stato" % i) and ok
 		if want.has("myTeam"):
-			ok = same(my, want.myTeam, "giornata %d: myMatchTeam" % i) and ok
+			ok = same(_senza_sub(my), want.myTeam, "giornata %d: myMatchTeam" % i) and ok
 			ok = same(opp, want.oppTeam, "giornata %d: aiMatchTeam" % i) and ok
 		else:
 			var corto := {"formation": opp.formation, "skill": opp.skill, "kit": opp.kit, "p0": opp.players[0], "p10": opp.players[10]}

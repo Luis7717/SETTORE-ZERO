@@ -344,6 +344,35 @@ func test_dopo_partita_continua_porta_alla_fine_stagione() -> bool:
 	return done()
 
 
+# Luis 2026-11-25: riepilogo a metà stagione (statistiche che cambiano solo lì, anche per gli avversari)
+func test_meta_stagione_riepilogo() -> bool:
+	_inizia(_carriera())
+	var meta := {"rosa": [{"id": 5, "nome": "M. Rossi", "pos": "C", "eta": 24, "media": 6.8, "punti": 2, "prima": 64, "dopo": 66,
+		"cambi": {"pco": 2, "agi": 1, "res": -1}}, {"id": 6, "nome": "L. Bianchi", "pos": "D", "eta": 33, "media": null,
+		"punti": -2, "prima": 70, "dopo": 69, "cambi": {"acc": -2}}],
+		"cpu": [{"id": "x", "name": "Atletico Prova", "short": "ATL", "media": 6.6, "div": 2}]}
+	var n := _apri("dopo_partita", {"esito": {"gol_a": 1, "gol_b": 0, "marcatori": [], "statistiche": {}, "me": 0},
+		"res": {"income": 70, "wages": 20, "grown": [], "others": [], "meta_stagione": meta}, "titolo": "Giornata 9", "tipo": "campionato"})
+	var ultimo: Button = null
+	for bt in n.corpo.find_children("*", "Button", true, false):
+		ultimo = bt
+	if ultimo != null:
+		ultimo.pressed.emit()
+	eq(_andate.back()[0] if not _andate.is_empty() else "", "meta_stagione", "a metà stagione Continua apre il riepilogo")
+	_finisci(n)
+	var r := _apri("meta_stagione", meta)
+	var testi := ""
+	for l in r.corpo.find_children("*", "RichTextLabel", true, false):
+		testi += (l as RichTextLabel).text
+	check(testi.contains("M. Rossi") and testi.contains("64 → "), "riga del giocatore con prima → dopo")
+	check(testi.contains("Passaggio corto"), "sotto-statistiche cambiate")
+	check(testi.contains("non ha giocato"), "chi non ha giocato")
+	var bottoni: Array = r.corpo.find_children("*", "Button", true, false)
+	eq((bottoni.back() as Button).text if not bottoni.is_empty() else "", "AVANTI", "tasto Avanti")
+	_finisci(r)
+	return done()
+
+
 func test_dopo_partita_apre_le_statistiche_e_torna_indietro() -> bool:
 	_inizia(_carriera())
 	var tab: Dictionary = ProvaMenu.statistiche_prova(MenuSchermata.carriera_prova.s).tabellino

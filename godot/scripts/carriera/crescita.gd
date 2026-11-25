@@ -6,25 +6,28 @@
 # statistica a partita, mai oltre 99, e più piano con l'età.
 extends RefCounted
 
+const Sotto := preload("res://sim/sottostat.gd")
+
 const MASSIMO := 99
-const PER_PARTITA_MAX := 0.5     # progresso massimo di una statistica in una partita
-## conteggio → [[statistica, progresso per ogni volta], ...]; "km" = chilometri corsi
+const PER_PARTITA_MAX := 1.0     # progresso massimo di una sotto-statistica in una partita
+## conteggio → [[sotto-statistica, progresso per ogni volta], ...]; "km" = chilometri corsi. Dal 2026-11-25 si
+## muovono le sotto-statistiche (sim/sottostat.gd; "tes" = colpo di testa): una grande è la loro media, quindi i
+## pesi sono circa il doppio di prima per una crescita della valutazione simile
 const PESI := {
-	"gol": [["tir", 0.25]],
-	"in_porta": [["tir", 0.08]],
-	"tiri": [["tir", 0.03]],
-	"dribbling": [["dri", 0.1]],
-	"scatti": [["vel", 0.08], ["dri", 0.03]],
-	"passaggi": [["pas", 0.025]],
-	"assist": [["pas", 0.15]],
-	"contrasti": [["dif", 0.08]],
-	"intercetti": [["dif", 0.06]],
-	"testa": [["tes", 0.08], ["fis", 0.04]],
-	"parate": [["por", 0.08]],
-	"km": [["vel", 0.04], ["fis", 0.06]],
+	"gol": [["fin", 0.5]],
+	"in_porta": [["fin", 0.1], ["pot", 0.06]],
+	"tiri": [["lon", 0.05], ["pot", 0.03]],
+	"dribbling": [["drb", 0.15], ["agi", 0.06]],
+	"scatti": [["acc", 0.12], ["vmax", 0.08]],
+	"passaggi": [["pco", 0.05]],
+	"assist": [["plu", 0.2], ["pco", 0.1]],
+	"contrasti": [["ctr", 0.16]],
+	"intercetti": [["int", 0.12]],
+	"testa": [["tes", 0.08], ["ele", 0.08]],
+	"parate": [["rif", 0.1], ["tuf", 0.06]],
+	"km": [["res", 0.12], ["vmax", 0.03]],
 }
-const NOMI := {"vel": "Velocità", "fis": "Fisico", "dri": "Dribbling", "tir": "Tiro", "dif": "Difesa",
-	"pas": "Passaggio", "por": "Parate", "tes": "Colpo di testa"}
+const NOMI := Sotto.NOMI
 ## età → quanto si cresce (1 = tutto): i giovani crescono di più, oltre i 30 quasi niente (poi c'è il calo
 ## di fine stagione di Carriera.endSeason)
 const ETA := [[23, 1.0], [27, 0.85], [30, 0.55], [33, 0.25], [99, 0.1]]
@@ -59,17 +62,16 @@ static func applica(p: Dictionary, conteggi: Dictionary, progressi: Dictionary) 
 	var pr: Dictionary = progressi.get(chiave, {}) if progressi.get(chiave) is Dictionary else {}
 	var righe: Array = []
 	var guadagno := progresso(conteggi, int(p.get("age", 25)))
+	if not Sotto.ha(p):
+		Sotto.crea(p, func() -> float: return 0.5) # (la carriera le crea già in novita: qui solo per sicurezza)
 	for st: String in guadagno:
-		if not p.has(st):
-			continue
 		var acc := float(pr.get(st, 0.0)) + float(guadagno[st])
 		var su := int(floor(acc))
 		acc -= su
-		var prima := int(p[st])
-		var ora := mini(MASSIMO, prima + su)
+		var prima := int(Sotto.valore(p, st)) if st != "tes" else int(p.get("tes", 50))
+		var ora := prima + Sotto.muovi(p, st, su) if su > 0 else prima
 		if ora >= MASSIMO:
 			acc = 0.0
-		p[st] = ora
 		pr[st] = snappedf(acc, 0.001)
 		righe.append({"k": st, "nome": NOMI.get(st, st), "su": ora - prima, "ora": ora, "parte": snappedf(float(guadagno[st]), 0.01)})
 	progressi[chiave] = pr

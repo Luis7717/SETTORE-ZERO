@@ -65,7 +65,7 @@ static func chiave(tid: String, i: int) -> String:
 # ---------------------------------------------------------------- giocatori delle squadre
 ## gli 11 della squadra t in questa stagione: [{p, i, prezzo, migliore}] (senza chi è già stato comprato)
 static func giocatori(c: RefCounted, t: Dictionary) -> Array:
-	var players: Array = c.aiMatchTeam(t, c.formazioneDi(t)).players
+	var players: Array = c.squadraCpu(t).players # con statistiche dettagliate e crescita di metà stagione
 	var best := -1
 	var bo := -1
 	for i in players.size():

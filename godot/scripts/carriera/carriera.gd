@@ -28,6 +28,7 @@ const C := preload("res://sim/core.gd")
 const Crescita := preload("res://scripts/carriera/crescita.gd")
 const CrescitaVoti := preload("res://scripts/carriera/crescita_voti.gd")
 const Voti := preload("res://scripts/partita/voti.gd")
+const Sotto := preload("res://sim/sottostat.gd")
 const Forma := preload("res://scripts/carriera/forma.gd")
 const Dirigenza := preload("res://scripts/carriera/dirigenza.gd")
 const Esultanze := preload("res://scripts/partita/esultanze.gd")
@@ -65,7 +66,7 @@ const STAT_KEYS := ["vel", "fis", "dri", "tir", "dif", "pas", "por"]
 ## chiavi dello stato che ha solo la versione Godot (fase B): semeB = seme dei numeri casuali delle novità,
 ## forma/infortuni/progressi = per id del giocatore (testo), obiettivo = {stagione, div, tipo, posto}, rivale = id
 const CHIAVI_GODOT := ["semeB", "forma", "infortuni", "progressi", "obiettivo", "rivale", "stileAtt", "stileDif",
-	"voti", "progVoti", "metaStagione", "ceduti", "trattative", "offerte", "inVendita"]
+	"voti", "progVoti", "metaStagione", "metaCpu", "ceduti", "trattative", "offerte", "inVendita"]
 
 ## stato della carriera (null = nessuna carriera): stesse chiavi di `career.s` nel web
 var s: Variant = null
@@ -976,6 +977,13 @@ func novita() -> void:
 			s[k] = {}
 	if not JS.is_integer(s.get("metaStagione")):
 		s["metaStagione"] = 0
+	if not s.get("metaCpu") is Dictionary or not s.metaCpu.get("medie") is Dictionary:
+		s["metaCpu"] = {"stagione": 0, "medie": {}}
+	# statistiche dettagliate (sim/sottostat.gd): chi non le ha (salvataggi vecchi, nuovi arrivati) le riceve,
+	# ricavate dalle grandi con un seme fisso per giocatore (le grandi non cambiano)
+	for p: Dictionary in s.squad:
+		if not Sotto.ha(p):
+			Sotto.crea(p, JS.rng32(Asp.hash32("sub", s.semeB, p.id)))
 	# stili di gioco della mia squadra (fase D): mancanti o sconosciuti = equilibrati, come prima
 	s["stileAtt"] = Stili.valido_att(s.get("stileAtt"))
 	s["stileDif"] = Stili.valido_dif(s.get("stileDif"))
@@ -1049,7 +1057,7 @@ func setFisico(id: Variant, altezza: Variant, corporatura: Variant) -> bool:
 ## squadra del computer per la partita (al posto di aiMatchTeam): chi le ho comprato è sostituito da un rimpiazzo
 ## (mercato_squadre.gd), statistiche col fisico (Fisico.applicaSquadra)
 func avversarioPartita(t: Dictionary) -> Dictionary:
-	var sq: Dictionary = Fisico.applicaSquadra(Mercato.rimpiazza(self, t, aiMatchTeam(t, formazioneDi(t))))
+	var sq: Dictionary = Fisico.applicaSquadra(evolviCpu(t, Mercato.rimpiazza(self, t, aiMatchTeam(t, formazioneDi(t)))))
 	var st := stileDi(t)
 	sq["stileAtt"] = st.att
 	sq["stileDif"] = st.dif
@@ -1062,18 +1070,57 @@ func _rng_novita(nome: String) -> Callable:
 
 
 ## voti della partita (pagella di voti.gd) → crescita a voti della rosa (campione escluso); dopo la 9ª giornata
-## la metà stagione (età +1 e salita/discesa con la media dei voti). Aggiunge res.voti_crescita e res.meta_stagione
+## la metà stagione (età +1 e salita/discesa con la media dei voti, anche gli avversari). Aggiunge res.meta_stagione
 func _crescita_voti(res: Dictionary, esito: Dictionary, mie: int, loro: int) -> void:
 	if crescitaRosa:
 		return
 	var tab: Variant = esito.get("tabellino")
 	var gioc: Variant = tab.get("giocatori") if tab is Dictionary else null
 	if gioc is Array and not gioc.is_empty():
-		var pagella := Voti.calcola(gioc, mie, loro)
-		res["voti_crescita"] = CrescitaVoti.dopo_partita(s.squad, pagella, s.voti, s.progVoti, _rng_novita("voti"))
+		CrescitaVoti.dopo_partita(s.squad, Voti.calcola(gioc, mie, loro), s.voti)
 	if res.get("season") == null and int(s.day) >= ROUNDS / 2 and int(s.metaStagione) != int(s.season):
-		s.metaStagione = int(s.season)
-		res["meta_stagione"] = CrescitaVoti.meta_stagione(s.squad, s.voti, _rng_novita("meta"))
+		res["meta_stagione"] = metaStagione()
+
+
+## metà stagione (Luis 2026-11-25: le statistiche salgono e scendono solo qui, anche per gli avversari): la mia rosa
+## con la media dei voti, gli avversari con la media dai punti del girone d'andata (valgono da adesso in squadraCpu).
+## Ritorna {rosa: righe di CrescitaVoti.meta_stagione, cpu: [{id, name, short, media}] dalla migliore}
+func metaStagione() -> Dictionary:
+	s.metaStagione = int(s.season)
+	var rosa := CrescitaVoti.meta_stagione(s.squad, s.voti, _rng_novita("meta"), func(p: Dictionary) -> int: return overall(p))
+	var medie := {}
+	var cpu: Array = []
+	for id: String in s.tab:
+		if id == "me" or not s.teams.has(id):
+			continue
+		var r: Dictionary = s.tab[id]
+		var m := CrescitaVoti.media_cpu(int(r.pts), int(r.p))
+		medie[id] = m
+		cpu.append({"id": id, "name": s.teams[id].name, "short": s.teams[id].short, "media": m, "div": divOf(s.teams[id])})
+	s.metaCpu = {"stagione": int(s.season), "medie": medie}
+	cpu.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.media > b.media)
+	s.teams.me.rating = myRating()
+	return {"rosa": rosa, "cpu": cpu}
+
+
+## giocatori di una squadra della CPU come sono adesso: statistiche dettagliate (seme della squadra e del posto) e,
+## dal girone di ritorno, +1 anno e la crescita di metà stagione (CrescitaVoti.meta_cpu). Cambia sq e la ritorna
+func evolviCpu(t: Dictionary, sq: Dictionary) -> Dictionary:
+	var mc: Variant = s.get("metaCpu")
+	var media: Variant = null
+	if mc is Dictionary and int(mc.get("stagione", 0)) == int(s.season) and mc.get("medie") is Dictionary:
+		media = mc.medie.get(str(t.get("id", "")))
+	for i in sq.players.size():
+		var p: Dictionary = sq.players[i]
+		Sotto.crea(p, JS.rng32(Asp.hash32("subcpu", int(t.seed), int(s.season), i)))
+		if media != null:
+			CrescitaVoti.meta_cpu(p, float(media), JS.rng32(Asp.hash32("metacpu", int(t.seed), int(s.season), i)))
+	return sq
+
+
+## squadra della CPU per il mercato e la partita (aiMatchTeam con la formazione Godot, poi evolviCpu)
+func squadraCpu(t: Dictionary) -> Dictionary:
+	return evolviCpu(t, aiMatchTeam(t, formazioneDi(t)))
 
 
 ## media dei voti in pagella di id da metà stagione (null se non ha giocato): per le offerte del mercato

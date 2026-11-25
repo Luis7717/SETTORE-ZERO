@@ -9,6 +9,7 @@ const Crescita := preload("res://scripts/carriera/crescita.gd")
 const Forma := preload("res://scripts/carriera/forma.gd")
 const Dirigenza := preload("res://scripts/carriera/dirigenza.gd")
 const Conta := preload("res://scripts/partita/conta_giocatori.gd")
+const Sotto := preload("res://sim/sottostat.gd")
 const DIR := "user://prove_carriera/"
 
 
@@ -28,28 +29,33 @@ static func _campione(c: CarrieraScript) -> Dictionary:
 # ---------------------------------------------------------------- 6. crescita del campione
 func test_crescita_lenta_con_tetto_e_eta() -> bool:
 	var g := Crescita.progresso({"gol": 10, "tiri": 30, "dribbling": 2}, 20)
-	near(g.tir, Crescita.PER_PARTITA_MAX, 1e-9, "tiro: al massimo 0,5 a partita anche con tanti gol")
-	near(g.dri, 0.2, 1e-9, "dribbling: 2 riusciti = +0,2")
-	check(not g.has("dif"), "niente contrasti = niente difesa")
+	near(g.fin, Crescita.PER_PARTITA_MAX, 1e-9, "finalizzazione: al massimo 1 a partita anche con tanti gol")
+	near(g.drb, 0.3, 1e-9, "dribbling: 2 riusciti = +0,3")
+	check(not g.has("ctr"), "niente contrasti = niente contrasto")
 	var vecchio := Crescita.progresso({"dribbling": 2}, 32)
-	check(vecchio.dri < g.dri * 0.5, "a 32 anni si cresce molto meno (%.3f)" % vecchio.dri)
+	check(vecchio.drb < g.drb * 0.5, "a 32 anni si cresce molto meno (%.3f)" % vecchio.drb)
 	return done()
 
 
 func test_crescita_si_accumula_e_sale_di_un_punto() -> bool:
-	var p := {"id": 7, "age": 20, "tir": 60, "dri": 98, "pas": 50}
+	var p := {"id": 7, "age": 20, "pos": "A", "vel": 50, "fis": 50, "dri": 98, "tir": 60, "dif": 30, "pas": 50, "por": 12, "tes": 50}
+	Sotto.crea(p, JS.rng32(3))
+	p.sub.fin = 60
+	p.sub.drb = 98
+	Sotto.ricalcola(p)
 	var pr := {}
 	var su := 0
-	for i in 3: # 3 partite con 1 gol, 2 in porta e 2 tiri: 3 × (0,25 + 0,16 + 0,06) = 1,41 → Tiro +1
+	for i in 3: # 3 partite con 1 gol, 2 in porta e 2 tiri: finalizzazione 3 × (0,5 + 0,2) = 2,1 → +2
 		var righe := Crescita.applica(p, {"gol": 1, "in_porta": 2, "tiri": 2}, pr)
 		for r: Dictionary in righe:
 			su += int(r.su)
-	eq(p.tir, 61, "tiro salito di 1")
-	eq(su, 1, "una riga con +1")
-	near(float(pr["7"].tir), 0.41, 1e-6, "il resto resta da parte")
+	eq(int(p.sub.fin), 62, "finalizzazione salita di 2")
+	eq(su, 2, "+2 in tutto")
+	near(float(pr["7"].fin), 0.1, 1e-6, "il resto resta da parte")
 	for i in 30:
 		Crescita.applica(p, {"dribbling": 9}, pr)
-	eq(p.dri, 99, "mai oltre 99")
+	eq(int(p.sub.drb), 99, "mai oltre 99")
+	eq(int(p.dri), int(roundf((int(p.sub.agi) + int(p.sub.ctl) + int(p.sub.drb) + int(p.sub.equ)) / 4.0)), "la grande è la media delle sue")
 	eq(Crescita.testo({"nome": "Tiro", "su": 1, "parte": 0.4}), "Tiro +1", "testo col punto")
 	eq(Crescita.testo({"nome": "Tiro", "su": 0, "parte": 0.3}), "Tiro +0,3", "testo col progresso")
 	return done()
@@ -106,9 +112,10 @@ func test_dopo_partita_fa_crescere_il_campione() -> bool:
 	res = c.dopoPartita(res, {"gol_a": 2, "gol_b": 0, "me": 0, "conteggi": {str(ch.id): {"gol": 2, "in_porta": 3, "tiri": 4, "dribbling": 3}}})
 	check(res.has("crescita"), "c'è la crescita nel risultato")
 	eq(res.crescita.nome, ch.name, "è il campione")
-	var tir: Dictionary = res.crescita.righe.filter(func(r: Dictionary) -> bool: return r.k == "tir")[0]
-	near(float(tir.parte), 0.5, 1e-9, "tiro +0,5 (tetto)")
-	near(float(c.s.progressi[str(ch.id)].tir), 0.5, 1e-6, "progresso salvato nello stato")
+	var fin: Dictionary = res.crescita.righe.filter(func(r: Dictionary) -> bool: return r.k == "fin")[0]
+	near(float(fin.parte), 1.0, 1e-9, "finalizzazione +1 (tetto)")
+	eq(int(fin.su), 1, "un punto intero")
+	check(c.s.progressi[str(ch.id)].has("drb"), "progresso salvato nello stato")
 	c.reset()
 	return done()
 

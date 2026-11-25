@@ -29,7 +29,7 @@ func costruisci() -> void:
 	var premio := D.fmt_money(float(r.get("prize", 0)) + float(r.get("bonus", 0)))
 	for t: String in ["Hai chiuso al <b>%d° posto</b> in %s." % [int(r.get("pos", 1)), div_ora],
 			"Premio di fine stagione: <b>%s</b>" % premio,
-			"La prossima stagione giochi in <b>%s</b>. I giocatori hanno un anno in più: controlla la rosa e il mercato." % div_nuova]:
+			"La prossima stagione giochi in <b>%s</b>. Controlla la rosa e il mercato." % div_nuova]:
 		var p := U.bb("[center]%s[/center]" % U.html_a_bbcode(t), 16.5, Color("#d7e1f3"))
 		corpo.add_child(p)
 	var ob: Variant = r.get("obiettivo")
