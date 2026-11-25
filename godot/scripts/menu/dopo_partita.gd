@@ -82,6 +82,9 @@ func costruisci() -> void:
 		var nov := _novita(res)
 		if nov != null:
 			corpo.add_child(nov)
+		var off := _offerte_mercato(res)
+		if off != null:
+			corpo.add_child(off)
 		corpo.add_child(_soldi(res))
 	var stagione: Variant = res.get("season") if res is Dictionary else null
 	if _tabellino is Dictionary and not (_tabellino as Dictionary).is_empty():
@@ -264,4 +267,28 @@ func _novita(res: Dictionary) -> Control:
 	carta.add_child(v)
 	for t: String in righe:
 		v.add_child(U.bb(t, 13.5, Color("#d7e1f3")))
+	return carta
+
+
+## offerte arrivate per i miei giocatori (mercato con le squadre, Carriera.dopoPartita → res.offerte); null se
+## nessuna. Si accettano o rifiutano in Mercato → Offerte
+func _offerte_mercato(res: Dictionary) -> Control:
+	var c := carriera()
+	var s := stato()
+	var righe: Array = []
+	for o: Variant in res.get("offerte", []):
+		if not o is Dictionary or s.is_empty():
+			continue
+		var p: Variant = c.player(o.get("id"))
+		var t: Variant = s.teams.get(o.get("squadra"))
+		if p is Dictionary and t is Dictionary:
+			righe.append("[color=#4aeb9f][b]Offerta:[/b][/color] %s offre %s per %s." % [U.esc(str(t.name)), D.fmt_money(float(o.soldi)), U.esc(str(p.name))])
+	if righe.is_empty():
+		return null
+	var carta := U.pannello("Carta")
+	var v := U.vbox(8)
+	carta.add_child(v)
+	for r: String in righe:
+		v.add_child(U.bb(r, 13.5, Color("#d7e1f3")))
+	v.add_child(U.bottone("Vedi le offerte", "BtnFantasma", func() -> void: vai("mercato", {"scheda": "offerte"}), 40))
 	return carta

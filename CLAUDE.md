@@ -122,6 +122,18 @@
   sua forma torna a 100 (`Forma.giornata`) e in `squadraPartita` non ha mai `energy0`.
   A fine partita **migliora solo il campione** (Luis 2026-11-25): la crescita a caso dei giovani del web (`_crescita`)
   vale solo per lui (`crescitaRosa` false; true solo nei confronti col JS di `test_carriera.gd`).
+  **Mercato con le squadre** (Luis 2026-11-25, `scripts/carriera/mercato_squadre.gd`, menu `mercato.gd`): si compra
+  dagli 11 delle squadre della CPU (divisione e ruolo in alto; `[id squadra, indice]` di `aiMatchTeam(t, formazioneDi(t))`);
+  prezzo chiesto = valore ×1,4 per il migliore della squadra, ×1,15 per gli altri; offerta da −20% a +20% a passi del 5%:
+  ≥ prezzo accetta, dall'85% controfferta al prezzo (si accetta), sotto rifiuta; una offerta per giocatore a giornata
+  (`s.trattative`). Il comprato entra con id nuovo e la squadra lo perde per la stagione (`s.ceduti`, azzerato a fine
+  stagione in `dopoPartita`): in `avversarioPartita` c'è un rimpiazzo più scarso (`rimpiazza`, dopo `aiMatchTeam` che
+  resta come il JS). Dopo ogni partita di campionato (`dopoPartita` → `res.offerte`, `_rng_novita("offerte")`) una
+  squadra può offrire per un mio giocatore (mai il campione): 25% a partita, di più e più soldi con `media_voti` alta;
+  `s.offerte` (scadono dopo 2 giornate, al massimo 3), Accetta/Rifiuta in Mercato → Offerte (regole di `sell`,
+  `motivoNonVendibile`), riga in `dopo_partita`, contatore sulla casella dell'hub. Nella Rosa "Vendi" è diventato
+  **Cerca acquirenti** (`s.inVendita`: offerta sicura alla giornata dopo). Il vecchio `s.market` resta nel salvataggio
+  (e `refreshMarket`/`buy` per il JS) ma non si mostra. Test `tests/test_mercato_squadre.gd`.
 - **Stili di gioco** (Fase D, `godot/sim/stili.gd`): nella Rosa, tasti **Attacco** e **Difesa**: attacco (Equilibrato, Contropiede,
   Possesso, Fasce, Lanci lunghi) e difesa (Equilibrata, Pressing, Catenaccio, A uomo, Fuorigioco). Valgono per i
   compagni della CPU e per gli avversari (stile fisso per squadra, mostrato nell'hub). Campi `stileAtt`/`stileDif`
