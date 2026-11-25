@@ -55,6 +55,7 @@ static func vista(p: Dictionary, ovr: int, colori: Array, k1: int, area: Rect2, 
 	velo.color = VELO
 	velo.set_anchors_preset(Control.PRESET_FULL_RECT)
 	velo.mouse_filter = Control.MOUSE_FILTER_STOP
+	velo.z_index = 50 # sopra la carta scelta della Rosa (che ha z_index 2)
 	velo.gui_input.connect(func(ev: InputEvent) -> void:
 		if (ev is InputEventMouseButton and not ev.pressed) or (ev is InputEventScreenTouch and not ev.pressed):
 			chiudi.call())
