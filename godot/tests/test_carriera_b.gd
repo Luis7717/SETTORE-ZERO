@@ -316,3 +316,22 @@ func test_campione_sempre_al_100() -> bool:
 			check(not p.has("energy0"), "in partita parte con l'energia piena")
 	Salv.cancella(c.percorso)
 	return done()
+
+
+# Luis 2026-11-25: "l'unico che migliora le proprie statistiche a fine partita deve essere il campione"
+func test_a_fine_partita_migliora_solo_il_campione() -> bool:
+	var c := _nuova("solo_campione.json")
+	var ch := _campione(c)
+	var prima := {}
+	for p: Dictionary in c.s.squad:
+		if not p.get("champ", false):
+			prima[p.id] = [p.vel, p.fis, p.dri, p.tir, p.dif, p.pas, p.por, p.tes]
+	for i in 10:
+		var res := c.finishMatch(1, 0, [])
+		for nome: Variant in res.get("grown", []):
+			eq(nome, ch.name, "nell'elenco dei cresciuti solo il campione")
+	for p: Dictionary in c.s.squad:
+		if prima.has(p.id):
+			eq([p.vel, p.fis, p.dri, p.tir, p.dif, p.pas, p.por, p.tes], prima[p.id], "%s non migliora" % p.name)
+	Salv.cancella(c.percorso)
+	return done()

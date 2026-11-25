@@ -67,6 +67,10 @@ const CHIAVI_GODOT := ["semeB", "forma", "infortuni", "progressi", "obiettivo", 
 var s: Variant = null
 ## file del salvataggio (le prove ne usano un altro)
 var percorso := Salv.PERCORSO
+## true = come il web: a fine partita crescono a caso i giovani della rosa (solo i confronti col JS). Nel gioco
+## (false) cresce solo il campione (Luis 2026-11-25: "l'unico che migliora le proprie statistiche a fine partita
+## deve essere il campione"); i numeri casuali si usano lo stesso, così il resto della carriera non cambia
+var crescitaRosa := false
 ## obiettivo della stagione appena chiusa da endSeason (per il giudizio in dopoPartita; non si salva)
 var _obiettivo_finito := {}
 ## da dove è venuto l'ultimo caricamento: "principale", "temporaneo", "copia" o "" (nessuno)
@@ -871,7 +875,7 @@ func finishMatch(my: int, opp: int, log: Array = []) -> Dictionary:
 	return res
 
 
-# crescita dei giovani che giocano
+# crescita dei giovani che giocano (nel gioco solo il campione: crescitaRosa)
 func _crescita(res: Dictionary) -> void:
 	var r := func() -> float: return rnd()
 	for p: Dictionary in s.squad:
@@ -887,8 +891,10 @@ func _crescita(res: Dictionary) -> void:
 			else:
 				keys = ["tir", "vel", "dri", "pas"]
 			var k1: String = pick(r, keys)
-			p[k1] = mini(99, p[k1] + 1)
 			var k2: String = pick(r, keys)
+			if not crescitaRosa and not p.get("champ", false):
+				continue # solo il campione migliora (estratti lo stesso: stessi numeri casuali dopo)
+			p[k1] = mini(99, p[k1] + 1)
 			p[k2] = mini(99, p[k2] + 1)
 			res.grown.append(p.name)
 

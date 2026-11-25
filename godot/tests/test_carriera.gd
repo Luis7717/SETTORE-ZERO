@@ -128,6 +128,7 @@ func _scenario(idx: int) -> bool:
 		return done()
 	var sc: Dictionary = scs[idx]
 	var c := CarrieraScript.new()
+	c.crescitaRosa = true # come il web
 	c.percorso = FILE_PROVA
 	c.create(sc.name, int(sc.kit), int(sc.seed))
 	if not same(come_web(c.s), sc.created, "create"):
