@@ -334,6 +334,13 @@
 - Comandi (G = `Godot_v4.7.2-stable_win64_console.exe`, in `C:\Users\forma\Documents\godot-tools`):
   `$G --headless --path godot --import` · `$G --headless --path godot -- --esci-dopo=4` (niente errori) ·
   `$G --path godot -- --schermata=shots/x.png --dopo=3` (anche `--vista=vicina|porta|alta`, `--senza-vsync`, `--prova-tocchi`).
+- **Statistiche del giocatore "come su FIFA"** (Luis 2026-11-25, `scripts/menu/statistiche_giocatore.gd`): tasto
+  **Statistiche** nel pannello del giocatore della Rosa (per tutti: il campione accanto ad Aspetto, gli altri accanto a
+  "Cerca acquirenti"; non in partita) e nella scheda del Mercato. Velo con riquadro e lista che scorre: gruppi in
+  2 colonne VELOCITÀ, TIRO, PASSAGGI, DRIBBLING, DIFESA (+ Colpo di testa), FISICO, il portiere con PORTIERE per primo;
+  arco col valore grande e sotto-statistiche (`sim/sottostat.gd`, `Sotto.valore`) con barretta verde ≥ 70, gialla
+  50-69, rossa sotto. Solo lettura. Arg di prova `{"statistiche": true}` (Rosa con `sel`, Mercato con `aperto`);
+  controllo `test_statistiche_dalla_rosa_e_dal_mercato`, foto `10_rosa_statistiche*` / `12_mercato_statistiche`.
 - **Stellina del campione** (Luis 2026-11-24): quando il controllato è il campione (`src.champ`) sopra di lui c'è una
   stellina gialla (`TV.stellina()`, ×`STELLA_K` 1,1) al posto del triangolo (`vista.gd` `_aggiorna_segni`).
 - **Maglie di casa e trasferta** (Luis 2026-11-24, `scripts/carriera/divise.gd`, applicate in `app.gd` `_partita`):

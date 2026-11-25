@@ -14,6 +14,7 @@ const SCHERMATE := ["principale", "nuova_carriera", "hub", "rosa", "mercato", "c
 const ProvaMenu := preload("res://tests/prova_menu.gd")
 const Stili := preload("res://sim/stili.gd")
 const MercatoSquadre := preload("res://scripts/carriera/mercato_squadre.gd")
+const Sotto := preload("res://sim/sottostat.gd")
 
 var _andate: Array = []
 var _app_carriera: Variant = null
@@ -228,6 +229,81 @@ func test_rosa_menu_formazione_e_stili() -> bool:
 	var dati: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(SALVA))
 	eq([dati.carriera.formation, dati.carriera.stileAtt, dati.carriera.stileDif], ["5-3-2", "contropiede", "catenaccio"], "salvato su file con le chiavi di sempre")
 	_finisci(n)
+	return done()
+
+
+# Statistiche dettagliate (Luis 2026-11-25, "come su FIFA"): dalla Rosa il tasto Statistiche c'è per tutti (campione
+# compreso), apre la vista coi gruppi (portiere: PORTIERE per primo), nomi e valori delle sotto-statistiche; la ×
+# chiude. Anche dal Mercato, sulla scheda di un giocatore delle altre squadre.
+func test_statistiche_dalla_rosa_e_dal_mercato() -> bool:
+	var c := _carriera()
+	_inizia(c)
+	var ch: Variant = c.campione()
+	var altro: Variant = null
+	var portiere: Variant = null
+	for p: Dictionary in c.s.squad:
+		if not p.get("champ", false) and p.pos != "P" and altro == null:
+			altro = p
+		if p.pos == "P" and portiere == null:
+			portiere = p
+	for caso: Array in [[ch, "campione"], [altro, "altro giocatore"], [portiere, "portiere"]]:
+		var p: Dictionary = caso[0]
+		var n := _apri("rosa", {"sel": p.id})
+		var tasti := _bottoni(n).filter(func(b: Button) -> bool: return b.text == "Statistiche")
+		eq(tasti.size(), 1, "%s: tasto Statistiche" % caso[1])
+		if p.get("champ", false):
+			eq(_bottoni_con(n, "Aspetto"), 1, "campione: Aspetto resta")
+		else:
+			eq(_bottoni_con(n, "Cerca acquirenti"), 1, "%s: Cerca acquirenti resta" % caso[1])
+		if tasti.is_empty():
+			_finisci(n)
+			_inizia(c)
+			continue
+		(tasti[0] as Button).pressed.emit()
+		var v: Control = n._stat_velo
+		check(v != null and is_instance_valid(v), "%s: la vista si apre" % caso[1])
+		if v == null:
+			_finisci(n)
+			_inizia(c)
+			continue
+		var testi: Array = v.find_children("*", "Label", true, false).map(func(l: Node) -> String: return (l as Label).text)
+		for g: String in ["VELOCITÀ", "TIRO", "PASSAGGI", "DRIBBLING", "DIFESA", "FISICO"]:
+			check(testi.has(g), "%s: gruppo %s" % [caso[1], g])
+		var gk: bool = p.pos == "P"
+		eq(testi.has("PORTIERE"), gk, "%s: gruppo PORTIERE solo per il portiere" % caso[1])
+		var gruppi: Array = v.find_children("Gruppo_*", "", true, false)
+		eq(gruppi.size(), 7 if gk else 6, "%s: numero di gruppi" % caso[1])
+		if not gruppi.is_empty():
+			eq(str(gruppi[0].name), "Gruppo_por" if gk else "Gruppo_vel", "%s: primo gruppo" % caso[1])
+		for k: String in ["acc", "fin", "pco", "drb", "ctr", "frz", "tes"]:
+			check(testi.has(Sotto.NOMI[k]), "%s: nome %s" % [caso[1], Sotto.NOMI[k]])
+		if gk:
+			check(testi.has(Sotto.NOMI["rif"]), "portiere: Riflessi")
+		# valori: il numero grande della Velocità e quello della Finalizzazione
+		var vel: Array = v.find_children("Gruppo_vel", "", true, false)
+		if not vel.is_empty():
+			var grande: Node = (vel[0] as Node).find_child("Valore", true, false)
+			eq((grande as Label).text if grande is Label else "", str(int(p.vel)), "%s: valore della Velocità" % caso[1])
+		var fin_v := str(int(roundf(Sotto.valore(p, "fin"))))
+		var riga_fin: Variant = null
+		for l: Node in v.find_children("*", "Label", true, false):
+			if (l as Label).text == Sotto.NOMI["fin"]:
+				riga_fin = l
+		check(riga_fin != null and (riga_fin.get_parent().get_child(1) as Label).text == fin_v, "%s: valore della Finalizzazione %s" % [caso[1], fin_v])
+		_bottoni(v)[0].pressed.emit()   # ×
+		check(n._stat_velo == null, "%s: la × chiude" % caso[1])
+		_finisci(n)
+		_inizia(c)
+	# Mercato: la scheda aperta ha Statistiche, che apre la stessa vista
+	var m := _apri("mercato", {"aperto": 0, "filtro": "T"})
+	var tm := _bottoni(m).filter(func(b: Button) -> bool: return b.text == "Statistiche")
+	eq(tm.size(), 1, "mercato: tasto Statistiche nella scheda")
+	if not tm.is_empty():
+		(tm[0] as Button).pressed.emit()
+		check(m._stat_velo != null and is_instance_valid(m._stat_velo), "mercato: la vista si apre")
+		if m._stat_velo != null:
+			check(m._stat_velo.find_children("Gruppo_*", "", true, false).size() >= 6, "mercato: gruppi mostrati")
+	_finisci(m)
 	return done()
 
 
