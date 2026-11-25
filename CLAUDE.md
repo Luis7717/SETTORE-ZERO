@@ -120,6 +120,9 @@
   Il **campione non si vende** (Luis 2026-11-25): `Carriera.sell` lo rifiuta e nella Rosa ha solo il tasto Aspetto.
   Il **campione parte sempre al 100%** (Luis 2026-11-25): in partita si stanca come gli altri, ma tra le partite la
   sua forma torna a 100 (`Forma.giornata`) e in `squadraPartita` non ha mai `energy0`.
+  **Energia sempre visibile** (Luis 2026-11-25, "non capisco se si sono rigenerate"): nella Rosa ogni carta ha la
+  barretta dell'energia anche piena e il pannello scrive "energia N%" (fuori partita = forma tra le partite; nella
+  Rosa della pausa = energia vera del motore, `CambiPartita.leggi_energie`); nel dopo partita una riga spiega il recupero.
   **Crescita coi voti** (Luis 2026-11-25, `scripts/carriera/crescita_voti.gd`, chiamata da `dopoPartita`): dopo ogni
   partita di campionato chi ha un voto in pagella (`voti.gd`) sopra 6 cresce e sotto 6 cala, di più o di meno secondo
   l'età (giovani crescono tanto e calano poco, vecchi il contrario; progresso decimale in `s.progVoti`, a ±1 una

@@ -20,6 +20,7 @@ var fatti := 0                 # sostituzioni fatte in questa partita
 var usciti: Array = []         # id di chi è uscito (non rientra)
 var espulsi: Array = []        # id degli espulsi della persona (leggi_espulsi)
 var da_mostrare: Array = []    # cambi applicati al motore e non ancora mostrati dalla scena del cambio
+var energie := {}              # energia in partita (0..100) per id, letta all'apertura della Rosa (leggi_energie)
 
 
 func restano() -> int:
@@ -32,6 +33,20 @@ func leggi_espulsi(m: Object, me: int) -> void:
 	for p: Object in m.team(me):
 		if p.off and p.src is Dictionary and p.src.has("id"):
 			espulsi.append(p.src.id)
+
+
+## energia attuale nel motore dei giocatori in campo della squadra me (Luis 2026-11-25: "non capisco se si sono
+## rigenerate"): la Rosa della pausa mostra questa, non la forma tra le partite
+func leggi_energie(m: Object, me: int) -> void:
+	energie = {}
+	for p: Object in m.team(me):
+		if p.src is Dictionary and p.src.has("id"):
+			energie[str(p.src.id)] = clampi(int(round(float(p.energy) * 100.0)), 0, 100)
+
+
+## energia da mostrare per id in partita: quella del motore per chi è in campo, piena per chi è in panchina
+func energia(id: Variant) -> int:
+	return int(energie.get(str(id), 100))
 
 
 func uscito(id: Variant) -> bool:

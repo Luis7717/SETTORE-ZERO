@@ -223,3 +223,17 @@ func test_campione_non_si_vende() -> bool:
 	check(c.sell(altro) == "", "gli altri si vendono ancora")
 	_fine()
 	return done()
+
+
+# Luis 2026-11-25 "non capisco se si sono rigenerate": la Rosa della pausa mostra l'energia vera del motore
+func test_energie_in_partita_dal_motore() -> bool:
+	var c := _carriera()
+	var m := _partita(c)
+	var cp := CambiPartita.new()
+	var p: Object = m.team(0)[5]
+	p.energy = 0.63
+	cp.leggi_energie(m, 0)
+	eq(cp.energia(p.src.id), 63, "energia del motore in percentuale")
+	eq(cp.energia(-999), 100, "chi non è in campo (panchina): piena")
+	m.dispose()
+	return done()

@@ -2,7 +2,7 @@
 # ruolo, ritratto, nome breve; fuori ruolo = ruolo vero in arancio a sinistra, a destra quanto cambia la squadra
 # scambiandola col giocatore scelto (verde/rosso). Bordo per fascia di valutazione; scelta = gialla, confronto =
 # bianca che pulsa, appena scambiata = lampo giallo che si spegne. Stato fisico (solo Godot, fisico()): croce rossa
-# sugli infortunati e barretta della forma in basso quando non è piena (verde, gialla, rossa).
+# sugli infortunati e barretta dell'energia in basso, sempre (verde, gialla, rossa; in partita quella del motore).
 # In partita (Rosa e tattica dalla pausa, in_partita()): "USCITO" su chi è già uscito (grigia, non rientra) ed
 # "ESPULSO" col cartellino rosso sull'espulso.
 # Disegnata tutta in _draw (un nodo per carta: la Rosa ne ha fino a 24 e si ridisegna a ogni tocco).
@@ -210,11 +210,11 @@ func _disegna_fisico() -> void:
 		_rett(Rect2(3, 21, 15, 15), T.BAD, 4)
 		draw_rect(Rect2(9, 23.5, 3, 10), Color.WHITE)
 		draw_rect(Rect2(5.5, 27, 10, 3), Color.WHITE)
-	if forma < 100:
-		var col := T.GOOD if forma >= 80 else (Color("#f1c75a") if forma >= 50 else T.BAD)
-		var w := W - 16.0
-		draw_rect(Rect2(8, H - 5, w, 2), Color(1, 1, 1, 0.12))
-		draw_rect(Rect2(8, H - 5, w * clampf(forma / 100.0, 0.0, 1.0), 2), col)
+	# barretta dell'energia sempre visibile, anche piena (Luis 2026-11-25: "non capisco se si sono rigenerate")
+	var col := T.GOOD if forma >= 80 else (Color("#f1c75a") if forma >= 50 else T.BAD)
+	var w := W - 16.0
+	draw_rect(Rect2(8, H - 6, w, 3), Color(1, 1, 1, 0.12))
+	draw_rect(Rect2(8, H - 6, w * clampf(forma / 100.0, 0.0, 1.0), 3), col)
 
 
 func _rett(r: Rect2, c: Color, raggio: int) -> void:

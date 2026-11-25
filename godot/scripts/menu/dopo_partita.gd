@@ -12,6 +12,7 @@
 extends MenuSchermata
 
 const Crescita := preload("res://scripts/carriera/crescita.gd")
+const Forma := preload("res://scripts/carriera/forma.gd")
 
 var _tabellino: Variant = null   # esito.tabellino (conta_giocatori.gd): c'è il tasto delle statistiche
 
@@ -283,6 +284,8 @@ func _novita(res: Dictionary) -> Control:
 		if not su.is_empty():
 			righe.append("[b]%s cresce:[/b] %s" % [U.esc(str(cr.nome)), " · ".join(su)])
 	righe.append_array(righe_voti(res))
+	if res.has("infortuni"): # giornata di campionato registrata (Forma.giornata): energia tra le partite
+		righe.append("[b]Energia:[/b] il campione riparte al 100%%; gli altri recuperano %d punti, %d chi ha riposato (vedi la barretta in Rosa)." % [Forma.RECUPERO, Forma.RECUPERO + Forma.RECUPERO_RIPOSO])
 	if res.has("derby"):
 		righe.append("[color=#ffd93d][b]Derby vinto![/b][/color] Premio in più dalla società." if int(res.derby) > 0 else "Derby perso o pareggiato: niente premio in più.")
 	for inf: Dictionary in res.get("infortuni", []):

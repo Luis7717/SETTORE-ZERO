@@ -858,6 +858,7 @@ func _apri_rosa() -> void:
 	if cambi == null or c == null or not paused or _rosa != null:
 		return
 	cambi.leggi_espulsi(m, me)
+	cambi.leggi_energie(m, me)
 	hud.nascondi_overlay()
 	_rosa_layer = CanvasLayer.new()
 	_rosa_layer.layer = 8

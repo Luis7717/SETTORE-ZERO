@@ -202,7 +202,8 @@ func _carta(p: Dictionary, slot_pos: String, sp: Variant, F: Array) -> MenuCarta
 	var carta := Carta.new()
 	carta.imposta(p, slot_pos, MenuFaccia.svg_tondo(D.look_of(p), _colori[0], _colori[1], MenuFaccia.fondo_di(_k1)), _delta(p, sp, F))
 	carta.segna(sel == p.id, tgt == p.id, just is Array and (just as Array).has(p.id))
-	carta.fisico(carriera().forma_di(p.id), carriera().infortunio(p.id))
+	# energia: in partita quella vera del motore, fuori la forma tra le partite (il campione sempre 100)
+	carta.fisico(cambi.energia(p.id) if in_partita else carriera().forma_di(p.id), carriera().infortunio(p.id))
 	carta.in_partita(_stato_partita(p.id))
 	carta.toccata.connect(_tocca)
 	return carta
@@ -463,8 +464,8 @@ func _pannello_giocatore(p: Dictionary, F: Array) -> Control:
 	var info := D.pos_name(p.pos) + " · " + Fisico.testo(fis)
 	if c.infortunio(p.id) > 0:
 		info += " · INFORTUNATO (%d)" % c.infortunio(p.id)
-	elif c.forma_di(p.id) < 100:
-		info += " · forma %d" % c.forma_di(p.id)
+	else: # sempre scritta (Luis 2026-11-25: "non capisco se si sono rigenerate")
+		info += " · energia %d%%" % (cambi.energia(p.id) if in_partita else c.forma_di(p.id))
 	if at.where != D.pos_name(p.pos):
 		info += " · in campo %s" % at.where
 	info += " · %d anni · %s" % [int(p.age), D.fmt_money(D.value(p))]
