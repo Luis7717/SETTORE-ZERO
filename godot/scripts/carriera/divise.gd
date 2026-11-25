@@ -3,14 +3,15 @@
 # Casa = i colori della squadra (Carriera.KITS: maglia del colore principale). Trasferta = una maglia fissa per colore
 # (TRASFERTA), chiara per le squadre scure e scura per quelle chiare. In partita la squadra di casa veste la maglia di
 # casa; l'ospite la sua di casa se si distingue bene, altrimenti quella da trasferta (e se anche quella si confonde, i
-# suoi colori invertiti, poi bianco o nero). Stile, stemma e portiere restano quelli della squadra.
+# riserve: nera, bianca, blu notte...). Conta anche il secondo colore (righe, maniche, calzoncini). Stile, stemma e portiere restano quelli della squadra.
 # Solo colori: nessun campo nuovo nel salvataggio (la trasferta si ricava dal colore della squadra).
 extends RefCounted
 
 const Car := preload("res://scripts/carriera/carriera.gd")
 
-## maglie troppo simili sotto questa distanza di colore (somma delle differenze R, G, B, come Carriera.colorDist)
-const SIMILI := 260
+## colori troppo simili sotto questa distanza come la vede l'occhio (ΔE nello spazio Lab, `dist`). Prima era la somma
+## delle differenze R, G, B: rosso e nero risultavano "simili" e il nero veniva scartato (Luis 2026-11-25)
+const SIMILI := 50.0
 const BIANCO := 0xf4f4f4
 const NERO := 0x16161c
 ## per indice di Carriera.KITS: [maglia, calzoncini, calzettoni] da trasferta
@@ -39,18 +40,76 @@ static func trasferta(k: int) -> Array:
 
 
 static func simili(a: int, b: int) -> bool:
-	return Car.colorDist(a, b) < SIMILI
+	return dist(a, b) < SIMILI
 
 
-## colori che veste l'ospite (colore kb) contro la squadra di casa (colore ka, in maglia di casa)
-static func scelta_ospite(ka: int, kb: int) -> Array:
-	var m_casa: int = casa(ka)[0]
+## distanza tra due colori 0xRRGGBB come la vede l'occhio (ΔE76 in CIELAB, luce D65)
+static func dist(a: int, b: int) -> float:
+	return _lab(a).distance_to(_lab(b))
+
+
+static func _lab(c: int) -> Vector3:
+	var rgb := Vector3(_lin((c >> 16) & 255), _lin((c >> 8) & 255), _lin(c & 255))
+	var x := (0.4124 * rgb.x + 0.3576 * rgb.y + 0.1805 * rgb.z) / 0.95047
+	var y := 0.2126 * rgb.x + 0.7152 * rgb.y + 0.0722 * rgb.z
+	var z := (0.0193 * rgb.x + 0.1192 * rgb.y + 0.9505 * rgb.z) / 1.08883
+	var fx := _f(x)
+	var fy := _f(y)
+	var fz := _f(z)
+	return Vector3(116.0 * fy - 16.0, 500.0 * (fx - fy), 200.0 * (fy - fz))
+
+
+static func _lin(v: int) -> float:
+	var f := v / 255.0
+	return f / 12.92 if f <= 0.04045 else pow((f + 0.055) / 1.055, 2.4)
+
+
+static func _f(t: float) -> float:
+	return pow(t, 1.0 / 3.0) if t > 0.008856 else 7.787 * t + 16.0 / 116.0
+
+
+## secondo colore come lo disegna la figura (vista._secondo_colore: righe, maniche, colletto): i calzoncini, o
+## quasi nero / bianco se sono come la maglia
+static func secondo(col: Array) -> int:
+	if int(col[1]) != int(col[0]):
+		return int(col[1])
+	return NERO if dist(int(col[0]), NERO) > dist(int(col[0]), BIANCO) else BIANCO
+
+
+## due divise si confondono se le maglie sono simili, o se hanno gli stessi due colori scambiati (Luis 2026-11-25:
+## biancorossa contro bianca a righe rosse non si capiva niente)
+static func confuse(a: Array, b: Array) -> bool:
+	return distacco(a, b) < SIMILI
+
+
+## quanto si distinguono due divise: la distanza tra le maglie, o tra i colori scambiati se è più piccola
+static func distacco(a: Array, b: Array) -> float:
+	var a1: int = int(a[0])
+	var b1: int = int(b[0])
+	var scambiati := maxf(dist(a1, secondo(b)), dist(secondo(a), b1))
+	return minf(dist(a1, b1), scambiati)
+
+
+## divise di riserva dopo casa e trasferta, in ordine: nera, bianca, blu notte, gialla, verde, viola
+static func riserve(kb: int) -> Array:
 	var c: Array = Car.KITS[_idx(kb)]
-	for opz: Array in [casa(kb), trasferta(kb), [c[2], c[1], c[2]]]:
-		if not simili(opz[0], m_casa):
+	return [[NERO, c[1], NERO], [NERO, 0xe8e8e8, NERO], [BIANCO, NERO, BIANCO], [0x14224a, BIANCO, 0x14224a],
+		[0xf2c200, NERO, 0xf2c200], [0x0b7a3e, BIANCO, 0x0b7a3e], [0x5b2a86, BIANCO, 0x5b2a86]]
+
+
+## colori che veste l'ospite (colore kb) contro la squadra di casa (colore ka, in maglia di casa): la prima tra
+## casa, trasferta e riserve che non si confonde; se si confondono tutte, quella che si distingue di più
+static func scelta_ospite(ka: int, kb: int) -> Array:
+	var m_casa: Array = casa(ka)
+	var opzioni: Array = [casa(kb), trasferta(kb)]
+	opzioni.append_array(riserve(kb))
+	var meglio: Array = opzioni[0]
+	for opz: Array in opzioni:
+		if not confuse(opz, m_casa):
 			return opz
-	var lontano: int = BIANCO if Car.colorDist(BIANCO, m_casa) > Car.colorDist(NERO, m_casa) else NERO
-	return [lontano, c[1], lontano]
+		if distacco(opz, m_casa) > distacco(meglio, m_casa):
+			meglio = opz
+	return meglio
 
 
 ## colore (indice di KITS) di una divisa già fatta da Carriera (stemma coi colori della squadra), -1 se non si capisce

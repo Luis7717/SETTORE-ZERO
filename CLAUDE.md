@@ -305,7 +305,10 @@
 - **Maglie di casa e trasferta** (Luis 2026-11-24, `scripts/carriera/divise.gd`, applicate in `app.gd` `_partita`):
   casa = colori della squadra, trasferta = maglia fissa per colore (`TRASFERTA`, chiara per le scure e scura per le
   chiare). La squadra di casa veste quella di casa; l'ospite la sua di casa se si distingue (`SIMILI`), altrimenti la
-  trasferta (poi colori invertiti, poi bianco/nero). In campionato fuori casa l'ospite sono io. Niente campi nuovi nel
+  trasferta, poi le riserve (nera col colore della squadra, nera, bianca, blu notte, gialla, verde, viola). Conta anche il
+  secondo colore (righe, maniche, calzoncini): si confondono maglie simili o due divise coi colori scambiati
+  (biancorossa contro bianca a righe rosse, Luis 2026-11-25); distanza dei colori come la vede l'occhio (ΔE Lab,
+  `Divise.dist`, `SIMILI` 50). In campionato fuori casa l'ospite sono io. Niente campi nuovi nel
   salvataggio. Test `tests/test_divise.gd`.
 - I **Momenti chiave** sono stati tolti (Luis 2026-11-23): resta solo la partita intera. Il campo `settings.momenti` dei
   salvataggi vecchi resta ma non conta più.
