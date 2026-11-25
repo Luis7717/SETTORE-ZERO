@@ -198,6 +198,15 @@
   ma sembra ancora che si fermi"). Test `test_dopo_il_dribbling_riuscito_non_si_ferma`; misura in partite vere:
   `-s res://tools/diag_dopo_dribbling.gd -- --partite=3 --solo-dribbling [--righe]`.
 - La finta è stata tolta (2026-11-20).
+- **Tiro da girato** (Godot, Luis 2026-11-25, con `rifiniture`, costanti `GIRATA_*` in `godot/sim/base.gd`): col corpo
+  (`fx`, `fy`) girato oltre 60° rispetto al tiro il tiro è via via più debole e impreciso, al massimo da 150° in su
+  (velocità ×0,45, errore ×3,5); vale per tutti, non nei calci da fermo (`launch`). La CPU girata non tira subito: si
+  gira verso la porta e tira solo dopo almeno `GIRATA_ATTESA` 0,5 s col pallone (`girataAspetta` in `ai.gd`, `presaT`).
+  In grafica il tiro girato oltre 90° è un piatto, non un collo pieno (`figura_mocap.gd`). Test `tests/test_girata.gd`.
+- **Fischio di fine tempo** (Godot, Luis 2026-11-25, con `rifiniture`, `azioneInCorso` in `sim/match.gd`): a tempo
+  scaduto col pallone in gioco entro `FISCHIO_ZONA` 25 m da una delle due porte si lascia finire l'azione; il fischio
+  arriva quando il pallone esce dalla zona, il portiere lo tiene, c'è un vantaggio o il gioco si ferma (fuori, fallo,
+  gol; il rigore si batte), al massimo `FISCHIO_MAX` 25 s dopo. L'orologio resta a 45'/90'. Test `tests/test_fischio.gd`.
 - Calcio d'angolo: telecamera alle spalle del battitore; dito vicino al battitore = cross, lontano = trascinando si gira la visuale.
 - **Rimessa laterale nostra** (Godot, Luis 2026-11-23): quando il battitore è sulla linea (`restart.sulPosto()`) la
   telecamera entra piano alle spalle del battitore, fuori dal campo, girata verso il campo e un po' verso la porta

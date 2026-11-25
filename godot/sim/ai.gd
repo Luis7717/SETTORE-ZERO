@@ -87,6 +87,22 @@ func aiShoot(p: R.Player, pen: bool = false, side: float = 0.0) -> void:
 	kick(p, {"type": "shot", "tx": tx, "ty": ty, "th": th, "curve": curve})
 
 
+# Con "rifiniture" (Luis 2026-11-25): la CPU col corpo girato rispetto al tiro (oltre GIRATA_DA, base.gd) non tira
+# subito: prima si gira verso la porta, e da quando ha preso il pallone ci vuole almeno GIRATA_ATTESA. Già ben
+# orientata quando lo riceve tira quando vuole. Dopo GIRATA_MAX_T col pallone tira comunque (il tiro da girato resta
+# debole e impreciso, match.gd launch). true = aspetta.
+func girataAspetta(p: R.Player, side: float) -> bool:
+	var gy: float = (-1.0 if p.team else 1.0) * HL
+	var tx: float = side * (GW / 2.0 - SHOT_POST)
+	var tenuto: float = time - p.presaT
+	if tenuto >= GIRATA_MAX_T:
+		return false
+	if girataK(p.fx, p.fy, tx - ball.x, gy - ball.y) > 0.0:
+		p.girataDa = p.presaT
+		return true
+	return p.girataDa == p.presaT and tenuto < GIRATA_ATTESA
+
+
 # lato di tiro con la linea libera (0 = entrambi coperti); a pari merito, il palo lontano dal portiere
 func shotSide(p: R.Player) -> float:
 	var tm := p.team
@@ -211,6 +227,8 @@ func carrierAI(p: R.Player) -> void:
 	var react: float = PRESS_REACT_T + 0.1 * (1.0 - sk)
 	if press < PRESS_REACT and p.aiT > react:
 		p.aiT = react
+	var girato := false
+	var side: float = 0.0
 	if p.aiT <= 0.0 and p.stun <= 0.0:
 		p.aiT = 0.42 - 0.2 * sk + rnd() * 0.15
 		if sa.contro and counter(tm):
@@ -220,7 +238,7 @@ func carrierAI(p: R.Player) -> void:
 			# dentro l'area si tira quasi sempre; da fuori solo da buona posizione (i tiri da lontano li para quasi tutti)
 			var q: float = (1.0 if dg < BOX_SHOT else C.clamp_((SHOT_RANGE - dg) / (SHOT_RANGE - BOX_SHOT), 0.0, 1.0) * LONG_SHOT) * C.clamp_(1.25 - ang * 0.9, 0.1, 1.0)
 			# si guarda la linea verso ciascun palo (dove si mira davvero), meglio se lontano dal portiere
-			var side: float = shotSide(p)
+			side = shotSide(p)
 			if side == 0.0:
 				q *= SHOT_BLOCKED
 			if dg < 10.0:
@@ -229,8 +247,10 @@ func carrierAI(p: R.Player) -> void:
 			if sa.poss and dg > BOX_SHOT:
 				bar += Stili.POSS_SHOT
 			if q > bar:
-				aiShoot(p, false, side)
-				return
+				if not (rifiniture and girataAspetta(p, side)):
+					aiShoot(p, false, side)
+					return
+				girato = true # girata: prima si gira verso la porta (sotto la corsa punta la porta)
 		# pressato vicino alla propria porta e senza passaggi sicuri: spazzata lunga verso la fascia
 		if p.y * dir < -HL + CLEAR_ZONE and press < 2.6:
 			var safe: Variant = passOptions(p)
@@ -288,6 +308,13 @@ func carrierAI(p: R.Player) -> void:
 				ba = a
 		p.dx = p.x + F.cos_(ba) * 10.0
 		p.dy = p.y + F.sin_(ba) * 10.0
+		if girato:
+			# si gira col pallone verso la porta e ci ripensa presto: il tiro parte quando è girato (girataAspetta)
+			var tgx: float = side * (GW / 2.0 - SHOT_POST)
+			var tgn: float = C.orf(C.hyp(tgx - p.x, gy - p.y), 1.0)
+			p.dx = p.x + (tgx - p.x) / tgn * 6.0
+			p.dy = p.y + (gy - p.y) / tgn * 6.0
+			p.aiT = minf(p.aiT, GIRATA_RIPENSA)
 	p.tx = C.clamp_(p.dx, -HW + 1.0, HW - 1.0)
 	p.ty = C.clamp_(p.dy, -HL + 1.0, HL - 1.0)
 	if sa.contro and counter(tm):

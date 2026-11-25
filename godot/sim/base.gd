@@ -28,6 +28,17 @@ const ROLL := C.ROLL
 
 const SPEED_TIRED := 0.86 # a energia 0 la velocità massima scende a questa frazione (l'energia cala più piano con più fisico = resistenza)
 const WIDE_GAP := 2.0 # metri dalla linea laterale degli esterni quando la squadra attacca
+# Tiro da girato (Luis 2026-11-25, solo con "rifiniture"): conta l'angolo tra il verso del corpo del tiratore (fx, fy) e
+# la direzione del tiro. Fino a GIRATA_DA niente cambia; poi il tiro diventa via via più debole e impreciso, fino al
+# massimo con le spalle alla porta (GIRATA_PIENA e oltre). Vale per tutti, anche per la persona (match.gd launch).
+const GIRATA_DA := deg_to_rad(60.0)     # fin qui il tiro è normale
+const GIRATA_PIENA := deg_to_rad(150.0) # da qui in su: tiro con le spalle alla porta, il più debole e impreciso
+const GIRATA_SIG := 2.5                 # errore di mira ×(1 + 2,5·g): ×3,5 con le spalle alla porta
+const GIRATA_V := 0.55                  # velocità del tiro ×(1 − 0,55·g): meno della metà con le spalle alla porta
+# ... e la CPU girata non tira subito (ai.gd carrierAI): prima si gira verso la porta, e ci vuole tempo
+const GIRATA_ATTESA := 0.5              # col corpo girato oltre GIRATA_DA: almeno tanto col pallone prima di tirare (s)
+const GIRATA_RIPENSA := 0.1             # mentre si gira, ci ripensa così spesso (s)
+const GIRATA_MAX_T := 1.6               # sicurezza: dopo tanto col pallone tira anche se non è ancora girato (s)
 
 var rng: SimRngScript = null
 var halfLen: float = 180.0
@@ -295,6 +306,17 @@ func pushAway(tm: int, x: float, y: float, Rr: float) -> void:
 			o.y = ny
 			o.vx = 0.0
 			o.vy = 0.0
+
+
+## Quanto il tiratore è girato rispetto al tiro (2026-11-25): 0 fino a GIRATA_DA tra il verso del corpo (fx, fy) e la
+## direzione (dx, dy), 1 da GIRATA_PIENA in su, in mezzo cresce dritto.
+static func girataK(fx: float, fy: float, dx: float, dy: float) -> float:
+	var nf: float = C.hyp(fx, fy)
+	var nd: float = C.hyp(dx, dy)
+	if nf < 1e-6 or nd < 1e-6:
+		return 0.0
+	var a: float = acos(clampf((fx * dx + fy * dy) / (nf * nd), -1.0, 1.0))
+	return clampf((a - GIRATA_DA) / (GIRATA_PIENA - GIRATA_DA), 0.0, 1.0)
 
 
 func faceTo(p: R.Player, x: float, y: float) -> void:

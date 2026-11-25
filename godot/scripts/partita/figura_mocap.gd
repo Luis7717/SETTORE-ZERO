@@ -45,6 +45,8 @@ const NEAR_BALL := 2.2
 const CALCIO_CORSA := 3.5      # m/s: dopo il contatto, se il motore lo fa già correre così, la clip esce prima
 const CALCIO_DOPO := 0.35      # s di clip dopo il contatto prima di poter uscire per la corsa
 const YAW_MAX := 1.7           # rad: al massimo si gira così verso il pallone calciato
+const TIRO_GIRATO := deg_to_rad(90.0) # tiro col corpo girato più di così rispetto al pallone (2026-11-25): niente collo
+                              # pieno, un tocco di piatto (il motore lo fa debole e impreciso, sim/base.gd GIRATA_*)
 const ESULTA_RAGGIO := 14.0    # m dal marcatore
 const ESULTA_COMPAGNI := 3
 const TUFFO_PIENO := 0.35      # s: il tuffo calcolato del motore è a pieno dopo questo tempo (figura.gd: p.t / 0.35)
@@ -288,12 +290,16 @@ func _calcio(p: Object, b: Object, ripresa: String) -> void:
 	_n_calci += 1
 	var k: Object = b.kick if b != null else null
 	var tk: String = k.type if k != null and k.kicker == p else "shot"
+	# angolo tra lo sguardo e la velocità del pallone calciato (col segno: verso dove si gira il corpo)
+	var a := 0.0
+	if b != null and absf(b.vx) + absf(b.vy) > 0.5:
+		a = atan2(p.fx * b.vy - p.fy * b.vx, p.fx * b.vx + p.fy * b.vy)
 	var n := ""
 	if ripresa == "throw":
 		n = "rimessa"
 	elif ripresa == "penalty":
 		n = "rigore%d_%s" % [1 + (_n_calci + p.i) % 2, _piede]
-	elif tk == "ground":
+	elif tk == "ground" or (tk == "shot" and absf(a) > TIRO_GIRATO):
 		n = "piatto_" + _piede
 	elif tk == "loft":
 		n = "collo_" + _piede
@@ -311,10 +317,7 @@ func _calcio(p: Object, b: Object, ripresa: String) -> void:
 	else:
 		_avvia(n, "calcio", _contatto, ENTRA_CALCIO, 1.0)
 	# il corpo si gira verso dove va il pallone (in campo l'angolo tra lo sguardo e la velocità del pallone)
-	yaw = 0.0
-	if b != null and absf(b.vx) + absf(b.vy) > 0.5:
-		var a := atan2(p.fx * b.vy - p.fy * b.vx, p.fx * b.vx + p.fy * b.vy)
-		yaw = clampf(a, -YAW_MAX, YAW_MAX)
+	yaw = clampf(a, -YAW_MAX, YAW_MAX)
 
 
 # marcatore + i compagni più vicini a lui (al massimo ESULTA_COMPAGNI entro ESULTA_RAGGIO); clip scelta col seme
