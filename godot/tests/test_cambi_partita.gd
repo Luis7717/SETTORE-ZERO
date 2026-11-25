@@ -209,3 +209,17 @@ func test_campione_sempre_titolare_fuori_partita() -> bool:
 	eq(ids.size(), 11, "11 titolari diversi")
 	_fine()
 	return done()
+
+
+# Luis 2026-11-25: "Ovviamente il campione non deve essere venduto"
+func test_campione_non_si_vende() -> bool:
+	var c := _carriera()
+	var ch := c.addChampion({"pos": "A", "name": "Campione"})
+	var soldi: int = c.s.money
+	var n: int = c.s.squad.size()
+	check(c.sell(ch.id) != "", "la vendita del campione viene rifiutata")
+	check(c.player(ch.id) != null and c.s.squad.size() == n and c.s.money == soldi, "il campione resta e i soldi non cambiano")
+	var altro: Variant = c.bench()[0].id
+	check(c.sell(altro) == "", "gli altri si vendono ancora")
+	_fine()
+	return done()

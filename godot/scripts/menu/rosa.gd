@@ -503,13 +503,16 @@ func _pannello_giocatore(p: Dictionary, F: Array) -> Control:
 		var nota := "Espulso: non si può cambiare" if st == "espulso" else ("Già uscito: non rientra" if st == "uscito" else "Tocca un altro giocatore per scambiarli")
 		v.add_child(U.testo(nota, 12.5, T.BAD if st != "" else T.DIM, T.PESO_FORTE, HORIZONTAL_ALIGNMENT_CENTER))
 		return pann
-	# solo il campione creato all'inizio si può modificare (Luis 2026-11-24): gli altri hanno solo Vendi
+	# solo il campione creato all'inizio si può modificare (Luis 2026-11-24) e lui non si vende mai (2026-11-25):
+	# il campione ha solo Aspetto, gli altri solo Vendi
 	var mio: bool = p.get("champ", false)
-	var bt := U.griglia(2 if mio else 1, 8, 8)
+	var bt := U.griglia(1, 8, 8)
 	if mio:
 		var asp := U.bottone("Aspetto", "", func() -> void: vai("editor", {"flow": "look", "id": p.id}), 44)
 		asp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		bt.add_child(asp)
+		v.add_child(bt)
+		return pann
 	var vendi := U.bottone("Vendi per %s" % D.fmt_money(c.sellPrice(p)), "BtnFantasma", Callable(), 44)
 	vendi.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vendi.pressed.connect(func() -> void:

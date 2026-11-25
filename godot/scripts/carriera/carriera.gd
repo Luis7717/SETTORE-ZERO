@@ -671,6 +671,8 @@ func sell(id: int) -> String:
 	var p: Variant = player(id)
 	if p == null:
 		return "Giocatore non trovato"
+	if p.get("champ", false): # il campione non si vende mai (Luis 2026-11-25)
+		return "Il tuo campione non si vende"
 	if s.squad.size() <= SQUAD_MIN:
 		return "Servono almeno 14 giocatori in rosa"
 	if p.pos == "P":

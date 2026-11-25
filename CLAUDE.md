@@ -117,6 +117,7 @@
   successiva (`squadraPartita`) e al caricamento. Prove: `-- --pausa-rosa[=pausa|giocatore|formazione|cambi]`,
   `--scena=cambio` (carriera di prova su `user://prova_pausa_rosa.json`); test `tests/test_cambi_partita.gd`,
   `-s res://tests/prova_cambio.gd`, controlli in `controlli_menu.gd`.
+  Il **campione non si vende** (Luis 2026-11-25): `Carriera.sell` lo rifiuta e nella Rosa ha solo il tasto Aspetto.
 - **Stili di gioco** (Fase D, `godot/sim/stili.gd`): nella Rosa, tasti **Attacco** e **Difesa**: attacco (Equilibrato, Contropiede,
   Possesso, Fasce, Lanci lunghi) e difesa (Equilibrata, Pressing, Catenaccio, A uomo, Fuorigioco). Valgono per i
   compagni della CPU e per gli avversari (stile fisso per squadra, mostrato nell'hub). Campi `stileAtt`/`stileDif`
