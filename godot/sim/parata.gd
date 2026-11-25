@@ -216,8 +216,8 @@ func _paraTry(tm: int) -> void:
 		return
 	var g := gk(tm)
 	var x0: float = paraShot.gx0 if paraShot != null else g.x
-	var tx: float = paraReachX(x0, g.st.por, float(am.x))
-	var need: float = absf(tx - g.x) / (GK_HUMAN_SPEED + g.st.por * 0.03) + PARA_MARGIN
+	var tx: float = paraReachX(x0, g.st.sv("tuf"), float(am.x))
+	var need: float = absf(tx - g.x) / (GK_HUMAN_SPEED + g.st.sv("tuf") * 0.03) + PARA_MARGIN
 	if paraLeft() > maxf(PARA_LEAD, need):
 		return
 	var auto: bool = bool(am.get("auto", false))
@@ -273,7 +273,7 @@ func _gkAutoTimed(p: R.Player, s: R.Shot) -> void:
 	if paraGkDone[tm]:
 		p.tx = gx
 		return
-	var vs: float = GK_AI_SPEED + p.st.por * 0.025
+	var vs: float = GK_AI_SPEED + p.st.sv("tuf") * 0.025
 	var need: float = absf(s.cx - p.x) / vs + PARA_MARGIN
 	if paraLeft() > maxf(PARA_LEAD, need):
 		p.tx = C.clamp_(s.gx0 + C.clamp_(s.cx - s.gx0, -PARA_STEP, PARA_STEP), -GW / 2.0, GW / 2.0)

@@ -60,7 +60,8 @@ static func tackleDot(o: R.Player, c: R.Player) -> float:
 ## fattore della probabilità di fallo di `o`: velocità, difesa, pioggia, squadra della persona
 func foulK(o: R.Player) -> float:
 	var k: float = C.clamp_(C.hyp(o.vx, o.vy) / FOUL_SPD_REF, FOUL_SPD_MIN, FOUL_SPD_MAX)
-	k *= C.clamp_(1.0 + (FOUL_DIF_REF - o.st.dif) * FOUL_DIF_K, FOUL_DIF_MIN, FOUL_DIF_MAX)
+	# meno contrasto (`ctr`) o più aggressività (scarto di `agg` da `fis`) = più falli
+	k *= C.clamp_(1.0 + (FOUL_DIF_REF - (o.st.sv("ctr") - o.st.scarto("agg"))) * FOUL_DIF_K, FOUL_DIF_MIN, FOUL_DIF_MAX)
 	if meteo == "pioggia":
 		k *= FOUL_RAIN
 	if human[o.team]:

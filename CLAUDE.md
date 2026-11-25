@@ -142,6 +142,20 @@
   esatta: valutazione e valore non cambiano) per chi non le ha; senza `sub` ogni sotto-statistica vale la sua grande
   (`Sotto.valore`). La crescita del campione e quella di metà stagione muovono le sotto-statistiche (`Sotto.muovi`
   ricalcola la grande). Nei confronti col JS `sub` si toglie (`test_carriera.gd`).
+  **In partita** (Luis 2026-11-25): `C.effStats` mette in `R.Stats.sub` le sotto-statistiche col malus del ruolo
+  della grande (portiere fuori ruolo al massimo 25); `st.sv(k)` = sotto-statistica (senza `sub` la grande), `st.scarto(k)`
+  = quanto si scosta dalla grande (dove la formula usava un'altra grande). Contano: `vmax` velocità massima, `acc`
+  accelerazione (`fis` + scarto), `fin` tiri entro `SUB_TIRO_VICINO` 18 m, `lon` oltre, `pot` velocità del tiro, `vol`
+  tiri di prima/girati/al volo (e malus della girata più piccolo, `GIRATA_VOL_K`), `rig` rigori e chi li batte, `pun`
+  punizioni, `pco`/`plu` passaggi fino/oltre `SUB_PASS_CORTO` 20 m, `cro` cross (angolo, alto dalla fascia verso l'area)
+  e chi batte l'angolo, `eff` tratto curvo (`subCalcio`/`abilCalcio` in `match.gd`; nei tiri `eff` e `pun`, che sono di
+  Passaggi, contano come `tir` + scarto); `agi` giro del corpo col pallone, `ctl` corsa
+  col pallone e stop dei palloni forti, `drb` dribbling, `equ` (+ scarto `frz`) tenuta nei contrasti; `int` intercetti,
+  `ctr` contrasto (raggio, furto, dribbling subito, falli); `ele` salti contesi (`tes` + scarto, `aereo`), `res`
+  stanchezza, `frz` spinte (`contatti.gd`, `FRZ_SPINTA`), `agg` raggio del contrasto e falli; `tuf` tuffo (portata e
+  velocità), `rif` reazione, `pre` presa, `pia` uscite sui cross (`gkContest`). Senza `sub` (o con sotto-statistiche
+  uguali alle grandi) il motore è identico. `Fisico.applica` sposta anche le sotto-statistiche della grande. Test
+  `tests/test_sottostat_motore.gd`; misura: `tools/controllo_gameplay.gd -- --sotto`.
   **Mercato con le squadre** (Luis 2026-11-25, `scripts/carriera/mercato_squadre.gd`, menu `mercato.gd`): si compra
   dagli 11 delle squadre della CPU (divisione e ruolo in alto; `[id squadra, indice]` di `aiMatchTeam(t, formazioneDi(t))`);
   prezzo chiesto = valore ×1,4 per il migliore della squadra, ×1,15 per gli altri; offerta da −20% a +20% a passi del 5%:

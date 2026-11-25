@@ -152,7 +152,27 @@ static func effStats(src: Dictionary, slotPos: String) -> R.Stats:
 	s.tes = headingOf(src) * f
 	if slotPos == "P" and src.get("pos", "") != "P":
 		s.por = minf(float(src.get("por", 0)), 25.0)
+	if src.get("sub") is Dictionary:
+		s.sub = subEff(src.sub, f, slotPos == "P" and src.get("pos", "") != "P")
 	return s
+
+
+## sotto-statistiche col malus del ruolo, come le loro grandi in effStats: vel, fis e por senza malus,
+## le altre ×f; il portiere fuori ruolo al massimo 25 come `por`
+static func subEff(sub: Dictionary, f: float, gkFuori: bool) -> Dictionary:
+	var out := {}
+	for k: String in sub:
+		if not R.GRANDE_DI.has(k):
+			continue
+		var g: String = R.GRANDE_DI[k]
+		var v: float = float(sub[k])
+		if g == "por":
+			out[k] = minf(v, 25.0) if gkFuori else v
+		elif g == "vel" or g == "fis":
+			out[k] = v
+		else:
+			out[k] = v * f
+	return out
 
 
 ## roll = attrito del rotolamento (m/s²): la partita passa il suo (meteo, SimMatch.roll); senza, ROLL come sempre

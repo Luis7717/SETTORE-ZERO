@@ -449,7 +449,7 @@ func sceneCornerTaker(outf: Array, x: float, y: float) -> R.Player:
 	for p: R.Player in outf:
 		if p.pos == "D":
 			continue
-		var s: float = C.hyp(p.x - x, p.y - y) - p.st.pas * CORNER_PAS_M
+		var s: float = C.hyp(p.x - x, p.y - y) - p.st.sv("cro") * CORNER_PAS_M
 		if s < bs:
 			bs = s
 			best = p

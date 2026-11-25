@@ -220,7 +220,7 @@ func headDuelRoll(w: R.HeadWin) -> bool:
 	var o := w.rival
 	var etaP: float = 0.12 + maxf(0.0, C.hyp(p.x - w.x, p.y - w.y) - HEAD_REACH) / vmax(p)
 	var etaO: float = 0.12 + maxf(0.0, C.hyp(o.x - w.x, o.y - w.y) - HEAD_ATT_R) / vmax(o)
-	var win: float = C.clamp_(0.5 + AIR_TES_K * (p.st.tes - o.st.tes) / 100.0 + (etaO - etaP) * HEAD_PRE_ETA_K, AIR_WIN_MIN, AIR_WIN_MAX)
+	var win: float = C.clamp_(0.5 + AIR_TES_K * (aereo(p) - aereo(o)) / 100.0 + (etaO - etaP) * HEAD_PRE_ETA_K, AIR_WIN_MIN, AIR_WIN_MAX)
 	var mine: bool = rnd() < win
 	ev("aerial_pre", {"p": p if mine else o, "o": o if mine else p, "win": win, "kind": w.kind})
 	return mine
@@ -460,7 +460,7 @@ func headContest(p: R.Player) -> R.Player:
 	var q := headWin.p
 	var dq: float = C.hyp(q.x - b.x, q.y - b.y)
 	var dp: float = C.hyp(p.x - b.x, p.y - b.y)
-	var win: float = C.clamp_(0.5 + AIR_TES_K * (q.st.tes - p.st.tes) / 100.0 + (dp - dq) * AIR_DIST_K + headDuelEdge(q, p), AIR_WIN_MIN, AIR_WIN_MAX)
+	var win: float = C.clamp_(0.5 + AIR_TES_K * (aereo(q) - aereo(p)) / 100.0 + (dp - dq) * AIR_DIST_K + headDuelEdge(q, p), AIR_WIN_MIN, AIR_WIN_MAX)
 	var w: R.Player = q if rnd() < win else p
 	ev("aerial", {"p": w, "o": p if w == q else q})
 	return w
@@ -516,7 +516,7 @@ func headStrike(p: R.Player, kind: String) -> void:
 	if k != null and k.team == tm and k.kicker != p:
 		lastPass = {"from": k.kicker, "to": p}
 	var head: bool = kind != "volley" # "clear": il nostro difensore col fermatempo in difesa
-	var skill: float = p.st.tes if head else p.st.tir
+	var skill: float = p.st.tes if head else p.st.sv("vol")
 	var press: float = 1.3 if nearOpp(p.x, p.y, tm) < 1.5 else 1.0
 	var sig: float = ((4.0 if head else 3.0) + (100.0 - skill) * (0.09 if head else 0.08)) * press * HEAD_HUMAN_SIG
 	var tx: float
