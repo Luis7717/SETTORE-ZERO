@@ -123,15 +123,25 @@
   **Energia sempre visibile** (Luis 2026-11-25, "non capisco se si sono rigenerate"): nella Rosa ogni carta ha la
   barretta dell'energia anche piena e il pannello scrive "energia N%" (fuori partita = forma tra le partite; nella
   Rosa della pausa = energia vera del motore, `CambiPartita.leggi_energie`); nel dopo partita una riga spiega il recupero.
-  **Crescita coi voti** (Luis 2026-11-25, `scripts/carriera/crescita_voti.gd`, chiamata da `dopoPartita`): dopo ogni
-  partita di campionato chi ha un voto in pagella (`voti.gd`) sopra 6 cresce e sotto 6 cala, di più o di meno secondo
-  l'età (giovani crescono tanto e calano poco, vecchi il contrario; progresso decimale in `s.progVoti`, a ±1 una
-  statistica del ruolo sale/scende di 1). **Metà stagione** (dopo la 9ª giornata, `s.metaStagione`): tutti tranne il
-  campione +1 anno e statistiche su/giù con la media dei voti (`s.voti`, da metà a metà) più la spinta dell'età.
-  Il campione cresce solo giocando (`crescita.gd`) e **non invecchia**; a fine stagione nessuno invecchia più
-  (`endSeason` lo fa solo con `crescitaRosa`, che vale true solo nei confronti col JS di `test_carriera.gd`, dove resta
-  anche la crescita a caso dei giovani del web). `media_voti(id)` serve al mercato. Righe nel dopo partita
-  (`righe_voti`). Test `tests/test_crescita_voti.gd`.
+  **Crescita coi voti, solo a metà stagione** (Luis 2026-11-25, `scripts/carriera/crescita_voti.gd`): dopo ogni
+  partita di campionato si segnano solo i voti in pagella (`voti.gd` → `s.voti`, da metà a metà; `media_voti(id)` per il
+  mercato); le statistiche cambiano **solo a metà stagione** (dopo la 9ª giornata, `Carriera.metaStagione`,
+  `s.metaStagione`): tutti tranne il campione +1 anno e sotto-statistiche del ruolo su/giù con la media dei voti
+  (sopra 6 su, sotto giù) e l'età (giovani crescono tanto e calano poco, vecchi il contrario; da 30 anni il calo va
+  anche sul fisico). **Anche gli avversari**: media dai punti a partita del girone d'andata (`s.metaCpu`), applicata
+  dal girone di ritorno a ogni generazione dei loro giocatori (`evolviCpu` / `squadraCpu`, usata da mercato e
+  `avversarioPartita`; +1 anno anche a loro). Riepilogo nella schermata **Metà stagione** (`scripts/menu/meta_stagione.gd`,
+  da CONTINUA del dopo partita). Il campione cresce solo giocando (`crescita.gd`, dopo ogni partita) e **non invecchia**;
+  a fine stagione nessuno invecchia (`endSeason` lo fa solo con `crescitaRosa`, true solo nei confronti col JS di
+  `test_carriera.gd`, dove resta anche la crescita a caso dei giovani del web). Test `tests/test_crescita_voti.gd`.
+  **Statistiche dettagliate** (Luis 2026-11-25, `godot/sim/sottostat.gd`): ogni grande (vel, tir, pas, dri, dif, fis,
+  por) è la media delle sue sotto-statistiche nel campo `sub` del giocatore (Accelerazione/Velocità massima;
+  Finalizzazione, Potenza, Tiri da lontano, Al volo e in girata, Rigori; Passaggio corto/lungo, Cross, Effetto,
+  Punizioni; Agilità, Controllo palla, Dribbling, Equilibrio; Intercetti, Contrasto (+ `tes` a sé); Elevazione,
+  Resistenza, Forza, Aggressività; Tuffo, Riflessi, Presa, Piazzamento). Create in `novita()` dalle grandi (somma
+  esatta: valutazione e valore non cambiano) per chi non le ha; senza `sub` ogni sotto-statistica vale la sua grande
+  (`Sotto.valore`). La crescita del campione e quella di metà stagione muovono le sotto-statistiche (`Sotto.muovi`
+  ricalcola la grande). Nei confronti col JS `sub` si toglie (`test_carriera.gd`).
   **Mercato con le squadre** (Luis 2026-11-25, `scripts/carriera/mercato_squadre.gd`, menu `mercato.gd`): si compra
   dagli 11 delle squadre della CPU (divisione e ruolo in alto; `[id squadra, indice]` di `aiMatchTeam(t, formazioneDi(t))`);
   prezzo chiesto = valore ×1,4 per il migliore della squadra, ×1,15 per gli altri; offerta da −20% a +20% a passi del 5%:
