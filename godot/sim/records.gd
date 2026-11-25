@@ -91,6 +91,8 @@ class Player:
 	var supX: float = 0.0
 	var supY: float = 0.0
 	var stickT: float = 0.0
+	var presaT: float = -99.0 # istante (time della partita) in cui ha preso il pallone (give): tiro da girato, ai.gd (2026-11-25)
+	var girataDa: float = -98.0 # = presaT se col pallone l'IA l'ha già trovato girato rispetto al tiro (ai.gd girataAspetta)
 	var claim: Kick = null # portiere: cross avversario su cui è già uscito (non torna indietro a metà strada)
 	# scena della ripresa (riprese.gd): il giocatore va camminando al suo posto (rtx, rty) invece di esserci messo
 	var rgo: bool = false

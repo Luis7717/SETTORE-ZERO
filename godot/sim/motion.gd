@@ -605,6 +605,7 @@ func give(p: R.Player) -> void:
 		b.prev = b.last
 		b.last = p
 	p.protect = 0.35
+	p.presaT = time
 	p.aiT = 0.12 + rnd() * 0.2
 	p.contact = 0.0
 	p.holdN = 0

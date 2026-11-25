@@ -67,6 +67,13 @@ const PATH_TTL := 20.0   # durata massima di una strada disegnata (s)
 const PATH_LOOK := 3.0   # il giocatore punta a un punto della strada almeno così avanti: un punto troppo vicino lo frenava e lo scatto non si vedeva (m)
 const RUN_MAX_LEN := 14.0 # lunghezza massima di una linea di difesa, misurata dal giocatore: il resto si taglia (m)
 const SPRINT_DIST := 6.0 # dito più lontano di così dal giocatore controllato (m) = scatto
+# Fischio di fine tempo (Luis 2026-11-25, solo con "rifiniture"): a tempo scaduto, col pallone in gioco nell'ultimo
+# quarto di campo (entro FISCHIO_ZONA dalla linea di fondo di una delle due porte) si lascia finire l'azione. Il fischio
+# arriva quando il pallone esce dalla zona, il portiere lo tiene, c'è un vantaggio o il gioco si ferma (fuori, fallo,
+# gol: dopo il gol, al calcio d'inizio). Al massimo FISCHIO_MAX secondi di partita in più.
+const FISCHIO_ZONA := 25.0 # ultimo quarto: entro tanti metri dalla linea di fondo (m)
+const FISCHIO_MAX := 25.0  # sicurezza: al massimo tanti secondi di partita oltre la fine del tempo (s)
+var fischioAtteso := false # a tempo scaduto si sta lasciando finire l'azione
 var queued: Array = [null, null] # di prima: calcio preparato per squadra {p, spec, kick} (userQueue / fireQueued)
 const CORNER_ATT := [[-3.0, 7.0], [3.0, 8.5], [0.0, 11.5], [-6.0, 10.0], [6.0, 12.5], [-2.0, 19.0], [9.0, 22.0], [-10.0, 46.0], [8.0, 50.0], [0.0, 44.0]]
 const CORNER_DEF := [[-2.6, 5.5], [2.6, 5.5], [0.0, 8.0], [-5.0, 8.5], [5.0, 9.5], [0.0, 13.0], [-3.0, 3.0], [-7.0, 20.0], [8.0, 21.0], [0.0, 38.0]]
@@ -467,8 +474,11 @@ func launch(p: R.Player, spec: Dictionary, noise: bool) -> Dictionary:
 			type = "loft" if (D > 30.0 or blocked(sx, sy, spec.tx, spec.ty, tm)) else "ground"
 	var press: float = nearOpp(p.x, p.y, tm)
 	var sig: float
+	# tiro da girato (2026-11-25, base.gd GIRATA_*): più debole e meno preciso; i calci da fermo no (il battitore si prepara)
+	var gir: float = girataK(p.fx, p.fy, dx, dy) if (rifiniture and type == "shot" and phase == "play") else 0.0
+	var vShot: float = (SHOT_V0 + p.st.tir * 0.14) * (1.0 - GIRATA_V * gir)
 	if type == "shot":
-		sig = (0.5 + (100.0 - p.st.tir) * 0.04) * (1.5 if press < 2.0 else 1.0)
+		sig = (0.5 + (100.0 - p.st.tir) * 0.04) * (1.5 if press < 2.0 else 1.0) * (1.0 + GIRATA_SIG * gir)
 	else:
 		sig = (0.3 + (100.0 - p.st.pas) * 0.025) * (1.4 if type == "loft" else 1.0)
 	if spec.get("human", false):
@@ -507,7 +517,7 @@ func launch(p: R.Player, spec: Dictionary, noise: bool) -> Dictionary:
 		v0 = D / Tt
 		vh = G * Tt / 2.0
 	else:
-		v0 = SHOT_V0 + p.st.tir * 0.14
+		v0 = vShot
 		Tt = D / v0
 		th = maxf(0.05, th + (gauss() if noise else 0.0) * sig * 0.017 * D)
 		vh = (th + 0.5 * G * Tt * Tt) / Tt
@@ -526,7 +536,7 @@ func launch(p: R.Player, spec: Dictionary, noise: bool) -> Dictionary:
 				v0 = D / T2
 				Tt = T2
 				vh = vu
-			var vmin: float = CURL_V_MIN * (SHOT_V0 + p.st.tir * 0.14)
+			var vmin: float = CURL_V_MIN * vShot
 			if v0 < vmin:
 				# troppo lento per arrivare in porta così in alto: più veloce e parabola più bassa, sempre all'altezza mirata
 				v0 = vmin
@@ -851,6 +861,9 @@ func step(dt: float) -> void:
 	time += dt
 	if phase == "full" or phase == "half":
 		return
+	if fischioAtteso and phase == "restart" and restart.type != "penalty":
+		endHalf() # azione finita col gioco fermo (fuori, fallo, gol): ora si fischia (il rigore si batte lo stesso)
+		return
 	for tm in 2:
 		var m: R.Move = move[tm]
 		if m != null:
@@ -889,7 +902,10 @@ func step(dt: float) -> void:
 			if att >= 0:
 				stats.poss[att] += dt
 			if t >= halfLen and b.shot == null:
-				endHalf()
+				if rifiniture and azioneInCorso():
+					fischioAtteso = true
+				else:
+					endHalf()
 	elif phase == "restart":
 		var r := restart
 		if r.scena != "":
@@ -950,7 +966,19 @@ func useAdvantage(tm: int) -> void:
 		ev("advantage_over", {"team": tm})
 
 
+## a tempo scaduto l'azione continua? Pallone in gioco nell'ultimo quarto di una delle due porte, non tenuto dal
+## portiere, nessun vantaggio in corso, entro FISCHIO_MAX dalla fine del tempo
+func azioneInCorso() -> bool:
+	var b := ball
+	if t >= halfLen + FISCHIO_MAX or phase != "play" or advantage != null:
+		return false
+	if b.owner != null and b.owner.pos == "P":
+		return false
+	return absf(b.y) > HL - FISCHIO_ZONA
+
+
 func endHalf() -> void:
+	fischioAtteso = false
 	endDuel("gioco fermo")
 	endFlee("gioco fermo")
 	resetStates()

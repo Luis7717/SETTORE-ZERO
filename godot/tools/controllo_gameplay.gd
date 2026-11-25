@@ -195,6 +195,24 @@ func _causa(m, st: Dictionary) -> String:
 	return "uscita" # il tempo sta tornando normale
 
 
+## tiro in gioco: angolo tra il verso del corpo del tiratore e la direzione del pallone appena calciato (2026-11-25)
+func _conta_girata(m, p: R.Player, e: Dictionary, suf: String) -> void:
+	var b: R.Ball = m.ball
+	var v: float = C.hyp(b.vx, b.vy)
+	if v < 0.1:
+		return
+	var cosa: float = clampf((p.fx * b.vx + p.fy * b.vy) / v, -1.0, 1.0)
+	var gradi: float = rad_to_deg(acos(cosa))
+	_add("tiro_play" + suf)
+	_add("tiro_v" + suf, float(e.get("v", 0.0)))
+	if gradi > 60.0:
+		_add("tiro_girato60" + suf)
+	if gradi > 90.0:
+		_add("tiro_girato90" + suf)
+		_add("tiro_v90" + suf, float(e.get("v", 0.0)))
+		m.set_meta("girato_t", m.time)
+
+
 func _chi(p) -> String:
 	return "_u" if p != null and p.team == 0 else "_c"
 
@@ -252,6 +270,8 @@ func _conta(m, st: Dictionary, sdt: float) -> void:
 					sub = "prima"
 					_add("prima_calci")
 				st.ultimo_calcio = {"team": p.team, "sub": sub, "t": m.time}
+				if k == "shot" and m.phase == "play":
+					_conta_girata(m, p, e, _chi(p))
 				if st.tiro != "":
 					_add("tiro_esito:" + String(st.tiro) + ":altro_tocco")
 					st.tiro = ""
@@ -268,6 +288,8 @@ func _conta(m, st: Dictionary, sdt: float) -> void:
 				if k == "header" and not e.get("clear", false):
 					_add("testa_colpi" + _chi(p))
 			"goal":
+				if float(st.ultimo_calcio.get("t", -1.0)) == float(m.get_meta("girato_t", -2.0)):
+					_add("gol_girato")
 				if st.tiro != "":
 					_add("tiro_esito:" + String(st.tiro) + ":gol")
 					st.tiro = ""
@@ -626,6 +648,9 @@ func _stampa(n: int, opz: Dictionary) -> void:
 		opz.get("mia", "60"), opz.get("forza", "60"), opz.get("tempo", "150"), opz.get("stile", "equilibrato"), opz.get("stilecpu", "caso"), opz.get("meteo", "caso")])
 	print("RISULTATI  V/N/P %d/%d/%d · gol a partita %.2f-%.2f · tiri %.1f-%.1f · in porta %.1f-%.1f · possesso umano %.0f%%" % [
 		_v("vinte"), _v("pari"), _v("perse"), _v("gf") / N, _v("gs") / N, _v("tiri_u") / N, _v("tiri_c") / N, _v("inporta_u") / N, _v("inporta_c") / N, 100.0 * _v("poss_u") / N])
+	print("GIRATA     tiri col corpo girato oltre 90° (oltre 60°): CPU %d su %d (%d) · umano %d su %d (%d) · velocità media tiro CPU %.1f m/s, girati %.1f m/s · gol da tiro girato %d" % [
+		_v("tiro_girato90_c"), _v("tiro_play_c"), _v("tiro_girato60_c"), _v("tiro_girato90_u"), _v("tiro_play_u"), _v("tiro_girato60_u"),
+		_v("tiro_v_c") / maxf(1.0, _v("tiro_play_c")), _v("tiro_v90_c") / maxf(1.0, _v("tiro_girato90_c")), _v("gol_girato")])
 	print("PARATE     umano %.1f (prese %s) · CPU %.1f (prese %s) · pali %.2f · tuffi del dito %.1f" % [_v("parata_u") / N, _pct(_v("presa_u"), _v("parata_u")),
 		_v("parata_c") / N, _pct(_v("presa_c"), _v("parata_c")), _v("palo") / N, _v("tuffo_u") / N])
 	print("RIPRESE    a partita: rimesse %.1f · angoli %.1f-%.1f · rinvii %.1f · punizioni %.1f · rigori (fallo in area) %.2f · falli %.1f · cartellini %.2f · fuorigioco %.2f/%.2f · vantaggi %.2f" % [
