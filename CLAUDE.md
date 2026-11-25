@@ -178,6 +178,10 @@
   scatto (1,2 s), poi il portatore torna subito alla guida automatica secondo lo stile, e la fuga non si riapre per
   `BURST_FLEE_CD` 3,5 s (prima si fermava sulla meta finché durava il comando, l'avversario lo riprendeva e la fuga
   riapriva il rallenty col portatore fermo).
+  Lo stesso dopo il **dribbling riuscito** (Luis 2026-11-25, "dopo una skill il giocatore si ferma", `dribCarry` in
+  `sim/duel.gd`): la corsa oltre il difensore punta `DRIB_CARRY` 6 m più avanti (niente frenata sulla meta), la guida
+  automatica riparte subito, la fuga non si riapre per `BURST_FLEE_CD`; finché dura `p.burst` l'andatura automatica
+  non scende sotto `AUTO_SPD`. Test `test_dopo_il_dribbling_riuscito_non_si_ferma`.
 - La finta è stata tolta (2026-11-20).
 - Calcio d'angolo: telecamera alle spalle del battitore; dito vicino al battitore = cross, lontano = trascinando si gira la visuale.
 - **Rimessa laterale nostra** (Godot, Luis 2026-11-23): quando il battitore è sulla linea (`restart.sulPosto()`) la

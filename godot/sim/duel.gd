@@ -52,6 +52,7 @@ const BURST_SIDE := 0.6    # ... con tanto di lato per metro in avanti (~31°), 
 # automatica secondo lo stile; e la fuga non si riapre per BURST_FLEE_CD s di partita (prima tornava dopo FLEE_CD,
 # quando il portatore fermo sulla meta veniva ripreso, e il rallenty lo lasciava lì).
 const BURST_FLEE_CD := 3.5
+const DRIB_CARRY := 6.0   # dopo il giochetto (portaAuto) la corsa punta così più avanti, per non frenare (m)
 # Rallenty scaduto (userCalm: il gioco lo chiama dopo 10 s veri senza linea né tasto): per lo stesso portatore duello e
 # fuga non si riaprono per tanto tempo di partita (s); l'area di tiro, se è scaduta lì, finché non perde il pallone.
 const CALM_CD := 4.0
@@ -590,7 +591,30 @@ func dribShowStep(dt: float) -> void:
 	# lo scatto dopo il giochetto è più veloce (come lo Scatto, BURST_SPD per BURST_T): recupera il tempo del giochetto,
 	# altrimenti gli altri difensori arrivavano a chiudere (controllo del gameplay: gol della persona da 0,9 a 0,4)
 	p.burst = maxf(p.burst, BURST_T)
+	if portaAuto and human[f.team] and ctrl[f.team] == p:
+		dribCarry(p, f.team)
 	ev("dribble_go", {"p": p, "o": f.o, "side": f.side})
+
+
+# Luis 2026-11-25 "dopo una skill riuscita il giocatore si ferma": la corsa oltre il difensore frenava fino a ~2 m/s
+# sulla meta (DRIB_PAST oltre di lui), poi la fuga si riapriva col difensore battuto alle spalle. Come dopo lo Scatto:
+# la meta va DRIB_CARRY m più avanti (stessa durata del comando: niente frenata), la guida automatica riparte subito
+# con una direzione nuova e per BURST_FLEE_CD s la fuga non si riapre per lui.
+func dribCarry(p: R.Player, tm: int) -> void:
+	var mv: R.Move = move[tm]
+	if mv != null:
+		var wx: float = mv.x - p.x
+		var wy: float = mv.y - p.y
+		var wn: float = C.orf(C.hyp(wx, wy), 1.0)
+		mv.x = C.clamp_(mv.x + wx / wn * DRIB_CARRY, -HW + 1.0, HW - 1.0)
+		mv.y = C.clamp_(mv.y + wy / wn * DRIB_CARRY, -HL + 1.0, HL - 1.0)
+		p.tx = mv.x
+		p.ty = mv.y
+		p.dx = mv.x
+		p.dy = mv.y
+	p.aiT = 0.0
+	fleeCd[tm] = BURST_FLEE_CD
+	fleeCdP[tm] = p
 
 
 # passo lento verso la finta: velocità portata (frenando) a DRIB_SHOW_V, un po' di lato dalla parte opposta al lato scelto

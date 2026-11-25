@@ -345,3 +345,39 @@ func test_dopo_dbl_free_il_battitore_torna_libero() -> bool:
 	check(m.ball.owner == p, "dopo %.0f s la partita non resta bloccata" % M.DBL_FREE)
 	m.dispose()
 	return done()
+
+
+# Luis 2026-11-25: "dopo una skill riuscita il giocatore si ferma, come prima con lo scatto"
+func test_dopo_il_dribbling_riuscito_non_si_ferma() -> bool:
+	var sd := first_ok_seed()
+	var r := book_and_resolve(sd, true)
+	var m: SimMatchScript = r[0]
+	var p: R.Player = r[1]
+	m.portaAuto = true
+	check(r[3] != null and r[3].ok, "dribbling riuscito")
+	var go: Variant = null
+	for i in 90:
+		m.step(DT)
+		go = findEvent(m.events, "dribble_go")
+		m.events.clear()
+		if go != null:
+			break
+	check(go != null, "parte lo scatto dopo il giochetto")
+	var vmin := 99.0
+	var y0 := p.y
+	var fuga := false
+	var t := 0.0
+	while t < 3.0:
+		m.step(DT)
+		t += DT
+		if t > 0.3:
+			vmin = minf(vmin, C.hyp(p.vx, p.vy))
+		fuga = fuga or m.flee != null
+		if m.ball.owner != p:
+			break
+	check(m.ball.owner == p, "ha ancora il pallone")
+	check(vmin > 3.0, "non frena dopo il dribbling: velocità minima %.2f m/s (prima ~2)" % vmin)
+	check(not fuga, "la fuga col difensore battuto non riapre il rallenty")
+	check(p.y - y0 > 10.0, "va avanti: %.1f m in 3 s" % (p.y - y0))
+	m.dispose()
+	return done()

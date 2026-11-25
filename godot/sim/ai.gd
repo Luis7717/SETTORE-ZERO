@@ -1114,6 +1114,8 @@ func humanCarrierAuto(p: R.Player) -> void:
 	p.ty = C.clamp_(p.dy, -HL + AUTO_EDGE, HL - AUTO_EDGE)
 	p.spdF = float(autoSpd[tm])
 	p.sprint = bool(autoSpr[tm])
+	if rifiniture and p.burst > 0.0:
+		p.spdF = maxf(p.spdF, AUTO_SPD) # slancio dello Scatto o del dribbling: non rallenta finché dura
 
 
 # sceglie verso e andatura del portatore umano automatico (ogni AUTO_THINK s)
