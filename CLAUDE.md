@@ -118,6 +118,8 @@
   `--scena=cambio` (carriera di prova su `user://prova_pausa_rosa.json`); test `tests/test_cambi_partita.gd`,
   `-s res://tests/prova_cambio.gd`, controlli in `controlli_menu.gd`.
   Il **campione non si vende** (Luis 2026-11-25): `Carriera.sell` lo rifiuta e nella Rosa ha solo il tasto Aspetto.
+  Il **campione parte sempre al 100%** (Luis 2026-11-25): in partita si stanca come gli altri, ma tra le partite la
+  sua forma torna a 100 (`Forma.giornata`) e in `squadraPartita` non ha mai `energy0`.
 - **Stili di gioco** (Fase D, `godot/sim/stili.gd`): nella Rosa, tasti **Attacco** e **Difesa**: attacco (Equilibrato, Contropiede,
   Possesso, Fasce, Lanci lunghi) e difesa (Equilibrata, Pressing, Catenaccio, A uomo, Fuorigioco). Valgono per i
   compagni della CPU e per gli avversari (stile fisso per squadra, mostrato nell'hub). Campi `stileAtt`/`stileDif`

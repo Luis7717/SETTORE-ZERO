@@ -1141,7 +1141,7 @@ func squadraPartita() -> Dictionary:
 			gioc.append(p)
 			continue
 		var q: Dictionary = Fisico.applica(p) # copia con le statistiche del fisico (altezza, corporatura)
-		var e := Forma.energia(forma_di(p.id))
+		var e := 1.0 if p.get("champ", false) else Forma.energia(forma_di(p.id)) # il campione parte sempre al 100%
 		if e < 1.0:
 			q["energy0"] = e
 		gioc.append(q)

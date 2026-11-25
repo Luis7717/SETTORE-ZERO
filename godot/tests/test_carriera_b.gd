@@ -296,3 +296,23 @@ func test_salva_e_ricarica_coi_campi_nuovi() -> bool:
 	eq(typeof(c2.s.forma.values()[0]), TYPE_INT, "la forma resta intera")
 	c.reset()
 	return done()
+
+
+# Luis 2026-11-25: "Il campione parte sempre al 100%, durante la partita si stanca come gli altri ma poi riparte da
+# quella dopo al 100%"
+func test_campione_sempre_al_100() -> bool:
+	var squad := [{"id": 1, "name": "Campione", "fis": 60, "champ": true}, {"id": 2, "name": "Altro", "fis": 60}]
+	var forma := {"1": 100, "2": 100}
+	for i in 10:
+		Forma.giornata(squad, [1, 2], forma, {}, func() -> float: return 0.99)
+	eq(forma["1"], Forma.FORMA_MAX, "dopo 10 partite il campione è ancora al 100")
+	check(int(forma["2"]) < Forma.ENERGIA_DA, "gli altri si stancano: %d" % int(forma["2"]))
+	var c := _nuova("campione_100.json")
+	var ch := _campione(c)
+	c.s.forma[str(ch.id)] = 20 # salvataggio vecchio col campione stanco
+	var t := c.squadraPartita()
+	for p: Variant in t.players:
+		if p is Dictionary and p.id == ch.id:
+			check(not p.has("energy0"), "in partita parte con l'energia piena")
+	Salv.cancella(c.percorso)
+	return done()

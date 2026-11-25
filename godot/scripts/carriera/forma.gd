@@ -1,5 +1,6 @@
 # Stanchezza e infortuni tra le partite (solo versione Godot).
 # Ogni giocatore ha una forma 0..100 (s.forma, per id; chi manca è a 100): cala se gioca, risale se riposa.
+# Il campione (champ) resta sempre a 100: ogni partita la comincia con l'energia piena (Luis 2026-11-25).
 # Sotto ENERGIA_DA il giocatore parte la partita già un po' stanco (energia iniziale del motore, campo `energy0`)
 # e rischia di più l'infortunio. Gli infortunati (s.infortuni = giornate che mancano, per id) non giocano.
 # Numeri casuali solo dal generatore passato (con seme): stessa carriera = stessi infortuni.
@@ -60,6 +61,8 @@ static func giornata(squad: Array, giocato: Array, forma: Dictionary, infortuni:
 		else:
 			f += RECUPERO_RIPOSO
 		f = clampi(f + RECUPERO, 0, FORMA_MAX)
+		if p.get("champ", false):
+			f = FORMA_MAX # il campione riparte sempre al 100% (Luis 2026-11-25); in partita si stanca come gli altri
 		forma[k] = f
 		if ha_giocato and not infortuni.has(k) and r.call() < rischio(f):
 			var g := durata(r)
