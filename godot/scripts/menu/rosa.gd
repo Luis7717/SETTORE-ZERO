@@ -24,16 +24,20 @@ const Fisico := preload("res://scripts/carriera/fisico.gd")
 const Stili := preload("res://sim/stili.gd")
 const Scelte := preload("res://scripts/menu/rosa_scelte.gd")
 const Mercato := preload("res://scripts/carriera/mercato_squadre.gd")
+const StatG := preload("res://scripts/menu/statistiche_giocatore.gd")
 const ALTEZZA_SOPRA := 150.0       # .sqtop
 const MENU := ["formazione", "attacco", "difesa"]
 const RIGA_CAMPO := Color(1, 1, 1, 0.11)
 const TASTO_TORNA := 52.0
+const TASTO_STAT := 132.0         # px: larghezza del tasto Statistiche accanto a "Cerca acquirenti"
 
 var sel: Variant = null
 var tgt: Variant = null
 var just: Variant = null
 var _menu := ""                    # menu a comparsa aperto: "" o uno di MENU
 var _velo: Control = null
+var _stat_aperte := false          # statistiche dettagliate del giocatore scelto aperte (arg {"statistiche": true})
+var _stat_velo: Control = null
 var _campo: Control
 var _carte_campo: Array = []
 var _panchina: ScrollContainer
@@ -52,6 +56,7 @@ func prepara() -> void:
 	if arg is Dictionary:
 		sel = arg.get("sel")
 		tgt = arg.get("tgt")
+		_stat_aperte = bool(arg.get("statistiche", false))
 		_menu = str(arg.get("menu", "attacco" if arg.get("stili", false) else ""))
 		if not MENU.has(_menu):
 			_menu = ""
@@ -165,6 +170,7 @@ func costruisci() -> void:
 		torna.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		corpo.add_child(torna)
 	_mostra_menu(_menu if sp == null else "")
+	_mostra_statistiche()
 
 
 func _torna_alla_partita() -> void:
@@ -437,6 +443,30 @@ func _scelto(id: String, quale: String) -> void:
 	_aggiorna()
 
 
+# ---------------------------------------------------------------- statistiche dettagliate (statistiche_giocatore.gd)
+func _apri_statistiche() -> void:
+	_stat_aperte = true
+	_mostra_statistiche()
+
+
+func _chiudi_statistiche() -> void:
+	_stat_aperte = false
+	_mostra_statistiche()
+
+
+func _mostra_statistiche() -> void:
+	if _stat_velo != null and is_instance_valid(_stat_velo):
+		_stat_velo.queue_free()
+	_stat_velo = null
+	var p: Variant = carriera().player(sel) if sel != null and tgt == null else null
+	if not _stat_aperte or p == null:
+		_stat_aperte = false
+		return
+	var F: Array = C.FORMATIONS[stato().formation]
+	_stat_velo = StatG.vista(p, int(_posto(p, F).o), _colori, _k1, sicura, _chiudi_statistiche)
+	add_child(_stat_velo)
+
+
 func _pannello_giocatore(p: Dictionary, F: Array) -> Control:
 	var c := carriera()
 	var at := _posto(p, F)
@@ -494,19 +524,24 @@ func _pannello_giocatore(p: Dictionary, F: Array) -> Control:
 		v.add_child(U.testo(nota, 12.5, T.BAD if st != "" else T.DIM, T.PESO_FORTE, HORIZONTAL_ALIGNMENT_CENTER))
 		return pann
 	# solo il campione creato all'inizio si può modificare (Luis 2026-11-24) e lui non si vende mai (2026-11-25):
-	# il campione ha solo Aspetto, gli altri solo Cerca acquirenti (mercato con le squadre, 2026-11-25)
+	# il campione ha Aspetto, gli altri Cerca acquirenti (mercato con le squadre, 2026-11-25); tutti Statistiche
 	var mio: bool = p.get("champ", false)
-	var bt := U.griglia(1, 8, 8)
+	var bt := U.hbox(8)
+	var stat := U.bottone("Statistiche", "BtnFantasma", _apri_statistiche, 44)
 	if mio:
 		var asp := U.bottone("Aspetto", "", func() -> void: vai("editor", {"flow": "look", "id": p.id}), 44)
 		asp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		stat.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		bt.add_child(asp)
+		bt.add_child(stat)
 		v.add_child(bt)
 		return pann
 	var gia := Mercato.in_vendita(stato(), p.id)
-	var vendi := U.bottone("In vendita · togli dalla lista" if gia else "Cerca acquirenti", "BtnFantasma", _cerca_acquirenti.bind(int(p.id)), 44)
+	var vendi := U.bottone("In vendita · togli" if gia else "Cerca acquirenti", "BtnFantasma", _cerca_acquirenti.bind(int(p.id)), 44)
 	vendi.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	stat.custom_minimum_size.x = TASTO_STAT
 	bt.add_child(vendi)
+	bt.add_child(stat)
 	v.add_child(bt)
 	return pann
 

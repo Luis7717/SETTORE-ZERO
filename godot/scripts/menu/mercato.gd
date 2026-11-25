@@ -5,11 +5,13 @@
 #   (si riprova la giornata dopo).
 # - Offerte: quelle delle squadre per i miei giocatori, con Accetta (vendi a quel prezzo) e Rifiuta.
 # Per mettere in vendita un giocatore: Rosa → "Cerca acquirenti". Il vecchio mercato generico (s.market) non si
-# mostra più. arg (prove): {filtro, div, scheda: "offerte", aperto: indice nella lista}
+# mostra più. arg (prove): {filtro, div, scheda: "offerte", aperto: indice nella lista, statistiche: true}
+# Nella scheda, "Statistiche" apre le statistiche dettagliate del giocatore (statistiche_giocatore.gd).
 extends MenuSchermata
 
 const Fisico := preload("res://scripts/carriera/fisico.gd")
 const Mercato := preload("res://scripts/carriera/mercato_squadre.gd")
+const StatG := preload("res://scripts/menu/statistiche_giocatore.gd")
 const FILTRI := [["T", "Tutti"], ["P", "POR"], ["D", "DIF"], ["C", "CEN"], ["A", "ATT"]]
 const DIV_CORTI := ["Prima", "Seconda", "Terza"]
 
@@ -18,6 +20,8 @@ var divisione := -1               # divisione mostrata (-1 = la mia)
 var vista := "compra"             # "compra" o "offerte"
 var aperto: Variant = null        # chiave "id squadra:indice" del giocatore con la scheda aperta
 var parte := 1.0                  # offerta = prezzo chiesto × parte (0,8 .. 1,2)
+var _stat_velo: Control = null    # statistiche dettagliate aperte sopra la lista
+var _stat_subito := false         # arg {"statistiche": true}: aprile sul giocatore aperto (prove)
 
 
 func prepara() -> void:
@@ -34,6 +38,7 @@ func prepara() -> void:
 			var l := _lista()
 			if a < l.size():
 				aperto = Mercato.chiave(str(l[a].squadra.id), int(l[a].i))
+				_stat_subito = bool(arg.get("statistiche", false))
 
 
 static func _intero(v: Variant) -> bool:
@@ -73,7 +78,13 @@ func costruisci() -> void:
 		var k := Mercato.chiave(str(g.squadra.id), int(g.i))
 		righe.add_child(_riga(g, s, k))
 		if aperto == k:
-			righe.add_child(scheda(g.p, _pannello_offerta(g, s)))
+			var sotto := U.vbox(8)
+			sotto.add_child(U.bottone("Statistiche", "BtnFantasma", _apri_statistiche.bind(g), 44))
+			sotto.add_child(_pannello_offerta(g, s))
+			righe.add_child(scheda(g.p, sotto))
+			if _stat_subito:
+				_stat_subito = false
+				_apri_statistiche.call_deferred(g)
 	corpo.add_child(righe)
 
 
@@ -117,6 +128,20 @@ func _riga(g: Dictionary, s: Dictionary, k: String) -> Control:
 	h.add_child(prezzo)
 	b.add_child(h)
 	return b
+
+
+## statistiche dettagliate di un giocatore di un'altra squadra, coi colori della sua squadra
+func _apri_statistiche(g: Dictionary) -> void:
+	_chiudi_statistiche()
+	var k := D.kit(g.squadra.get("kit", 0))
+	_stat_velo = StatG.vista(g.p, D.overall(g.p), [D.hex(int(k[1])), D.hex(int(k[2]))], int(k[1]), sicura, _chiudi_statistiche)
+	add_child(_stat_velo)
+
+
+func _chiudi_statistiche() -> void:
+	if _stat_velo != null and is_instance_valid(_stat_velo):
+		_stat_velo.queue_free()
+	_stat_velo = null
 
 
 func _apri(k: String) -> void:
