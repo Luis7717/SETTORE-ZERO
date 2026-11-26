@@ -374,6 +374,21 @@
   arco col valore grande e sotto-statistiche (`sim/sottostat.gd`, `Sotto.valore`) con barretta verde ≥ 70, gialla
   50-69, rossa sotto. Solo lettura. Arg di prova `{"statistiche": true}` (Rosa con `sel`, Mercato con `aperto`);
   controllo `test_statistiche_dalla_rosa_e_dal_mercato`, foto `10_rosa_statistiche*` / `12_mercato_statistiche`.
+- **Modelli dei giocatori rifiniti** (Luis 2026-11-26, `scripts/partita/proporzioni.gd`): `athlete.glb` resta com'è e al
+  caricamento si ritocca in posa di riposo, una volta per tutti (vertici con `Proporzioni.deforma` in
+  `giocatore.gd` `_mesh_con_riposo`, ossa e pose di legame della pelle con `Proporzioni.applica`; `ATTIVE = false` =
+  modello originale): spalle ×1,08 e 1,5 cm più alte, braccio ×0,97 (il polso a T resta dov'era: le pose con la IK
+  sono in metri del modello), mano ×0,84 lunga e ×0,8 larga con le dita meno aperte, testa 3 cm più in basso (collo
+  più corto), sedere meno sporgente, mascella più stretta, naso meno sporgente, occhi +20%. **Sopracciglia e frangia
+  non si toccano** (il centro degli occhi e la testa non cambiano forma; taglio 15 uguale). Gambe uguali (piedi a
+  terra come prima). Nel clip "fermo" (`IDLE_FIX_*` in `figura.gd`): braccia verso i fianchi, gomiti un po' piegati,
+  testa su, schiena più dritta. Stoffa: normali levigate (`Vestibilita.lisce`, messe al posto delle tangenti della mesh)
+  mescolate sulla maglia (`LISCIA_LARGA` / `LISCIA_ADERENTE`) e sui calzoncini, che si staccano dalla coscia e si
+  svasano (`CALZ_*`); viso con ombre e luci di rilievo (`RILIEVO*`), collo in ombra sotto il mento; capelli con
+  volume (`VOLUME_*` in `capelli.gdshader`) e tagli corti più stretti ai lati e sulla nuca (`STRETTI`, `STRINGI` in
+  `capelli.gd`). Polsi di saluto, cuore, orecchie e silenzio rimisurati (`mosse/esultanza.gd`), `MANO_PALLA` del
+  portiere più su. Foto di controllo: `-s res://tools/foto_modelli.gd -- --file=CARTELLA/x.png [--corsa=5]
+  [--solo=N --viste=0,1,2,3 --tile=480x720]`; test `tests/test_proporzioni.gd`.
 - **Stellina del campione** (Luis 2026-11-24): quando il controllato è il campione (`src.champ`) sopra di lui c'è una
   stellina gialla (`TV.stellina()`, ×`STELLA_K` 1,1) al posto del triangolo (`vista.gd` `_aggiorna_segni`).
 - **Maglie di casa e trasferta** (Luis 2026-11-24, `scripts/carriera/divise.gd`, applicate in `app.gd` `_partita`):

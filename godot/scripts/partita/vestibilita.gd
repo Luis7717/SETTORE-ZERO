@@ -12,6 +12,11 @@ const LAMBDA := 0.6        # quanto ci si sposta verso la media dei vicini a ogn
 const MAX_VALLE := 0.03    # m: oltre non si riempie (ascelle, inguine: lì la stoffa non arriva)
 const SALDA := 10000.0     # 1/m: vertici più vicini di 0,1 mm sono lo stesso punto (cuciture UV)
 
+## normali della superficie levigata, una per vertice (riempite da valli()): la stoffa della maglia non segue ogni
+## muscolo. scripts/giocatore.gd le mette al posto delle tangenti della mesh (non usate: niente mappe di normali),
+## così seguono le ossa come le normali vere e lo shader della divisa le mescola (LISCIA_*).
+static var lisce := PackedVector3Array()
+
 
 ## profondità della valle (m, >= 0) per ogni vertice: vertici, normali e indici dei triangoli di una superficie
 static func valli(vertici: PackedVector3Array, normali: PackedVector3Array, indici: PackedInt32Array) -> PackedFloat32Array:
@@ -59,10 +64,27 @@ static func valli(vertici: PackedVector3Array, normali: PackedVector3Array, indi
 			media /= vk.size()
 			q[k] = p[k].lerp(media, LAMBDA)
 		p = q
+	# normali della superficie levigata (somma delle normali dei triangoli, pesate con l'area)
+	var nl := PackedVector3Array()
+	nl.resize(m)
+	for t in range(0, indici.size() - 2, 3):
+		var a := id_di[indici[t]]
+		var b := id_di[indici[t + 1]]
+		var c := id_di[indici[t + 2]]
+		var fn := (p[b] - p[a]).cross(p[c] - p[a])
+		nl[a] += fn
+		nl[b] += fn
+		nl[c] += fn
+	lisce = PackedVector3Array()
+	lisce.resize(n)
 	for i in n:
 		var k := id_di[i]
 		var nr := normali[i] if i < normali.size() else Vector3.UP
 		out[i] = clampf((p[k] - punti[k]).dot(nr), 0.0, MAX_VALLE)
+		var l := nl[k].normalized()
+		if l.dot(nr) < 0.0:   # il verso dei triangoli non conta: dalla parte della normale vera
+			l = -l
+		lisce[i] = l if l.length_squared() > 0.5 and l.dot(nr) > 0.3 else nr
 	return out
 
 

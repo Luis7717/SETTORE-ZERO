@@ -56,6 +56,10 @@ Nessuna texture scaricata: tutte si rigenerano con `$G --headless --path godot -
 
 ## Fatto nel codice (niente file esterni)
 
+2026-11-26: proporzioni del modello dei giocatori ritoccate a codice al caricamento (`scripts/partita/proporzioni.gd`:
+spalle, braccia, mani, collo, viso), stoffa e capelli rifiniti negli shader. `athlete.glb` (Quaternius, CC0) non cambia;
+nessun file nuovo.
+
 Fase 4: pubblico 3D (figurine disegnate a codice in `scripts/stadio/pubblico.gd`), cartelloni a led con 16 sponsor
 inventati (`scripts/stadio/cartelloni.gd`), maxischermi, tettoie, coriandoli, scia, capelli, barbe, numeri e cognomi
 sulle maglie (font predefinito di Godot): tutto disegnato dal codice, niente copiato da altri giochi.

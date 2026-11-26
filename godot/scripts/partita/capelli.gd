@@ -54,6 +54,13 @@ const HAIR := [
 	{"line": [Vector2(0, 4), Vector2(32, 6), Vector2(68, -6), Vector2(100, -8), Vector2(180, -22)], "cols": 44, "taper": Vector2(0.6, 0.15)},  # 15 frangia
 	{"line": [Vector2(0, 37), Vector2(45, 30), Vector2(85, 10), Vector2(105, 7), Vector2(180, -18)], "taper": Vector2(0.5, 0.25)},  # 16 indietro
 ]
+# tagli corti meno "a casco" (2026-11-26): ai lati e sulla nuca la calotta stringe verso la testa (la base radiale è
+# il raggio massimo allargato: lì restava staccata), in cima resta com'è. Sotto c'è la cute dipinta del colore dei
+# capelli (divisa.gdshader), quindi non si vede pelle. Frangia (15), caschetto, lunghi, ricci, afro: come prima.
+const STRETTI := [2, 3, 4, 5, 7, 12, 13, 16]
+const STRINGI := 0.06            # quanto stringe (frazione del raggio della base)
+const STRINGI_EL := Vector2(46.0, 8.0)   # da questa elevazione (niente) a questa (tutto), in gradi
+const STRINGI_AZ := Vector2(30.0, 75.0)   # solo ai lati e dietro: l'attaccatura sulla fronte resta dov'è
 const SHELL_COLS := 40
 const SHELL_ROWS := 9
 const SKIRT_IN := -0.06          # il risvolto del bordo entra sotto la base (in R)
@@ -464,6 +471,8 @@ static func _shell_point(taglio: int, st: Dictionary, el: float, az: float, v: f
 		var tp: Vector2 = st.get("taper", Vector2(0.4, 0.25))
 		var e := _sm(0.0, tp.y, v)
 		t = t * (tp.x + (1.0 - tp.x) * e) - TUCK * (1.0 - e)
+	if STRETTI.has(taglio):
+		b *= 1.0 - STRINGI * _sm(STRINGI_EL.x, STRINGI_EL.y, el) * _sm(STRINGI_AZ.x, STRINGI_AZ.y, absf(az))
 	var p := L * (b + t)
 	if hanging:
 		var drop := (sin(deg_to_rad(he)) - sin(deg_to_rad(el))) * float(st.get("drop", 1.0))

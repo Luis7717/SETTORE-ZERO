@@ -380,11 +380,13 @@ static func _indice() -> Coreografia:
 
 
 # ---------------------------------------------------------------- 6. saluto militare: sull'attenti, mano tesa alla tempia
+# (2026-11-26: polsi di saluto, cuore, orecchie e silenzio rimisurati sulle proporzioni nuove del modello, proporzioni.gd:
+# testa 2 cm più in basso, spalle più larghe e più alte, mano più corta; tools/misura_esultanza.gd)
 # Mano destra tesa e dritta (dita in fila con l'avambraccio), punta delle dita al sopracciglio destro, palmo in giù e in
 # avanti, avambraccio inclinato, gomito in fuori all'altezza della spalla; braccio sinistro teso lungo il fianco.
-const SALUTO_POLSO := Vector3(0.088, 0.148, 0.09)    # mano destra rispetto alla spalla (x in fuori)
-const SALUTO_GOMITO := Vector3(1, 0.05, 0.25)        # polo: gomito in fuori, appena avanti
-const SALUTO_DITA := Vector3(-0.8, 0.57, 0.13)       # dal polso alla tempia: verso dentro e in su
+const SALUTO_POLSO := Vector3(0.074, 0.161, 0.1)   # mano destra rispetto alla spalla (x in fuori)
+const SALUTO_GOMITO := Vector3(1, 0.1, 0.33)        # polo: gomito in fuori, appena avanti
+const SALUTO_DITA := Vector3(-0.863, 0.503, 0.055)      # dal polso alla tempia: verso dentro e in su
 const SALUTO_PALMO := Vector3(0, -1, 0.45)          # palmo in giù e un po' in avanti
 
 static func _saluto() -> Coreografia:
@@ -408,11 +410,11 @@ static func _saluto() -> Coreografia:
 # Le dita del modello non si piegano: il cuore lo fanno le due mani tese e inclinate, punte delle dita che si toccano
 # in alto al centro, pollici verso il basso e verso dentro, palmi verso il pubblico, gomiti larghi; prima davanti al
 # petto, poi spinto un po' in avanti e in alto verso il pubblico.
-const CUORE_POLSO := Vector3(-0.04, -0.155, 0.36)     # mano rispetto alla spalla (x in fuori), davanti al petto
-const CUORE_SU := Vector3(-0.04, -0.095, 0.4)          # poi un po' più su e più avanti
+const CUORE_POLSO := Vector3(-0.064, -0.147, 0.36)    # mano rispetto alla spalla (x in fuori), davanti al petto
+const CUORE_SU := Vector3(-0.064, -0.087, 0.4)         # poi un po' più su e più avanti
 const CUORE_DITA := Vector3(-0.47, 0.88, 0.0)         # punte verso dentro e in su: si toccano al centro
 const CUORE_PALMO := Vector3(0, 0, 1)                 # palmo verso il pubblico (pollice in giù e verso dentro)
-const CUORE_GOMITO := Vector3(1, -0.8, -0.3)          # gomiti larghi e un po' in giù
+const CUORE_GOMITO := Vector3(1, -0.4, -0.3)          # gomiti larghi e un po' in giù
 
 static func _cuore() -> Coreografia:
 	var c := Coreografia.new("cuore", 2.8)
@@ -458,7 +460,7 @@ static func _ballo() -> Coreografia:
 	return c
 
 
-const ORECCHIE_POLSO := Vector3(-0.05, 0.12, 0.04)
+const ORECCHIE_POLSO := Vector3(-0.05, 0.1, 0.04)
 const ORECCHIE_GOMITO := Vector3(1, -0.55, 0.05)
 const ORECCHIE_DITA := Vector3(-0.2, 1, -0.15)
 const ORECCHIE_PALMO := Vector3(-0.35, 0, 0.94)
@@ -484,7 +486,7 @@ static func _orecchie() -> Coreografia:
 	return c
 
 
-const SILENZIO_POLSO := Vector3(-0.157, 0.025, 0.2)
+const SILENZIO_POLSO := Vector3(-0.157, 0.021, 0.2)
 const SILENZIO_DITA := Vector3(0.0, 1.0, -0.25)
 const SILENZIO_PALMO := Vector3(-1, 0, 0)
 

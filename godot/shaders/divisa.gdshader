@@ -115,6 +115,18 @@ const float LARGA_SVASO = 0.024;   // maglia larga: stacco in più all'orlo (m)
 const float LARGA_MANICA = 0.016;  // maglia larga: manica più ampia in fondo (m)
 const float LARGA_VALLE = 0.015;   // maglia larga: valle più profonda che si riempie (m)
 const float LARGA_PIEGHE = 0.13;   // maglia larga: quanto scuriscono le pieghe
+// stoffa (2026-11-26): sulla maglia la luce segue un po' la superficie levigata (TANGENT = normale levigata, messa da
+// scripts/giocatore.gd) invece di ogni muscolo: la larga quasi del tutto ("gonfia", a bozzi), l'aderente poco
+const float LISCIA_LARGA = 0.85;
+const float LISCIA_ADERENTE = 0.3;
+// calzoncini (2026-11-26): non più una seconda pelle da ciclista: si staccano un po' dalla coscia e si svasano verso
+// l'orlo (non nell'interno coscia: le gambe si toccherebbero), con la luce della superficie levigata
+const float CALZ_BASE = 0.004;     // stacco minimo (m)
+const float CALZ_SVASO = 0.02;     // stacco in più all'orlo (m)
+const float CALZ_LISCIA = 0.7;
+const float RILIEVO = 0.55;        // viso: forza delle ombre del rilievo
+const float RILIEVO_LUCE = 0.3;    // viso: forza delle luci del rilievo
+const float COLLO_OMBRA = 0.88;    // collo: sotto il mento la pelle è in ombra (stacca il viso, il collo sembra meno lungo)
 const float ADERENTE_MUSCOLI = 9.0; // maglia aderente: scurimento per metro di valle (al massimo 0,2)
 const float IRIDE_K = 1.15;       // occhi: iride più grande del web (la finestra misurata qui è più piccola)
 const float IRIDE_SU = 0.1;       // occhi: iride al centro dell'apertura, un filo in alto (sguardo dritto, non in basso)
@@ -255,8 +267,17 @@ void vertex() {
 			float svaso = braccio ? sm(spalla_x, mf, ax) : 0.0;
 			float riempi = braccio ? 0.0 : min(valle, LARGA_VALLE) * (1.0 - sm(spalla_x - 0.05, spalla_x - 0.01, ax));
 			float onda = sin(TIME * 13.0 + p.y * 38.0 + p.x * 21.0) * 0.5 + sin(TIME * 21.0 - p.y * 55.0) * 0.25;
+			NORMAL = normalize(mix(NORMAL, TANGENT, dentro * collo * mix(LISCIA_ADERENTE, LISCIA_LARGA, larga)));
 			off = dentro * collo * (larga * (LARGA_BASE + riempi + LARGA_SVASO * orlo * orlo + LARGA_MANICA * svaso)
 				+ corsa * 0.006 * onda * (0.25 + orlo) * (1.0 + larga));
+		}
+		float cf = anca_y - (stile2.w > 0.5 ? 0.5 : 0.36) * (anca_y - caviglia_y);   // orlo dei calzoncini
+		if (p.y < fine + 0.02 && p.y > cf - 0.04) {
+			float giu = sm(anca_y + 0.03, cf, p.y);
+			float dentro = sm(cf - 0.035, cf + 0.005, p.y) * sm(fine + 0.02, fine - 0.02, p.y);
+			float fuori = sm(-0.8, -0.25, normale_riposo.x * sign(p.x));
+			off += dentro * fuori * (CALZ_BASE + CALZ_SVASO * giu * giu);
+			NORMAL = normalize(mix(NORMAL, TANGENT, dentro * CALZ_LISCIA));
 		}
 		if (int(stile.y + 0.5) == 2) {
 			off += POLO_RIALZO * polo_colletto(p, zf, 0.01);   // polo: il colletto si stacca dal collo
@@ -487,6 +508,15 @@ vec3 viso(vec3 p, vec3 n, float dettaglio, inout float ruvido) {
 	col = mix(col, caldo_c, min(0.6, caldo * (0.22 + 0.22 * lum)));
 	float freddo = 0.35 * gauss(pow(ex - viso_naso_orecchie.w, 2.0) * 0.6 + pow(ey + 0.016, 2.0), 0.011) * fronte;
 	col = mix(col, sk * vec3(0.86, 0.84, 0.9), freddo);
+	// rilievo (2026-11-26, "visi piatti"): ombre morbide nell'orbita, ai lati del naso e sotto lo zigomo, luce sul dorso
+	// del naso e in mezzo alla fronte: il viso ha profondità anche con la luce piatta. Sopracciglia dipinte dopo: uguali
+	float orbita = gauss(pow(ex - viso_naso_orecchie.w * 0.75, 2.0) + pow(ey - 0.008, 2.0) * 2.5, 0.013);
+	float naso_lati = gauss(pow(ex - 0.016, 2.0) * 3.0 + pow(ey + 0.022, 2.0) * 0.5, 0.012);
+	float zigomo = gauss(pow(ex - 0.052, 2.0) * 0.5 + pow(ey + 0.062, 2.0), 0.022);
+	float ombra = clamp(0.55 * orbita + 0.4 * naso_lati + 0.45 * zigomo, 0.0, 1.0) * fronte;
+	col = mix(col, sk * vec3(0.72, 0.64, 0.64), RILIEVO * ombra);
+	float luce = gauss(ex * ex * 6.0 + pow(ey + 0.012, 2.0) * 0.25, 0.012) + 0.6 * gauss(ex * ex + pow(ey - 0.042, 2.0) * 1.5, 0.03);
+	col = mix(col, min(vec3(1.0), sk * 1.08 + 0.03), RILIEVO_LUCE * min(1.0, luce) * fronte);
 	if (p.y < mento + 0.02) {
 		float fondo = 0.45 * sm(-0.15, -0.65, n.y) * sm(mento - 0.06, mento - 0.01, p.y) * sm(mento + 0.03, mento, p.y);
 		col = mix(col, sk * vec3(0.7, 0.64, 0.66), fondo);
@@ -640,9 +670,10 @@ void fragment() {
 		c = v * v;
 	} else if (classe.y > 0.5) {
 		// collo: vicino allo scollo si dipinge come il busto, poi pelle fin sotto il mento
-		vec3 b = scollo(colletto, p, zf) < AA ? busto(p, zf, pixel, valle, ruvido) : pelle.rgb;
+		vec3 pc0 = pelle.rgb * mix(1.0, COLLO_OMBRA, sm(collo_y + 0.012, collo_y + 0.04, p.y));
+		vec3 b = scollo(colletto, p, zf) < AA ? busto(p, zf, pixel, valle, ruvido) : pc0;
 		float a = collo_pelle(colletto, p, zf);
-		c = mix(b, pelle.rgb, a);
+		c = mix(b, pc0, a);
 		ruvido = mix(ruvido, 0.62, a);
 		if (colletto == 2) {
 			vec4 pc = polo(p, zf);   // il colletto rialzato sale sul collo

@@ -12,6 +12,7 @@ const Capelli := preload("res://scripts/partita/capelli.gd")
 const Viso := preload("res://scripts/partita/viso.gd")
 const MASCHERE_VISO_PATH := "res://assets/textures/viso_maschere.png"
 const Vestibilita := preload("res://scripts/partita/vestibilita.gd")
+const Proporzioni := preload("res://scripts/partita/proporzioni.gd")   # ritocchi del modello in posa di riposo
 
 const RUN_REF := 4.2       # m/s: velocità a cui il clip di corsa gira a velocità 1 (come src/athlete3d.js)
 const SPRINT_REF := 8.0    # m/s: idem per lo scatto
@@ -67,6 +68,7 @@ func prepara(kit: Dictionary, aspetto: Dictionary, sfasa: float) -> void:
 	_mesh = _modello.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D
 	var scheletro := _modello.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
 	var player := _modello.find_children("*", "AnimationPlayer", true, false)[0] as AnimationPlayer
+	Proporzioni.applica(scheletro, _mesh.skin)   # prima di tutto: le misure dopo si leggono dalle ossa
 	if _mesh_divisa == null:
 		_prepara_condivisi(_mesh, scheletro, player)
 	# clip in loop su OGNI modello (Luis 2026-11-24, "scivolano sul terreno"): se il modello viene ricaricato le sue
@@ -198,6 +200,9 @@ static func _mesh_con_riposo(src: ArrayMesh, ossa: PackedStringArray) -> ArrayMe
 	for s in src.get_surface_count():
 		var arrays := src.surface_get_arrays(s)
 		var vertici: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		for i in vertici.size():   # proporzioni ritoccate (proporzioni.gd): le ossa le sposta Proporzioni.applica
+			vertici[i] = Proporzioni.deforma(vertici[i])
+		arrays[Mesh.ARRAY_VERTEX] = vertici
 		var normali: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
 		var bi: PackedInt32Array = arrays[Mesh.ARRAY_BONES] if arrays[Mesh.ARRAY_BONES] != null else PackedInt32Array()
 		var bw: PackedFloat32Array = arrays[Mesh.ARRAY_WEIGHTS] if arrays[Mesh.ARRAY_WEIGHTS] != null else PackedFloat32Array()
@@ -236,6 +241,16 @@ static func _mesh_con_riposo(src: ArrayMesh, ossa: PackedStringArray) -> ArrayMe
 		arrays[Mesh.ARRAY_CUSTOM0] = riposo
 		arrays[Mesh.ARRAY_CUSTOM1] = nr
 		arrays[Mesh.ARRAY_CUSTOM2] = Vestibilita.valli(vertici, normali, arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX] != null else PackedInt32Array())
+		# normali levigate al posto delle tangenti (seguono le ossa; lo shader le usa per la stoffa della maglia)
+		var tang := PackedFloat32Array()
+		tang.resize(vertici.size() * 4)
+		for i in vertici.size():
+			var l := Vestibilita.lisce[i] if i < Vestibilita.lisce.size() else (normali[i] if i < normali.size() else Vector3.UP)
+			tang[i * 4] = l.x
+			tang[i * 4 + 1] = l.y
+			tang[i * 4 + 2] = l.z
+			tang[i * 4 + 3] = 1.0
+		arrays[Mesh.ARRAY_TANGENT] = tang
 		var flags := (Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT) | (Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM1_SHIFT) 			| (Mesh.ARRAY_CUSTOM_R_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM2_SHIFT)
 		if src.surface_get_format(s) & Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS:
 			flags |= Mesh.ARRAY_FLAG_USE_8_BONE_WEIGHTS

@@ -14,6 +14,9 @@ uniform sampler2D tinta : hint_default_white, filter_linear_mipmap, repeat_disab
 
 const vec2 EXTRA_U = vec2(0.81, 1.01);    // pezzi in più (TEX_EXTRA del web, col margine)
 const float RISVOLTO_V = 0.9;             // risvolto interno (TEX_UNDER del web e oltre)
+const float VOLUME_CIMA = 0.1;            // più chiari in cima...
+const float VOLUME_BORDO = 0.16;          // ... più scuri verso il bordo (sRGB)
+const float VOLUME_TAGLIO = 0.22;         // più scuri visti di taglio (contorno meno "di plastica")
 const vec2 ELASTICO_V = vec2(0.06, 0.14); // TEX_TIE del web
 
 void fragment() {
@@ -37,6 +40,13 @@ void fragment() {
 	if (UV2.x > EXTRA_U.x && UV2.y > ELASTICO_V.x && UV2.y < ELASTICO_V.y) {
 		c = l < 0.25 ? vec3(0.722, 0.196, 0.227) : vec3(0.149, 0.149, 0.173);   // #b8323a / #26262c
 	}
+	// volume (2026-11-26, "capelli a casco"): la calotta si scurisce verso il bordo e la nuca e prende luce in cima,
+	// i bordi visti di taglio si ammorbidiscono verso il colore dei capelli in ombra. Forma e frangia non cambiano.
+	if (UV2.x < EXTRA_U.x) {
+		c *= mix(1.0 + VOLUME_CIMA, 1.0 - VOLUME_BORDO, smoothstep(0.1, 0.86, UV2.y));
+	}
+	float taglio_luce = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 2.5);
+	c *= 1.0 - VOLUME_TAGLIO * taglio_luce;
 	ALBEDO = c * c;
 	ROUGHNESS = 0.78;
 	SPECULAR = 0.25;

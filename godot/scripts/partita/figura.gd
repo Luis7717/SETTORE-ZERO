@@ -29,7 +29,11 @@ const SPRINT_ON_FULL := 6.6
 const KICK_T := 0.35           # durata di kickAnim nel motore
 const HEAD_H := 1.3            # palla sopra questa altezza al momento del colpo = colpo di testa
 const IDLE_FIX_LEGS := 0.12    # rad: nel clip "fermo" si chiudono un po' le gambe...
-const IDLE_FIX_ARMS := -0.05   # ... e si aprono appena le braccia
+const IDLE_FIX_ARMS := 0.1     # ... e le braccia scendono verso i fianchi (2026-11-26: prima si aprivano, "rigide")
+const IDLE_FIX_GOMITI := 0.18  # gomiti un po' piegati in avanti: braccia morbide, non due pali
+const IDLE_FIX_TESTA := 0.2    # testa su (nel clip guarda per terra) ...
+const IDLE_FIX_COLLO := 0.08   # ... e collo meno proteso in avanti
+const IDLE_FIX_SCHIENA := 0.05 # schiena più dritta
 const TRICK_BLEND := 0.12      # s: entrata e uscita dal movimento calcolato del giochetto
 # raggio del pallone a schermo (m del gioco; vista.gd BALL_R). 2026-11-22: da 0,21 a 0,16 (Luis: "palla leggermente
 # troppo grande rispetto ai giocatori", alti 2,3 m a schermo). I giochetti restano misurati col pallone del web (0,21,
@@ -39,7 +43,7 @@ const PALLA_R := 0.16
 const GK_PRONTO_SU := ["penalty", "corner", "freekick"]
 # rilancio dalle mani (ripresa "gk" del motore): il portiere tiene il pallone davanti al petto (metri del modello,
 # riferimento del corpo: +X sinistra, +Y su, +Z avanti); polsi ai lati del pallone, gomiti in basso, fuori e indietro
-const MANO_PALLA := Vector3(0, 1.12, 0.3)
+const MANO_PALLA := Vector3(0, 1.16, 0.28)
 const MANO_POLSO := Vector3(0.05, -0.03, -0.05)    # polso rispetto al lato del pallone (x verso fuori)
 const MANO_GOMITO := Vector3(0.6, -0.6, -0.5)      # verso dei gomiti (x verso fuori)
 const MANO_ENTRA := 0.2        # s: il pallone arriva nelle mani
@@ -119,6 +123,7 @@ func prepara(kit: Dictionary, aspetto: Dictionary, sfasa: float, tex_avviso: Tex
 	var mesh := modello.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D
 	_scheletro = modello.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
 	var player := modello.find_children("*", "AnimationPlayer", true, false)[0] as AnimationPlayer
+	Giocatore.Proporzioni.applica(_scheletro, mesh.skin)   # prima di tutto: le misure dopo si leggono dalle ossa
 	# anche se Giocatore ha già lasciato le sue risorse (partita di prova ricaricata dopo libera_condivisi)
 	if not _pronto or Giocatore._mesh_divisa == null:
 		_prepara_condivisi(mesh, _scheletro, player)
@@ -411,6 +416,9 @@ func _applica_rot() -> void:
 		var w := _w_idle
 		_rot("thigh_l", AX_Z, -IDLE_FIX_LEGS * w); _rot("thigh_r", AX_Z, IDLE_FIX_LEGS * w)
 		_rot("upperarm_l", AX_Z, -IDLE_FIX_ARMS * w); _rot("upperarm_r", AX_Z, IDLE_FIX_ARMS * w)
+		_rot("lowerarm_l", AX_X, -IDLE_FIX_GOMITI * w); _rot("lowerarm_r", AX_X, -IDLE_FIX_GOMITI * w)
+		_rot("spine_02", AX_X, -IDLE_FIX_SCHIENA * w); _rot("neck_01", AX_X, -IDLE_FIX_COLLO * w)
+		_rot("Head", AX_X, -IDLE_FIX_TESTA * w)
 	if _todo.is_empty():
 		return
 	var out: Array = []

@@ -189,8 +189,9 @@ func test_rinvio_dal_fondo_il_portiere_non_apre_le_braccia() -> bool:
 	m.ball.owner = gk
 	f.posa(gk, 0.0, ctx_partita(m))
 	# nel test l'AnimationTree non gira: senza pose calcolate restano solo le piccole correzioni del clip "fermo"
-	check(dir(f, "upperarm_l", "lowerarm_l").distance_to(dl) < 0.1, "rinvio: braccio sinistro come nel clip")
-	check(dir(f, "upperarm_r", "lowerarm_r").distance_to(dr) < 0.1, "rinvio: braccio destro come nel clip")
+	# (0,15: dal 2026-11-26 nel clip fermo le braccia scendono di IDLE_FIX_ARMS 0,1 rad verso i fianchi)
+	check(dir(f, "upperarm_l", "lowerarm_l").distance_to(dl) < 0.15, "rinvio: braccio sinistro come nel clip")
+	check(dir(f, "upperarm_r", "lowerarm_r").distance_to(dr) < 0.15, "rinvio: braccio destro come nel clip")
 	check(dir(f, "thigh_l", "calf_l").distance_to(gamba) < 0.15, "rinvio: gambe non piegate")
 	near(f.corpo.position.y, 0.0, 1e-4, "rinvio: corpo non abbassato")
 	eq(f.mano_gk, 0.0, "rinvio: il pallone resta a terra")
