@@ -617,7 +617,10 @@ func _evento(e: Dictionary, adv: bool) -> void:
 				print("prova dribbling: %s %s (a %.2f m)" % [nome, "riuscito" if e.ok else "fallito",
 					C.hyp(e.p.x - e.o.x, e.p.y - e.o.y)])
 			if (e.p as R.Player).team == me:
-				hud.big(nome, "g" if e.ok else "", 1000)
+				if e.ok: # il nome del giochetto: piccolo e in alto, non sopra il portatore nel momento chiave
+					hud.nota(nome, "g")
+				else:
+					hud.big(nome, "", 1000)
 		"goal":
 			_gol(e)
 		"restart":

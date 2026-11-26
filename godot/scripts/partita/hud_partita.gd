@@ -35,6 +35,12 @@ const FONDO := Color(0.039, 0.063, 0.125, 0.85)
 const BORDO := Color(1, 1, 1, 0.13)
 const FPS_OGNI := 0.5             # secondi tra un aggiornamento del contatore e l'altro
 const BIG_TOP := 0.27             # la scritta grande sta a questa frazione dell'altezza (come #big del web)
+# nome del giochetto del dribbling (Luis 2026-11-26: la scritta grande copriva il portatore proprio nel momento chiave):
+# più in alto (tra la cronaca e i giocatori, sotto il tabellone), più piccola e più breve
+const NOTA_TOP := 0.195
+const NOTA_DIM := 26
+const BIG_DIM := 46
+const NOTA_MS := 700
 const FADE_DA := 0.85             # nero del taglio di scena (ripartenza lontana), poi sparisce in FADE_S
 const FADE_S := 0.35
 const RALLENTY_K := 10.0          # 1/s: il bordo del rallenty si accende e si spegne in ~0,15 s
@@ -84,6 +90,7 @@ var _mappa: Control
 var _big: Label
 var _big_sotto: Label             # seconda riga della scritta grande, più piccola (chi ha segnato, chi è ammonito...)
 var _big_fino := 0
+var _big_alta := false            # la scritta di adesso è una nota (piccola, in alto)
 var _big_tween: Tween = null
 var _cartellino: Panel            # cartellino giallo o rosso sopra la scritta grande (figlio di _big: sparisce con lei)
 var _suggerimento: PanelContainer
@@ -280,7 +287,7 @@ func _crea_angoli() -> void:
 
 
 func _crea_centro() -> void:
-	_big = _etichetta(46)
+	_big = _etichetta(BIG_DIM)
 	_big.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_big.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.55))
 	_big.add_theme_constant_override("outline_size", 10)
@@ -400,7 +407,7 @@ func _disponi() -> void:
 	_mappa.position = Vector2(s.end.x - MARGINE - _mappa.size.x, top + 46.0)
 	_fps.position = Vector2(s.end.x - MARGINE - _mappa.size.x, top + 46.0 + _mappa.size.y + 3.0)
 	_big.size = Vector2(tutto.x, 0)
-	_big.position = Vector2(0, tutto.y * BIG_TOP)
+	_big.position = Vector2(0, tutto.y * big_top(_big_alta))
 	_big.pivot_offset = Vector2(tutto.x / 2.0, 30.0)
 	_big_sotto.size = Vector2(tutto.x - 2.0 * BIG_SOTTO_MARGINE, 0)
 	_cartellino.position = Vector2((tutto.x - CARTELLINO.x) / 2.0, -CARTELLINO_SU)
@@ -564,8 +571,21 @@ func aiuto_visuale(chiave: String) -> void:
 		f.visible = chiave != ""
 
 
-## scritta grande al centro (big() del web); classe "g" = gialla, "b" = rossa
-func big(testo: String, classe: String = "", ms: int = 1400, piccolo: String = "") -> void:
+## a che frazione dell'altezza sta la scritta: quella grande al centro, la nota (nome del giochetto) più su
+static func big_top(alta: bool) -> float:
+	return NOTA_TOP if alta else BIG_TOP
+
+
+## scritta piccola in alto che dura poco (nome del giochetto del dribbling): non copre i giocatori né il tabellone
+func nota(testo: String, classe: String = "", ms: int = NOTA_MS) -> void:
+	big(testo, classe, ms, "", true)
+
+
+## scritta grande al centro (big() del web); classe "g" = gialla, "b" = rossa; alta = piccola e più su (nota())
+func big(testo: String, classe: String = "", ms: int = 1400, piccolo: String = "", alta: bool = false) -> void:
+	_big_alta = alta
+	_big.add_theme_font_size_override("font_size", NOTA_DIM if alta else BIG_DIM)
+	_big.position.y = get_viewport().get_visible_rect().size.y * big_top(alta)
 	_big.text = testo
 	var colore := GIALLO if classe == "g" else (ROSSO if classe == "b" else Color.WHITE)
 	_big.add_theme_color_override("font_color", colore)

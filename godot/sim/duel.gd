@@ -196,6 +196,12 @@ func frontOpp(c: R.Player, Rr: float, lines: bool = false) -> R.Player:
 	return best
 
 
+# c sta facendo il giochetto del dribbling o sta inseguendo il pallone staccato (tunnel, pallonetti): niente duello né
+# fuga nuovi finché non ha finito (il rallenty a metà inseguimento lo lasciava fermo col pallone ancora lontano)
+func dribBusy(c: R.Player) -> bool:
+	return (dribShow != null and dribShow.p == c) or (dribChase != null and dribChase.p == c)
+
+
 # apre e chiude il duello del portatore della squadra umana (chiamato a ogni passo prima dei contrasti)
 func updateDuel(dt: float) -> void:
 	for tm in 2:
@@ -226,7 +232,7 @@ func updateDuel(dt: float) -> void:
 		return
 	if duelCd[c.team] > 0.0 and duelCdP[c.team] == c:
 		return
-	if calmed(c) or (dribShow != null and dribShow.p == c):
+	if calmed(c) or dribBusy(c):
 		return # (giochetto del dribbling in corso: niente duello nuovo finché non è passato)
 	var o := frontOpp(c, DUEL_R, true)
 	if o == null:
@@ -297,7 +303,7 @@ func updateFlee(dt: float) -> void:
 	var c := b.owner
 	if c == null or not human[c.team] or ctrl[c.team] != c or c.state != "play" or c.burst > 0.0:
 		return
-	if (fleeCd[c.team] > 0.0 and fleeCdP[c.team] == c) or calmed(c) or (dribShow != null and dribShow.p == c):
+	if (fleeCd[c.team] > 0.0 and fleeCdP[c.team] == c) or calmed(c) or dribBusy(c):
 		return
 	var o := sideOpp(c, FLEE_R)
 	if o == null:
@@ -824,6 +830,9 @@ func dribChaseEnd(f: R.Duel, preso: bool) -> void:
 		return
 	# come dopo lo scatto: avanti senza frenare, guida automatica subito
 	var tm := f.team
+	# appena ripreso il pallone, un attimo prima di un duello nuovo (come dopo la fine di un duello: DUEL_CD)
+	duelCd[tm] = maxf(duelCd[tm], DUEL_CD)
+	duelCdP[tm] = p
 	if human[tm] and ctrl[tm] == p:
 		var v: float = C.hyp(p.vx, p.vy)
 		var wx: float = p.vx / v if v > 0.5 else p.fx
