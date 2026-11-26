@@ -1898,3 +1898,14 @@ le fasce si chiamano **esterno sinistro / destro (ES / ED)**.
   (7) a metà stagione crescono/calano le sotto-statistiche che contano per il ruolo (`PESI`), non più quelle del gruppo.
 - **Non misurato**: l'equilibrio (vittorie, gol) con `controllo_gameplay`: le squadre della CPU hanno la stessa
   valutazione di prima ma statistiche distribuite diversamente (ali più veloci, centrali più forti di testa).
+
+## 2026-11-26 — Godot: calci piazzati scelti nella Rosa, capitano = campione
+- Tasto "Calci piazzati" accanto a "Forza squadra" (i tre tasti in alto restano tre): menu a due passi, 5 scelte e poi
+  "Automatico" + i 10 titolari di movimento. Si sceglie solo tra i titolari; se poi il scelto va in panchina la scelta
+  resta salvata ma in partita vale l'automatico (il menu lo dice).
+- Punizioni: "lontana" oltre 25 m dalla porta avversaria (`PUN_LONTANA_M`). Oltre 45 m (`PUN_ZONA_M`, scelta mia) batte
+  il più vicino come sempre: sennò il battitore scelto verrebbe portato a battere anche le punizioni nella nostra area.
+- Senza scelta la punizione la batte sempre il più vicino (com'era): "automatico" non cerca il migliore in `pun`.
+- Il portiere non si può scegliere. La CPU non usa le scelte.
+- Capitano: "C" gialla sulla carta del campione e "· capitano" nel pannello. **Non fatto**: la fascia al braccio in
+  partita (serve un pezzo nuovo nel modello della figura: non era "semplice").

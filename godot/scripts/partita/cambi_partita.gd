@@ -138,6 +138,7 @@ func applica(m: Object, me: int, c: Object) -> Variant:
 			src = Fisico.applica(q)
 			(src as Dictionary).erase("energy0")
 		srcs.append(src)
+	m.teams[me]["piazzati"] = c.piazzati() # battitori dei calci piazzati scelti nella pausa
 	var fatti_ora: Variant = m.cambiaSquadra(me, srcs, str(s.formation), c.stileAtt(), c.stileDif())
 	if fatti_ora is Array:
 		da_mostrare.append_array(fatti_ora)

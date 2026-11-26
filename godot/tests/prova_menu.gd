@@ -27,6 +27,8 @@ const TUTTE := [
 	["08_rosa", "rosa", null, ""],
 	["08_rosa_formazione", "rosa", {"menu": "formazione"}, ""],
 	["08_rosa_formazione_sotto", "rosa", {"menu": "formazione"}, "trascina:195,700,195,200,500;aspetta:0.6"],
+	["08_rosa_piazzati", "rosa", {"menu": "piazzati"}, ""],
+	["08_rosa_piazzati_rigorista", "rosa", {"menu": "piazzati:rig"}, ""],
 	["09_rosa_scelto", "rosa", {"sel": "titolare:9"}, ""],
 	["10_rosa_confronto", "rosa", {"sel": "titolare:9", "tgt": "panchina:0"}, ""],
 	["10_rosa_statistiche", "rosa", {"sel": "titolare:9", "statistiche": true}, ""],

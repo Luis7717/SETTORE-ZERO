@@ -44,6 +44,7 @@ var faccia_svg := ""
 var forma := 100                 # 0..100
 var infortunio := 0              # giornate che mancano (0 = sano)
 var stato_partita := ""          # in partita: "uscito", "espulso" o ""
+var capitano := false            # il campione è il capitano: "C" gialla accanto al ritratto (Luis 2026-11-26)
 
 var _t := 0.0
 var _giu := Vector2.INF
@@ -69,6 +70,7 @@ func imposta(p: Dictionary, slot_pos: String, faccia: String, d: Variant) -> voi
 	# fuori ruolo = non nel suo ruolo, né nella seconda scelta, né in un ruolo compatibile (sim/ruoli.gd)
 	ruolo_vero = vero if slot_pos != "" and D.fuori_ruolo(p, slot_pos) else ""
 	nome = MenuRosa.short_name(p.get("name", ""))
+	capitano = bool(p.get("champ", false))
 	faccia_svg = faccia
 	delta = d
 	tooltip_text = "%s, %s %d" % [str(p.get("name", "")), D.pos_name(ruolo), ovr]
@@ -167,6 +169,10 @@ func _draw() -> void:
 		var tx := MenuSvg.texture(faccia_svg, 30.0 * MenuSvg.scala_schermo() / 40.0)
 		if tx != null:
 			draw_texture_rect(tx, Rect2((W - 30.0) / 2.0, 20, 30, 30), false)
+	if capitano: # fascia da capitano: C gialla sull'angolo del ritratto
+		draw_circle(Vector2(47, 46), 6.5, Color("#101b30"), true, -1.0, true)
+		draw_circle(Vector2(47, 46), 5.5, T.GOLD, true, -1.0, true)
+		draw_string(f_nero, Vector2(43.6, 49.4), "C", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color("#2a1600"))
 	# fuori ruolo (a sinistra) e variazione della squadra (a destra)
 	if ruolo_vero != "":
 		var t := D.pos_name(ruolo_vero)

@@ -102,6 +102,18 @@
   5-3-2, 4-1-4-1 + (2026-11-26) 4-2-4, 4-3-2-1, 4-2-2-2, 4-3-3 offensivo, 4-3-3 difensivo, 4-1-2-1-2 largo. La CPU
   sorteggia come il JS tra le 4 del web (`aiMatchTeam`), poi metà squadre usa una "cugina" solo Godot
   (`FORMAZIONE_CUGINE`, `formazioneDi`, in partita con `avversarioPartita`). Test: `tests/test_formazioni.gd`.
+- **Calci piazzati e capitano** (Godot, Luis 2026-11-26): nella Rosa, accanto a "Forza squadra", il tasto **Calci
+  piazzati** apre un menu a comparsa con 5 scelte (Rigorista, Punizioni lontane, Punizioni vicine, Angolo destro,
+  Angolo sinistro); ognuna apre la lista "Automatico" + i 10 titolari di movimento con le sotto-statistiche utili
+  (`rig`; `pun`/`lon`; `pun`/`eff`/`fin`; `cro`/`eff`). Anche nella Rosa della pausa (vale subito, `cambi_partita.applica`).
+  Salvataggio: campo nuovo `s.piazzati` `{rig, punL, punV, angD, angS}` = id o null (automatico, predefinito);
+  `Carriera.piazzati()` toglie chi non è più in rosa, `setPiazzato(k, id)`. Motore: campo facoltativo `piazzati` della
+  squadra del Match (lo mette `squadraPartita`), `SimMatch.piazzato(tm, chiave)` in `setRestart`: il scelto batte se è
+  in campo (non espulso, non portiere), sennò sceglie il motore come sempre; senza campo motore identico. Punizione
+  lontana = oltre `PUN_LONTANA_M` 25 m dalla porta avversaria; oltre `PUN_ZONA_M` 45 m batte il più vicino come sempre;
+  angolo destro/sinistro visti da chi attacca. **Capitano = sempre il campione** (`Carriera.capitano()`): "C" gialla
+  sulla sua carta e "· capitano" nel pannello; la fascia al braccio in partita non c'è ancora. Test
+  `tests/test_calci_piazzati.gd`, controllo `test_rosa_calci_piazzati`, foto `08_rosa_piazzati*`.
 - **Ruoli e moduli** (Godot, Luis 2026-11-26, `godot/sim/ruoli.gd`): al posto di D/C/A ogni giocatore ha un ruolo
   specifico nel campo `ruolo` e (tranne il portiere) una seconda scelta `ruolo2`: P, TD, TS, DC (difesa), CDC mediano,
   CC, ED/ES esterno destro/sinistro, COC trequartista (centrocampo), ATT, AD/AS ala (attacco). Il vecchio `pos`

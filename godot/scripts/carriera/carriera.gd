@@ -67,7 +67,10 @@ const STAT_KEYS := ["vel", "fis", "dri", "tir", "dif", "pas", "por"]
 ## chiavi dello stato che ha solo la versione Godot (fase B): semeB = seme dei numeri casuali delle novità,
 ## forma/infortuni/progressi = per id del giocatore (testo), obiettivo = {stagione, div, tipo, posto}, rivale = id
 const CHIAVI_GODOT := ["semeB", "forma", "infortuni", "progressi", "obiettivo", "rivale", "stileAtt", "stileDif",
-	"voti", "progVoti", "metaStagione", "metaCpu", "ceduti", "trattative", "offerte", "inVendita"]
+	"voti", "progVoti", "metaStagione", "metaCpu", "ceduti", "trattative", "offerte", "inVendita", "piazzati"]
+## calci piazzati che la persona può affidare a un giocatore (s.piazzati: {chiave: id o null = automatico}):
+## rigorista, punizioni lontane e vicine, angolo destro e sinistro (stesse chiavi del motore, SimMatch.PIAZZATI)
+const PIAZZATI := ["rig", "punL", "punV", "angD", "angS"]
 
 ## stato della carriera (null = nessuna carriera): stesse chiavi di `career.s` nel web
 var s: Variant = null
@@ -1085,6 +1088,7 @@ func novita() -> void:
 		if not Sotto.ha(p):
 			Sotto.crea(p, JS.rng32(Asp.hash32("sub", s.semeB, p.id)))
 	_ruoli_rosa()
+	s["piazzati"] = piazzati() # calci piazzati: chiavi mancanti = automatico, chi non è più in rosa si toglie
 	# stili di gioco della mia squadra (fase D): mancanti o sconosciuti = equilibrati, come prima
 	s["stileAtt"] = Stili.valido_att(s.get("stileAtt"))
 	s["stileDif"] = Stili.valido_dif(s.get("stileDif"))
@@ -1379,7 +1383,36 @@ func squadraPartita() -> Dictionary:
 	t["stileAtt"] = stileAtt()
 	t["stileDif"] = stileDif()
 	t["moduli"] = true # posti dei moduli del gioco (C.FORMATIONS_GODOT)
+	t["piazzati"] = piazzati() # battitori scelti (chi non è in campo: sceglie il motore)
 	return t
+
+
+# ---------------------------------------------------------------- calci piazzati e capitano (Luis 2026-11-26)
+## battitori scelti {rig, punL, punV, angD, angS}: id di un giocatore della rosa, o null = automatico (il motore
+## sceglie il migliore in campo, come sempre). Sempre tutte le chiavi; chi non è più in rosa torna automatico.
+func piazzati() -> Dictionary:
+	var pz: Variant = s.get("piazzati") if s is Dictionary else null
+	var out := {}
+	for k: String in PIAZZATI:
+		var id: Variant = pz.get(k) if pz is Dictionary else null
+		out[k] = int(id) if JS.is_integer(id) and player(int(id)) != null else null
+	return out
+
+
+## affida il calcio piazzato k al giocatore id (null = automatico) e salva; false se k o id non vanno
+func setPiazzato(k: String, id: Variant) -> bool:
+	if not PIAZZATI.has(k) or (id != null and (not JS.is_integer(id) or player(int(id)) == null or player(int(id)).pos == "P")):
+		return false
+	var pz := piazzati()
+	pz[k] = int(id) if id != null else null
+	s["piazzati"] = pz
+	save()
+	return true
+
+
+## il capitano è sempre il campione (niente scelta)
+func capitano() -> Variant:
+	return campione()
 
 
 # ---------------------------------------------------------------- stili di gioco (fase D, sim/stili.gd)

@@ -155,7 +155,7 @@ func test_formazione_e_stili_nel_motore() -> bool:
 	var fatti: Variant = cambi.applica(m, 0, c)
 	eq((fatti as Array).size(), 0, "nessuna sostituzione")
 	eq(cambi.fatti, 0, "la formazione non conta come cambio")
-	var F: Array = C.FORMATIONS["3-5-2"]
+	var F: Array = C.schema("3-5-2") # posti del gioco (squadraPartita ha "moduli": due mediani bassi, trequartista alto)
 	for i in 11:
 		var p: R.Player = m.team(0)[i]
 		eq([p.pos, p.bx, p.by, p.i], [F[i][0], F[i][1], F[i][2], i], "posto %d della formazione nuova" % i)

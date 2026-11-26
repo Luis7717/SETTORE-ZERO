@@ -30,6 +30,9 @@ const SUB_PASS_CORTO := 20.0  # passaggio fino a tanto = Passaggio corto `pco`, 
 const GIRATA_VOL_K := 0.02    # tiro girato: ogni punto di `vol` sopra `tir` toglie il 2% del malus (e sotto lo aggiunge)
 const GIRATA_VOL_MIN := 0.5   # ... al massimo metà malus in meno ...
 const GIRATA_VOL_MAX := 1.5   # ... o metà in più
+const PUN_LONTANA_M := 25.0 # calci piazzati scelti: punizione oltre tanto dalla porta avversaria = "lontana" (punL), entro = "vicina" (punV) (m)
+const PUN_ZONA_M := 45.0 # oltre tanto dalla porta avversaria la punizione la batte il più vicino come sempre, anche con un battitore scelto (m)
+const PIAZZATI := ["rig", "punL", "punV", "angD", "angS"] # chiavi di `piazzati` della squadra
 const DBL_FREE := 6.0 # sicurezza: dopo tanto tempo di pallone libero senza che nessun altro lo tocchi, il battitore può riprenderlo (s)
 # Meteo: campo facoltativo "meteo" delle opzioni della partita ("sereno" | "nuvoloso" | "pioggia" | "neve").
 # Senza il campo (o sereno, nuvoloso, valori sconosciuti) il motore resta identico a prima. Come src/sim/match.js.
@@ -216,6 +219,26 @@ func lookFor(_src: Dictionary) -> Variant:
 	return null
 
 
+## calci piazzati scelti dalla persona (Luis 2026-11-26): campo facoltativo `piazzati` della squadra, {rig, punL, punV,
+## angD, angS: id del giocatore sorgente}. Ritorna il giocatore scelto per `chiave` se è in campo (non espulso, non il
+## portiere); null = nessuna scelta o scelto fuori dal campo → sceglie il motore come sempre.
+func piazzato(tm: int, chiave: String) -> R.Player:
+	var pz: Variant = teams[tm].get("piazzati")
+	if not pz is Dictionary or pz.get(chiave) == null:
+		return null
+	var id: Variant = pz[chiave]
+	var numero: bool = typeof(id) == TYPE_INT or typeof(id) == TYPE_FLOAT
+	for p: R.Player in team(tm):
+		if p.off or p.pos == "P":
+			continue
+		var pid: Variant = p.src.get("id")
+		if pid == null:
+			continue
+		if (numero and (typeof(pid) == TYPE_INT or typeof(pid) == TYPE_FLOAT) and int(pid) == int(id)) or (not numero and typeof(pid) == typeof(id) and pid == id):
+			return p
+	return null
+
+
 func _nearest(list: Array, x: float, y: float) -> R.Player:
 	var best: R.Player = null
 	var bd: float = 1e9
@@ -291,6 +314,11 @@ func setRestart(type: String, tm: int, x: float, y: float, taker: R.Player = nul
 		x = C.clamp_(x, -HW + 1.0, HW - 1.0)
 		y = C.clamp_(y, -HL + 1.0, HL - 1.0)
 		taker = _nearest(mine, x, y)
+		var dPorta: float = C.hyp(x, dir * HL - y)
+		if dPorta <= PUN_ZONA_M: # battitore scelto dalla persona: punizioni lontane o vicine
+			var sceltoP: R.Player = piazzato(tm, "punL" if dPorta > PUN_LONTANA_M else "punV")
+			if sceltoP != null:
+				taker = sceltoP
 		place(taker, x - 0.0, y - dir * 0.3)
 		pushAway(opp, x, y, 8.5)
 		wallSide = buildWall(tm, x, y)
@@ -338,6 +366,10 @@ func setRestart(type: String, tm: int, x: float, y: float, taker: R.Player = nul
 				taker = p
 		if sceneNoCut: # scena (riprese.gd): batte uno bravo e vicino, che alla bandierina ci va di corsa
 			taker = sceneCornerTaker(outf, x, y)
+		# battitore scelto dalla persona: angolo destro o sinistro visti da chi attacca
+		var sceltoA: R.Player = piazzato(tm, "angD" if sx * dir > 0.0 else "angS")
+		if sceltoA != null:
+			taker = sceltoA
 		var tk := taker
 		var order: Array = stableSort(outf.filter(func(p: R.Player) -> bool: return p != tk), func(p: R.Player) -> float: return float("ACD".find(p.pos)))
 		for k in order.size():
@@ -361,6 +393,9 @@ func setRestart(type: String, tm: int, x: float, y: float, taker: R.Player = nul
 			if p.pos != "P" and p.st.sv("rig") > bt:
 				bt = p.st.sv("rig")
 				taker = p
+		var sceltoR: R.Player = piazzato(tm, "rig") # rigorista scelto dalla persona
+		if sceltoR != null:
+			taker = sceltoR
 		var k: int = 0
 		for p: R.Player in players:
 			if p.off or p == taker or p.pos == "P":

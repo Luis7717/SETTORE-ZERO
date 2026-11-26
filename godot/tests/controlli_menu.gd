@@ -202,6 +202,31 @@ func _bottoni_con(n: Node, testo: String) -> int:
 	return k
 
 
+# Calci piazzati (Luis 2026-11-26): 5 scelte, ognuna apre la lista dei titolari; la scelta si salva e si torna alle 5
+func test_rosa_calci_piazzati() -> bool:
+	var c := _carriera()
+	_inizia(c)
+	var n := _apri("rosa")
+	check(_bottoni_con(n, "Calci piazzati  ▾") == 1, "tasto Calci piazzati nella Rosa")
+	n._apri_menu("piazzati")
+	var voci := _bottoni(n._velo)
+	eq(voci.size(), 1 + 5, "× più le 5 scelte")
+	voci[1].pressed.emit()   # Rigorista
+	eq(n._menu, "piazzati:rig", "si apre la scelta del rigorista")
+	var scelte := _bottoni(n._velo)
+	eq(scelte.size(), 1 + 1 + 10, "×, Automatico e i 10 titolari di movimento")
+	scelte[2].pressed.emit()   # il primo titolare dopo il portiere
+	eq(c.piazzati().rig, c.s.lineup[1], "rigorista scelto e salvato")
+	eq(n._menu, "piazzati", "si torna alle 5 scelte")
+	n._apri_menu("piazzati:rig")
+	_bottoni(n._velo)[1].pressed.emit()   # Automatico
+	eq(c.piazzati().rig, null, "di nuovo automatico")
+	var dati: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(SALVA))
+	check(dati.carriera.piazzati is Dictionary and dati.carriera.piazzati.size() == 5, "salvato su file nel campo nuovo `piazzati`")
+	_finisci(n)
+	return done()
+
+
 # i tre tasti in alto (Formazione, Attacco, Difesa) aprono il loro menu; una scelta si salva e chiude il menu
 func test_rosa_menu_formazione_e_stili() -> bool:
 	var c := _carriera()

@@ -14,7 +14,7 @@ const DIR := "user://test_formazioni/"
 const NUOVE := ["4-5-1", "3-4-3", "5-3-2", "4-1-4-1", "4-2-4", "4-3-2-1", "4-2-2-2", "4-3-3 offensivo", "4-3-3 difensivo", "4-1-2-1-2 largo"]
 ## moduli (Luis 2026-11-26) dove il nome non basta: [P, D, C, A] e file di carte nella Rosa
 const GRUPPI_ATTESI := {"4-3-2-1": [1, 4, 3, 3]}
-const FILE_ATTESE := {"4-3-3 offensivo": 5, "4-3-3 difensivo": 5}
+const FILE_ATTESE := {"4-3-3 offensivo": 5, "4-3-3 difensivo": 5, "4-1-2-1-2 largo": 5}
 const PARTITA_S := 25.0
 
 

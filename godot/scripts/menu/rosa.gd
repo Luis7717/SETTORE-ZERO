@@ -26,7 +26,11 @@ const Scelte := preload("res://scripts/menu/rosa_scelte.gd")
 const Mercato := preload("res://scripts/carriera/mercato_squadre.gd")
 const StatG := preload("res://scripts/menu/statistiche_giocatore.gd")
 const ALTEZZA_SOPRA := 150.0       # .sqtop
-const MENU := ["formazione", "attacco", "difesa"]
+const MENU := ["formazione", "attacco", "difesa", "piazzati"]
+const Sotto := preload("res://sim/sottostat.gd")
+## calci piazzati (Luis 2026-11-26): nome a schermo e sotto-statistiche utili mostrate accanto a ogni giocatore
+const PIAZZATI_NOMI := {"rig": "Rigorista", "punL": "Punizioni lontane", "punV": "Punizioni vicine", "angD": "Angolo destro", "angS": "Angolo sinistro"}
+const PIAZZATI_STAT := {"rig": ["rig"], "punL": ["pun", "lon"], "punV": ["pun", "eff", "fin"], "angD": ["cro", "eff"], "angS": ["cro", "eff"]}
 const RIGA_CAMPO := Color(1, 1, 1, 0.11)
 const TASTO_TORNA := 52.0
 const TASTO_STAT := 132.0         # px: larghezza del tasto Statistiche accanto a "Cerca acquirenti"
@@ -58,7 +62,7 @@ func prepara() -> void:
 		tgt = arg.get("tgt")
 		_stat_aperte = bool(arg.get("statistiche", false))
 		_menu = str(arg.get("menu", "attacco" if arg.get("stili", false) else ""))
-		if not MENU.has(_menu):
+		if not MENU.has(_menu.get_slice(":", 0)): # "piazzati:rig" = già dentro la scelta del rigorista
 			_menu = ""
 		in_partita = bool(arg.get("in_partita", false)) and arg.get("cambi") is Object
 		if in_partita:
@@ -386,7 +390,15 @@ func _controlli() -> Control:
 	var forza := U.bb("[font_size=13]Forza squadra [/font_size][font_size=20][color=#ffd93d][b]%d[/b][/color][/font_size]" % int(c.myRating()), 13, T.DIM)
 	forza.autowrap_mode = TextServer.AUTOWRAP_OFF
 	forza.fit_content = true
-	v.add_child(forza)
+	forza.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	forza.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var riga_forza := U.hbox(8)
+	riga_forza.add_child(forza)
+	var pz := U.bottone("Calci piazzati  ▾", "BtnFantasma", _apri_menu.bind("piazzati"), 32)
+	pz.add_theme_font_size_override("font_size", 13)
+	pz.custom_minimum_size.x = 150
+	riga_forza.add_child(pz)
+	v.add_child(riga_forza)
 	if in_partita:
 		v.add_child(U.paragrafo("Tocca un titolare e poi uno della panchina per il cambio: restano %d cambi su %d." % [cambi.restano(), cambi.MAX_CAMBI], 12.5))
 	else:
@@ -415,6 +427,20 @@ func _mostra_menu(quale: String) -> void:
 	var voci: Array = []
 	var titolo_menu := ""
 	var scelto := ""
+	if quale == "piazzati": # le 5 scelte, ognuna con chi batte adesso
+		titolo_menu = "Calci piazzati"
+		for k: String in D.Car.PIAZZATI:
+			voci.append({"id": k, "nome": PIAZZATI_NOMI[k], "spiega": _piazzato_ora(k)})
+	elif quale.begins_with("piazzati:"): # chi batte: automatico o uno dei titolari (non il portiere)
+		var k := quale.get_slice(":", 1)
+		titolo_menu = str(PIAZZATI_NOMI.get(k, k))
+		var ora: Variant = c.piazzati().get(k)
+		scelto = "auto" if ora == null else str(ora)
+		voci.append({"id": "auto", "nome": "Automatico", "spiega": "Batte il più vicino al pallone, come sempre." if k.begins_with("pun") else "Batte il migliore in campo, come sempre."})
+		for id: Variant in stato().lineup:
+			var g: Variant = c.player(id)
+			if g != null and g.pos != "P" and _stato_partita(id) == "":
+				voci.append({"id": str(g.id), "nome": str(g.name) + ("  (C)" if g.get("champ", false) else ""), "spiega": "%s · %s" % [D.pos_name(D.ruolo_di(g)), _piazzato_stat(g, k)]})
 	match quale:
 		"formazione":
 			titolo_menu = "Formazione"
@@ -431,9 +457,37 @@ func _mostra_menu(quale: String) -> void:
 	add_child(_velo)
 
 
+# "Punizioni 61 · Tiri da lontano 68": le sotto-statistiche che contano per quel calcio piazzato
+func _piazzato_stat(g: Dictionary, k: String) -> String:
+	var pezzi: PackedStringArray = []
+	for st: String in PIAZZATI_STAT.get(k, []):
+		pezzi.append("%s %d" % [Sotto.NOMI[st], int(Sotto.valore(g, st))])
+	return " · ".join(pezzi)
+
+
+# chi batte adesso il calcio piazzato k (riga sotto il nome nel menu)
+func _piazzato_ora(k: String) -> String:
+	var c := carriera()
+	var id: Variant = c.piazzati().get(k)
+	var g: Variant = c.player(id) if id != null else null
+	if g == null:
+		return "Automatico: batte il più vicino al pallone." if k.begins_with("pun") else "Automatico: batte il migliore in campo."
+	if not stato().lineup.has(g.id) or _stato_partita(g.id) != "":
+		return "%s (non è in campo: per ora automatico)" % g.name
+	return "%s · %s" % [g.name, _piazzato_stat(g, k)]
+
+
 func _scelto(id: String, quale: String) -> void:
 	if quale == "formazione":
 		_formazione(id)
+		return
+	if quale == "piazzati":
+		_apri_menu("piazzati:" + id)
+		return
+	if quale.begins_with("piazzati:"):
+		carriera().setPiazzato(quale.get_slice(":", 1), null if id == "auto" else int(id))
+		_menu = "piazzati"
+		_aggiorna()
 		return
 	_menu = ""
 	if quale == "attacco":
@@ -478,7 +532,7 @@ func _pannello_giocatore(p: Dictionary, F: Array) -> Control:
 	testa.add_child(MenuFaccia.nuovo(D.look_of(p), _colori[0], _colori[1], 40, _k1))
 	var nm := U.vbox(2)
 	nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	nm.add_child(U.corto(str(p.name), 16, T.TXT, T.PESO_NERO))
+	nm.add_child(U.corto(str(p.name) + ("  · capitano" if p.get("champ", false) else ""), 16, T.TXT, T.PESO_NERO))
 	var fis := Fisico.di(p)
 	var info := D.ruolo_testo(p) + " · " + Fisico.testo(fis)
 	if c.infortunio(p.id) > 0:
