@@ -91,7 +91,7 @@ const DRIB_GAP_KO_R := 2.3  # fallito: il portatore cade in avanti, il difensore
 const DRIB_GAP_RATE := 9.0  # la sovrapposizione si toglie così in fretta (frazione per s)
 const DRIB_GAP_OK := 0.9    # riuscito: dura il giochetto più tanto (s, il sorpasso)
 const DRIB_GAP_KO := 0.9    # fallito: dura tanto (s, contrasto e caduta)
-const DRIB_KO_STUN := 0.8   # fallito: il portatore resta fermo tanto (cade su un ginocchio e si rialza; senza: 0,35 s)
+const DRIB_KO_STUN := 0.6   # fallito: il portatore resta fermo tanto (cade su un ginocchio e si rialza; senza: 0,35 s)
 
 
 func duelFor(tm: int) -> bool:

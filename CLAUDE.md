@@ -204,7 +204,7 @@
   telecamera della regia sta dalla parte opposta al lato del dribbling (guarda nel verso dello scatto: il portatore
   passa di fianco al difensore senza coprirlo), più vicina (`DRIB_DIST` 7,5 m). Dopo lo scatto il rallenty dura
   ancora secondo il giochetto (`DOPO_SKILL`: veronica, tunnel, pallonetti). **Fallito**: affondo del difensore con
-  l'interno del piede, il portatore cade su un ginocchio con una mano a terra e si rialza (`DRIB_KO_STUN` 0,8 s fermo).
+  l'interno del piede, il portatore cade su un ginocchio con una mano a terra e si rialza (`DRIB_KO_STUN` 0,6 s fermo).
   **Portatore di corsa** (`figura.gd` `_corsa_col_pallone`): busto più dritto, braccia strette che vanno a tempo con
   le gambe. I dribbling dell'IA tengono i giochetti di prima (`giochetti.gd`). Test `tests/test_skill.gd` (motore),
   `tests/test_coreo.gd` (tutti i giochetti, compenetrazione dei corpi, pallone). Prove:
