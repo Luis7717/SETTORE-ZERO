@@ -931,8 +931,12 @@ func step(dt: float) -> void:
 	movePlayers(dt)
 	updateBall(dt)
 	updateDuel(dt)
+	if ball.finto != null:
+		dribPallaStep(dt) # tunnel e pallonetti: il pallone che si vede, staccato dal portatore
 	if dribShow != null:
 		dribShowStep(dt) # giochetto del dribbling prenotato (solo con "rifiniture")
+	if dribChase != null:
+		dribChaseStep(dt) # ... e il portatore che lo va a riprendere
 	if dribGap != null:
 		dribGapStep(dt) # ... e i due corpi restano staccati finché dura
 	updateFlee(dt)

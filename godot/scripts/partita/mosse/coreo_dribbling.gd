@@ -9,7 +9,7 @@
 #   "affondo" passo largo verso la finta (si sbilancia), poi allunga l'altra gamba verso il pallone che se ne va (a
 #             vuoto, senza entrare nel corpo del portatore), la ritira e si gira;
 #   "gambe"   (tunnel) gambe larghe, il pallone gli passa in mezzo: si piega a guardare e chiude le ginocchia tardi;
-#   "alto"    (sombrero, arcobaleno) guarda in su il pallone che gli passa sopra, un passo indietro, braccia su;
+#   "alto"    (sombrero, bicicletta) guarda in su il pallone che gli passa sopra, un passo indietro, braccia su;
 #   "blocco"  (finta di tiro) si gira di fianco e alza la gamba per coprirsi dal tiro che non arriva.
 # Dribbling fallito: il difensore fa un passo lungo e toglie il pallone con l'interno del piede (i due corpi restano
 #   staccati: sim/duel.gd DRIB_GAP); il portatore, col piede portato via, cade in avanti: busto giù, braccia avanti, una
@@ -28,7 +28,7 @@ const T_CONTRASTO := 0.2       # fallito: il piede del difensore arriva sul pall
 const ALLUNGO := 0.82          # il difensore allunga la gamba al massimo a questa frazione della sua lunghezza
 # giochetti della persona (ordine di sim/skill.gd)
 const FINTE := Sk.IDS
-const STILE_DIF := {"tunnel": "gambe", "sombrero": "alto", "arcobaleno": "alto", "fintatiro": "blocco"}
+const STILE_DIF := {"tunnel": "gambe", "sombrero": "alto", "bicicletta": "alto", "fintatiro": "blocco"}
 const BR_RIPOSO := Sk.BR_RIPOSO
 
 ## solo per le prove (prova_vista --giochetto=...) quando il motore non dice il giochetto: giochetto fisso

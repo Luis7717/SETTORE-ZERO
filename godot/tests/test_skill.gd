@@ -31,7 +31,7 @@ func test_scelta_secondo_il_dribbling() -> bool:
 	for k in 4000:
 		var id := String(Skill.scegli(99.0, (k + 0.5) / 4000.0).id)
 		conta[id] = int(conta.get(id, 0)) + 1
-	check(int(conta.arcobaleno) > 2 * int(conta.finta), "arcobaleno %d volte, finta %d" % [conta.arcobaleno, conta.finta])
+	check(int(conta.bicicletta) > 2 * int(conta.finta), "bicicletta %d volte, finta %d" % [conta.bicicletta, conta.finta])
 	return done()
 
 
@@ -53,14 +53,14 @@ func test_il_giochetto_non_tocca_i_numeri_casuali() -> bool:
 	# Arrange / Act: stesso seme, giochetto scelto dal motore o fisso, con e senza rifiniture
 	var sd := TD.first_ok_seed()
 	var a := TD.book_and_resolve(sd, true, "")
-	var b := TD.book_and_resolve(sd, true, "bicicletta")
+	var b := TD.book_and_resolve(sd, true, "pedalata")
 	var c := TD.book_and_resolve(sd, false, "")
 	# Assert: la sequenza della partita è allo stesso punto, l'esito è lo stesso
 	eq((a[0] as SimMatchScript).rng.a, (b[0] as SimMatchScript).rng.a, "stessa sequenza con un giochetto o l'altro")
 	eq((a[0] as SimMatchScript).rng.a, (c[0] as SimMatchScript).rng.a, "stessa sequenza con e senza rifiniture")
 	eq(bool(a[3].ok), bool(c[3].ok), "stesso esito")
 	check(String(a[3].skill) != "", "il motore dice il giochetto: %s" % a[3].skill)
-	eq(String(b[3].skill), "bicicletta", "giochetto fisso")
+	eq(String(b[3].skill), "pedalata", "giochetto fisso")
 	eq(String(c[3].skill), "", "senza rifiniture niente giochetto")
 	eq(float(c[3].show), 0.0, "... e niente attesa")
 	check((c[0] as SimMatchScript).dribGap == null, "... e nessuna distanza tenuta")

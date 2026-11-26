@@ -83,6 +83,7 @@ var dribShow: R.Duel = null
 var skillRng: SimRngScript = null
 var skillForza: String = ""
 var dribGap: R.Duel = null
+var dribChase: R.Duel = null # tunnel e pallonetti: il portatore va a riprendere il pallone che si vede (ball.finto)
 var flee: R.Duel = null # fuga: avversario alla pari o dietro (per linee), tasto Scatto; stessi campi del duello
 var fleeCd: Array = [0.0, 0.0]
 var fleeCdP: Array = [null, null]
@@ -273,6 +274,8 @@ func place(p: R.Player, x: float, y: float) -> void:
 func resetStates() -> void:
 	dribShow = null
 	dribGap = null
+	dribChase = null
+	ball.finto = null
 	for p: R.Player in players:
 		p.wall = null
 	for p: R.Player in players:

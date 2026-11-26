@@ -453,7 +453,7 @@ func _pallone_coreo() -> Dictionary:
 		var c: Coreo = _coreo[k]
 		if c.pallone_attivo():
 			var q := c.pallone()
-			return {"x": q.x, "z": q.z, "h": c.pallone_h(), "w": c.peso}
+			return {"x": q.x, "z": q.z, "h": c.pallone_h(), "w": c.peso_palla()}
 	return {"x": 0.0, "z": 0.0, "h": 0.0, "w": 0.0}
 
 

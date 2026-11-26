@@ -17,7 +17,9 @@ const TS_GIOCHETTO := 0.3    # ... durante il giochetto, lo scatto oltre il dife
 const DOPO_OK := 0.12
 # ... ma nei giochetti in cui il bello arriva dopo lo scatto (il pallone tra le gambe o sopra la testa, il giro della
 # veronica, il taglio dietro la gamba) il rallenty dura fino a lì (Luis 2026-11-26: "falli vedere")
-const DOPO_SKILL := {"veronica": 0.4, "tunnel": 0.32, "sombrero": 0.34, "arcobaleno": 0.34, "chop": 0.2, "cruyff": 0.22,
+# (tunnel e pallonetti: il pallone tra le gambe o che sale sopra la testa; poi il tempo torna normale e la corsa a
+# riprenderlo si guarda a velocità vera)
+const DOPO_SKILL := {"veronica": 0.42, "tunnel": 0.4, "sombrero": 0.3, "bicicletta": 0.3, "chop": 0.24, "cruyff": 0.26,
 	"tacco": 0.2, "croqueta": 0.2, "elastico": 0.18, "elastico_inv": 0.18}
 const DOPO_KO := 0.8         # fallito: contrasto e caduta si guardano per tanto (s di partita)
 const USCITA_K := 2.2        # 1/s: alla fine il tempo torna normale con questa dolcezza (TEMPO_K del gioco è 14)
