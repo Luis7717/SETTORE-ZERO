@@ -385,7 +385,7 @@
   testa su, schiena più dritta. Stoffa: normali levigate (`Vestibilita.lisce`, messe al posto delle tangenti della mesh)
   mescolate sulla maglia (`LISCIA_LARGA` / `LISCIA_ADERENTE`) e sui calzoncini, che si staccano dalla coscia e si
   svasano (`CALZ_*`); viso con ombre e luci di rilievo (`RILIEVO*`), collo in ombra sotto il mento; capelli con
-  volume (`VOLUME_*` in `capelli.gdshader`) e tagli corti più stretti ai lati e sulla nuca (`STRETTI`, `STRINGI` in
+  volume (`VOLUME_*` in `capelli.gdshader`) e tagli corti più stretti ai lati e sulla nuca, attaccatura ferma (`STRETTI`, `STRINGI*` in
   `capelli.gd`). Polsi di saluto, cuore, orecchie e silenzio rimisurati (`mosse/esultanza.gd`), `MANO_PALLA` del
   portiere più su. Foto di controllo: `-s res://tools/foto_modelli.gd -- --file=CARTELLA/x.png [--corsa=5]
   [--solo=N --viste=0,1,2,3 --tile=480x720]`; test `tests/test_proporzioni.gd`.

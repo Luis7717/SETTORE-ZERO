@@ -61,6 +61,7 @@ const STRETTI := [2, 3, 4, 5, 7, 12, 13, 16]
 const STRINGI := 0.06            # quanto stringe (frazione del raggio della base)
 const STRINGI_EL := Vector2(46.0, 8.0)   # da questa elevazione (niente) a questa (tutto), in gradi
 const STRINGI_AZ := Vector2(30.0, 75.0)   # solo ai lati e dietro: l'attaccatura sulla fronte resta dov'è
+const STRINGI_BORDO := 0.3       # il bordo (attaccatura) resta dov'era: stringe salendo dal bordo (v da 0 a questo)
 const SHELL_COLS := 40
 const SHELL_ROWS := 9
 const SKIRT_IN := -0.06          # il risvolto del bordo entra sotto la base (in R)
@@ -472,7 +473,7 @@ static func _shell_point(taglio: int, st: Dictionary, el: float, az: float, v: f
 		var e := _sm(0.0, tp.y, v)
 		t = t * (tp.x + (1.0 - tp.x) * e) - TUCK * (1.0 - e)
 	if STRETTI.has(taglio):
-		b *= 1.0 - STRINGI * _sm(STRINGI_EL.x, STRINGI_EL.y, el) * _sm(STRINGI_AZ.x, STRINGI_AZ.y, absf(az))
+		b *= 1.0 - STRINGI * _sm(STRINGI_EL.x, STRINGI_EL.y, el) * _sm(STRINGI_AZ.x, STRINGI_AZ.y, absf(az)) * _sm(0.0, STRINGI_BORDO, v)
 	var p := L * (b + t)
 	if hanging:
 		var drop := (sin(deg_to_rad(he)) - sin(deg_to_rad(el))) * float(st.get("drop", 1.0))
