@@ -11,6 +11,7 @@ const C := preload("core.gd")
 const SimRngScript := preload("rng.gd")
 const F := preload("fmath.gd") # sin, cos, atan2 identici a V8
 const Stili := preload("stili.gd")
+const Skill := preload("skill.gd")
 
 const HW := C.HW
 const HL := C.HL
@@ -77,6 +78,11 @@ var duelCdP: Array = [null, null]
 # giochetto del dribbling prenotato riuscito (solo con "rifiniture", duel.gd → dribShowStep): il portatore rallenta, fa la
 # finta dal lato opposto e poi scatta oltre il difensore. Campi del duello: p, o, side, t = tempo che resta (s)
 var dribShow: R.Duel = null
+# giochetto del dribbling (skill.gd): generatore a parte per sceglierlo (non tocca la sequenza di rnd()), giochetto fisso
+# per le prove, e coppia portatore-difensore tenuta a distanza finché dura il dribbling (duel.gd dribGapStep)
+var skillRng: SimRngScript = null
+var skillForza: String = ""
+var dribGap: R.Duel = null
 var flee: R.Duel = null # fuga: avversario alla pari o dietro (per linee), tasto Scatto; stessi campi del duello
 var fleeCd: Array = [0.0, 0.0]
 var fleeCdP: Array = [null, null]
@@ -266,6 +272,7 @@ func place(p: R.Player, x: float, y: float) -> void:
 
 func resetStates() -> void:
 	dribShow = null
+	dribGap = null
 	for p: R.Player in players:
 		p.wall = null
 	for p: R.Player in players:

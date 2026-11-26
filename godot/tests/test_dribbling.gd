@@ -105,10 +105,12 @@ func test_lato_opposto_allo_sbilanciamento_e_verso_il_centro() -> bool:
 # --- giochetto del dribbling prenotato (solo con "rifiniture", Luis 2026-11-24: "falli vedere bene")
 
 # tasto Dribbling col duello aperto (difensore a 5 m) e passi finché arriva l'esito: [m, p, o, evento dribble]
-static func book_and_resolve(seed_value: int, rif: bool) -> Array:
+# (forza = giochetto fisso, sim/skill.gd: ognuno dura il suo tempo)
+static func book_and_resolve(seed_value: int, rif: bool, forza: String = "finta") -> Array:
 	var s := setup(seed_value, 5.0)
 	var m: SimMatchScript = s[0]
 	m.rifiniture = rif
+	m.skillForza = forza
 	var p: R.Player = s[1]
 	var o: R.Player = s[2]
 	p.st.dri = 99

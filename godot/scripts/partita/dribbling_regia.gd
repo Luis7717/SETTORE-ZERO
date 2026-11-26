@@ -15,7 +15,11 @@ const TS_GIOCHETTO := 0.3    # ... durante il giochetto, lo scatto oltre il dife
 # tornava normale piano: a schermo il portatore sembrava fermarsi dopo il dribbling (Luis 2026-11-25, "è migliorato
 # ma sembra ancora che si fermi"); ora il sorpasso si vede appena e si riparte di corsa (USCITA_K_OK)
 const DOPO_OK := 0.12
-const DOPO_KO := 0.65        # fallito: il contrasto si guarda per tanto (s di partita)
+# ... ma nei giochetti in cui il bello arriva dopo lo scatto (il pallone tra le gambe o sopra la testa, il giro della
+# veronica, il taglio dietro la gamba) il rallenty dura fino a lì (Luis 2026-11-26: "falli vedere")
+const DOPO_SKILL := {"veronica": 0.4, "tunnel": 0.32, "sombrero": 0.34, "arcobaleno": 0.34, "chop": 0.2, "cruyff": 0.22,
+	"tacco": 0.2, "croqueta": 0.2, "elastico": 0.18, "elastico_inv": 0.18}
+const DOPO_KO := 0.8         # fallito: contrasto e caduta si guardano per tanto (s di partita)
 const USCITA_K := 2.2        # 1/s: alla fine il tempo torna normale con questa dolcezza (TEMPO_K del gioco è 14)
 const USCITA_K_OK := 7.0     # 1/s: ... dopo il dribbling riuscito invece in fretta (il portatore scatta via)
 const USCITA_FINE := 0.97    # tempo tornato quasi normale: la regia ha finito ...
@@ -34,6 +38,7 @@ var o: Object = null         # difensore
 var side := 0.0              # lato del dribbling (+1 = sinistra del portatore guardando il difensore)
 var ok := true               # esito (vale dalla fase "giochetto")
 var resta := 0.0             # s di partita che restano nella fase "giochetto"
+var dopo := DOPO_OK          # riuscito: rallenty dopo lo scatto (s di partita; secondo il giochetto)
 var yaw := 0.0               # angolo voluto della telecamera (spazio orientato di camfit.gd: 0 = verso la porta avversaria)
 
 
@@ -74,12 +79,13 @@ func evento(e: Dictionary, me: int) -> void:
 			if pe == p and (fase == "corsa" or fase == "uscita"):
 				fase = "giochetto"
 				ok = bool(e.ok)
+				dopo = float(DOPO_SKILL.get(String(e.get("skill", "")), DOPO_OK))
 				# riuscito col giochetto del motore: il rallenty dura fino allo scatto (poi dribble_go: DOPO_OK);
 				# fallito: il tempo di guardare il contrasto
-				resta = (float(e.get("show", 0.0)) + DOPO_OK) if ok else DOPO_KO
+				resta = (float(e.get("show", 0.0)) + dopo) if ok else DOPO_KO
 		"dribble_go":
 			if pe == p and fase == "giochetto":
-				resta = DOPO_OK
+				resta = dopo
 
 
 ## velocità del tempo voluta dalla regia, −1 = nessuna (decide il resto del gioco)

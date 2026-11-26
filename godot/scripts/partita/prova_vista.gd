@@ -34,7 +34,7 @@
 #   --traccia=N|segui     stampa a ogni fotogramma lo stato mocap di m.players[N] o di quello seguito (clip, tempo, peso)
 #   dribbling della persona da vicino (coreografie di mosse/coreo_dribbling.gd), a passo fisso (non dipende da quanto
 #   è veloce il PC): --scena=dribbling_ok | dribbling_ko [--lato=1|-1] [--giochetto=finta|doppiopasso|elastico]
-#   [--vista=lato|dietro|alto|largo|largo_dietro] --foto=CARTELLA/prefisso [--ogni-passi=N]: una schermata ogni N fotogrammi (tempo al 30%)
+#   [--vista=lato|dietro|alto|largo|largo_dietro|diag|diag2] --foto=CARTELLA/prefisso [--ogni-passi=N]: una schermata ogni N fotogrammi (tempo al 30%)
 extends Node
 
 const VISTA := preload("res://scenes/vista_partita.tscn")
@@ -344,6 +344,8 @@ func _dribbling_da_vicino() -> void:
 	m.ball.x = att.x
 	m.ball.y = att.y + 0.6
 	m.ctrl[0] = att
+	if _opz.has("giochetto"):   # giochetto fisso: lo sceglie il motore (sim/skill.gd: ognuno dura il suo tempo)
+		m.skillForza = String(_opz.giochetto)
 	var lato := float(_opz.get("lato", "0"))
 	var foto: String = _opz.get("foto", "")
 	var ogni := int(_opz.get("ogni-passi", "4"))
@@ -366,13 +368,13 @@ func _dribbling_da_vicino() -> void:
 				match String(e.type):
 					"dribble":
 						var es := DribblingRegia.esito(e)
-						if _opz.has("giochetto") and bool(e.ok):
-							CoreoDrib.FORZA = String(_opz.giochetto)
 						var tk: Dictionary = vista.dribbling(e, es)
-						print("prova dribbling: %s %s lato %s" % [tk.get("name", "-"), "riuscito" if e.ok else "fallito", e.side])
+						print("prova dribbling: %s %s lato %s (a %.2f m)" % [tk.get("name", "-"), "riuscito" if e.ok else "fallito", e.side,
+							Vector2(att.x - dif.x, att.y - dif.y).length()])
 						fine = m.time + 1.3
 					"dribble_go":
 						vista.dribbling_go(e)
+						print("prova dribbling: scatto a %.2f m" % Vector2(att.x - dif.x, att.y - dif.y).length())
 			m.events.clear()
 			regia.passo(m, 0, DT, ts)
 		if not prenotato and m.duelFor(0):
@@ -389,7 +391,8 @@ func _dribbling_da_vicino() -> void:
 		cam = cam.lerp(c, 0.08) if n > 0 else c
 		var dove: String = _opz.get("vista", "lato")
 		var viste := {"lato": Vector3(6.5, 2.0, -1.0), "dietro": Vector3(1.2, 2.4, 6.5), "alto": Vector3(3.0, 7.5, 2.0),
-			"largo": Vector3(11.0, 2.6, -2.5), "largo_dietro": Vector3(1.5, 3.2, 10.5)} # largo: tutto il corpo nei video
+			"largo": Vector3(11.0, 2.6, -2.5), "largo_dietro": Vector3(1.5, 3.2, 10.5),
+			"diag": Vector3(6.0, 3.6, 8.5), "diag2": Vector3(-6.0, 3.6, 8.5)} # largo: tutto il corpo nei video
 		var o: Vector3 = viste.get(dove, viste.lato)
 		vista.cam.fov = 38.0
 		vista.cam.look_at_from_position(cam + o, cam + Vector3(0, 0.8, -1.0), Vector3.UP)

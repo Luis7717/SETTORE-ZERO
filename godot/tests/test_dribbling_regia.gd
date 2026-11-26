@@ -36,6 +36,7 @@ func test_rallenty_dal_tasto_alla_fine_del_giochetto() -> bool:
 	var s := TD.setup(sd, 5.0)
 	var m: SimMatchScript = s[0]
 	m.rifiniture = true
+	m.skillForza = "finta"   # giochetto corto: il rallenty finisce DOPO_OK dopo lo scatto
 	(s[1] as R.Player).st.dri = 99
 	(s[2] as R.Player).st.dif = 20
 	var rg := Regia.new()
