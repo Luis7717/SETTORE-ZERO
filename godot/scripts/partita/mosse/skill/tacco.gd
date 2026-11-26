@@ -6,30 +6,36 @@ const Coreo := preload("../coreo.gd")
 const K := preload("comune.gd")
 
 
-# colpo di tacco: appoggio accanto al pallone, l'altro piede gli passa davanti e il tacco lo manda dietro la gamba
-# d'appoggio, dal lato scelto
+const Finta := preload("finta.gd")
+
+
+# colpo di tacco (tacco contro tacco): in corsa il corpo passa sopra il pallone, che rallenta; il piede della finta lo
+# scavalca col ginocchio alto e col tacco lo manda indietro, verso il piede rimasto dietro, che allo scatto lo calcia
+# in avanti dal lato scelto
 static func a(c: Coreo, S: float, g: float) -> void:
 	var F := -S
 	var pS := K.ls(S)
 	var pF := K.ls(F)
-	var t0 := K.libera(c, pS)
-	c.chiave_giro(0.6 * g, F * 0.3)
-	c.palla_a(0.8 * g, {"rel": Vector3(F * 0.02, 0, 0.4)})
-	var tp := maxf(t0 + 0.1, 0.4 * g)
-	c.appoggia(pS, tp, Vector2(S * 0.2, 0.6), 0.0, 0.07)
-	c.stacca(pF, tp - 0.03)
-	c.passa_palla(pF, 0.7 * g, Vector3(F * 0.24, 0.24, 0.05), Vector3(-S * 0.5, 0.3, 0), 0.03)
-	c.passa_palla(pF, 0.93 * g, Vector3(F * 0.2, 0.14, 0.2), Vector3(-S * 1.1, 0.2, 0), 0.0)
-	c.chiave_bacino(tp, Vector3(0, 0.9, 0.02))
-	c.chiave_bacino(0.93 * g, Vector3(S * 0.04, 0.92, 0.06))
-	c.chiave_angoli(0.93 * g, Vector3(F * 0.2, 0.08, 0))
-	c.chiave_busto(0.93 * g, Vector3(0.14, F * 0.06, F * 0.2))
-	K.braccia(c, 0.93 * g, pS, Vector3(0.37, -0.1, 0.1), Vector3(0.36, -0.14, -0.1))
-	c.chiave_sguardo(0.6 * g, 0.3, F * 0.45)
-	c.chiave_sguardo(g, 0.7, 0.0)
+	var th := 0.8 * g
+	Finta.rincorsa(c, pF, th - 0.1)
+	# ginocchio alto sopra il pallone, poi il piede scende davanti al pallone e il tacco lo colpisce all'indietro
+	c.passa_palla(pF, th - 0.1, Vector3(F * 0.03, 0.5, 0.06), Vector3(0, 0.5, 0), 0.0)
+	c.tocca(pF, th, "heel", Vector3(-S * 0.1, -0.3, 0), {"rel": Vector3(F * 0.02, 0, 0.16)})
+	c.palla_a(g + 0.07, {"rel": Vector3(S * 0.12, 0, -0.12)})
+	c.appoggia_corsa(pF, th + 0.08, 0.1, Vector2(F * 0.04, 0.04), 0.03)
+	c.chiave_bacino(th - 0.1, Vector3(0, 0.95, -0.02))
+	c.chiave_angoli(th - 0.1, Vector3(0, -0.04, 0))
+	c.chiave_busto(th - 0.1, Vector3(0.0, 0, 0))
+	c.chiave_bacino(th, Vector3(0, 0.93, 0.02))
+	c.chiave_busto(th, Vector3(0.1, 0, S * 0.1))
+	K.braccia(c, th - 0.1, pS, K.BR_LARGO, K.BR_ALTO)
+	K.braccia(c, th, pS, K.BR_LARGO, K.BR_LARGO)
+	c.chiave_sguardo(0.5 * g, 0.9, 0.0)
 
 
 # parte B: S = lato scelto, tg = adesso (lo scatto)
 static func b(c: Coreo, S: float, tg: float) -> void:
-	var pF := K.ls(-S)
-	K.via(c, S, tg, pF, "heel", Vector3(-S * 1.15, 0.2, 0), 0.04)
+	var pS := K.ls(S)
+	# (il pallone, colpito da dietro, salta in avanti con un piccolo arco: si vede uscire da sotto il corpo)
+	K.via(c, S, tg, pS, "instep", Vector3(-S * 0.25, 0.6, 0), 0.04,
+		{"palla": [[tg + 0.26, {"rel": Vector3(S * 0.16, 0, 0.75), "arco": 0.3}]]})
