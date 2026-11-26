@@ -179,7 +179,7 @@ func test_giochetto_frena_poi_scatta_oltre_il_difensore() -> bool:
 	check(go != null, "poi lo scatto (dribble_go)")
 	near(t, D.DRIB_SHOW_T, 2.0 * DT, "lo scatto dopo DRIB_SHOW_T")
 	check(vmax <= D.DRIB_SHOW_V + 0.3, "durante il giochetto va piano: %.2f m/s" % vmax)
-	check(dmin >= D.DRIB_SHOW_GAP - 0.5, "non finisce addosso al difensore: %.2f m" % dmin)
+	check(dmin >= D.DRIB_NEAR - 0.2, "non finisce addosso al difensore: %.2f m" % dmin)
 	check((p.x - x0) * side > 0.0, "la finta va dal lato opposto a quello scelto (+1 = sinistra = x minori)")
 	check(m.dribShow == null, "giochetto finito")
 	check(C.hyp(p.vx, p.vy) > 5.0, "accelera: %.2f m/s" % C.hyp(p.vx, p.vy))

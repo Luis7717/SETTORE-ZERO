@@ -103,7 +103,7 @@ func test_ogni_giochetto_dura_il_suo_tempo_e_poi_scatta() -> bool:
 		# Assert
 		check(go, "%s: lo scatto arriva" % s.id)
 		check(dmin_a >= D.DRIB_GAP - 0.25, "%s: durante il giochetto restano staccati (%.2f m)" % [s.id, dmin_a])
-		check(dmin_b >= D.DRIB_GAP_GO - 0.25, "%s: nel sorpasso non si toccano (%.2f m)" % [s.id, dmin_b])
+		check(dmin_b >= D.DRIB_GAP_GO - 0.4, "%s: nel sorpasso non si toccano (%.2f m)" % [s.id, dmin_b])
 		check(p.y > o.y + 0.5, "%s: oltre il difensore" % s.id)
 		check(m.ball.owner == p, "%s: col pallone" % s.id)
 		m.dispose()

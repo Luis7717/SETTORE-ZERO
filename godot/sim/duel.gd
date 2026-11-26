@@ -78,16 +78,16 @@ const DRIB_SHOW_V := 2.5    # ... il portatore va a questa velocità (m/s) ...
 const DRIB_SHOW_DEC := 24.0 # ... frenando così (m/s²: da uno scatto pieno in ~0,25 s)
 const DRIB_FEINT := 1.0     # ... di lato verso il lato opposto a quello scelto (la finta) ...
 const DRIB_FEINT_FWD := 0.45 # ... e un po' in avanti, ma solo finché resta lontano dal difensore più di DRIB_SHOW_GAP
-const DRIB_SHOW_GAP := 2.2  # (m: più vicino i due corpi a schermo si compenetrerebbero)
+const DRIB_SHOW_GAP := 2.6  # (m: più vicino i due corpi a schermo si compenetrerebbero)
 const DRIB_LEAN_V := 1.2    # il difensore si sbilancia verso la finta a questa velocità (m/s), poi resta fermo
 # Giochetti veri (Luis 2026-11-26, skill.gd): il giochetto lo sceglie il motore (skillRng, non rnd()) e ognuno dura il
 # suo tempo prima dello scatto (evento 'dribble': skill, show). I due corpi a schermo si compenetravano (il difensore
 # arrivava di corsa addosso al portatore, nel fallito sembravano un corpo solo; le figure sono grandi 1,25 volte): dal
 # dribbling prenotato in poi (deciso l'esito: il numero casuale è lo stesso di prima) il difensore resta ad almeno una
 # certa distanza dal portatore: viene spostato lui (indietreggia), mai il portatore, e non gli corre addosso.
-const DRIB_GAP := 2.2       # distanza minima tra i centri durante il giochetto (m) ...
-const DRIB_GAP_GO := 1.5    # ... e dopo lo scatto, mentre il portatore gli passa accanto
-const DRIB_GAP_KO_R := 2.0  # fallito: il portatore cade in avanti, il difensore affonda col piede
+const DRIB_GAP := 2.6       # distanza minima tra i centri durante il giochetto (m) ...
+const DRIB_GAP_GO := 1.9    # ... e dopo lo scatto, mentre il portatore gli passa accanto
+const DRIB_GAP_KO_R := 2.3  # fallito: il portatore cade in avanti, il difensore affonda col piede
 const DRIB_GAP_RATE := 9.0  # la sovrapposizione si toglie così in fretta (frazione per s)
 const DRIB_GAP_OK := 0.9    # riuscito: dura il giochetto più tanto (s, il sorpasso)
 const DRIB_GAP_KO := 0.9    # fallito: dura tanto (s, contrasto e caduta)
@@ -694,7 +694,8 @@ func dribShowSteer(f: R.Duel, dt: float) -> void:
 	var fw: float = DRIB_FEINT_FWD * C.clamp_(d - DRIB_SHOW_GAP, 0.0, 1.0)
 	var wx: float = ux * fw + uy * f.side * DRIB_FEINT * f.lat
 	var wy: float = uy * fw - ux * f.side * DRIB_FEINT * f.lat
-	var wn: float = C.orf(C.hyp(wx, wy), 1.0)
+	# (con lat < 1 va di lato più piano, non alla stessa velocità in un'altra direzione)
+	var wn: float = maxf(1.0, C.hyp(wx, wy))
 	wx = wx / wn * DRIB_SHOW_V * f.vel
 	wy = wy / wn * DRIB_SHOW_V * f.vel
 	var ex: float = wx - p.vx

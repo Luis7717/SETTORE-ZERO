@@ -126,6 +126,14 @@ static func braccia(c: Coreo, tt: float, pS: String, bS: Vector3, bF: Vector3) -
 	c.chiave_braccio(altro(pS), tt, bF)
 
 
+# il pallone che il portatore si portava avanti si ferma subito lì davanti (z m del modello dal corpo com'è adesso) e
+# ci resta: nelle finte di corpo è il corpo che se ne va, non il pallone
+static func ferma(c: Coreo, z: float) -> void:
+	var q := davanti(c, z)
+	c.palla_a(0.1, {"mondo": q})
+	c.palla_a(9.0, {"mondo": q})
+
+
 # punto fisso nel mondo davanti al corpo com'è adesso (z avanti, x a sinistra; m del modello), a terra
 static func davanti(c: Coreo, z: float, x: float = 0.0) -> Vector3:
 	var q := c.mondo_a(c.t, Vector3(x, 0, z))
@@ -168,8 +176,8 @@ static func via(c: Coreo, S: float, tg: float, piede: String, part: String, ang:
 	var k: float = opt.get("spinta", 1.0)
 	var su: float = opt.get("salto", 0.0)
 	c.chiave_bacino(tg + 0.07, Vector3(S * 0.05, 0.875 - 0.02 * k + su, 0.02))
-	c.chiave_angoli(tg + 0.07, Vector3(S * 0.22, 0.22 * k, S * 0.14))
-	c.chiave_busto(tg + 0.08, Vector3(0.22 * k, S * 0.16, S * 0.14))
+	c.chiave_angoli(tg + 0.07, Vector3(S * 0.22, 0.22 * k, S * 0.08))
+	c.chiave_busto(tg + 0.08, Vector3(0.22 * k, S * 0.1, S * 0.14))
 	c.chiave_bacino(tg + 0.22, Vector3(0, 0.9, 0.02))
 	c.chiave_angoli(tg + 0.22, Vector3(0, 0.2, 0))
 	c.chiave_busto(tg + 0.24, Vector3(0.2, 0, 0))
@@ -196,14 +204,14 @@ static func a_finta(c: Coreo, S: float, g: float) -> void:
 	var pS := ls(S)
 	var pF := ls(F)
 	var t0 := libera(c, pF)
-	c.palla_a(g + 0.05, {"mondo": davanti(c, 0.64)})
+	ferma(c, 0.54)
 	c.appoggia(pF, maxf(t0 + 0.1, 0.55 * g), Vector2(F * 0.52, 0.16), F * 0.35, 0.08)
 	c.chiave_bacino(0.55 * g, Vector3(F * 0.17, 0.85, 0.0))
-	c.chiave_angoli(0.55 * g, Vector3(F * 0.35, 0.04, F * 0.16))
-	c.chiave_busto(0.55 * g, Vector3(0.14, F * 0.42, F * 0.3))
+	c.chiave_angoli(0.55 * g, Vector3(F * 0.35, 0.04, F * 0.1))
+	c.chiave_busto(0.55 * g, Vector3(0.14, F * 0.25, F * 0.3))
 	c.chiave_bacino(g, Vector3(F * 0.2, 0.84, 0.02))
-	c.chiave_angoli(g, Vector3(F * 0.38, 0.05, F * 0.2))
-	c.chiave_busto(g, Vector3(0.16, F * 0.46, F * 0.32))
+	c.chiave_angoli(g, Vector3(F * 0.38, 0.05, F * 0.12))
+	c.chiave_busto(g, Vector3(0.16, F * 0.28, F * 0.32))
 	braccia(c, 0.55 * g, pS, Vector3(0.1, -0.24, 0.3), Vector3(0.38, -0.1, -0.05))
 	c.chiave_sguardo(0.5 * g, 0.2, F * 0.55)
 	c.chiave_sguardo(g, 0.4, F * 0.3)
@@ -213,8 +221,7 @@ static func a_finta(c: Coreo, S: float, g: float) -> void:
 # indietro il pallone e riparte di scatto
 static func a_stopgo(c: Coreo, S: float, g: float) -> void:
 	var pS := ls(S)
-	var pF := ls(-S)
-	var t0 := libera(c, pS)
+	var t0 := libera(c, pS)   # (l'altro piede regge fermo)
 	var t1 := maxf(t0 + 0.07, 0.2 * g)
 	c.tocca(pS, t1, "sole", Vector3(0, -0.25, 0), {"rel": Vector3(S * 0.05, 0, 0.5)})
 	c.tocca(pS, 0.8 * g, "sole", Vector3(0, -0.2, 0), {"rel": Vector3(S * 0.05, 0, 0.36), "lega": true})
@@ -231,8 +238,6 @@ static func a_stopgo(c: Coreo, S: float, g: float) -> void:
 	braccia(c, g, pS, BR_DIETRO, BR_AVANTI)
 	c.chiave_sguardo(0.5 * g, 0.25, 0.0)
 	c.chiave_sguardo(g, 1.0, 0.0)
-	if c.a_terra(pF) or t0 > 0.0:
-		pass   # l'altro piede regge fermo
 
 
 # finta di tiro: appoggio accanto al pallone, gamba caricata dietro e braccio alto come per calciare; il piede scende
@@ -242,7 +247,7 @@ static func a_fintatiro(c: Coreo, S: float, g: float) -> void:
 	var pS := ls(S)
 	var pF := ls(F)
 	var t0 := libera(c, pS)
-	c.palla_a(g + 0.05, {"mondo": davanti(c, 0.66)})
+	ferma(c, 0.56)
 	var tp := maxf(t0 + 0.1, 0.3 * g)
 	c.appoggia_palla(pS, tp, Vector3(S * 0.24, H, -0.08), S * 0.15, 0.06)
 	c.stacca(pF, tp - 0.04)
@@ -250,10 +255,10 @@ static func a_fintatiro(c: Coreo, S: float, g: float) -> void:
 	c.passa_palla(pF, 0.92 * g, Vector3(F * 0.14, 0.2, -0.16), Vector3(-S * 0.4, 0.5, 0), 0.0)
 	c.chiave_bacino(0.6 * g, Vector3(S * 0.04, 0.93, 0.0))
 	c.chiave_angoli(0.6 * g, Vector3(F * 0.38, -0.06, 0))
-	c.chiave_busto(0.6 * g, Vector3(-0.1, S * 0.12, F * 0.3))
+	c.chiave_busto(0.6 * g, Vector3(-0.1, S * 0.07, F * 0.3))
 	c.chiave_bacino(0.95 * g, Vector3(S * 0.04, 0.88, 0.06))
 	c.chiave_angoli(0.95 * g, Vector3(S * 0.1, 0.1, 0))
-	c.chiave_busto(0.95 * g, Vector3(0.22, S * 0.05, S * 0.2))
+	c.chiave_busto(0.95 * g, Vector3(0.22, S * 0.03, S * 0.2))
 	braccia(c, 0.6 * g, pS, Vector3(0.38, -0.04, 0.12), Vector3(0.3, -0.26, -0.3))
 	braccia(c, 0.95 * g, pS, Vector3(0.32, -0.26, -0.2), Vector3(0.2, -0.24, 0.26))
 	c.chiave_sguardo(0.5 * g, 0.1, 0.0)
@@ -266,11 +271,11 @@ static func a_tunnel(c: Coreo, S: float, g: float) -> void:
 	var pS := ls(S)
 	var pF := ls(F)
 	var t0 := libera(c, pF)
-	c.palla_a(g + 0.05, {"mondo": davanti(c, 0.62)})
+	ferma(c, 0.54)
 	c.appoggia(pF, maxf(t0 + 0.1, 0.55 * g), Vector2(F * 0.4, 0.12), F * 0.25, 0.07)
 	c.chiave_bacino(0.6 * g, Vector3(F * 0.12, 0.87, 0.0))
-	c.chiave_angoli(0.6 * g, Vector3(F * 0.25, 0.04, F * 0.1))
-	c.chiave_busto(0.6 * g, Vector3(0.14, F * 0.3, F * 0.22))
+	c.chiave_angoli(0.6 * g, Vector3(F * 0.25, 0.04, F * 0.06))
+	c.chiave_busto(0.6 * g, Vector3(0.14, F * 0.18, F * 0.22))
 	c.chiave_bacino(g, Vector3(F * 0.12, 0.86, 0.02))
 	braccia(c, 0.6 * g, pS, Vector3(0.12, -0.26, 0.28), Vector3(0.37, -0.14, 0.0))
 	c.chiave_sguardo(0.5 * g, 0.2, F * 0.5)
@@ -290,17 +295,19 @@ static func b_tunnel(c: Coreo, S: float, tg: float) -> void:
 	# la punta guarda il difensore: giro del piede rispetto al corpo com'è al momento del tocco
 	var ang := wrapf(atan2(dir.x, dir.z) - c.yaw_a(tt), -PI, PI)
 	var t2 := tt + clampf(b0.distance_to(d) / 9.0, 0.1, 0.25)
+	# passato tra le gambe il pallone piega verso il lato scelto, dove il portatore lo va a riprendere
+	var lato := Vector3(dir.z, 0, -dir.x) * S
 	via(c, S, tg, pS, "toe", Vector3(clampf(ang, -1.2, 1.2), 0.25, 0), 0.05, {"fine": 0.62,
-		"palla": [[t2, {"mondo": d}], [t2 + 0.14, {"mondo": d + dir * 1.3}]]})
+		"palla": [[t2, {"altro": true}], [t2 + 0.13, {"mondo": d + dir * 1.0 + lato * 0.7}]]})
 
 
 # ================================================================ passi sopra il pallone
 # giro del piede `s` intorno al davanti del pallone, da dentro a fuori (verso il lato dir), dal tempo ta per dur s;
 # largo = quanto fuori appoggia (m del modello dal pallone)
 static func _passo_sopra(c: Coreo, s: String, dir: float, ta: float, dur: float, largo: float, alto: float) -> void:
-	c.passa_palla(s, ta + 0.38 * dur, Vector3(-dir * 0.1, alto, -0.02), Vector3(dir * 0.35, 0.25, 0), 0.03)
-	c.passa_palla(s, ta + 0.7 * dur, Vector3(dir * 0.05, alto + 0.03, 0.25), Vector3(-dir * 0.25, 0.3, 0), 0.0)
-	c.appoggia_palla(s, ta + dur, Vector3(dir * largo, H, 0.08), dir * 0.4, 0.02)
+	c.passa_palla(s, ta + 0.38 * dur, Vector3(-dir * 0.1, alto, -0.06), Vector3(dir * 0.35, 0.25, 0), 0.03)
+	c.passa_palla(s, ta + 0.7 * dur, Vector3(dir * 0.05, alto + 0.03, 0.22), Vector3(-dir * 0.25, 0.3, 0), 0.0)
+	c.appoggia_palla(s, ta + dur, Vector3(dir * largo, H, -0.16), dir * 0.4, 0.02)
 
 
 # doppio passo: due passi larghi e lenti sopra il pallone (prima dal lato scelto, poi dalla finta, con tutto il corpo
@@ -310,7 +317,8 @@ static func a_doppiopasso(c: Coreo, S: float, g: float) -> void:
 	var pS := ls(S)
 	var pF := ls(F)
 	var t0 := libera(c, pS)
-	c.palla_a(g + 0.05, {"mondo": davanti(c, 0.74)})
+	c.palla_a(0.1, {"rel": Vector3(0, 0, 0.5)})
+	c.palla_a(g + 0.05, {"rel": Vector3(0, 0, 0.44)})
 	var d1 := 0.19
 	var ta := t0
 	_passo_sopra(c, pS, S, ta, d1, 0.3, 0.24)
@@ -319,11 +327,11 @@ static func a_doppiopasso(c: Coreo, S: float, g: float) -> void:
 	var d2 := minf(0.2, g - 0.02 - tb)
 	_passo_sopra(c, pF, F, tb, d2, 0.38, 0.24)
 	c.chiave_bacino(ta + 0.75 * d1, Vector3(S * 0.08, 0.88, 0.0))
-	c.chiave_angoli(ta + 0.75 * d1, Vector3(S * 0.3, 0.08, S * 0.1))
-	c.chiave_busto(ta + 0.75 * d1, Vector3(0.16, S * 0.26, S * 0.22))
+	c.chiave_angoli(ta + 0.75 * d1, Vector3(S * 0.3, 0.08, S * 0.06))
+	c.chiave_busto(ta + 0.75 * d1, Vector3(0.16, S * 0.16, S * 0.22))
 	c.chiave_bacino(tb + 0.85 * d2, Vector3(F * 0.15, 0.85, 0.0))
-	c.chiave_angoli(tb + 0.85 * d2, Vector3(F * 0.38, 0.08, F * 0.18))
-	c.chiave_busto(tb + 0.85 * d2, Vector3(0.18, F * 0.42, F * 0.3))
+	c.chiave_angoli(tb + 0.85 * d2, Vector3(F * 0.38, 0.08, F * 0.11))
+	c.chiave_busto(tb + 0.85 * d2, Vector3(0.18, F * 0.25, F * 0.3))
 	braccia(c, ta + 0.75 * d1, pS, Vector3(0.37, -0.16, -0.02), Vector3(0.12, -0.26, 0.28))
 	braccia(c, tb + 0.85 * d2, pS, Vector3(0.12, -0.26, 0.28), Vector3(0.38, -0.1, -0.04))
 	c.chiave_sguardo(tb + 0.6 * d2, 0.5, F * 0.4)
@@ -336,7 +344,8 @@ static func a_bicicletta(c: Coreo, S: float, g: float) -> void:
 	var pS := ls(S)
 	var pF := ls(F)
 	var t0 := libera(c, pS)
-	c.palla_a(g + 0.05, {"mondo": davanti(c, 0.86)})
+	c.palla_a(0.1, {"rel": Vector3(0, 0, 0.5)})
+	c.palla_a(g + 0.05, {"rel": Vector3(0, 0, 0.46)})
 	var n := 4
 	var per := (g - 0.03 - t0) / float(n)
 	for i in n:
@@ -349,8 +358,8 @@ static func a_bicicletta(c: Coreo, S: float, g: float) -> void:
 		var tm := ta + 0.7 * per
 		var k := 0.6 if i < n - 1 else 1.0
 		c.chiave_bacino(tm, Vector3(dir * 0.06 * k, 0.93 - 0.05 * k, 0.0))
-		c.chiave_angoli(tm, Vector3(dir * 0.24 * k, 0.03, dir * 0.08 * k))
-		c.chiave_busto(tm, Vector3(0.08, dir * 0.2 * k, dir * 0.22 * k))
+		c.chiave_angoli(tm, Vector3(dir * 0.24 * k, 0.03, dir * 0.05 * k))
+		c.chiave_busto(tm, Vector3(0.08, dir * 0.12 * k, dir * 0.22 * k))
 		braccia(c, tm, ls(dir), Vector3(0.36, -0.2, -0.14), Vector3(0.14, -0.2, 0.3))
 	c.chiave_sguardo(g * 0.5, 0.6, 0.0)
 
@@ -373,8 +382,8 @@ static func a_elastico(c: Coreo, S: float, g: float) -> void:
 	c.appoggia(pS, 0.45 * g + 0.09, Vector2(S * 0.1, 0.0), 0.0, 0.04)
 	c.chiave_bacino(tf, Vector3(F * 0.04, 0.9, -0.03))
 	c.chiave_bacino(0.76 * g, Vector3(F * 0.14, 0.86, 0.0))
-	c.chiave_angoli(0.76 * g, Vector3(F * 0.32, 0.06, F * 0.14))
-	c.chiave_busto(0.76 * g, Vector3(0.14, F * 0.36, F * 0.24))
+	c.chiave_angoli(0.76 * g, Vector3(F * 0.32, 0.06, F * 0.08))
+	c.chiave_busto(0.76 * g, Vector3(0.14, F * 0.22, F * 0.24))
 	braccia(c, 0.76 * g, pS, Vector3(0.14, -0.26, 0.28), Vector3(0.38, -0.12, 0.0))
 	c.chiave_sguardo(0.7 * g, 0.6, F * 0.3)
 
@@ -395,8 +404,8 @@ static func a_elastico_inv(c: Coreo, S: float, g: float) -> void:
 	c.appoggia(pF, 0.4 * g + 0.09, Vector2(F * 0.2, -0.04), F * 0.2, 0.04)
 	c.chiave_bacino(tf, Vector3(0, 0.9, -0.03))
 	c.chiave_bacino(0.76 * g, Vector3(F * 0.1, 0.87, 0.0))
-	c.chiave_angoli(0.76 * g, Vector3(F * 0.4, 0.06, F * 0.1))
-	c.chiave_busto(0.76 * g, Vector3(0.14, F * 0.3, F * 0.3))
+	c.chiave_angoli(0.76 * g, Vector3(F * 0.4, 0.06, F * 0.06))
+	c.chiave_busto(0.76 * g, Vector3(0.14, F * 0.18, F * 0.3))
 	braccia(c, 0.76 * g, pS, Vector3(0.4, -0.2, -0.16), Vector3(0.36, -0.14, 0.1))
 	c.chiave_sguardo(0.7 * g, 0.6, F * 0.3)
 
@@ -412,11 +421,11 @@ static func a_croqueta(c: Coreo, S: float, g: float) -> void:
 	c.tocca(pS, g + 0.08, "inside", Vector3(S * 1.15, 0.1, 0), {"rel": Vector3(S * 0.5, 0, 0.42)})
 	c.appoggia(pF, t1 + 0.09, Vector2(F * 0.02, 0.1), 0.0, 0.05)
 	c.chiave_bacino(t1 - 0.03, Vector3(F * 0.08, 0.86, -0.02))
-	c.chiave_angoli(t1 - 0.03, Vector3(F * 0.15, 0.06, F * 0.1))
-	c.chiave_busto(t1 - 0.03, Vector3(0.14, F * 0.2, F * 0.1))
+	c.chiave_angoli(t1 - 0.03, Vector3(F * 0.15, 0.06, F * 0.06))
+	c.chiave_busto(t1 - 0.03, Vector3(0.14, F * 0.12, F * 0.1))
 	c.chiave_bacino(g + 0.02, Vector3(S * 0.08, 0.95, 0.0))
-	c.chiave_angoli(g + 0.02, Vector3(S * 0.1, 0.04, S * 0.12))
-	c.chiave_busto(g + 0.02, Vector3(0.1, S * 0.2, 0))
+	c.chiave_angoli(g + 0.02, Vector3(S * 0.1, 0.04, S * 0.07))
+	c.chiave_busto(g + 0.02, Vector3(0.1, S * 0.12, 0))
 	braccia(c, t1, pS, BR_LARGO, BR_LARGO)
 	braccia(c, g + 0.02, pS, Vector3(0.38, -0.05, 0.0), Vector3(0.36, -0.2, 0.1))
 
@@ -435,10 +444,10 @@ static func a_suola(c: Coreo, S: float, g: float) -> void:
 	c.appoggia(pS, 0.4 * g + 0.11, Vector2(S * 0.2, -0.04), S * 0.2, 0.05)
 	c.chiave_bacino(t1, Vector3(S * 0.02, 0.91, -0.05))
 	c.chiave_angoli(t1, Vector3(F * 0.2, -0.02, 0))
-	c.chiave_busto(t1, Vector3(0.06, F * 0.1, F * 0.15))
+	c.chiave_busto(t1, Vector3(0.06, F * 0.06, F * 0.15))
 	c.chiave_bacino(0.9 * g, Vector3(S * 0.1, 0.89, -0.03))
-	c.chiave_angoli(0.9 * g, Vector3(S * 0.25, 0.02, S * 0.1))
-	c.chiave_busto(0.9 * g, Vector3(0.1, S * 0.15, S * 0.15))
+	c.chiave_angoli(0.9 * g, Vector3(S * 0.25, 0.02, S * 0.06))
+	c.chiave_busto(0.9 * g, Vector3(0.1, S * 0.09, S * 0.15))
 	braccia(c, t1, pS, BR_LARGO, Vector3(0.4, -0.24, -0.1))
 	braccia(c, 0.9 * g, pS, Vector3(0.4, -0.2, -0.16), Vector3(0.37, -0.1, 0.12))
 
@@ -463,7 +472,7 @@ static func a_chop(c: Coreo, S: float, g: float) -> void:
 	c.chiave_busto(tp, Vector3(0.18, 0, 0))
 	c.chiave_bacino(0.92 * g, Vector3(S * 0.02, 0.97, 0.08))
 	c.chiave_angoli(0.92 * g, Vector3(S * 0.3, 0.1, 0))
-	c.chiave_busto(0.92 * g, Vector3(0.16, S * 0.1, S * 0.3))
+	c.chiave_busto(0.92 * g, Vector3(0.16, S * 0.06, S * 0.3))
 	braccia(c, tp, pS, BR_DIETRO, BR_AVANTI)
 	braccia(c, 0.92 * g, pS, Vector3(0.38, -0.04, 0.0), Vector3(0.36, -0.06, 0.12))
 
@@ -485,10 +494,10 @@ static func a_cruyff(c: Coreo, S: float, g: float) -> void:
 	c.passa_palla(pF, 0.92 * g, Vector3(F * 0.03, 0.16, 0.27), Vector3(S * 1.2, 0.1, 0), 0.02)
 	c.chiave_bacino(0.58 * g, Vector3(S * 0.04, 0.93, -0.02))
 	c.chiave_angoli(0.58 * g, Vector3(F * 0.3, -0.05, 0))
-	c.chiave_busto(0.58 * g, Vector3(-0.08, S * 0.1, F * 0.25))
+	c.chiave_busto(0.58 * g, Vector3(-0.08, S * 0.06, F * 0.25))
 	c.chiave_bacino(0.95 * g, Vector3(S * 0.06, 0.87, 0.04))
-	c.chiave_angoli(0.95 * g, Vector3(S * 0.25, 0.12, S * 0.08))
-	c.chiave_busto(0.95 * g, Vector3(0.24, S * 0.12, S * 0.3))
+	c.chiave_angoli(0.95 * g, Vector3(S * 0.25, 0.12, S * 0.05))
+	c.chiave_busto(0.95 * g, Vector3(0.24, S * 0.07, S * 0.3))
 	braccia(c, 0.58 * g, pS, Vector3(0.38, -0.04, 0.1), Vector3(0.36, -0.1, -0.2))
 	braccia(c, 0.95 * g, pS, Vector3(0.36, -0.18, -0.2), Vector3(0.4, -0.12, 0.2))
 	c.chiave_sguardo(0.5 * g, 0.15, F * 0.3)
@@ -512,7 +521,7 @@ static func a_tacco(c: Coreo, S: float, g: float) -> void:
 	c.chiave_bacino(tp, Vector3(0, 0.9, 0.02))
 	c.chiave_bacino(0.93 * g, Vector3(S * 0.04, 0.92, 0.06))
 	c.chiave_angoli(0.93 * g, Vector3(F * 0.2, 0.08, 0))
-	c.chiave_busto(0.93 * g, Vector3(0.14, F * 0.1, F * 0.2))
+	c.chiave_busto(0.93 * g, Vector3(0.14, F * 0.06, F * 0.2))
 	braccia(c, 0.93 * g, pS, Vector3(0.37, -0.1, 0.1), Vector3(0.36, -0.14, -0.1))
 	c.chiave_sguardo(0.6 * g, 0.3, F * 0.45)
 	c.chiave_sguardo(g, 0.7, 0.0)
@@ -630,7 +639,7 @@ static func a_arcobaleno(c: Coreo, S: float, g: float) -> void:
 	c.chiave_angoli(tf, Vector3(0, 0.26, 0))
 	c.chiave_busto(tf, Vector3(0.4, 0, 0))
 	braccia(c, 0.46 * g, pS, BR_LARGO, BR_LARGO)
-	braccia(c, tf, pS, Vector3(0.4, -0.1, -0.3), Vector3(0.4, -0.1, -0.3))
+	braccia(c, tf, pS, Vector3(0.28, -0.3, -0.22), Vector3(0.3, -0.26, -0.2))
 	c.chiave_sguardo(tf, 0.3, 0.0)
 	c.chiave_sguardo(tf + 0.2, 1.0, 0.0)
 

@@ -116,14 +116,15 @@ func test_esito_nello_stesso_passo_del_tasto() -> bool:
 
 
 func test_telecamera_girata_dal_lato_del_dribbling() -> bool:
-	# Arrange / Act / Assert: lato +1 = sinistra del portatore: telecamera dietro a sinistra, guarda a destra (yaw +)
-	near(Regia.giro_camera(Vector2(0, 0), Vector2(0, 5), 1.0, 1.0), deg_to_rad(45.0), 1e-5, "lato sinistro")
-	near(Regia.giro_camera(Vector2(0, 0), Vector2(0, 5), -1.0, 1.0), -deg_to_rad(45.0), 1e-5, "lato destro")
+	# Arrange / Act / Assert: lato +1 = sinistra del portatore: telecamera dietro a destra, guarda a sinistra (yaw −),
+	# nel verso dello scatto: il portatore passa di fianco al difensore senza coprirlo
+	near(Regia.giro_camera(Vector2(0, 0), Vector2(0, 5), 1.0, 1.0), -deg_to_rad(45.0), 1e-5, "lato sinistro")
+	near(Regia.giro_camera(Vector2(0, 0), Vector2(0, 5), -1.0, 1.0), deg_to_rad(45.0), 1e-5, "lato destro")
 	# squadra 1 (attacca verso −y): spazio orientato girato, stesso risultato
-	near(Regia.giro_camera(Vector2(0, 0), Vector2(0, -5), 1.0, -1.0), deg_to_rad(45.0), 1e-5, "squadra 1")
+	near(Regia.giro_camera(Vector2(0, 0), Vector2(0, -5), 1.0, -1.0), -deg_to_rad(45.0), 1e-5, "squadra 1")
 	# difensore spostato di lato: il verso conta al massimo BASE_MAX
 	var y := Regia.giro_camera(Vector2(0, 0), Vector2(5, 1), 1.0, 1.0)
-	near(y, Regia.BASE_MAX + deg_to_rad(45.0), 1e-5, "verso del difensore limitato")
+	near(y, Regia.BASE_MAX - deg_to_rad(45.0), 1e-5, "verso del difensore limitato")
 	return done()
 
 
@@ -141,8 +142,9 @@ func test_visuale_del_dribbling_portatore_e_difensore_a_schermo() -> bool:
 			check(absf(s.x) <= 1.0 - CF.DRIB_MARGIN.l + 0.01 and s.y >= -1.0 + CF.DRIB_MARGIN.b - 0.01 and s.y <= 1.0 - CF.DRIB_MARGIN.t + 0.01 and s.z > 0.0, "a schermo (lato %d): %s" % [lato, s])
 		var dist := (v.pos as Vector3).distance_to(Vector3(c.x, 0, c.y))
 		check(dist < CF.WIDE_MIN_DIST, "più vicina della visuale larga: %.1f m" % dist)
-		# la telecamera sta dal lato del dribbling (+1 = sinistra = x minori)
-		check(((v.pos as Vector3).x - c.x) * lato < 0.0, "dal lato del dribbling")
+		# la telecamera sta dalla parte opposta al lato del dribbling (+1 = sinistra = x minori) e guarda nel verso dello
+		# scatto: il portatore passa di fianco al difensore senza coprirlo
+		check(((v.pos as Vector3).x - c.x) * lato > 0.0, "dalla parte opposta al lato del dribbling")
 	return done()
 
 

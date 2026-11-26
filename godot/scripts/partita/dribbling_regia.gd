@@ -141,13 +141,15 @@ func _inizia(pp: Object, oo: Object, lato: float, me: int) -> void:
 
 
 ## angolo della telecamera (spazio orientato, dir = verso d'attacco nel motore): verso il difensore (al massimo
-## BASE_MAX dalla direzione d'attacco) più GIRO dal lato del dribbling. Lato +1 = sinistra del portatore: la telecamera
-## si mette dietro a sinistra e guarda in diagonale verso destra (yaw +), così il sorpasso passa davanti, senza il
-## difensore in mezzo.
+## BASE_MAX dalla direzione d'attacco) più GIRO dalla parte opposta al lato del dribbling. Lato +1 = sinistra del
+## portatore: la telecamera si mette dietro a destra e guarda in diagonale verso sinistra (yaw −), cioè nel verso in
+## cui il portatore scatterà: durante il giochetto i due si vedono uno accanto all'altro e nel sorpasso il portatore
+## passa di fianco al difensore, staccato (Luis 2026-11-26: prima la telecamera stava dal lato del sorpasso e il
+## portatore passava davanti al difensore coprendolo: a schermo sembravano uno dentro l'altro).
 static func giro_camera(pp: Vector2, po: Vector2, lato: float, dir: float) -> float:
 	var u := (po - pp) * dir
 	var base := 0.0 if u.length() < 0.1 else clampf(atan2(u.x, u.y), -BASE_MAX, BASE_MAX)
-	return base + GIRO * signf(lato) if lato != 0.0 else base
+	return base - GIRO * signf(lato) if lato != 0.0 else base
 
 
 ## Grafica dell'esito di un dribbling (evento 'dribble' {p, o, ok, side, show}): durata del giochetto a schermo (−1 =

@@ -85,7 +85,7 @@ interfaccia dei menu, sfondo del menu e allenamento guidato, grafica.
 | `scripts/partita/telecamera_partita.gd` | telecamera come `View.update` del web: normale, vicino alla porta, difesa, duello, rallenty largo, angolo, parata, girata |
 | `scripts/partita/camfit.gd`, `camuser.gd` | inquadrature calcolate e visuale girata col dito (conti puri, provati senza schermo) |
 | `scripts/partita/figura.gd` | un giocatore in partita: clip fermo/corsa/scatto/salto, pose (calcio, testa, tuffo, scivolata, esultanza), giochetti con la IK |
-| `scripts/partita/mosse/` | movimenti calcolati dei giochetti (`mossa.gd`, `corpo.gd`, `giochetti.gd`), coreografie del dribbling ancorate al campo (`coreo.gd`, `coreo_dribbling.gd`), palleggi e tiro del menu (`palleggi.gd`, `tiro.gd`) e IK a due ossa (`ik.gd`) |
+| `scripts/partita/mosse/` | movimenti calcolati dei giochetti (`mossa.gd`, `corpo.gd`, `giochetti.gd`), coreografie del dribbling ancorate al campo (`coreo.gd`, `coreo_dribbling.gd`, i 16 giochetti in `coreo_skill.gd`; quale giochetto: `sim/skill.gd`), palleggi e tiro del menu (`palleggi.gd`, `tiro.gd`) e IK a due ossa (`ik.gd`) |
 
 | `scripts/partita/figura_mocap.gd` | animazioni mocap vere sopra la figura: esultanze, parate, piatto/collo/rigore, rimessa, difesa (vedi "Animazioni mocap") |
 | `assets/mocap/mocap.res` | le clip mocap reindirizzate sul nostro scheletro (AnimationLibrary compressa, ~436 KB), fatte da `tools/converti_mocap.gd` |
