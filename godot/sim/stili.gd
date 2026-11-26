@@ -199,6 +199,12 @@ const PESI_FORMAZIONE := {
 	"3-4-3": {"fasce": 2, "pressing": 2, "fuorigioco": 1},
 	"5-3-2": {"contropiede": 2, "catenaccio": 3},
 	"4-1-4-1": {"possesso": 2, "uomo": 1, "pressing": 1},
+	"4-2-4": {"fasce": 2, "lanci": 1, "pressing": 2},
+	"4-3-2-1": {"possesso": 3, "pressing": 1},
+	"4-2-2-2": {"possesso": 2, "contropiede": 1, "uomo": 1},
+	"4-3-3 offensivo": {"possesso": 2, "fasce": 1, "pressing": 2, "fuorigioco": 1},
+	"4-3-3 difensivo": {"contropiede": 2, "fasce": 1, "catenaccio": 1},
+	"4-1-2-1-2 largo": {"fasce": 2, "possesso": 1, "uomo": 1},
 }
 const FORTE := 70      # forza da cui una squadra è "forte"
 const DEBOLE := 57     # forza sotto cui è "debole"

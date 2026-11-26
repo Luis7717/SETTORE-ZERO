@@ -11,6 +11,7 @@ const ALTEZZA_TASTO := 58.0
 const ALTEZZA_VOCE := 58.0
 const LARGHEZZA_MENU := 420.0     # al massimo; sull'iPhone è lo schermo meno i margini
 const MARGINE_MENU := 14.0
+const TESTA_MENU := 78.0          # titolo, × e bordi del riquadro: il resto dell'altezza è per le voci
 const VELO := Color(0.02, 0.035, 0.07, 0.78)
 const SCHEMA := Vector2(34, 44)   # formazione disegnata a puntini nella voce
 const PUNTINO := 2.6
@@ -65,8 +66,29 @@ static func menu(titolo: String, voci: Array, scelto: String, area: Rect2, scegl
 	x.custom_minimum_size.x = 38
 	testa.add_child(x)
 	v.add_child(testa)
-	for voce: Dictionary in voci:
-		v.add_child(_voce(voce, voce.id == scelto, scegli))
+	# tante voci (14 moduli, Luis 2026-11-26): la lista scorre dentro il riquadro, che resta nello schermo
+	var lista := U.vbox(6)
+	lista.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var i_scelto := 0
+	for i in voci.size():
+		var voce: Dictionary = voci[i]
+		if voce.id == scelto:
+			i_scelto = i
+		lista.add_child(_voce(voce, voce.id == scelto, scegli))
+	var alta := voci.size() * (ALTEZZA_VOCE + 6.0) - 6.0
+	var spazio := area.size.y - 2.0 * MARGINE_MENU - TESTA_MENU
+	if alta <= spazio:
+		v.add_child(lista)
+	else:
+		var sc := ScrollContainer.new()
+		sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		sc.custom_minimum_size.y = spazio
+		sc.scroll_deadzone = 6
+		sc.add_child(lista)
+		v.add_child(sc)
+		# la scelta attuale in vista
+		var giu := maxf(0.0, (i_scelto + 0.5) * (ALTEZZA_VOCE + 6.0) - spazio / 2.0)
+		sc.ready.connect(func() -> void: sc.set_deferred("scroll_vertical", int(giu)))
 	velo.add_child(pann)
 	# al centro dell'area sicura, ricalcolato quando il velo prende la misura dello schermo o il riquadro cresce
 	# (segnali dei nodi stessi: spariscono col menu chiuso)

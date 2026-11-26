@@ -114,7 +114,7 @@ func _riga(g: Dictionary, s: Dictionary, k: String) -> Control:
 	h.offset_left = 8
 	h.offset_right = -10
 	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	h.add_child(U.ruolo(p.pos, D.pos_name(p.pos)))
+	h.add_child(U.ruolo(p.pos, D.pos_name(D.ruolo_di(p))))
 	var nome := U.vbox(0)
 	nome.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	nome.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -233,7 +233,7 @@ func _carta_offerta(s: Dictionary, o: Dictionary, k: int) -> Control:
 	if p == null or not t is Dictionary:
 		return carta
 	var h := U.hbox(8)
-	h.add_child(U.ruolo(p.pos, D.pos_name(p.pos)))
+	h.add_child(U.ruolo(p.pos, D.pos_name(D.ruolo_di(p))))
 	var nome := U.vbox(0)
 	nome.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	nome.add_child(U.corto(str(p.name), 15.5, T.TXT, T.PESO_FORTE))
@@ -277,7 +277,7 @@ static func scheda(p: Dictionary, sotto: Control) -> Control:
 	pann.add_child(v)
 	var testa := MenuUi.vbox(4)
 	testa.add_child(MenuUi.testo(str(p.name), 18, MenuTema.TXT, MenuTema.PESO_NERO))
-	var info := "%s · %s · %d anni · valore %s" % [MenuDati.pos_name(p.pos), Fisico.testo(Fisico.di(p)), int(p.age), MenuDati.fmt_money(MenuDati.value(p))]
+	var info := "%s · %s · %d anni · valore %s" % [MenuDati.ruolo_testo(p), Fisico.testo(Fisico.di(p)), int(p.age), MenuDati.fmt_money(MenuDati.value(p))]
 	if p.get("num") != null:
 		info += " · n. %d" % int(p.num)
 	if int(p.get("apps", 0)) > 0:

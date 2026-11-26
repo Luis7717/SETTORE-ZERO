@@ -265,7 +265,7 @@ static func valutazione(o: int, cls: String, larghezza := 42.0, altezza := 34.0,
 
 ## ruolo colorato (POR arancio, DIF blu, CEN verde, ATT rosso)
 static func ruolo(pos: String, nome: String, larghezza := 42.0, altezza := 34.0, dim := 11.5) -> PanelContainer:
-	var p := pannello_stile(T.stile(T.POS_BG.get(pos, T.PANEL2), 10, Color(0, 0, 0, 0), 0, Vector4(4, 0, 4, 0)))
+	var p := pannello_stile(T.stile(T.POS_BG.get(MenuDati.gruppo(pos), T.PANEL2), 10, Color(0, 0, 0, 0), 0, Vector4(4, 0, 4, 0)))
 	p.custom_minimum_size = Vector2(larghezza, altezza)
 	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	p.add_child(testo(nome, dim, Color.WHITE, T.PESO_NERO, HORIZONTAL_ALIGNMENT_CENTER))

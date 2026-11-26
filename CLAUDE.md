@@ -98,9 +98,33 @@
 - **Rosa in alto** (Godot, Luis 2026-11-24, `scripts/menu/rosa_scelte.gd`): tre tasti uguali **Formazione** /
   **Attacco** / **Difesa** con la scelta attuale; ognuno apre un menu a comparsa (una riga di spiegazione per scelta,
   scelta attuale in giallo, si chiude toccando fuori o con la ×). "Migliori 11" tolto (resta `autoLineup`).
-  **8 formazioni** in `sim/core.gd`: le 4 del web (prime, identiche) + 4-5-1, 3-4-3, 5-3-2, 4-1-4-1. La CPU sorteggia
-  come il JS tra le 4 del web (`aiMatchTeam`), poi metà squadre usa la "cugina" nuova (`FORMAZIONE_CUGINA`,
-  `formazioneDi`, in partita con `avversarioPartita`). Test: `tests/test_formazioni.gd`.
+  **14 formazioni** in `sim/core.gd` (il menu Formazione scorre): le 4 del web (prime, identiche) + 4-5-1, 3-4-3,
+  5-3-2, 4-1-4-1 + (2026-11-26) 4-2-4, 4-3-2-1, 4-2-2-2, 4-3-3 offensivo, 4-3-3 difensivo, 4-1-2-1-2 largo. La CPU
+  sorteggia come il JS tra le 4 del web (`aiMatchTeam`), poi metà squadre usa una "cugina" solo Godot
+  (`FORMAZIONE_CUGINE`, `formazioneDi`, in partita con `avversarioPartita`). Test: `tests/test_formazioni.gd`.
+- **Ruoli e moduli** (Godot, Luis 2026-11-26, `godot/sim/ruoli.gd`): al posto di D/C/A ogni giocatore ha un ruolo
+  specifico nel campo `ruolo` e (tranne il portiere) una seconda scelta `ruolo2`: P, TD, TS, DC (difesa), CDC mediano,
+  CC, ED/ES esterno destro/sinistro, COC trequartista (centrocampo), ATT, AD/AS ala (attacco). Il vecchio `pos`
+  (P/D/C/A) resta ed è il gruppo del ruolo: lo usano il motore (IA) e i confronti col JS. **Tabella dei ruoli per
+  posto di ogni modulo in un posto solo: `Ruoli.POSTI`** (stesso ordine dei posti di `C.FORMATIONS`; le posizioni
+  restano in `core.gd`; il 3-5-2 del gioco, due mediani bassi e trequartista alto, è in `C.FORMATIONS_GODOT`, usato solo
+  dalle squadre con `"moduli": true` = `squadraPartita`/`avversarioPartita`; `C.schema(modulo)`, `C.schema_ruoli`).
+  **Malus fuori ruolo** (`Ruoli.fattore`, in `C.effStats(src, gruppo, ruoloPosto)` e nella valutazione): suo ruolo 1;
+  seconda scelta 0,98; compatibili 0,97 (`COMPATIBILI`: TS⇄ES, TD⇄ED, ES⇄AS, ED⇄AD, ATT⇄COC, DC⇄CDC, CC→COC ma non
+  COC→CC); altra fascia 0,94; stessa linea 0,90; linea accanto 0,86; terzino⇄ala stessa fascia 0,84; difesa⇄attacco
+  0,72; porta 0,6 (e `por` al massimo 25) come prima. Chi non ha `ruolo` usa `POSPEN` come sempre.
+  **Valutazione per ruolo** (`Ruoli.PESI`, sulle sotto-statistiche; `Carriera.overall`/`overallAs` la usano per chi ha
+  `ruolo`, il portiere e chi non ce l'ha restano con la formula del web): `tara()` fa sì che un giocatore "generico"
+  valga in media come prima, quindi valore e prezzi non si spostano. **Giocatori generati** (rosa nuova `_rosa_nuova`,
+  campione `addChampion({ruolo})`, CPU e mercato `evolviCpu`): `Ruoli.modella` sposta le sotto-statistiche secondo
+  `PROFILO` (terzino: velocità e cross; DC: forza e testa; ...) e poi rimette la valutazione uguale a quella del web.
+  **Salvataggi vecchi** (`_ruoli_rosa` in `novita()`, `Ruoli.assegna_rosa`): statistiche intatte; i titolari prendono
+  il ruolo del loro posto, gli altri quello dove valgono di più tenendo la rosa assortita; `pot` si sposta di quanto si
+  sposta la valutazione. `autoLineup`/`fixLineup`/`myRating` usano i ruoli dei posti (`ruoliPosti`), poi
+  `_sistema_posti` scambia i titolari finché migliora. `Carriera.ruoli = false` (solo `test_carriera.gd`) = tutto come
+  il web. A schermo: sigla del ruolo su carte, Rosa ("DC · 2ª CDC", "in campo TS (fuori ruolo)"), Mercato, Statistiche
+  (nome del ruolo e seconda scelta), editor del campione (12 ruoli); badge arancio sulla carta solo se fuori ruolo
+  davvero (fattore sotto `F_FUORI` 0,96). Test `tests/test_ruoli.gd`.
 - **Rosa e tattica nella pausa** (Godot, Luis 2026-11-24): nelle partite della carriera (campionato, amichevole) la
   pausa e l'intervallo hanno il tasto **Rosa e tattica**: la Rosa del menu (`rosa.gd` con `{"in_partita": true, "cambi",
   "carriera"}`) si apre sopra la partita ferma, senza Aspetto, Vendi né altre schermate, con "Cambi N/5" (quanti restano)

@@ -98,7 +98,8 @@ static func _testa(p: Dictionary, ovr: int, colori: Array, k1: int, chiudi: Call
 	nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	nm.alignment = BoxContainer.ALIGNMENT_CENTER
 	nm.add_child(U.corto(str(p.get("name", "")), 16, T.TXT, T.PESO_NERO))
-	var info := "%s · %d anni · Statistiche" % [D.pos_name(str(p.get("pos", "C"))), int(p.get("age", 0))]
+	var r2 := D.ruolo2_di(p) # ruolo per esteso e seconda scelta in testa (Luis 2026-11-26)
+	var info := "%s%s · %d anni" % [D.ruolo_nome(D.ruolo_di(p)), "" if r2 == "" else " · 2ª scelta %s" % r2, int(p.get("age", 0))]
 	nm.add_child(U.corto(info, 12, T.DIM, T.PESO_MEDIO))
 	testa.add_child(nm)
 	testa.add_child(U.valutazione(ovr, D.ovr_cls(ovr)))

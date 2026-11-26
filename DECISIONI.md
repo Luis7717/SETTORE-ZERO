@@ -1868,3 +1868,33 @@ largo), non sui nomi delle formazioni: valgono anche per le formazioni nuove.
   lo scatto è ancora un po' rigida; i dribbling dell'IA usano ancora i giochetti vecchi.
 - Da provare sull'iPhone: i giochetti si distinguono? La telecamera dall'altra parte disturba? 0,6 s fermo dopo il
   dribbling fallito è troppo?
+
+## 2026-11-26 — Godot: ruoli specifici (TD, DC, CDC, ES, COC, ATT, ...) e 14 moduli
+Richiesta di Luis: ruoli veri al posto di D/C/A, compatibilità, seconda scelta, statistiche sensate per ruolo, moduli
+nuovi. Correzioni arrivate durante il lavoro: nel 4-2-3-1 ai lati del trequartista ci sono gli esterni (non le ali);
+le fasce si chiamano **esterno sinistro / destro (ES / ED)**.
+- **Modello**: campi nuovi del giocatore `ruolo` e `ruolo2`; `pos` (P/D/C/A) resta ed è il gruppo del ruolo (motore,
+  IA, confronti col JS). Tutto in `godot/sim/ruoli.gd`; la tabella dei ruoli per posto è `Ruoli.POSTI` (un posto solo
+  da cambiare se Luis corregge un modulo; le posizioni x/y restano in `core.gd`).
+- **Malus** (moltiplica tiro, passaggi, dribbling, difesa, testa, come il vecchio `POSPEN`; velocità e fisico no):
+  suo ruolo 1 · seconda scelta 0,98 · compatibile 0,97 · altra fascia 0,94 · stessa linea 0,90 · linea accanto 0,86 ·
+  terzino⇄ala stessa fascia 0,84 · difesa⇄attacco 0,72 (era 0,82) · porta 0,6 come prima. Prima dentro la stessa linea
+  non c'era malus: ora un DC terzino perde il 10%.
+- **Valutazione**: pesi per ruolo sulle sotto-statistiche (`PESI`) più una taratura per ruolo (`tara()`), calcolata
+  dalle tabelle, che fa valere un giocatore "generico" in media quanto valeva con la formula del web: così valore,
+  prezzi, stipendi e forza squadra non si spostano. Il portiere resta con la formula del web.
+- **Giocatori generati**: restano generati con gli stessi numeri casuali del web (`genPlayer`), poi `Ruoli.modella`
+  sposta le sotto-statistiche secondo il profilo del ruolo e rimette la valutazione uguale a quella che avevano (le
+  squadre della CPU restano forti uguali). Rosa nuova: 2 P, DC DC TS TD DC TD, CC CC ES ED CDC COC, ATT ATT AS AD.
+- **Salvataggi vecchi**: nessuna statistica cambia. I titolari prendono il ruolo del posto dove la persona li ha
+  messi (tra destra e sinistra le statistiche non dicono niente), gli altri il ruolo del loro gruppo dove valgono di
+  più, con un freno ai doppioni (`QUOTE`). Seconda scelta: tra quelle sensate per il ruolo, dove valgono di più.
+  Il potenziale `pot` si sposta di quanto si sposta la valutazione.
+- **Scelte mie da confermare**: (1) il COC ha come seconde scelte possibili ATT/AS/AD, mai CC (Luis: "COC non può fare
+  CC"); (2) terzino e ala dello stesso lato non sono compatibili direttamente (solo tramite l'esterno); (3) nel 4-3-2-1
+  i due dietro la punta sono ATT (come scritto da Luis), quindi il modulo ha 3 attaccanti per il motore; (4) nessun
+  comportamento nuovo dell'IA per ruolo: contano i posti del modulo; (5) il filtro del Mercato resta per gruppo
+  (Portieri/Difensori/...), con la sigla specifica su ogni riga; (6) l'editor del campione fa scegliere tra i 12 ruoli;
+  (7) a metà stagione crescono/calano le sotto-statistiche che contano per il ruolo (`PESI`), non più quelle del gruppo.
+- **Non misurato**: l'equilibrio (vittorie, gol) con `controllo_gameplay`: le squadre della CPU hanno la stessa
+  valutazione di prima ma statistiche distribuite diversamente (ali più veloci, centrali più forti di testa).

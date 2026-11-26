@@ -14,6 +14,7 @@
 extends RefCounted
 
 const Sotto := preload("res://sim/sottostat.gd")
+const Ruoli := preload("res://sim/ruoli.gd")
 
 const VOTO_NEUTRO := 6.0
 ## età → [quanto si cresce col voto alto, quanto si cala col voto basso]
@@ -80,6 +81,9 @@ static func muovi(p: Dictionary, punti: int, r: Callable) -> Dictionary:
 	Sotto.crea(p, r)
 	var out := {}
 	var chiavi: Array = STAT_RUOLO.get(str(p.get("pos", "C")), STAT_RUOLO.C)
+	# ruolo specifico (sim/ruoli.gd): si muovono le sotto-statistiche che contano per quel ruolo
+	if Ruoli.valido(p.get("ruolo")) and p.ruolo != "P":
+		chiavi = Ruoli._pesi(p.ruolo).keys()
 	var passo := 1 if punti > 0 else -1
 	var vecchio := passo < 0 and int(p.get("age", 25)) >= ETA_CALO_FISICO
 	for _i in absi(punti) * SUB_PER_PUNTO:

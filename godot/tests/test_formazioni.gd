@@ -11,7 +11,10 @@ extends "test_base.gd"
 const CarrieraScript := preload("res://scripts/carriera/carriera.gd")
 const Salv := preload("res://scripts/carriera/salvataggio.gd")
 const DIR := "user://test_formazioni/"
-const NUOVE := ["4-5-1", "3-4-3", "5-3-2", "4-1-4-1"]
+const NUOVE := ["4-5-1", "3-4-3", "5-3-2", "4-1-4-1", "4-2-4", "4-3-2-1", "4-2-2-2", "4-3-3 offensivo", "4-3-3 difensivo", "4-1-2-1-2 largo"]
+## moduli (Luis 2026-11-26) dove il nome non basta: [P, D, C, A] e file di carte nella Rosa
+const GRUPPI_ATTESI := {"4-3-2-1": [1, 4, 3, 3]}
+const FILE_ATTESE := {"4-3-3 offensivo": 5, "4-3-3 difensivo": 5}
 const PARTITA_S := 25.0
 
 
@@ -25,7 +28,7 @@ func _nuova(nome_file: String) -> CarrieraScript:
 
 
 func test_otto_formazioni_coi_ruoli_del_nome() -> bool:
-	eq(C.FORMATIONS.size(), 8, "8 formazioni")
+	eq(C.FORMATIONS.size(), 14, "14 formazioni")
 	eq(C.FORMATIONS.keys().slice(0, 4), C.FORMATIONS_WEB, "le 4 del web restano le prime")
 	for f: String in NUOVE:
 		check(C.FORMATIONS.has(f), "c'è " + f)
@@ -41,11 +44,14 @@ func test_otto_formazioni_coi_ruoli_del_nome() -> bool:
 		var centro := 0
 		for k in range(1, n.size() - 1):
 			centro += int(n[k])
-		eq([conta.P, conta.D, conta.C, conta.A], [1, int(n[0]), centro, int(n[-1])], f + ": ruoli come il nome")
-		eq(MenuRosa.field_rows(F).size(), n.size() + 1, f + ": portiere + una fila di carte per numero")
+		eq([conta.P, conta.D, conta.C, conta.A], GRUPPI_ATTESI.get(f, [1, int(n[0]), centro, int(n[-1])]), f + ": ruoli come il nome")
+		eq(MenuRosa.field_rows(F).size(), FILE_ATTESE.get(f, n.size() + 1), f + ": portiere + una fila di carte per numero")
 		check(C.FORMAZIONE_SPIEGA.has(f) and String(C.FORMAZIONE_SPIEGA[f]).length() <= 75, f + ": spiegazione corta")
 	for f: String in C.FORMATIONS_WEB:
 		check(NUOVE.has(C.FORMAZIONE_CUGINA[f]), f + ": ha una cugina nuova")
+		eq(C.FORMAZIONE_CUGINE[f][0], C.FORMAZIONE_CUGINA[f], f + ": la prima cugina è quella di sempre")
+		for cug: String in C.FORMAZIONE_CUGINE[f]:
+			check(NUOVE.has(cug), cug + ": cugina solo Godot")
 	return done()
 
 
@@ -88,7 +94,7 @@ func test_cpu_usa_tutte_le_formazioni() -> bool:
 				if sq.players[i].pos != F[i][0]:
 					check(false, "%s: giocatore %d nel ruolo del posto" % [f, i])
 					break
-	eq(viste.size(), 8, "escono tutte e 8: " + str(viste.keys()))
+	eq(viste.size(), 14, "escono tutte e 14: " + str(viste.keys()))
 	c.reset()
 	return done()
 

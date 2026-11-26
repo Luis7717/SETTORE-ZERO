@@ -25,6 +25,8 @@ const TUTTE := [
 	["06_editor_nome", "editor", {"flow": "new", "club": "Atletico Sole", "kit": 3, "mode": "champ", "tab": "me"}, ""],
 	["07_hub", "hub", null, ""],
 	["08_rosa", "rosa", null, ""],
+	["08_rosa_formazione", "rosa", {"menu": "formazione"}, ""],
+	["08_rosa_formazione_sotto", "rosa", {"menu": "formazione"}, "trascina:195,700,195,200,500;aspetta:0.6"],
 	["09_rosa_scelto", "rosa", {"sel": "titolare:9"}, ""],
 	["10_rosa_confronto", "rosa", {"sel": "titolare:9", "tgt": "panchina:0"}, ""],
 	["10_rosa_statistiche", "rosa", {"sel": "titolare:9", "statistiche": true}, ""],

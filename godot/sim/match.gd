@@ -169,13 +169,14 @@ func _init(o: Dictionary) -> void:
 	players = []
 	for tt in 2:
 		var tmd: Dictionary = teams[tt]
-		var F: Array = C.FORMATIONS.get(tmd.get("formation", ""), C.FORMATIONS["4-4-2"])
+		var F: Array = C.schema(String(tmd.get("formation", "")), bool(tmd.get("moduli", false)))
+		var FR: Array = C.Ruoli.posti(String(tmd.get("formation", "")), F)
 		if not tmd.has("skill"):
 			tmd.skill = 0.5
 		stA[tt] = Stili.att(tmd.get("stileAtt"))
 		stD[tt] = Stili.dif(tmd.get("stileDif"))
 		for i in 11:
-			players.append(mk(tt, i, tmd.players[i], F[i]))
+			players.append(mk(tt, i, tmd.players[i], F[i], FR[i]))
 	ball = R.Ball.new()
 	score = [0, 0]
 	half = 1
@@ -189,16 +190,17 @@ func _init(o: Dictionary) -> void:
 	setupKickoff(kickoffTeam)
 
 
-func mk(tm: int, i: int, src: Dictionary, slot: Array) -> R.Player:
+func mk(tm: int, i: int, src: Dictionary, slot: Array, ruolo: String = "") -> R.Player:
 	var p := R.Player.new()
 	p.team = tm
 	p.i = i
 	p.src = src
 	p.name = String(src.get("name", ""))
 	p.pos = slot[0]
+	p.ruolo = ruolo
 	p.bx = slot[1]
 	p.by = slot[2]
-	p.st = C.effStats(src, slot[0])
+	p.st = C.effStats(src, slot[0], ruolo)
 	p.energy = startEnergy(src)
 	p.fy = -1.0 if tm else 1.0
 	p.phase = rnd() * 6.0
@@ -1394,7 +1396,7 @@ func substitute(tm: int, idx: int, src: Dictionary, fuori: String = "") -> bool:
 		return false
 	p.src = src
 	p.name = String(src.get("name", ""))
-	p.st = C.effStats(src, p.pos)
+	p.st = C.effStats(src, p.pos, p.ruolo)
 	p.energy = startEnergy(src)
 	p.wear = {"dri": 1.0, "tes": 1.0}
 	p.dribCd = 0.0
@@ -1421,7 +1423,8 @@ func substitute(tm: int, idx: int, src: Dictionary, fuori: String = "") -> bool:
 func cambiaSquadra(tm: int, srcs: Array, formation: String, stileAtt: Variant = null, stileDif: Variant = null) -> Variant:
 	if srcs.size() != 11:
 		return null
-	var F: Array = C.FORMATIONS.get(formation, C.FORMATIONS["4-4-2"])
+	var F: Array = C.schema(formation, bool(teams[tm].get("moduli", false)))
+	var FR: Array = C.Ruoli.posti(formation, F)
 	var old := team(tm)
 	var nuovi: Array = []
 	nuovi.resize(11)
@@ -1453,9 +1456,10 @@ func cambiaSquadra(tm: int, srcs: Array, formation: String, stileAtt: Variant = 
 		players[tm * 11 + i] = p
 		p.i = i
 		p.pos = F[i][0]
+		p.ruolo = FR[i]
 		p.bx = F[i][1]
 		p.by = F[i][2]
-		p.st = C.effStats(p.src, p.pos)
+		p.st = C.effStats(p.src, p.pos, p.ruolo)
 	for c: Dictionary in out:
 		substitute(tm, c.i, srcs[c.i], c.fuori)
 	var td: Dictionary = teams[tm]

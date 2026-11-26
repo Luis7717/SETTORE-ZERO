@@ -24,7 +24,8 @@ const SCHEDE := {
 	"kit": [["kit", "Divisa"]],
 }
 const TITOLI := {"crest": "Lo stemma", "champ": "Crea il tuo campione", "look": "Aspetto", "kit": "Stile della divisa"}
-const RUOLI := [["P", "Portiere"], ["D", "Difensore"], ["C", "Centrocampista"], ["A", "Attaccante"]]
+## ruoli specifici tra cui scegliere (sim/ruoli.gd), dal portiere all'attacco
+const RUOLI := ["P", "TS", "DC", "TD", "CDC", "CC", "ES", "ED", "COC", "AS", "ATT", "AD"]
 const NUMERI_RAPIDI := [7, 9, 10, 11, 1, 4, 8, 99]
 const GK_KIT := {"shirt": 0x27e0c0, "shorts": 0x0c5c52, "socks": 0x27e0c0}
 const PALCO_ALTO := 0.38         # frazione dello schermo (min(38vh, 320px) del web)
@@ -75,7 +76,7 @@ func _titoli() -> void:
 func _apri_nuova(club: String, kit: int) -> void:
 	var seme := D.hash32([club, kit, Time.get_ticks_usec()])
 	d = {"club": club, "kit": kit, "crest": D.crest_from_seed(seme), "style": D.normalize_kit_style(null),
-		"look": D.look_casuale(seme), "name": D.random_name(seme), "pos": "A", "num": 9, "esultanza": Esultanze.PREDEFINITA,
+		"look": D.look_casuale(seme), "name": D.random_name(seme), "pos": "A", "ruolo": "ATT", "num": 9, "esultanza": Esultanze.PREDEFINITA,
 		"altezza": Fisico.PREDEFINITO.altezza, "corporatura": Fisico.PREDEFINITO.corporatura}
 	mode = "crest"
 	tab = "shape"
@@ -478,15 +479,15 @@ func _pannello_nome() -> void:
 		d.name = t.left(20)
 		_aggiorna_palco())
 	corpo.add_child(nome)
-	_riga("Ruolo", "")
-	var f := HFlowContainer.new()
-	f.add_theme_constant_override("h_separation", 8)
-	f.add_theme_constant_override("v_separation", 8)
-	for r: Array in RUOLI:
-		var b := U.chip(r[1], d.pos == r[0], _imposta.bind("pos", r[0]))
+	var f := U.griglia(6, 6, 8) # 12 ruoli specifici: due righe da sei
+	var ruolo_ora: String = d.get("ruolo", D.Ruoli.PREDEFINITO.get(d.pos, "ATT"))
+	for r: String in RUOLI:
+		var b := U.chip(D.pos_name(r), ruolo_ora == r, _imposta.bind("ruolo", r))
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.custom_minimum_size.x = 100
+		b.custom_minimum_size.x = 0
+		b.add_theme_font_size_override("font_size", 13)
 		f.add_child(b)
+	_riga("Ruolo", D.ruolo_nome(ruolo_ora))
 	corpo.add_child(f)
 	_riga("Numero di maglia", "")
 	var h := U.hbox(10)
@@ -511,7 +512,7 @@ func _pannello_nome() -> void:
 		b.custom_minimum_size.x = 64
 		q.add_child(b)
 	corpo.add_child(q)
-	corpo.add_child(U.paragrafo("Il campione entra in rosa come un giovane forte della Terza Divisione (%s), con l'aspetto che hai scelto." % D.pos_name(d.pos), 13.5))
+	corpo.add_child(U.paragrafo("Il campione entra in rosa come un giovane forte della Terza Divisione (%s), con l'aspetto che hai scelto." % D.ruolo_nome(d.get("ruolo", d.pos)).to_lower(), 13.5))
 
 
 ## altezza e corporatura scelte (fisico.gd)
@@ -581,7 +582,11 @@ func _imposta(chiave: String, val: Variant) -> void:
 		d[parti[0]] = o
 	else:
 		d[chiave] = val
-	if chiave == "pos" and val == "P" and int(d.num) == 9:
+	if chiave == "ruolo": # il gruppo (P/D/C/A) viene dal ruolo
+		d["pos"] = D.gruppo(val)
+	elif chiave == "pos": # solo il gruppo: ruolo predefinito del gruppo
+		d["ruolo"] = D.Ruoli.PREDEFINITO.get(str(val), "ATT")
+	if (chiave == "pos" or chiave == "ruolo") and str(val) == "P" and int(d.num) == 9:
 		d.num = 1
 	ridisegna()
 
@@ -636,7 +641,7 @@ func _conferma() -> void:
 			c.create(d.club, d.kit)
 			c.setCrest(d.crest)
 			c.setKitStyle(d.style)
-			var champ: Dictionary = c.addChampion({"name": d.name, "pos": d.pos, "look": d.look, "num": d.num})
+			var champ: Dictionary = c.addChampion({"name": d.name, "pos": d.pos, "ruolo": d.get("ruolo"), "look": d.look, "num": d.num})
 			c.setEsultanza(champ.id, d.get("esultanza", Esultanze.PREDEFINITA))
 			c.setFisico(champ.id, d.get("altezza"), d.get("corporatura"))
 			gioca("allenamento")

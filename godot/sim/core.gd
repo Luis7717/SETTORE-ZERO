@@ -7,6 +7,7 @@ class_name SimCore
 extends RefCounted
 
 const R := preload("records.gd")
+const Ruoli := preload("ruoli.gd")
 
 const W := 64.0
 const L := 100.0
@@ -35,21 +36,46 @@ const FORMATIONS := {
 	"3-4-3": [["P", 0.0, 0.03], ["D", -0.5, 0.19], ["D", 0.0, 0.16], ["D", 0.5, 0.19], ["C", -0.8, 0.43], ["C", -0.26, 0.39], ["C", 0.26, 0.39], ["C", 0.8, 0.43], ["A", -0.7, 0.64], ["A", 0.0, 0.69], ["A", 0.7, 0.64]],
 	"5-3-2": [["P", 0.0, 0.03], ["D", -0.84, 0.24], ["D", -0.44, 0.18], ["D", 0.0, 0.15], ["D", 0.44, 0.18], ["D", 0.84, 0.24], ["C", -0.5, 0.42], ["C", 0.0, 0.38], ["C", 0.5, 0.42], ["A", -0.22, 0.66], ["A", 0.22, 0.66]],
 	"4-1-4-1": [["P", 0.0, 0.03], ["D", -0.72, 0.2], ["D", -0.24, 0.16], ["D", 0.24, 0.16], ["D", 0.72, 0.2], ["C", 0.0, 0.31], ["C", -0.78, 0.47], ["C", -0.27, 0.45], ["C", 0.27, 0.45], ["C", 0.78, 0.47], ["A", 0.0, 0.69]],
+	# Luis 2026-11-26 (ruoli specifici: il ruolo di ogni posto è in sim/ruoli.gd, POSTI)
+	"4-2-4": [["P", 0.0, 0.03], ["D", -0.72, 0.2], ["D", -0.24, 0.16], ["D", 0.24, 0.16], ["D", 0.72, 0.2], ["C", -0.26, 0.38], ["C", 0.26, 0.38], ["A", -0.76, 0.63], ["A", -0.24, 0.68], ["A", 0.24, 0.68], ["A", 0.76, 0.63]],
+	"4-3-2-1": [["P", 0.0, 0.03], ["D", -0.72, 0.2], ["D", -0.24, 0.16], ["D", 0.24, 0.16], ["D", 0.72, 0.2], ["C", -0.5, 0.4], ["C", 0.0, 0.36], ["C", 0.5, 0.4], ["A", -0.32, 0.57], ["A", 0.32, 0.57], ["A", 0.0, 0.7]],
+	"4-2-2-2": [["P", 0.0, 0.03], ["D", -0.72, 0.2], ["D", -0.24, 0.16], ["D", 0.24, 0.16], ["D", 0.72, 0.2], ["C", -0.25, 0.34], ["C", 0.25, 0.34], ["C", -0.44, 0.51], ["C", 0.44, 0.51], ["A", -0.22, 0.68], ["A", 0.22, 0.68]],
+	"4-3-3 offensivo": [["P", 0.0, 0.03], ["D", -0.72, 0.2], ["D", -0.24, 0.16], ["D", 0.24, 0.16], ["D", 0.72, 0.2], ["C", -0.3, 0.38], ["C", 0.3, 0.38], ["C", 0.0, 0.52], ["A", -0.72, 0.65], ["A", 0.0, 0.7], ["A", 0.72, 0.65]],
+	"4-3-3 difensivo": [["P", 0.0, 0.03], ["D", -0.72, 0.2], ["D", -0.24, 0.16], ["D", 0.24, 0.16], ["D", 0.72, 0.2], ["C", 0.0, 0.3], ["C", -0.38, 0.43], ["C", 0.38, 0.43], ["A", -0.72, 0.64], ["A", 0.0, 0.69], ["A", 0.72, 0.64]],
+	"4-1-2-1-2 largo": [["P", 0.0, 0.03], ["D", -0.72, 0.2], ["D", -0.24, 0.16], ["D", 0.24, 0.16], ["D", 0.72, 0.2], ["C", 0.0, 0.3], ["C", -0.76, 0.42], ["C", 0.76, 0.42], ["C", 0.0, 0.54], ["A", -0.22, 0.68], ["A", 0.22, 0.68]],
+}
+## posti diversi solo nel gioco Godot (squadre con "moduli": true; i confronti col JS usano FORMATIONS): nel 3-5-2 i
+## due mediani più bassi e il trequartista più alto (Luis 2026-11-26)
+const FORMATIONS_GODOT := {
+	"3-5-2": [["P", 0.0, 0.03], ["D", -0.5, 0.19], ["D", 0.0, 0.16], ["D", 0.5, 0.19], ["C", -0.85, 0.45], ["C", -0.3, 0.35], ["C", 0.0, 0.52], ["C", 0.3, 0.35], ["C", 0.85, 0.45], ["A", -0.22, 0.67], ["A", 0.22, 0.67]],
 }
 ## formazioni del web (src/sim.js): le squadre della CPU tirano a sorte tra queste come il JS (Carriera.aiMatchTeam)
 const FORMATIONS_WEB := ["4-4-2", "4-3-3", "3-5-2", "4-2-3-1"]
 ## per ogni formazione del web la "cugina" solo Godot che la CPU può usare al suo posto (Carriera.formazioneDi)
 const FORMAZIONE_CUGINA := {"4-4-2": "4-5-1", "4-3-3": "3-4-3", "3-5-2": "5-3-2", "4-2-3-1": "4-1-4-1"}
+## tutte le formazioni solo Godot che la CPU può usare al posto di quella del web (la prima è la cugina di sempre)
+const FORMAZIONE_CUGINE := {
+	"4-4-2": ["4-5-1", "4-2-4", "4-2-2-2"],
+	"4-3-3": ["3-4-3", "4-3-3 offensivo", "4-3-3 difensivo"],
+	"3-5-2": ["5-3-2", "4-1-2-1-2 largo"],
+	"4-2-3-1": ["4-1-4-1", "4-3-2-1"],
+}
 ## nome breve e una riga di spiegazione per il menu Formazione della Rosa
 const FORMAZIONE_SPIEGA := {
 	"4-4-2": "Classica: due punte e quattro a centrocampo, coperta in ogni zona.",
 	"4-3-3": "Tre attaccanti larghi, ali che puntano il fondo e crossano.",
-	"3-5-2": "Tre dietro, centrocampo affollato e due punte vicine.",
-	"4-2-3-1": "Due mediani davanti alla difesa, tre dietro all'unica punta.",
+	"3-5-2": "Tre dietro, due mediani, due esterni e un trequartista per le due punte.",
+	"4-2-3-1": "Due mediani, due esterni e un trequartista dietro all'unica punta.",
 	"4-5-1": "Cinque a centrocampo e una punta sola: compatta, si chiude bene.",
 	"3-4-3": "Tre difensori e tre attaccanti: tanta gente in avanti, rischiosa.",
 	"5-3-2": "Cinque dietro con gli esterni che spingono, due punte in avanti.",
 	"4-1-4-1": "Un mediano davanti alla difesa, quattro in mezzo, una punta.",
+	"4-2-4": "Due ali e due punte: quattro davanti, solo due in mezzo a coprire.",
+	"4-3-2-1": "Albero di Natale: due mezze punte strette dietro al centravanti.",
+	"4-2-2-2": "Due mediani, due trequartisti e due punte: tutto per vie centrali.",
+	"4-3-3 offensivo": "Come il 4-3-3, ma con un trequartista dietro ai tre davanti.",
+	"4-3-3 difensivo": "Come il 4-3-3, ma con un mediano basso davanti alla difesa.",
+	"4-1-2-1-2 largo": "Rombo largo: mediano, due esterni, trequartista e due punte.",
 }
 
 # Colpi di testa (`tes`): i giocatori dei salvataggi vecchi non ce l'hanno e lo si ricava da fisico e tiro,
@@ -130,6 +156,23 @@ static func formationNames() -> Array:
 	return FORMATIONS.keys()
 
 
+## posti [gruppo, x, y] del modulo; godot = true (gioco, squadre con "moduli") usa le posizioni di FORMATIONS_GODOT
+static func schema(modulo: String, godot: bool = true) -> Array:
+	if godot and FORMATIONS_GODOT.has(modulo):
+		return FORMATIONS_GODOT[modulo]
+	return FORMATIONS.get(modulo, FORMATIONS["4-4-2"])
+
+
+## schema del modulo col ruolo specifico al posto del gruppo: [ruolo, x, y] (menu della Rosa)
+static func schema_ruoli(modulo: String) -> Array:
+	var F := schema(modulo)
+	var rr: Array = Ruoli.posti(modulo, F)
+	var out: Array = []
+	for i in F.size():
+		out.append([rr[i], F[i][1], F[i][2]])
+	return out
+
+
 static func headingOf(src: Dictionary) -> float:
 	var tes: Variant = src.get("tes")
 	if typeof(tes) == TYPE_FLOAT or typeof(tes) == TYPE_INT:
@@ -139,8 +182,12 @@ static func headingOf(src: Dictionary) -> float:
 	return clamp_(round_(base + TES_ROLE.get(src.get("pos", ""), 0) + vary), 18.0, 99.0)
 
 
-static func effStats(src: Dictionary, slotPos: String) -> R.Stats:
+## ruoloPosto (facoltativo) = ruolo specifico del posto (sim/ruoli.gd): se il giocatore ha il suo `ruolo`, il malus
+## fuori ruolo viene da Ruoli.fattore (seconda scelta e ruoli compatibili quasi niente); senza, POSPEN come sempre
+static func effStats(src: Dictionary, slotPos: String, ruoloPosto: String = "") -> R.Stats:
 	var f: float = POSPEN.get(String(src.get("pos", "")) + slotPos, 0.6)
+	if ruoloPosto != "" and src.get("ruolo") is String and Ruoli.GRUPPO.has(src.ruolo):
+		f = Ruoli.fattore(src, ruoloPosto)
 	var s := R.Stats.new()
 	s.vel = float(src.get("vel", 0))
 	s.tir = float(src.get("tir", 0)) * f

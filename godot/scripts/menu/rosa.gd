@@ -86,7 +86,7 @@ func costruisci() -> void:
 	var k := D.kit(s.kit)
 	_k1 = int(k[1])
 	_colori = [D.hex(int(k[1])), D.hex(int(k[2]))]
-	var F: Array = C.FORMATIONS[s.formation]
+	var F: Array = C.schema_ruoli(s.formation) # posti col ruolo specifico: [ruolo, x, y]
 	var sp: Variant = c.player(sel) if sel != null else null
 	if sp == null:
 		sel = null
@@ -229,7 +229,7 @@ func _delta(p: Dictionary, sp: Variant, F: Array) -> Variant:
 
 func _ruolo_ora(p: Dictionary, F: Array) -> String:
 	var i: int = stato().lineup.find(p.id)
-	return F[i][0] if i >= 0 else str(p.pos)
+	return F[i][0] if i >= 0 else D.ruolo_di(p)
 
 
 # ruolo e valutazione dove sta adesso (posto in campo o panchina)
@@ -237,14 +237,14 @@ func _posto(p: Dictionary, F: Array) -> Dictionary:
 	var i: int = stato().lineup.find(p.id)
 	if i >= 0:
 		return {"role": F[i][0], "o": D.overall_as(p, F[i][0]), "where": D.pos_name(F[i][0])}
-	return {"role": p.pos, "o": D.overall(p), "where": "Panchina"}
+	return {"role": D.ruolo_di(p), "o": D.overall(p), "where": "Panchina"}
 
 
 func _disponi_carte() -> void:
 	var s := stato()
 	if s.is_empty() or _campo == null:
 		return
-	var L := Rosa.field_layout(C.FORMATIONS[s.formation], _campo.size.x, _campo.size.y)
+	var L := Rosa.field_layout(C.schema(s.formation), _campo.size.x, _campo.size.y)
 	for i in _carte_campo.size():
 		var carta: Control = _carte_campo[i]
 		if carta == null:
@@ -354,7 +354,7 @@ func _formazione(f: String) -> void:
 	var c := carriera()
 	if in_partita: # gli stessi 11 nei posti nuovi: nessuno entra dalla panchina
 		var s := stato()
-		s.lineup = cambi.formazione_stessi_11(C.FORMATIONS[f], s.lineup, func(id: Variant, r: String) -> int: return D.overall_as(c.player(id), r))
+		s.lineup = cambi.formazione_stessi_11(C.schema(f), s.lineup, func(id: Variant, r: String) -> int: return D.overall_as(c.player(id), r), c.ruoliPosti(f))
 		s.formation = f
 		salva()
 		_chiudi()
@@ -420,7 +420,7 @@ func _mostra_menu(quale: String) -> void:
 			titolo_menu = "Formazione"
 			scelto = str(stato().formation)
 			for f: String in C.FORMATIONS:
-				voci.append({"id": f, "nome": f, "spiega": C.FORMAZIONE_SPIEGA.get(f, ""), "schema": C.FORMATIONS[f]})
+				voci.append({"id": f, "nome": f, "spiega": C.FORMAZIONE_SPIEGA.get(f, ""), "schema": C.schema(f)})
 		"attacco", "difesa":
 			var att := quale == "attacco"
 			titolo_menu = "Stile offensivo" if att else "Stile difensivo"
@@ -462,7 +462,7 @@ func _mostra_statistiche() -> void:
 	if not _stat_aperte or p == null:
 		_stat_aperte = false
 		return
-	var F: Array = C.FORMATIONS[stato().formation]
+	var F: Array = C.schema_ruoli(stato().formation)
 	_stat_velo = StatG.vista(p, int(_posto(p, F).o), _colori, _k1, sicura, _chiudi_statistiche)
 	add_child(_stat_velo)
 
@@ -480,13 +480,13 @@ func _pannello_giocatore(p: Dictionary, F: Array) -> Control:
 	nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	nm.add_child(U.corto(str(p.name), 16, T.TXT, T.PESO_NERO))
 	var fis := Fisico.di(p)
-	var info := D.pos_name(p.pos) + " · " + Fisico.testo(fis)
+	var info := D.ruolo_testo(p) + " · " + Fisico.testo(fis)
 	if c.infortunio(p.id) > 0:
 		info += " · INFORTUNATO (%d)" % c.infortunio(p.id)
 	else: # sempre scritta (Luis 2026-11-25: "non capisco se si sono rigenerate")
 		info += " · energia %d%%" % (cambi.energia(p.id) if in_partita else c.forma_di(p.id))
-	if at.where != D.pos_name(p.pos):
-		info += " · in campo %s" % at.where
+	if at.where != D.pos_name(D.ruolo_di(p)) and at.where != "Panchina":
+		info += " · in campo %s%s" % [at.where, " (fuori ruolo)" if D.fuori_ruolo(p, str(at.role)) else ""]
 	info += " · %d anni · %s" % [int(p.age), D.fmt_money(D.value(p))]
 	if p.get("num") != null:
 		info += " · n. %d" % int(p.num)

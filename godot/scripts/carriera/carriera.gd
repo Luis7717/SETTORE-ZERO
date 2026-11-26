@@ -35,6 +35,7 @@ const Esultanze := preload("res://scripts/partita/esultanze.gd")
 const Fisico := preload("res://scripts/carriera/fisico.gd")
 const Stili := preload("res://sim/stili.gd")
 const Mercato := preload("res://scripts/carriera/mercato_squadre.gd")
+const Ruoli := preload("res://sim/ruoli.gd")
 
 const FORMATIONS := C.FORMATIONS
 const DIV_NAMES := ["Prima Divisione", "Seconda Divisione", "Terza Divisione"]
@@ -77,6 +78,12 @@ var percorso := Salv.PERCORSO
 ## stagione, il campione cresce giocando e non invecchia (crescita_voti.gd, Luis 2026-11-25); i numeri casuali
 ## di _crescita si usano lo stesso
 var crescitaRosa := false
+## ruoli specifici (sim/ruoli.gd, Luis 2026-11-26): ogni giocatore ha `ruolo` e `ruolo2`, la formazione chiede un
+## ruolo per posto, le statistiche dei giocatori generati seguono il ruolo. false solo nei confronti col JS
+## (giocatori senza `ruolo`: tutto come il web)
+var ruoli := true
+## ruoli della rosa nuova, nell'ordine in cui create() genera i giocatori di ogni gruppo (i primi due sono i più forti)
+const ROSA_NUOVA := {"D": ["DC", "DC", "TS", "TD", "DC", "TD"], "C": ["CC", "CC", "ES", "ED", "CDC", "COC"], "A": ["ATT", "ATT", "AS", "AD"]}
 ## obiettivo della stagione appena chiusa da endSeason (per il giudizio in dopoPartita; non si salva)
 var _obiettivo_finito := {}
 ## da dove è venuto l'ultimo caricamento: "principale", "temporaneo", "copia" o "" (nessuno)
@@ -97,7 +104,14 @@ static func randomName(r: Callable) -> String:
 	return nome.left(1) + ". " + String(pick(r, COGNOMI))
 
 
+## valutazione di p nel posto `pos`: un gruppo (P/D/C/A, come il web) o un ruolo specifico (sim/ruoli.gd).
+## Chi ha il suo `ruolo` è valutato coi pesi del ruolo e col malus di Ruoli.fattore; chi non ce l'ha come nel web.
 static func overallAs(p: Dictionary, pos: String) -> int:
+	if Ruoli.valido(p.get("ruolo")):
+		if pos.length() == 1 and pos != "P":
+			pos = p.ruolo if Ruoli.gruppo(p.ruolo) == pos else String(Ruoli.PREDEFINITO.get(pos, "CC"))
+		return Ruoli.overall_come(p, pos)
+	pos = Ruoli.gruppo(pos)
 	var pp: String = p.pos
 	var pen := 1.0
 	if pp != pos:
@@ -107,19 +121,13 @@ static func overallAs(p: Dictionary, pos: String) -> int:
 			pen = 0.82
 		else:
 			pen = 0.92
-	var o: float
-	if pos == "P":
-		o = p.por * 0.72 + p.fis * 0.14 + p.pas * 0.14
-	elif pos == "D":
-		o = p.dif * 0.45 + p.fis * 0.2 + p.vel * 0.15 + p.pas * 0.1 + p.dri * 0.1
-	elif pos == "C":
-		o = p.pas * 0.35 + p.dri * 0.25 + p.dif * 0.12 + p.vel * 0.12 + p.tir * 0.16
-	else:
-		o = p.tir * 0.4 + p.vel * 0.22 + p.dri * 0.23 + p.pas * 0.1 + p.fis * 0.05
+	var o: float = Ruoli.base_gruppo(p, pos)
 	return JS.jround(o * pen)
 
 
 static func overall(p: Dictionary) -> int:
+	if Ruoli.valido(p.get("ruolo")):
+		return Ruoli.overall(p)
 	return overallAs(p, p.pos)
 
 
@@ -304,6 +312,10 @@ func _completa_giocatore(p: Dictionary) -> void:
 	for k: String in STAT_KEYS:
 		if not JS.is_integer(p.get(k)):
 			p[k] = 12 if k == "por" and p.pos != "P" else 40
+	# ruoli specifici: un ruolo sbagliato o di un altro gruppo si toglie (novita() ne dà uno nuovo)
+	if p.has("ruolo") and (not Ruoli.valido(p.ruolo) or Ruoli.gruppo(p.ruolo) != p.pos):
+		p.erase("ruolo")
+		p.erase("ruolo2")
 	if not JS.is_integer(p.get("pot")):
 		p["pot"] = overall(p)
 
@@ -405,8 +417,42 @@ func create(name: String, kit: int, seme: int = -1) -> void:
 	s.teams.me.rating = myRating()
 	newSeason(true)
 	refreshMarket(MARKET_SIZE)
+	if ruoli:
+		_rosa_nuova()
 	novita()
 	save()
+
+
+## rosa appena creata: ruoli assortiti (ROSA_NUOVA) e statistiche coerenti col ruolo (Ruoli.modella: la valutazione
+## di ognuno resta quella di prima). Non tocca i numeri casuali della carriera (s.seed).
+func _rosa_nuova() -> void:
+	s["semeB"] = Asp.hash32("novita", s.club, s.get("seed", 0))
+	var quanti := {}
+	for p: Dictionary in s.squad:
+		var g: String = p.pos
+		var k := int(quanti.get(g, 0))
+		quanti[g] = k + 1
+		var lista: Array = ROSA_NUOVA.get(g, [])
+		_nasce(p, lista[k % lista.size()] if not lista.is_empty() else "P")
+	autoLineup()
+	s.teams.me.rating = myRating()
+
+
+## giocatore appena generato della mia rosa: sotto-statistiche, ruolo r, statistiche del ruolo, seconda scelta
+func _nasce(p: Dictionary, r: String, r2: Variant = null) -> void:
+	Sotto.crea(p, JS.rng32(Asp.hash32("sub", s.get("semeB", 0), p.id)))
+	Ruoli.modella(p, r, JS.rng32(Asp.hash32("ruolo", s.get("semeB", 0), p.id)))
+	if Ruoli.valido(r2) and r2 != r and r2 != "P" and r != "P":
+		p["ruolo2"] = r2
+
+
+## ruolo chiesto da ogni posto della formazione: specifico (sim/ruoli.gd) o, nei confronti col JS, il gruppo
+func ruoliPosti(formazione: String = "") -> Array:
+	var f: String = formazione if formazione != "" else String(s.formation)
+	var F: Array = FORMATIONS.get(f, FORMATIONS["4-4-2"])
+	if ruoli:
+		return Ruoli.posti(f, F)
+	return F.map(func(slot: Array) -> String: return slot[0])
 
 
 ## sigla di 3 lettere: testo senza i caratteri di `togli`, in maiuscolo (o `riserva` se resta vuoto)
@@ -457,7 +503,13 @@ func setLook(id: int, look: Variant) -> bool:
 func addChampion(opz: Dictionary) -> Dictionary:
 	var id: int = s.nextId
 	s.nextId += 1
-	var p := genPlayer(func() -> float: return rnd(), String(opz.get("pos", "A")), CHAMP_LEVEL, id, true)
+	var pos_ch := String(opz.get("pos", "A"))
+	var ruolo_ch: Variant = opz.get("ruolo")
+	if Ruoli.valido(ruolo_ch): # editor: si sceglie il ruolo specifico, il gruppo viene da lì
+		pos_ch = Ruoli.gruppo(ruolo_ch)
+	var p := genPlayer(func() -> float: return rnd(), pos_ch, CHAMP_LEVEL, id, true)
+	if ruoli:
+		_nasce(p, ruolo_ch if Ruoli.valido(ruolo_ch) else String(Ruoli.PREDEFINITO.get(pos_ch, "ATT")), opz.get("ruolo2"))
 	var nome: Variant = opz.get("name")
 	var testo := (JS.js_str(nome) if nome != null and nome != "" else "").strip_edges().left(20)
 	if testo != "":
@@ -533,11 +585,11 @@ func table(d: int) -> Array:
 
 
 func myRating() -> int:
-	var F: Array = FORMATIONS[s.formation]
+	var FR := ruoliPosti()
 	var t := 0
 	for i in s.lineup.size():
 		var p: Variant = player(s.lineup[i])
-		t += overallAs(p, F[i][0]) if p != null else 30
+		t += overallAs(p, FR[i]) if p != null else 30
 	return JS.jround(t / 11.0)
 
 
@@ -559,6 +611,7 @@ func nextMatch() -> Variant:
 
 func autoLineup() -> void:
 	var F: Array = FORMATIONS[s.formation]
+	var FR := ruoliPosti()
 	var used := {}
 	var l: Array = []
 	l.resize(F.size())
@@ -569,15 +622,62 @@ func autoLineup() -> void:
 		var bo := -1
 		for p: Dictionary in s.squad:
 			if not used.has(p.id):
-				var o := overallAs(p, F[i][0])
+				var o := overallAs(p, FR[i])
 				if o > bo:
 					bo = o
 					best = p
 		l[i] = best.id
 		used[best.id] = true
-	s.lineup = l
+	s.lineup = _sistema_posti(l, FR) if ruoli else l
 	schieraSani()
 	tieniCampione()
+
+
+## ruoli specifici: la scelta "il migliore posto per posto" lascia errori (l'esterno finito terzino e un mediano al
+## suo posto): finché la somma delle valutazioni cresce si scambiano due titolari, entra uno dalla panchina, o entra
+## uno dalla panchina spostando un titolare in un altro posto (il terzo esce). Niente numeri casuali.
+func _sistema_posti(l: Array, FR: Array) -> Array:
+	var out := l.duplicate()
+	var n := out.size()
+	var val := {} # id → valutazione in ogni posto
+	for p: Dictionary in s.squad:
+		var riga: Array = []
+		for i in n:
+			riga.append(overallAs(p, FR[i]))
+		val[p.id] = riga
+	for id: Variant in out:
+		if not val.has(id):
+			return out
+	for _giro in 12:
+		var mosso := false
+		for a in n:
+			for b in range(a + 1, n):
+				if val[out[a]][b] + val[out[b]][a] > val[out[a]][a] + val[out[b]][b]:
+					var x: Variant = out[a]
+					out[a] = out[b]
+					out[b] = x
+					mosso = true
+		for p: Dictionary in s.squad:
+			if out.has(p.id):
+				continue
+			var fatto := false
+			for a in n:
+				if val[p.id][a] > val[out[a]][a]:
+					out[a] = p.id
+					fatto = true
+					break
+				for b in n:
+					if b != a and val[p.id][a] + val[out[a]][b] > val[out[a]][a] + val[out[b]][b]:
+						out[b] = out[a]
+						out[a] = p.id
+						fatto = true
+						break
+				if fatto:
+					break
+			mosso = mosso or fatto
+		if not mosso:
+			break
+	return out
 
 
 ## dopo vendite e acquisti: riempie i buchi della formazione
@@ -594,7 +694,7 @@ func fixLineup() -> void:
 		else:
 			nuova.append(null)
 	s.lineup = nuova
-	var F: Array = FORMATIONS[s.formation]
+	var FR := ruoliPosti()
 	for i in s.lineup.size():
 		if s.lineup[i] != null:
 			continue
@@ -602,7 +702,7 @@ func fixLineup() -> void:
 		var bo := -1
 		for p: Dictionary in s.squad:
 			if not used.has(p.id):
-				var o := overallAs(p, F[i][0])
+				var o := overallAs(p, FR[i])
 				if o > bo:
 					bo = o
 					best = p
@@ -984,6 +1084,7 @@ func novita() -> void:
 	for p: Dictionary in s.squad:
 		if not Sotto.ha(p):
 			Sotto.crea(p, JS.rng32(Asp.hash32("sub", s.semeB, p.id)))
+	_ruoli_rosa()
 	# stili di gioco della mia squadra (fase D): mancanti o sconosciuti = equilibrati, come prima
 	s["stileAtt"] = Stili.valido_att(s.get("stileAtt"))
 	s["stileDif"] = Stili.valido_dif(s.get("stileDif"))
@@ -1025,6 +1126,28 @@ func novita() -> void:
 		s["obiettivo"] = Dirigenza.nuovo(int(s.season), d, mia, altre)
 
 
+## ruoli specifici per chi nella rosa non li ha (salvataggi vecchi, giocatori comprati dal vecchio mercato): ruolo e
+## seconda scelta dal posto in formazione e dalle statistiche, che NON cambiano (Ruoli.assegna_rosa). Il potenziale
+## si sposta di quanto si è spostata la valutazione (coi pesi del ruolo), così il margine di crescita resta uguale.
+func _ruoli_rosa() -> void:
+	if not ruoli:
+		return
+	var prima := {}
+	for p: Dictionary in s.squad:
+		if not Ruoli.valido(p.get("ruolo")):
+			p.erase("ruolo")
+			prima[p.id] = overall(p)
+	if prima.is_empty():
+		for p: Dictionary in s.squad:
+			Ruoli.sistema_seconda(p)
+		return
+	var lineup: Array = s.lineup if s.get("lineup") is Array else []
+	Ruoli.assegna_rosa(s.squad, lineup, ruoliPosti() if FORMATIONS.has(s.get("formation", "")) else [])
+	for p: Dictionary in s.squad:
+		if prima.has(p.id) and JS.is_integer(p.get("pot")):
+			p.pot = int(p.pot) + overall(p) - int(prima[p.id])
+
+
 ## esultanza del giocatore p (campo "esultanza" del campione, fase C): senza campo, o sbagliato, la predefinita.
 ## Il campo si scrive solo con setEsultanza (editor): addChampion resta identico al JS, i salvataggi vecchi vanno.
 static func esultanza_di(p: Variant) -> String:
@@ -1058,6 +1181,7 @@ func setFisico(id: Variant, altezza: Variant, corporatura: Variant) -> bool:
 ## (mercato_squadre.gd), statistiche col fisico (Fisico.applicaSquadra)
 func avversarioPartita(t: Dictionary) -> Dictionary:
 	var sq: Dictionary = Fisico.applicaSquadra(evolviCpu(t, Mercato.rimpiazza(self, t, aiMatchTeam(t, formazioneDi(t)))))
+	sq["moduli"] = true # posti dei moduli del gioco (C.FORMATIONS_GODOT)
 	var st := stileDi(t)
 	sq["stileAtt"] = st.att
 	sq["stileDif"] = st.dif
@@ -1110,9 +1234,12 @@ func evolviCpu(t: Dictionary, sq: Dictionary) -> Dictionary:
 	var media: Variant = null
 	if mc is Dictionary and int(mc.get("stagione", 0)) == int(s.season) and mc.get("medie") is Dictionary:
 		media = mc.medie.get(str(t.get("id", "")))
+	var FR: Array = Ruoli.posti(String(sq.get("formation", "")), FORMATIONS.get(sq.get("formation", ""), []))
 	for i in sq.players.size():
 		var p: Dictionary = sq.players[i]
 		Sotto.crea(p, JS.rng32(Asp.hash32("subcpu", int(t.seed), int(s.season), i)))
+		if ruoli and i < FR.size() and not p.has("ruolo"): # ruolo del posto e statistiche del ruolo
+			Ruoli.modella(p, FR[i], JS.rng32(Asp.hash32("ruolocpu", int(t.seed), int(s.season), i)))
 		if media != null:
 			CrescitaVoti.meta_cpu(p, float(media), JS.rng32(Asp.hash32("metacpu", int(t.seed), int(s.season), i)))
 	return sq
@@ -1181,6 +1308,7 @@ func tieniCampione() -> bool:
 	if ch == null or not s.get("lineup") is Array or s.lineup.has(ch.id) or infortunio(ch.id) > 0:
 		return false
 	var F: Array = FORMATIONS.get(s.formation, FORMATIONS["4-4-2"])
+	var FR := ruoliPosti()
 	var best := -1
 	var bo := 1 << 30
 	for giro in 2: # prima i posti del suo ruolo, poi qualunque posto (il portiere solo per un portiere)
@@ -1189,7 +1317,9 @@ func tieniCampione() -> bool:
 			if (giro == 0 and r != ch.pos) or (giro == 1 and (r == "P") != (ch.pos == "P")):
 				continue
 			var q: Variant = player(s.lineup[i])
-			var o := overallAs(q, r) if q != null else -1
+			var o := overallAs(q, FR[i]) if q != null else -1
+			if ruoli and q != null: # meglio il posto dove il campione rende di più
+				o -= overallAs(ch, FR[i]) * 2
 			if o < bo:
 				bo = o
 				best = i
@@ -1206,7 +1336,7 @@ func schieraSani() -> Array:
 	var cambi: Array = []
 	if not _ha_infortunati():
 		return cambi
-	var F: Array = FORMATIONS[s.formation]
+	var FR := ruoliPosti()
 	for i in s.lineup.size():
 		var id: Variant = s.lineup[i]
 		if id == null or infortunio(id) <= 0:
@@ -1216,7 +1346,7 @@ func schieraSani() -> Array:
 		for p: Dictionary in s.squad:
 			if s.lineup.has(p.id) or infortunio(p.id) > 0:
 				continue
-			var o := overallAs(p, F[i][0])
+			var o := overallAs(p, FR[i])
 			if o > bo:
 				bo = o
 				best = p
@@ -1248,6 +1378,7 @@ func squadraPartita() -> Dictionary:
 	t.bench = t.bench.filter(func(p: Dictionary) -> bool: return infortunio(p.id) <= 0).map(func(p: Dictionary) -> Dictionary: return Fisico.applica(p))
 	t["stileAtt"] = stileAtt()
 	t["stileDif"] = stileDif()
+	t["moduli"] = true # posti dei moduli del gioco (C.FORMATIONS_GODOT)
 	return t
 
 
@@ -1276,8 +1407,10 @@ func formazioneDi(t: Dictionary) -> String:
 	var r := JS.rng32(int(t.get("seed", 0)) + int(s.season) * 977)
 	var fs: Array = C.FORMATIONS_WEB
 	var web: String = fs[int(floor(r.call() * fs.size()))]
-	if Asp.hash32("formazione", int(t.get("seed", 0)), int(s.season)) % 2 == 1:
-		return C.FORMAZIONE_CUGINA[web]
+	var h := Asp.hash32("formazione", int(t.get("seed", 0)), int(s.season))
+	if h % 2 == 1:
+		var cugine: Array = C.FORMAZIONE_CUGINE[web]
+		return cugine[(h >> 1) % cugine.size()]
 	return web
 
 

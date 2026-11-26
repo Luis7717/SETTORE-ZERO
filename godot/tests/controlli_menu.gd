@@ -387,7 +387,7 @@ func test_editor_nuova_squadra_crea_la_carriera_e_va_all_allenamento() -> bool:
 	n._imposta("crest.icon", 5)
 	n._conferma()
 	eq(n.mode, "champ", "poi il campione")
-	n._imposta("pos", "C")
+	n._imposta("ruolo", "COC")
 	n._numero(1)
 	n._conferma()
 	check(c.s is Dictionary, "carriera creata")
@@ -397,7 +397,7 @@ func test_editor_nuova_squadra_crea_la_carriera_e_va_all_allenamento() -> bool:
 		var champ: Array = c.s.squad.filter(func(p: Dictionary) -> bool: return p.get("champ", false))
 		eq(champ.size(), 1, "un campione in rosa")
 		if champ.size() == 1:
-			eq(champ[0].pos, "C", "ruolo del campione")
+			eq([champ[0].pos, champ[0].get("ruolo")], ["C", "COC"], "ruolo del campione (specifico, col suo gruppo)")
 			eq(int(champ[0].num), 10, "numero 9 + 1")
 	eq(_andate.back()[0] if not _andate.is_empty() else "", "gioca:allenamento", "parte l'allenamento guidato")
 	_finisci(n)

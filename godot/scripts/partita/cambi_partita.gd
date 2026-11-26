@@ -86,8 +86,9 @@ func registra(lineup: Array, a: Variant, b: Variant) -> void:
 
 ## nuova formazione F per gli stessi titolari: l'espulso resta al suo posto (nell'indice), il portiere in porta se
 ## c'è un posto P all'indice 0, gli altri posti (portiere, attacco, difesa, centrocampo) al migliore nel ruolo.
-## valuta(id, ruolo) → valutazione. Ritorna la nuova lista dei titolari (stessi id).
-func formazione_stessi_11(F: Array, lineup: Array, valuta: Callable) -> Array:
+## valuta(id, ruolo) → valutazione; ruoli (facoltativo) = ruolo specifico di ogni posto, passato a valuta al posto
+## del gruppo (sim/ruoli.gd). Ritorna la nuova lista dei titolari (stessi id).
+func formazione_stessi_11(F: Array, lineup: Array, valuta: Callable, ruoli: Array = []) -> Array:
 	var nuova: Array = []
 	nuova.resize(F.size())
 	var liberi: Array = []
@@ -108,7 +109,7 @@ func formazione_stessi_11(F: Array, lineup: Array, valuta: Callable) -> Array:
 		var best := 0
 		var bo := -INF
 		for k in liberi.size():
-			var o := float(valuta.call(liberi[k], F[i][0]))
+			var o := float(valuta.call(liberi[k], ruoli[i] if i < ruoli.size() else F[i][0]))
 			if o > bo:
 				bo = o
 				best = k

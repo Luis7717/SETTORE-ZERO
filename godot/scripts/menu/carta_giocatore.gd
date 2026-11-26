@@ -62,11 +62,12 @@ func _init() -> void:
 ## riempie la carta: p = giocatore, slot_pos = ruolo del posto in campo ("" = panchina)
 func imposta(p: Dictionary, slot_pos: String, faccia: String, d: Variant) -> void:
 	id = p.id
-	var vero: String = str(p.pos)
+	var vero: String = D.ruolo_di(p)
 	ruolo = slot_pos if slot_pos != "" else vero
 	ovr = D.overall_as(p, slot_pos) if slot_pos != "" else D.overall(p)
 	cls = D.ovr_cls(ovr)
-	ruolo_vero = vero if slot_pos != "" and slot_pos != vero else ""
+	# fuori ruolo = non nel suo ruolo, né nella seconda scelta, né in un ruolo compatibile (sim/ruoli.gd)
+	ruolo_vero = vero if slot_pos != "" and D.fuori_ruolo(p, slot_pos) else ""
 	nome = MenuRosa.short_name(p.get("name", ""))
 	faccia_svg = faccia
 	delta = d
@@ -159,7 +160,7 @@ func _draw() -> void:
 	var f_pos := T.font(850)
 	var lw := f_pos.get_string_size(nr, HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x + 8.0
 	var rp := Rect2(W - 5.0 - lw, 4, lw, 14)
-	_rett(rp, T.POS_BG.get(ruolo, T.PANEL2), 5)
+	_rett(rp, T.POS_BG.get(D.gruppo(ruolo), T.PANEL2), 5)
 	draw_string(f_pos, Vector2(rp.position.x + 4, rp.position.y + 10.5), nr, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color.WHITE)
 	# ritratto
 	if faccia_svg != "":

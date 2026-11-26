@@ -65,6 +65,7 @@ class Player:
 	var src: Dictionary = {}
 	var name: String = ""
 	var pos: String = ""
+	var ruolo: String = "" # ruolo specifico del posto (sim/ruoli.gd): solo per il malus fuori ruolo, l'IA usa pos
 	var bx: float = 0.0
 	var by: float = 0.0
 	var st: Stats = null

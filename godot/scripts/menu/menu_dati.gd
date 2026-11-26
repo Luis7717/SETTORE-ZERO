@@ -10,6 +10,7 @@ const Asp := preload("res://scripts/carriera/aspetto.gd")
 const Stm := preload("res://scripts/carriera/stemma_dati.gd")
 const JS := preload("res://scripts/carriera/js.gd")
 const Core := preload("res://sim/core.gd")
+const Ruoli := preload("res://sim/ruoli.gd")
 
 # ---------------------------------------------------------------- carriera (career.js)
 const DIV_NAMES := Car.DIV_NAMES
@@ -53,8 +54,45 @@ static func div_names() -> Array:
 	return DIV_NAMES
 
 
+## sigla a schermo di un gruppo (POR, DIF, CEN, ATT) o di un ruolo specifico (TS, DC, CDC, ...: è già la sigla)
 static func pos_name(pos: Variant) -> String:
 	return str(POS_NAME.get(str(pos), str(pos)))
+
+
+# ---------------------------------------------------------------- ruoli specifici (sim/ruoli.gd)
+## ruolo del giocatore: quello specifico se ce l'ha, sennò il gruppo (P/D/C/A)
+static func ruolo_di(p: Dictionary) -> String:
+	var r: Variant = p.get("ruolo")
+	return r if Ruoli.valido(r) else str(p.get("pos", "C"))
+
+
+## seconda scelta del giocatore ("" se non ce l'ha: portiere, giocatori senza ruolo)
+static func ruolo2_di(p: Dictionary) -> String:
+	return Ruoli.seconda_di(p) if Ruoli.valido(p.get("ruolo")) else ""
+
+
+## gruppo (P/D/C/A) di un ruolo o di un gruppo: per i colori
+static func gruppo(r: Variant) -> String:
+	return Ruoli.gruppo(str(r))
+
+
+## nome per esteso: "Terzino destro" (o "Difensore" per chi ha solo il gruppo)
+static func ruolo_nome(r: Variant) -> String:
+	return str(Ruoli.NOMI.get(str(r), POS_FULL.get(str(r), str(r))))
+
+
+## "DC · 2ª CDC" (sigla del ruolo e della seconda scelta)
+static func ruolo_testo(p: Dictionary) -> String:
+	var t := pos_name(ruolo_di(p))
+	var r2 := ruolo2_di(p)
+	return t if r2 == "" else "%s · 2ª %s" % [t, r2]
+
+
+## il giocatore nel posto `posto` è fuori ruolo? (no nel suo ruolo, nella seconda scelta e nei ruoli compatibili)
+static func fuori_ruolo(p: Dictionary, posto: String) -> bool:
+	if Ruoli.valido(p.get("ruolo")):
+		return Ruoli.fattore(p, posto) < Ruoli.F_FUORI
+	return Ruoli.gruppo(posto) != str(p.get("pos", ""))
 
 
 # ---------------------------------------------------------------- valutazioni e soldi
