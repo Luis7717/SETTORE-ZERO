@@ -1527,12 +1527,12 @@ func _scena_dribbling(att: R.Player, nome: String) -> void:
 	_sposta(dif, 4.6, dy * 14.5)
 	dif.fx = 0.0
 	dif.fy = -dy
-	if nome == "dribbling_ok":
-		att.st.dri = 99.0
-		dif.st.dif = 1.0
-	elif nome == "dribbling_ko":
-		att.st.dri = 1.0
-		dif.st.dif = 99.0
+	if nome == "dribbling_ok" or nome == "dribbling_ko":
+		var ok := nome == "dribbling_ok"
+		att.st.dri = 99.0 if ok else 1.0
+		dif.st.dif = 1.0 if ok else 99.0
+		att.st.sub.erase("drb") # il dribbling guarda Dribbling e Contrasto: senza sotto-statistica vale la grande
+		dif.st.sub.erase("ctr")
 	m.ball.owner = att
 	m.ball.last = att
 	m.ball.x = att.x

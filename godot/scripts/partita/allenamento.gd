@@ -413,6 +413,8 @@ func _setup_dribbling(kk: int) -> Dictionary:
 	o.fx = 0.0
 	o.fy = -1.0
 	o.st.dif = minf(o.st.dif, DRIB_DEF_DIF)
+	if o.st.sub.has("ctr"): # il dribbling guarda il Contrasto (statistiche dettagliate)
+		o.st.sub["ctr"] = minf(float(o.st.sub.ctr), DRIB_DEF_DIF)
 	put(m.players[9], c.x + [12.0, 14.0, -14.0][kk], c.y + 4.0)
 	return {"c": c, "o": o}
 
