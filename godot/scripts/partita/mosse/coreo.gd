@@ -20,6 +20,7 @@ extends RefCounted
 
 const Corpo := preload("corpo.gd")
 const Mossa := preload("mossa.gd")
+const IK := preload("ik.gd")
 
 const ENTRA := 0.08           # s: il peso della coreografia sale da 0 a 1 (sopra il clip di corsa)
 const ESCE := 0.15            # s: ... e scende alla fine
@@ -40,6 +41,12 @@ var finito := false
 var yaw := 0.0                # verso mostrato (rotation.y della figura)
 var yaw_fisso := NAN          # verso voluto fino a yaw_fisso_fino; NAN (o dopo) = quello del motore
 var yaw_fisso_fino := INF
+var yaw_k := YAW_K            # rapidità e velocità massima del verso mostrato (la veronica gira più in fretta)
+var yaw_v := YAW_V
+# l'altro giocatore del dribbling: Callable() -> Vector3 (dove sta, mondo); i piedi di questo restano fuori dal
+# cilindro di raggio ost_r intorno a lui (niente gambe dentro il corpo dell'altro)
+var ostacolo := Callable()
+var ost_r := 0.42
 var palla := false            # questo episodio muove il pallone (vista.gd lo mostra al posto di quello del motore)
 var tipo := ""
 var lato := 0.0               # parametro della coreografia (lato del dribbling o della reazione)
@@ -49,6 +56,7 @@ var _flip := 1.0
 var _pos := Vector3.ZERO      # corpo nel mondo (dal motore) a questo fotogramma
 var _vel := Vector3.ZERO
 var _yaw_moto := 0.0
+var yaw0 := 0.0               # verso del corpo all'inizio dell'episodio (riferimento fisso per "rel0")
 var _scala := Vector3.ONE     # scala della figura (Coord.SCALE × fisico)
 var _palla_moto := Vector3.ZERO   # pallone del motore (a terra, mondo) e velocità
 var _palla_vel := Vector3.ZERO
@@ -56,7 +64,7 @@ var _palla0 := Vector3.ZERO   # pallone mostrato all'inizio e sua velocità
 var _palla0_v := Vector3.ZERO
 
 # chiavi del corpo: [{t, v}] (v Vector3), curve rifatte quando cambiano
-var _k := {"bacino": [], "angoli": [], "busto": [], "br_l": [], "br_r": []}
+var _k := {"bacino": [], "angoli": [], "busto": [], "br_l": [], "br_r": [], "giro": [], "sguardo": []}
 var _c := {}
 var _sporco := true
 
@@ -66,6 +74,7 @@ var _piedi := {}
 var _tocchi: Array = []
 var _palla_pos := Vector3.ZERO    # pallone mostrato (a terra) e velocità mostrata
 var _palla_v := Vector3.ZERO
+var _palla_h := 0.0               # altezza del pallone mostrato (sotto del pallone da terra, m)
 var _dt := 1.0 / 60.0
 const ANTICIPO := 0.12        # s: un piede a terra con un appoggio, un tocco o un passaggio programmato si stacca tanto prima
 
@@ -77,6 +86,7 @@ func _init(p: Object, flip: float, scala: Vector3, caviglie: Dictionary, palla0:
 	_scala = scala
 	_leggi_motore(p, null)
 	yaw = _yaw_moto
+	yaw0 = _yaw_moto
 	_palla0 = Vector3(palla0.x, 0.0, palla0.z)
 	_palla0_v = Vector3(palla0_v.x, 0.0, palla0_v.z)
 	_palla_pos = _palla0
@@ -91,14 +101,16 @@ func _init(p: Object, flip: float, scala: Vector3, caviglie: Dictionary, palla0:
 		# a terra se basso e non chiaramente più alto dell'altro (correndo un piede è sempre più su)
 		var terra := h < giu + 0.06 * _scala.y and h <= altra + 0.02 * _scala.y
 		_piedi[s] = {"terra": terra, "pos": Vector3(c.x, giu if terra else c.y, c.z), "yaw": yaw, "pitch": 0.0, "roll": 0.0,
-			"ev": [], "da": Vector3(c.x, c.y, c.z), "da_t": 0.0, "da_yaw": yaw, "da_pitch": 0.0, "da_roll": 0.0}
+			"ev": [], "su": null, "da": Vector3(c.x, c.y, c.z), "da_t": 0.0, "da_yaw": yaw, "da_pitch": 0.0, "da_roll": 0.0}
 	if not _piedi.l.terra and not _piedi.r.terra:   # in volo tutti e due: il più basso è quello che appoggia prima
 		_piedi["l" if hl <= hr else "r"].terra = false
 	chiave_bacino(0.0, PELVIS)
 	chiave_angoli(0.0, Vector3.ZERO)
 	chiave_busto(0.0, Vector3(0.1, 0, 0))
-	chiave_braccio("l", 0.0, Vector3(0.2, -0.5, 0.05))
-	chiave_braccio("r", 0.0, Vector3(0.2, -0.5, 0.05))
+	chiave_braccio("l", 0.0, Vector3(0.13, -0.4, 0.12))
+	chiave_braccio("r", 0.0, Vector3(0.13, -0.4, 0.12))
+	chiave_giro(0.0, 0.0)
+	chiave_sguardo(0.0, 1.0)
 
 
 ## il piede `s` è a terra adesso?
@@ -126,6 +138,17 @@ func chiave_braccio(s: String, tt: float, off: Vector3) -> void:
 	_metti("br_" + s, tt, off)
 
 
+## giro del corpo in più rispetto al verso voluto (rad, + = verso sinistra): la veronica, i cambi di fronte
+func chiave_giro(tt: float, ang: float) -> void:
+	_metti("giro", tt, Vector3(ang, 0, 0))
+
+
+## quanto la testa guarda il pallone (1) o dritto davanti (0: la finta si vende guardando dall'altra parte); gy = giro
+## della testa in più (rad, + = sinistra)
+func chiave_sguardo(tt: float, k: float, gy: float = 0.0) -> void:
+	_metti("sguardo", tt, Vector3(k, gy, 0))
+
+
 ## il piede si stacca da terra a tt
 func stacca(s: String, tt: float) -> void:
 	_evento(s, {"t": tt, "tipo": "stacca"})
@@ -135,6 +158,23 @@ func stacca(s: String, tt: float) -> void:
 ## prima si stacca (se è a terra), 0 = come già programmato
 func appoggia(s: String, tt: float, rel: Vector2, yaw_rel: float = 0.0, alto: float = PASSO_ALTO) -> void:
 	_evento(s, {"t": tt, "tipo": "appoggia", "rel": rel, "yaw": yaw_rel, "alto": alto})
+
+
+## come appoggia, ma accanto al pallone com'è in quel momento: off come presso_palla (y = altezza della caviglia)
+func appoggia_palla(s: String, tt: float, off: Vector3, yaw_rel: float = 0.0, alto: float = PASSO_ALTO) -> void:
+	_evento(s, {"t": tt, "tipo": "appoggia", "presso": off, "yaw": yaw_rel, "alto": alto})
+
+
+## punto di passaggio del piede in volo accanto al pallone com'è in quel momento (off come presso_palla)
+func passa_palla(s: String, tt: float, off: Vector3, ang: Vector3 = Vector3.ZERO, alto: float = 0.03) -> void:
+	_evento(s, {"t": tt, "tipo": "via", "presso": off, "ang": ang, "alto": alto})
+
+
+## punto vicino al pallone mostrato adesso: off nel riferimento del corpo (x sinistra, y altezza da terra, z avanti; m
+## del modello), col verso voluto di adesso
+func presso_palla(off: Vector3) -> Vector3:
+	var q := _palla_pos + Basis(Vector3.UP, yaw_a(t)).scaled(_scala) * Vector3(off.x, 0.0, off.z)
+	return Vector3(q.x, off.y * _scala.y, q.z)
 
 
 ## punto di passaggio del piede in volo: rel = caviglia nel riferimento del corpo in quel momento (Vector3), piede
@@ -166,7 +206,7 @@ func palla_a(tt: float, spec: Dictionary) -> void:
 
 ## da tt in poi via chiavi, passi e tocchi programmati dopo (la coreografia cambia: arriva lo scatto del motore);
 ## i valori di adesso restano come chiave a tt, così il movimento continua senza salti
-func taglia(tt: float) -> void:
+func taglia(tt: float, anche_palla: bool = true) -> void:
 	for nome: String in _k:
 		var v: Vector3 = _curva(nome).at(tt) if not (_k[nome] as Array).is_empty() else Vector3.ZERO
 		var tenute: Array = []
@@ -182,13 +222,15 @@ func taglia(tt: float) -> void:
 			if float(e.t) <= tt:
 				ev.append(e)
 		_piedi[s].ev = ev
+	if not anche_palla:   # il pallone continua come programmato (è in volo: sombrero, arcobaleno)
+		return
 	var tk: Array = []
 	for k: Dictionary in _tocchi:
 		if float(k.t) <= tt:
 			tk.append(k)
 	_tocchi = tk
 	if palla: # il pallone resta dov'è adesso (da qui va al tocco nuovo)
-		_tocchi.append({"t": tt, "spec": {"mondo": _palla_pos}, "pos": _palla_pos})
+		_tocchi.append({"t": tt, "spec": {"mondo": _palla_pos, "h": _palla_h}, "pos": _palla_pos})
 
 
 ## dove sarà il pallone mostrato a tt andando avanti come adesso
@@ -246,9 +288,15 @@ func corpo_a(tt: float) -> Vector3:
 	return _pos + _vel * maxf(0.0, tt - t)
 
 
+## verso di corsa del motore adesso
+func yaw_motore() -> float:
+	return _yaw_moto
+
+
 ## verso del corpo a tt: quello fisso voluto (fino a yaw_fisso_fino), sennò quello del motore
 func yaw_a(tt: float) -> float:
-	return yaw_fisso if not is_nan(yaw_fisso) and tt < yaw_fisso_fino else _yaw_moto
+	var g: float = (_curva("giro").at(tt) as Vector3).x
+	return (yaw_fisso if not is_nan(yaw_fisso) and tt < yaw_fisso_fino else _yaw_moto) + g
 
 
 ## punto rel (riferimento del corpo, m del modello) nel mondo, col corpo come sarà a tt
@@ -265,6 +313,12 @@ func _risolvi_palla(spec: Dictionary, tt: float) -> Vector3:
 	if spec.has("rel"):
 		var q := mondo_a(tt, spec.rel)
 		return Vector3(q.x, 0.0, q.z)
+	if spec.has("rel0"):   # come "rel" ma col verso dell'inizio (non gira col corpo: veronica)
+		var q0 := corpo_a(tt) + Basis(Vector3.UP, yaw0).scaled(_scala) * (spec.rel0 as Vector3)
+		return Vector3(q0.x, 0.0, q0.z)
+	if spec.has("altro"):  # dove sta l'altro giocatore in quel momento (il pallone gli passa sopra o tra le gambe)
+		var qf := altro()
+		return Vector3(qf.x, 0.0, qf.z) if qf != Vector3.INF else _palla_pos
 	if spec.has("rotola"):
 		return _palla0 + _palla0_v * tt * float(spec.get("k", 1.0))
 	if spec.has("moto"):
@@ -287,7 +341,7 @@ func passo(dt: float, p: Object, b: Object) -> void:
 	# verso mostrato: dolce verso quello voluto, mai più veloce di YAW_V
 	var mira := yaw_a(t)
 	var d := wrapf(mira - yaw, -PI, PI)
-	var passo_y := clampf(d * minf(1.0, dt * YAW_K), -YAW_V * dt, YAW_V * dt)
+	var passo_y := clampf(d * minf(1.0, dt * yaw_k), -yaw_v * dt, yaw_v * dt)
 	yaw = wrapf(yaw + passo_y, -PI, PI)
 	# peso
 	if t >= fine:
@@ -310,6 +364,7 @@ func _aggiorna_palla() -> void:
 	var t0 := 0.0
 	var p0 := _palla0
 	var v0 := _palla0_v
+	var h0 := 0.0
 	var dopo: Dictionary = {}
 	for k: Dictionary in _tocchi:
 		if float(k.t) <= t:
@@ -317,6 +372,7 @@ func _aggiorna_palla() -> void:
 				k.pos = _risolvi_palla(k.spec, float(k.t))
 			t0 = float(k.t)
 			p0 = k.pos
+			h0 = float((k.spec as Dictionary).get("h", 0.0))
 			v0 = Vector3.INF
 		else:
 			dopo = k
@@ -325,12 +381,18 @@ func _aggiorna_palla() -> void:
 		# dopo l'ultimo tocco: se era "moto" il pallone è quello del motore, sennò resta dov'è
 		var ultimo: Dictionary = _tocchi.back() if not _tocchi.is_empty() else {}
 		_palla_pos = _palla_moto if ultimo.is_empty() or (ultimo.spec as Dictionary).has("moto") else p0
+		_palla_h = 0.0 if ultimo.is_empty() or (ultimo.spec as Dictionary).has("moto") else h0
 	else:
 		var t1 := float(dopo.t)
 		var p1 := _risolvi_palla(dopo.spec, t1)
 		var u := clampf((t - t0) / maxf(1e-4, t1 - t0), 0.0, 1.0)
+		var sp: Dictionary = dopo.spec
+		# altezza: da quella del tocco prima a quella del tocco dopo, con un arco in mezzo (pallonetti)
+		_palla_h = maxf(0.0, lerpf(h0, float(sp.get("h", 0.0)), u) + float(sp.get("arco", 0.0)) * 4.0 * u * (1.0 - u))
 		if v0 == Vector3.INF:
-			_palla_pos = p0.lerp(p1, u)   # dopo un tocco: dritto e a velocità costante fino al tocco dopo
+			# dopo un tocco: dritto fino al tocco dopo, a velocità costante o ("frena") partendo forte e rallentando
+			var ue := 1.0 - (1.0 - u) * (1.0 - u) if sp.has("frena") else u
+			_palla_pos = p0.lerp(p1, ue)
 		else:
 			# dall'inizio al primo tocco: parte con la velocità che aveva e rallenta fino al tocco
 			var dt1 := t1 - t0
@@ -342,6 +404,11 @@ func _aggiorna_palla() -> void:
 ## pallone mostrato (a terra, mondo)
 func pallone() -> Vector3:
 	return _palla_pos
+
+
+## altezza del pallone mostrato (sotto del pallone da terra, m)
+func pallone_h() -> float:
+	return _palla_h
 
 
 ## l'episodio comanda ancora il pallone (dopo l'ultimo tocco "moto" coincide con quello del motore)
@@ -367,6 +434,7 @@ func _aggiorna_piede(s: String) -> void:
 			"appoggia":
 				var q := _bersaglio(s, e)
 				f.terra = true
+				q.pos = _fuori_ostacolo(q.pos)
 				f.pos = Vector3(q.pos.x, Corpo.ANKLE_H * _scala.y, q.pos.z)
 				f.yaw = q.yaw
 				f.pitch = 0.0
@@ -381,7 +449,9 @@ func _aggiorna_piede(s: String) -> void:
 				f.da_pitch = q.pitch
 				f.da_roll = q.roll
 				f.pos = q.pos
+				f.su = {"part": e.part, "ang": e.ang} if e.tipo == "tocco" else null
 	if f.terra:
+		f.su = null
 		return
 	# in volo: dal punto di prima al prossimo punto (appoggio, tocco o passaggio)
 	var nx: Dictionary = {}
@@ -402,6 +472,12 @@ func _aggiorna_piede(s: String) -> void:
 	var b: Vector3 = q.pos
 	var alto := float(nx.get("alto", PASSO_ALTO)) * _scala.y
 	f.pos = a.lerp(b, e2) + Vector3.UP * (alto * sin(PI * u))
+	# tra due tocchi "legati" il piede resta sul pallone (suola che lo trascina, esterno che lo accompagna)
+	if nx.tipo == "tocco" and f.get("su") != null and ((nx.tocco as Dictionary).spec as Dictionary).has("lega"):
+		var a0: Vector3 = f.su.ang
+		var qs := _piede_su(s, String(nx.part), a0.lerp(nx.ang, e2), _palla_pos, _palla_h, yaw_a(t))
+		f.pos = qs.pos
+	f.pos = _fuori_ostacolo(f.pos)
 	f.yaw = lerp_angle(float(f.da_yaw), float(q.yaw), e2)
 	# punta in giù a metà passo verso un appoggio; verso un tocco la posa del tocco
 	var giu := 0.35 * sin(PI * u) if nx.tipo == "appoggia" else 0.0
@@ -424,28 +500,62 @@ func _bersaglio(s: String, e: Dictionary) -> Dictionary:
 	var yb := yaw_a(tt)
 	match String(e.tipo):
 		"appoggia":
+			if e.has("presso"):
+				return {"pos": presso_palla(e.presso), "yaw": yb + float(e.yaw), "pitch": 0.0, "roll": 0.0}
 			var rel: Vector2 = e.rel
 			var q := mondo_a(tt, Vector3(rel.x, Corpo.ANKLE_H, rel.y))
 			return {"pos": q, "yaw": yb + float(e.yaw), "pitch": 0.0, "roll": 0.0}
 		"via":
 			var ang: Vector3 = e.ang
-			var q: Vector3 = (e.fn as Callable).call() if e.has("fn") else mondo_a(tt, e.rel3)
+			var q: Vector3
+			if e.has("fn"):
+				q = (e.fn as Callable).call()
+			elif e.has("presso"):
+				q = presso_palla(e.presso)
+			else:
+				q = mondo_a(tt, e.rel3)
 			return {"pos": q, "yaw": yb + ang.x, "pitch": ang.y, "roll": ang.z}
 		"tocco":
-			var ang: Vector3 = e.ang
 			var k: Dictionary = e.tocco
 			var bp: Vector3 = k.pos if k.pos != null else _risolvi_palla(k.spec, tt)
-			var centro := bp + Vector3.UP * PALLA_R
-			var fq := Corpo.q_body(ang.x, ang.y, ang.z)            # piede nel riferimento del corpo
-			var rot := Basis(Vector3.UP, yb)
-			var n: Vector3 = rot * Corpo.foot_normal(fq, String(e.part), s)
-			var contatto := centro - n.normalized() * PALLA_R
-			var pt: Vector3 = Corpo.FOOT_PTS[String(e.part)][0]
-			var off := rot.scaled(_scala) * (fq * Vector3(pt.x * Corpo.SIDE[s], pt.y, pt.z))
-			var q := contatto - off
-			q.y = maxf(q.y, Corpo.ANKLE_H * _scala.y * 0.9)
-			return {"pos": q, "yaw": yb + ang.x, "pitch": ang.y, "roll": ang.z}
+			return _piede_su(s, String(e.part), e.ang, bp, float((k.spec as Dictionary).get("h", 0.0)), yb)
 	return {"pos": _piedi[s].pos, "yaw": yb, "pitch": 0.0, "roll": 0.0}
+
+
+# caviglia (mondo) che mette il punto `part` del piede s, girato di ang rispetto al corpo (verso yb), sul pallone che
+# sta in bp (a terra) alto h
+func _piede_su(s: String, part: String, ang: Vector3, bp: Vector3, h: float, yb: float) -> Dictionary:
+	var centro := Vector3(bp.x, h + PALLA_R, bp.z)
+	var fq := Corpo.q_body(ang.x, ang.y, ang.z)            # piede nel riferimento del corpo
+	var rot := Basis(Vector3.UP, yb)
+	var n: Vector3 = rot * Corpo.foot_normal(fq, part, s)
+	var contatto := centro - n.normalized() * PALLA_R
+	var pt: Vector3 = Corpo.FOOT_PTS[part][0]
+	var off := rot.scaled(_scala) * (fq * Vector3(pt.x * Corpo.SIDE[s], pt.y, pt.z))
+	var q := contatto - off
+	q.y = maxf(q.y, Corpo.ANKLE_H * _scala.y * 0.9)
+	return {"pos": q, "yaw": yb + ang.x, "pitch": ang.y, "roll": ang.z}
+
+
+# punto (caviglia, mondo) portato fuori dal cilindro intorno all'altro giocatore
+func _fuori_ostacolo(q: Vector3) -> Vector3:
+	if not ostacolo.is_valid():
+		return q
+	var o: Vector3 = ostacolo.call()
+	var d := Vector2(q.x - o.x, q.z - o.z)
+	var l := d.length()
+	if l >= ost_r:
+		return q
+	if l < 1e-4:   # proprio al centro: via verso il proprio corpo
+		d = Vector2(_pos.x - o.x, _pos.z - o.z)
+		l = maxf(1e-4, d.length())
+	d = d / l * ost_r
+	return Vector3(o.x + d.x, q.y, o.z + d.y)
+
+
+## dove sta l'altro giocatore (mondo); Vector3.INF se non c'è
+func altro() -> Vector3:
+	return ostacolo.call() if ostacolo.is_valid() else Vector3.INF
 
 
 # un piede a terra troppo lontano dall'anca (il motore ha portato via il corpo) fa da solo un passo
@@ -486,19 +596,20 @@ func _bacino_mondo() -> Vector3:
 # ---------------------------------------------------------------- posa
 ## posa nel riferimento del corpo per figura.applica_mossa: N = trasformazione della figura (mondo) in questo
 ## fotogramma (posizione del motore, verso `yaw`, scala). palla_mondo = pallone mostrato (per lo sguardo)
-func frame(N: Transform3D, palla_mondo: Vector3) -> Dictionary:
+func frame(N: Transform3D, palla_mondo: Vector3, palla_h: float = 0.0) -> Dictionary:
 	var inv := N.affine_inverse()
 	var bp: Vector3 = _curva("bacino").at(t)
 	var an: Vector3 = _curva("angoli").at(t)
 	var pq := Corpo.q_body(an.x, an.y, an.z)
 	var bend: Vector3 = _curva("busto").at(t)
 	# sguardo verso il pallone (come Mossa.trunk_look): metà al collo e metà alla testa
-	var ball_l := inv * (palla_mondo + Vector3.UP * PALLA_R)
+	var ball_l := inv * (Vector3(palla_mondo.x, palla_h, palla_mondo.z) + Vector3.UP * PALLA_R)
+	var sg: Vector3 = _curva("sguardo").at(t)
 	var tr0 := Corpo.trunk(bp, pq, bend)
 	var to_b: Vector3 = Corpo.q_conj(tr0.q.spine_03) * (ball_l - ((tr0.p.Head as Vector3) + Vector3(0, 0.08, 0)))
 	var hz := sqrt(to_b.x * to_b.x + to_b.z * to_b.z)
-	var gy := clampf(atan2(to_b.x, to_b.z), -0.9, 0.9) * Corpo.smooth(hz / 0.25)
-	var gp := clampf(atan2(-to_b.y, hz), -Mossa.LOOK_UP, 0.9)
+	var gy := clampf(atan2(to_b.x, to_b.z), -0.9, 0.9) * Corpo.smooth(hz / 0.25) * sg.x + sg.y
+	var gp := lerpf(0.1, clampf(atan2(-to_b.y, hz), -Mossa.LOOK_UP, 0.9), sg.x)
 	var half := Corpo.q_axis(Vector3.UP, gy / 2.0) * Corpo.q_axis(Vector3.RIGHT, gp / 2.0)
 	var tr := Corpo.trunk(bp, pq, bend, half, half)
 	var q3: Quaternion = tr.q.spine_03
@@ -512,6 +623,45 @@ func frame(N: Transform3D, palla_mondo: Vector3) -> Dictionary:
 		var fq := Corpo.q_body(wrapf(float(f.yaw) - yaw, -PI, PI), float(f.pitch), float(f.roll))
 		legs[s] = {"ankle": inv * (f.pos as Vector3), "fq": fq, "pole": Mossa._knee_dir(fq)}
 	return {"t": t, "pelvis": {"p": bp, "q": pq}, "yaw": an.x, "rot": tr.q, "legs": legs, "arms": arms}
+
+
+## per i test e per il controllo dei corpi: segmenti del corpo nel mondo [[a, b, raggio, nome], ...] dalla posa fr di
+## frame(N, ...): busto (bacino → testa), cosce e gambe (anca → ginocchio → caviglia). Raggi in m del mondo.
+static func segmenti(N: Transform3D, fr: Dictionary) -> Array:
+	var sc := N.basis.get_scale().y
+	var tr := Corpo.trunk(fr.pelvis.p, fr.pelvis.q, Vector3.ZERO)
+	var out: Array = []
+	var q3: Quaternion = fr.rot.spine_03
+	var bacino: Vector3 = fr.pelvis.p
+	# busto: dal bacino lungo la schiena (verso della terza vertebra) fino alla testa
+	var testa: Vector3 = bacino + ((fr.rot.spine_01 as Quaternion) * Vector3(0, 0.23, 0)) + (q3 * Vector3(0, 0.42, 0))
+	out.append([N * bacino, N * testa, 0.17 * sc, "busto"])
+	for s: String in ["l", "r"]:
+		var anca := Corpo.hip(tr, s)
+		var l: Dictionary = fr.legs[s]
+		var k := IK.two_bone(anca, l.ankle, Corpo.THIGH_L, Corpo.CALF_L, l.pole)
+		out.append([N * anca, N * (k.knee as Vector3), 0.085 * sc, "coscia_" + s])
+		out.append([N * (k.knee as Vector3), N * (k.end as Vector3), 0.06 * sc, "gamba_" + s])
+	return out
+
+
+## distanza tra due segmenti a-b e c-d (m)
+static func dist_segmenti(a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> float:
+	var pts := Geometry3D.get_closest_points_between_segments(a, b, c, d)
+	return (pts[0] as Vector3).distance_to(pts[1])
+
+
+## quanto si compenetrano due corpi (m, 0 = non si toccano): il peggiore tra busto-busto, busto-gambe e gambe-gambe
+## (le gambe tra loro contano la metà: un contatto piede-gamba ci sta)
+static func compenetrazione(sa: Array, sb: Array) -> float:
+	var peggio := 0.0
+	for x: Array in sa:
+		for y: Array in sb:
+			var dentro := float(x[2]) + float(y[2]) - dist_segmenti(x[0], x[1], y[0], y[1])
+			if String(x[3]) != "busto" and String(y[3]) != "busto":
+				dentro *= 0.5
+			peggio = maxf(peggio, dentro)
+	return peggio
 
 
 ## per i test: {l, r: {terra, pos (mondo)}}

@@ -65,8 +65,8 @@ const THROW_MARGIN := {"l": 0.08, "r": 0.08, "t": 0.2, "b": 0.42}  # in basso pi
 
 # Dribbling della persona (Luis 2026-11-24, dribbling_regia.gd): telecamera girata di ~45° intorno al portatore dal lato
 # del dribbling, più bassa e più vicina della visuale larga; portatore e difensore sempre a schermo.
-const DRIB_PITCH := 0.62       # inclinazione verso il basso (rad, ~36°: il difensore dietro resta più in alto a schermo)
-const DRIB_DIST := 12.0        # distanza minima dal punto guardato (m)
+const DRIB_PITCH := 0.5        # inclinazione verso il basso (rad, ~29°: il difensore dietro resta più in alto a schermo)
+const DRIB_DIST := 7.5         # distanza minima dal punto guardato (m; era 12: i giochetti a schermo erano piccoli)
 const DRIB_MAX_DIST := 17.0    # ... massima (si allontana solo se portatore e difensore non stanno a schermo)
 const DRIB_AHEAD := 0.45       # guarda tra portatore e difensore: a questa frazione della distanza ...
 const DRIB_AHEAD_MAX := 3.0    # ... ma al massimo tanti metri davanti al portatore

@@ -1844,3 +1844,27 @@ largo), non sui nomi delle formazioni: valgono anche per le formazioni nuove.
   `--scena=testa_difesa|testa_difesa_linea|testa_passaggio|testa_passaggio_linea|testa_fascia`.
 - Da provare sull'iPhone: si capisce subito perché il tempo si ferma in difesa (scritta "Respingi!")? 3 s bastano per
   disegnare il rinvio? Il salto ceduto all'avversario quando non si disegna è chiaro o sembra un errore?
+
+## 2026-11-26 — Giochetti del dribbling rifatti (16) e corpi staccati
+- **Chiesto**: "le animazioni delle skill fanno pena", più skill vere. Viste nei video: corpi uno dentro l'altro, i tre
+  giochetti tutti uguali, postura rigida, inciampo che non si capiva.
+- **Il giochetto lo sceglie il motore** (`sim/skill.gd`, solo con `rifiniture`): serve perché ognuno dura un tempo
+  diverso (0,32-0,6 s contro 0,35 fissi di prima; media ~0,43). Generatore a parte (`skillRng`): `rnd()` non cambia e
+  l'esito è lo stesso con e senza rifiniture (test `test_esito_uguale_con_e_senza_rifiniture`, `test_skill.gd`).
+- **Distanza tra i due** (`DRIB_GAP`): provato a far partire il dribbling più lontano (2,6 m invece di 2): cambiava
+  l'istante del numero casuale e quindi l'esito di alcuni semi; scartato. Ora l'esito arriva a 2 m come prima e DOPO
+  il difensore indietreggia fino a 2,6 m (spostato lui, mai il portatore). Nel fallito il portatore resta fermo 0,6 s
+  invece di 0,35 (cade su un ginocchio): è l'unica cosa che cambia un po' il gioco, a sfavore di chi sbaglia.
+- **Telecamera del dribbling dall'altra parte**: prima stava dal lato del sorpasso e il portatore passava davanti al
+  difensore coprendolo (a schermo sembravano uno dentro l'altro anche a 1,5 m); ora guarda nel verso dello scatto. Più
+  vicina (7,5 m invece di 12) e più bassa: i giochetti a schermo erano piccoli.
+- **Numeri** (`controllo_gameplay`, 10 partite 2×150 s, forza 60, seme 1; prima → dopo, col portatore fermo 0,8 s):
+  V/N/P 2/6/2 → 3/2/5, gol 0,5-0,5 → 0,7-0,7, tiri 2,2-5,9 → 1,7-8,7, Dribbling 16,3 a partita (riusciti 44% → 39%),
+  rallenty del dribbling 41 → 52 s veri a partita, "BUG?" nessuno. Campione piccolo (le partite cambiano dal primo
+  dribbling in poi), ma la CPU tira di più: per prudenza il portatore fermo dopo il fallito è sceso da 0,8 a 0,6 s
+  (non rimisurato).
+- **Nomi**: niente nomi di calciatori veri a schermo ("Taglio secco", "Finta e giro").
+- **Ancora debole** (visto nei video): colpo di tacco e taglio secco si leggono poco da lontano; la corsa subito dopo
+  lo scatto è ancora un po' rigida; i dribbling dell'IA usano ancora i giochetti vecchi.
+- Da provare sull'iPhone: i giochetti si distinguono? La telecamera dall'altra parte disturba? 0,6 s fermo dopo il
+  dribbling fallito è troppo?

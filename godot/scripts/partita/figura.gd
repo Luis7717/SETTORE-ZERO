@@ -51,6 +51,13 @@ const MANO_ENTRA := 0.2        # s: il pallone arriva nelle mani
 const MANO_ESCE := 0.3         # s: dopo il rilancio torna sul pallone vero
 const CHINO_S := 0.18          # s: il battitore si china (raccoglie o appoggia il pallone, sim/riprese.gd) e si rialza
 const RETRO_V := 0.3           # m/s: sopra questa velocità, andando all'indietro rispetto allo sguardo, la corsa va al contrario
+# portatore di corsa (Luis 2026-11-26: "piegato, con le braccia larghe e ferme"): busto più dritto e braccia che
+# vanno a tempo con le gambe (quella opposta alla gamba avanti), sopra il clip di corsa
+const PALLA_BUSTO := 0.02      # rad: inclinazione in avanti del corpo (gli altri di corsa: 0,08)
+const PALLA_DRITTO := 0.1      # rad: la schiena si raddrizza di tanto
+const PALLA_BRACCIA := 0.55    # rad: oscillazione delle braccia avanti e indietro
+const PALLA_STRETTE := 0.16    # rad: braccia più vicine al corpo
+const PALLA_GOMITO := 0.35     # rad: gomiti un po' più piegati
 const AX_X := 0
 const AX_Y := 1
 const AX_Z := 2
@@ -307,6 +314,9 @@ func posa(p: Object, dt: float, ctx: Dictionary) -> void:
 		_rot("upperarm_l", AX_X, -0.6); _rot("upperarm_r", AX_X, -0.6)
 	elif run > 0.3:
 		bx = 0.08 * run
+		if b != null and b.owner == p and st == "play" and mc <= 0.0:
+			bx = PALLA_BUSTO * run
+			_corsa_col_pallone(run)
 	# rotazione del corpo come Euler "XYZ" di three.js (Rx · Ry · Rz)
 	corpo.basis = Basis(Vector3.RIGHT, bx) * Basis(Vector3.UP, by) * Basis(Vector3.BACK, bz)
 	corpo.position = Vector3(px, py, pz)
@@ -467,6 +477,21 @@ func _rimetti() -> void:
 		else:
 			_scheletro.set_bone_pose_position(e[0], e[2])
 	_saved.clear()
+
+
+# portatore di corsa: schiena più dritta, braccia strette al corpo che oscillano a tempo con le gambe (la fase si
+# legge dalle cosce del clip: avanti il braccio opposto alla gamba avanti)
+func _corsa_col_pallone(run: float) -> void:
+	var sw := clampf((_coscia_avanti("l") - _coscia_avanti("r")) / 0.45, -1.0, 1.0) * run   # > 0: gamba sinistra avanti
+	_rot("spine_02", AX_X, -PALLA_DRITTO * run)
+	_rot("upperarm_r", AX_X, -PALLA_BRACCIA * sw); _rot("upperarm_l", AX_X, PALLA_BRACCIA * sw)
+	_rot("upperarm_l", AX_Z, -PALLA_STRETTE * run); _rot("upperarm_r", AX_Z, PALLA_STRETTE * run)
+	_rot("lowerarm_l", AX_X, -PALLA_GOMITO * run * maxf(0.0, -sw)); _rot("lowerarm_r", AX_X, -PALLA_GOMITO * run * maxf(0.0, sw))
+
+
+# quanto la coscia del lato s va in avanti (m del modello, riferimento del corpo)
+func _coscia_avanti(s: String) -> float:
+	return (pos_corpo("calf_" + s) - pos_corpo("thigh_" + s)).z
 
 
 # ---------------------------------------------------------------- giochetti: movimento calcolato + IK

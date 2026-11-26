@@ -16,7 +16,8 @@
 #   --scena=area|duello|fuga|scatto|angolo|rinvio|rilancio|pausa|gol|curva|prima   mette la partita in una situazione da fotografare (gol: tiro a
 #                       porta vuota, per vedere cronaca e replay)
 #   --scena=dribbling|dribbling_ok|dribbling_ko   duello col difensore e tasto Dribbling (regia del dribbling,
-#                       dribbling_regia.gd); _ok / _ko con statistiche estreme (l'esito resta a caso col seme)
+#                       dribbling_regia.gd); _ok / _ko con statistiche estreme (l'esito resta a caso col seme);
+#                       --giochetto=ID giochetto fisso (finta, veronica, tunnel, ...: sim/skill.gd)
 #   --scena=fallo|rigore|espulso   fallo da dietro sul nostro n. 10 (sim/falli.gd): giallo e punizione con la barriera,
 #                       giallo e rigore, secondo giallo = espulso
 #   --scena=testa_difesa|testa_difesa_linea|testa_passaggio|testa_passaggio_linea|testa_fascia   salto conteso di
@@ -613,7 +614,8 @@ func _evento(e: Dictionary, adv: bool) -> void:
 			if e.ok:
 				nome = _nome_giochetto(tk) + "!"
 			if _opzioni.has("scena"):
-				print("prova dribbling: %s %s" % [nome, "riuscito" if e.ok else "fallito"])
+				print("prova dribbling: %s %s (a %.2f m)" % [nome, "riuscito" if e.ok else "fallito",
+					C.hyp(e.p.x - e.o.x, e.p.y - e.o.y)])
 			if (e.p as R.Player).team == me:
 				hud.big(nome, "g" if e.ok else "", 1000)
 		"goal":
@@ -1538,6 +1540,8 @@ func _scena_dribbling(att: R.Player, nome: String) -> void:
 	m.ball.x = att.x
 	m.ball.y = att.y + 0.6 * dy
 	m.ctrl[me] = att
+	if _opzioni.has("giochetto"):   # --giochetto=ID: giochetto fisso (sim/skill.gd)
+		m.skillForza = String(_opzioni.giochetto)
 	while not m.duelFor(me):
 		await get_tree().process_frame
 	await get_tree().create_timer(0.6).timeout

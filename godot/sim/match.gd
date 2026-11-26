@@ -141,6 +141,7 @@ static func lookAhead(path: Array, i: int, x: float, y: float) -> int:
 func _init(o: Dictionary) -> void:
 	var sd: int = int(o.get("seed", 1))
 	rng = SimRngScript.new(sd if sd != 0 else 1)
+	skillRng = SimRngScript.new((sd if sd != 0 else 1) ^ 0x5bd1e995)
 	var hl: float = float(o.get("halfLen", 0.0))
 	halfLen = hl if hl != 0.0 else 180.0
 	human = o.get("human", [true, false])
@@ -932,6 +933,8 @@ func step(dt: float) -> void:
 	updateDuel(dt)
 	if dribShow != null:
 		dribShowStep(dt) # giochetto del dribbling prenotato (solo con "rifiniture")
+	if dribGap != null:
+		dribGapStep(dt) # ... e i due corpi restano staccati finché dura
 	updateFlee(dt)
 	updateCalm(dt)
 	updateHead(dt)

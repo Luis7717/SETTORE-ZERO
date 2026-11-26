@@ -235,6 +235,8 @@ class Duel:
 	var t: float = 0.0
 	var side: float = 0.0 # dribbling prenotato: 0 = no, ±1 = lato scelto (+1 = sinistra del portatore)
 	var bt: float = 0.0   # ... tempo di partita dal tocco del tasto
+	var lat: float = 1.0  # giochetto (dribShow): quanto va di lato verso la finta (skill.gd) ...
+	var vel: float = 1.0  # ... e a che frazione di DRIB_SHOW_V
 
 
 # Colpo di testa controllato (testa.gd): pallone alto di un compagno che sta per arrivare a un attaccante della squadra

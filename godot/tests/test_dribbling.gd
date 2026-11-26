@@ -105,10 +105,12 @@ func test_lato_opposto_allo_sbilanciamento_e_verso_il_centro() -> bool:
 # --- giochetto del dribbling prenotato (solo con "rifiniture", Luis 2026-11-24: "falli vedere bene")
 
 # tasto Dribbling col duello aperto (difensore a 5 m) e passi finché arriva l'esito: [m, p, o, evento dribble]
-static func book_and_resolve(seed_value: int, rif: bool) -> Array:
+# (forza = giochetto fisso, sim/skill.gd: ognuno dura il suo tempo)
+static func book_and_resolve(seed_value: int, rif: bool, forza: String = "finta") -> Array:
 	var s := setup(seed_value, 5.0)
 	var m: SimMatchScript = s[0]
 	m.rifiniture = rif
+	m.skillForza = forza
 	var p: R.Player = s[1]
 	var o: R.Player = s[2]
 	p.st.dri = 99
@@ -177,7 +179,7 @@ func test_giochetto_frena_poi_scatta_oltre_il_difensore() -> bool:
 	check(go != null, "poi lo scatto (dribble_go)")
 	near(t, D.DRIB_SHOW_T, 2.0 * DT, "lo scatto dopo DRIB_SHOW_T")
 	check(vmax <= D.DRIB_SHOW_V + 0.3, "durante il giochetto va piano: %.2f m/s" % vmax)
-	check(dmin >= D.DRIB_SHOW_GAP - 0.5, "non finisce addosso al difensore: %.2f m" % dmin)
+	check(dmin >= D.DRIB_NEAR - 0.2, "non finisce addosso al difensore: %.2f m" % dmin)
 	check((p.x - x0) * side > 0.0, "la finta va dal lato opposto a quello scelto (+1 = sinistra = x minori)")
 	check(m.dribShow == null, "giochetto finito")
 	check(C.hyp(p.vx, p.vy) > 5.0, "accelera: %.2f m/s" % C.hyp(p.vx, p.vy))
