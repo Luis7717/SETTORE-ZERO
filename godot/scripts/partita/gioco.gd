@@ -97,6 +97,8 @@ const TimerRallenty := preload("res://scripts/partita/timer_rallenty.gd")
 const DribblingRegia := preload("res://scripts/partita/dribbling_regia.gd")
 const CambiPartita := preload("res://scripts/partita/cambi_partita.gd")
 const CambioRegia := preload("res://scripts/partita/cambio_regia.gd")
+const NomiGiocatori := preload("res://scripts/partita/nomi_giocatori.gd")
+const NOMI_LIVELLO := 4       # i nomi sopra i giocatori stanno sotto l'interfaccia (hud_partita: livello 5)
 const SCENA_ROSA := "res://scenes/menu/rosa.tscn"
 const SALVA_PROVA_ROSA := "user://prova_pausa_rosa.json"   # carriera di prova di --pausa-rosa e --scena=cambio
 const SCENA_VISTA := "res://scenes/vista_partita.tscn"
@@ -157,6 +159,7 @@ var _inizio_ms := 0
 var _seme_partita := 0
 var _rallenty := TimerRallenty.new()  # timer di 10 s veri del rallenty col pallone (timer_rallenty.gd)
 var _drib := DribblingRegia.new()     # regia del dribbling della persona: rallenty e telecamera girata (dribbling_regia.gd)
+var nomi: NomiGiocatori = null        # nomi sopra i giocatori (nomi_giocatori.gd, Impostazioni → settings.nomi)
 var _testa_reale := -1.0       # secondi veri dall'apertura del fermatempo del colpo di testa (−1 = chiuso)
 var _parata := ParataRegia.new() # fermatempo della parata col bersaglio (portiere manuale, sim/parata.gd)
 var _scena_veloce := false     # un tocco durante la scena della ripresa la fa andare più veloce (fino alla fine)
@@ -256,6 +259,7 @@ func _parti() -> void:
 	hud.esci.connect(_esci_dalla_pausa)
 	hud.nuova_partita.connect(_nuova_partita)
 	hud.rosa_premuta.connect(_apri_rosa)
+	_crea_nomi(k0, k1)
 	if carriera_partita() != null:
 		cambi = CambiPartita.new()
 	_cambio = CambioRegia.new()
@@ -359,6 +363,7 @@ func _process(delta: float) -> void:
 	var dt := _dt_fisso if _dt_fisso > 0.0 else minf(DT_MAX, delta)
 	gesti.dim = get_viewport().get_visible_rect().size
 	if _cambio != null and _cambio.attiva: # scena del cambio: tempo di partita fermo, la scena muove vista e telecamera
+		nomi.nascondi() # la scena del cambio ha le sue targhette
 		_cambio.fotogramma(dt)
 		return
 	if paused and bot != null and m.phase == "half":
@@ -366,6 +371,7 @@ func _process(delta: float) -> void:
 	elif paused and bot != null and _all_hud != null and _all_hud.scheda_aperta():
 		_all_hud.premi_prova() # ... e "Prova (3 volte)" sulla scheda dell'allenamento
 	if replay != null and replay.attivo(): # replay del gol: motore fermo, la vista rigioca gli ultimi secondi
+		nomi.nascondi()
 		if not paused:
 			replay.fotogramma(m, vista, dt * _velocita)
 		return
@@ -397,6 +403,30 @@ func _process(delta: float) -> void:
 	esultanza.aggiorna(dt_reale, m)
 	vista.update_view(0.0 if paused else dt * maxf(ts, 0.25), dt_reale)
 	esultanza.camera(vista)
+	_aggiorna_nomi()
+
+
+# ---------------------------------------------------------------- nomi sopra i giocatori
+# modo: opzione "nomi" di avvia() (l'app la prende da settings.nomi), o --nomi=tutti|pallone|nessuno
+func _crea_nomi(k0: Dictionary, k1: Dictionary) -> void:
+	var livello := CanvasLayer.new()
+	livello.name = "Nomi"
+	livello.layer = NOMI_LIVELLO
+	add_child(livello)
+	nomi = NomiGiocatori.new()
+	nomi.name = "NomiGiocatori"
+	nomi.modo = NomiGiocatori.modo_valido(_opzioni.get("nomi", _avvio.get("nomi", NomiGiocatori.MODO_PREDEFINITO)))
+	nomi.imposta_colori(Minimappa.colore(k0.shirt), Minimappa.colore(k1.shirt))
+	livello.add_child(nomi)
+
+
+## nascosti in pausa, nell'esultanza ravvicinata e nei fermatempo del colpo di testa e della parata (hanno il loro
+## cerchio con la scritta); sopra il portatore col cerchietto del rallenty il nome sale sopra il cerchietto
+func _aggiorna_nomi() -> void:
+	if paused or esultanza.attiva or m.headFor(me) or _parata.reale >= 0.0:
+		nomi.nascondi()
+		return
+	nomi.aggiorna(m, me, vista, _rallenty.portatore if hud.cerchio_rallenty_visibile() else null)
 
 
 ## fermatempo del colpo di testa (sim/testa.gd, Luis 2026-11-23): il tempo si ferma del tutto per
@@ -976,6 +1006,8 @@ static func _righe_cartellini(st: Dictionary) -> Array:
 func riassunto() -> String:
 	var secondi := maxf(0.001, (Time.get_ticks_msec() - _inizio_ms) / 1000.0)
 	var testo := "FPS medi %.1f · %s\n" % [_fotogrammi / secondi, HudFase1.testo_memoria()]
+	if nomi != null and nomi.fotogrammi > 0:
+		testo += "nomi sopra i giocatori (%s): %.3f ms a fotogramma\n" % [nomi.modo, nomi.us_tot / 1000.0 / nomi.fotogrammi]
 	testo += "fine partita %s %d - %d %s · tempo di gioco %.0f s · %s" % [
 		m.teams[0].short, m.score[0], m.score[1], m.teams[1].short, m.time, "abbandonata" if abbandonata else ("finita" if stato == "fine" else "in corso")]
 	if bot != null:

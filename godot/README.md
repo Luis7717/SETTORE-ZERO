@@ -73,6 +73,7 @@ interfaccia dei menu, sfondo del menu e allenamento guidato, grafica.
 | `scripts/partita/gesti.gd` | comandi a un dito, porting di `src/input.js` (logica pura, provata senza schermo) |
 | `scripts/partita/visuale_dito.gd` | visuale girata col dito: la parte "gesto" di `src/camuser.js` |
 | `scripts/partita/hud_partita.gd` | punteggio, tempo, minimappa, suggerimenti, tasto Dribbling / Scatto, pausa, scritte, frecce, menu, FPS. Stile (2026-11-24): pannelli scuri con ombra e filo di luce in alto, punteggio nel suo riquadro che "salta" quando cambia, scritta grande con l'ombra e seconda riga più piccola, tasto col bordo scuro, lampo dorato e "GOL!" che rimbalza al nostro gol |
+| `scripts/partita/nomi_giocatori.gd` | nomi sopra i giocatori: disegno 2D proiettato (un Control sotto l'HUD), priorità portatore/controllato → vicini al pallone → altri tenui, niente sovrapposizioni; Impostazioni `settings.nomi` (tutti / pallone / nessuno), `--nomi=...`; test `tests/test_nomi.gd` |
 | `scripts/partita/minimappa.gd`, `anteprima.gd` | minimappa; anteprima del calcio disegnato (volo, fuorigioco, chi riceve) |
 | `scripts/partita/audio_partita.gd` | suoni agganciati agli eventi del motore, pubblico che cresce vicino alla porta |
 | `scripts/partita/squadre_prova.gd` | due squadre inventate (Virtus Borgoalto, Aurora Portosole) finché non c'è la carriera |

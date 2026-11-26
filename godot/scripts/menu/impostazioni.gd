@@ -1,4 +1,4 @@
-# Impostazioni (settings() di src/ui.js): durata di un tempo, difficoltà, portiere, audio; in più musica e
+# Impostazioni (settings() di src/ui.js): durata di un tempo, difficoltà, portiere, nomi sopra i giocatori, audio; in più musica e
 # vibrazione (campi nuovi del salvataggio, accesi se mancano); stile della divisa e stemma; cancella la carriera
 # (secondo tocco = conferma). Ogni scelta si salva subito e avvisa App (App.impostazioni(), come api.settings).
 extends MenuSchermata
@@ -18,6 +18,7 @@ func costruisci() -> void:
 	_opzioni(st, "Durata di un tempo", "half", [[90, "1:30"], [150, "2:30"], [240, "4:00"], [360, "6:00"]], 150)
 	_opzioni(st, "Difficoltà avversari", "diff", [[0, "Facile"], [1, "Normale"], [2, "Difficile"]], 1)
 	_opzioni(st, "Portiere", "gkManuale", [[false, "Automatico"], [true, "Manuale (prova)"]], false)
+	_opzioni(st, "Nomi sopra i giocatori", "nomi", [["tutti", "Tutti"], ["pallone", "Solo pallone e controllato"], ["nessuno", "Nessuno"]], "tutti")
 	_opzioni(st, "Audio", "sound", [[true, "Acceso"], [false, "Spento"]], true)
 	_opzioni(st, "Musica", "music", [[true, "Accesa"], [false, "Spenta"]], true)
 	_opzioni(st, "Vibrazione", "vibra", [[true, "Accesa"], [false, "Spenta"]], true)
