@@ -810,7 +810,7 @@ func dribChaseStep(dt: float) -> void:
 	var sp: float = vfull
 	if f.tl > 0.0: # pallonetto in volo: arriva dove cade quando cade (il pallone ai piedi sta 0,6 m più avanti)
 		sp = clampf(maxf(0.0, path - 0.6) / maxf(0.12, f.tl), DRIB_CHASE_VMIN, vfull)
-	dribSteer(p, f.team, wx / wn * sp, wy / wn * sp, dt, 16.0)
+	dribSteer(p, f.team, wx / wn * sp, wy / wn * sp, dt, 24.0)
 
 
 func dribChaseEnd(f: R.Duel, preso: bool) -> void:

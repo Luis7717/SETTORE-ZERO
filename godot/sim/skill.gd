@@ -25,11 +25,11 @@ const LISTA := [
 	{"id": "tacco", "name": "Colpo di tacco", "show": 0.42, "dri": 55.0, "av": 0.8, "lat": 0.5, "vel": 0.7},
 	{"id": "pedalata", "name": "Pedalata", "show": 0.6, "dri": 55.0, "av": 1.0, "lat": 0.1, "vel": 1.0},
 	{"id": "elastico", "name": "Elastico", "show": 0.42, "dri": 60.0, "av": 0.7, "lat": 0.7, "vel": 0.8},
-	{"id": "tunnel", "name": "Tunnel", "show": 0.38, "dri": 60.0, "av": 0.8, "lat": 0.5, "vel": 0.8,
+	{"id": "tunnel", "name": "Tunnel", "show": 0.38, "dri": 60.0, "av": 0.8, "lat": -0.6, "vel": 0.85,
 		"palla": "terra", "tk": 0.38, "oltre": 3.4},
 	{"id": "veronica", "name": "Veronica", "show": 0.5, "dri": 65.0, "av": 1.0, "lat": -0.45, "vel": 0.8},
 	{"id": "elastico_inv", "name": "Elastico inverso", "show": 0.42, "dri": 70.0, "av": 0.7, "lat": 0.6, "vel": 0.8},
-	{"id": "sombrero", "name": "Sombrero", "show": 0.42, "dri": 75.0, "av": 1.0, "lat": 0.0, "vel": 0.5,
+	{"id": "sombrero", "name": "Sombrero", "show": 0.42, "dri": 75.0, "av": 1.0, "lat": -0.3, "vel": 0.55,
 		"palla": "alta", "tk": 0.34, "su": 2.75, "oltre": 2.3, "da": 0.55, "dh": 0.05},
 	# (Luis 2026-11-26: per lui la "bicicletta" è questa: pallone portato su dietro il polpaccio e alzato col tacco
 	# sopra la testa propria e del difensore; i giri alternati del piede intorno al pallone sono la "pedalata")

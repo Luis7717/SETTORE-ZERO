@@ -16,7 +16,7 @@ const TRICKS := [
 	{"id": "elastico", "name": "Elastico"},
 	{"id": "veronica", "name": "Veronica"},
 	{"id": "sombrero", "name": "Sombrero"},
-	{"id": "arcobaleno", "name": "Colpo dell'arcobaleno"},
+	{"id": "arcobaleno", "name": "Bicicletta"},
 ]
 const DRI_FIRST := 35.0   # sotto questo dribbling solo la finta di corpo
 const DRI_STEP := 10.0    # ogni 10 punti di dribbling si sblocca un giochetto più bello

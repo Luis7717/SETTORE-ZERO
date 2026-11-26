@@ -102,8 +102,12 @@ func test_ogni_giochetto_dura_il_suo_tempo_e_poi_scatta() -> bool:
 				dmin_a = minf(dmin_a, d)
 		# Assert
 		check(go, "%s: lo scatto arriva" % s.id)
-		check(dmin_a >= D.DRIB_GAP - 0.25, "%s: durante il giochetto restano staccati (%.2f m)" % [s.id, dmin_a])
-		check(dmin_b >= D.DRIB_GAP_GO - 0.4, "%s: nel sorpasso non si toccano (%.2f m)" % [s.id, dmin_b])
+		# (il portatore ora avanza durante il giochetto e il difensore indietreggia davanti a lui: la distanza resta un
+		# po' sotto DRIB_GAP; che i corpi non si compenetrino lo controlla test_coreo.gd)
+		check(dmin_a >= D.DRIB_GAP - 0.5, "%s: durante il giochetto restano staccati (%.2f m)" % [s.id, dmin_a])
+		# tunnel e pallonetti: il difensore non viene spostato (il pallone gli passa tra le gambe o sopra la testa)
+		var gap_go: float = (D.DRIB_CHASE_GAP - 0.25) if s.has("palla") else (D.DRIB_GAP_GO - 0.4)
+		check(dmin_b >= gap_go, "%s: nel sorpasso non si toccano (%.2f m)" % [s.id, dmin_b])
 		check(p.y > o.y + 0.5, "%s: oltre il difensore" % s.id)
 		check(m.ball.owner == p, "%s: col pallone" % s.id)
 		m.dispose()

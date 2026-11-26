@@ -22,7 +22,7 @@ const CAM_SEGUI := 3.0       # 1/s: quanto in fretta segue il pallone
 const YAW_RITORNO := 2.5     # 1/s: fuori dal rallenty la visuale girata torna dritta (come CAM_USER_RETURN del web)
 const LINEA_LARGA := 0.45    # larghezza della linea disegnata (m)
 const COLORI_LINEA := {"run": Color(1, 1, 1, 0.85), "pass": Color(1.0, 0.88, 0.29, 0.9), "shot": Color(1.0, 0.36, 0.3, 0.95), "def": Color(0.4, 0.85, 1.0, 0.9)}
-const GIOCHETTI := ["Finta di corpo", "Doppio passo", "Elastico", "Veronica", "Sombrero", "Colpo dell'arcobaleno"] # src/tricks.js
+const GIOCHETTI := ["Finta di corpo", "Doppio passo", "Elastico", "Veronica", "Sombrero", "Bicicletta"] # src/tricks.js
 
 var user_yaw := 0.0
 var cam_drag := false
