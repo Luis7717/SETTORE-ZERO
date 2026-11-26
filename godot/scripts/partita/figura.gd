@@ -29,8 +29,9 @@ const SPRINT_ON_FULL := 6.6
 const KICK_T := 0.35           # durata di kickAnim nel motore
 const HEAD_H := 1.3            # palla sopra questa altezza al momento del colpo = colpo di testa
 const IDLE_FIX_LEGS := 0.12    # rad: nel clip "fermo" si chiudono un po' le gambe...
-const IDLE_FIX_ARMS := 0.1     # ... e le braccia scendono verso i fianchi (2026-11-26: prima si aprivano, "rigide")
-const IDLE_FIX_GOMITI := 0.18  # gomiti un po' piegati in avanti: braccia morbide, non due pali
+const IDLE_FIX_ARMS := 0.02    # ... e le braccia scendono appena verso i fianchi (2026-11-26: prima si aprivano di 0,05; con 0,1
+                               # e i gomiti a 0,18 la mano faceva ombra sulla coscia: macchia scura sui calzoncini)
+const IDLE_FIX_GOMITI := 0.08  # gomiti un po' piegati in avanti: braccia morbide, non due pali
 const IDLE_FIX_TESTA := 0.13   # testa su (nel clip guarda per terra) ...
 const IDLE_FIX_COLLO := 0.08   # ... e collo meno proteso in avanti
 const IDLE_FIX_SCHIENA := 0.05 # schiena più dritta

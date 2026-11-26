@@ -381,7 +381,7 @@
   sono in metri del modello), mano ×0,84 lunga e ×0,8 larga con le dita meno aperte, testa 3 cm più in basso (collo
   più corto), sedere meno sporgente, mascella più stretta, naso meno sporgente, occhi +20%. **Sopracciglia e frangia
   non si toccano** (il centro degli occhi e la testa non cambiano forma; taglio 15 uguale). Gambe uguali (piedi a
-  terra come prima). Nel clip "fermo" (`IDLE_FIX_*` in `figura.gd`): braccia verso i fianchi, gomiti un po' piegati,
+  terra come prima). Nel clip "fermo" (`IDLE_FIX_*` in `figura.gd`): braccia appena verso i fianchi e gomiti appena piegati (non di più: la mano farebbe ombra sui calzoncini),
   testa su, schiena più dritta. Stoffa: normali levigate (`Vestibilita.lisce`, messe al posto delle tangenti della mesh)
   mescolate sulla maglia (`LISCIA_LARGA` / `LISCIA_ADERENTE`) e sui calzoncini, che si staccano dalla coscia e si
   svasano (`CALZ_*`); viso con ombre e luci di rilievo (`RILIEVO*`), collo in ombra sotto il mento; capelli con
