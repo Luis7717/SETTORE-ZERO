@@ -1957,3 +1957,20 @@ le fasce si chiamano **esterno sinistro / destro (ES / ED)**.
   I lanci rilevati come tiro restano "tiri" per le statistiche e per `airPlay` (gli attaccanti non li colpiscono di
   testa al volo): non toccato. Da provare sull'iPhone: tiri da fuori e lanci lunghi della CPU contro il portiere
   automatico.
+
+## 2026-11-27 — Nomi sopra i giocatori: solo nel rallenty (i miei) e sul portatore
+- **Richiesta** (Luis): "I nomi falli apparire solo nel momento dei rallenty e solo per i miei giocatori, mentre invece
+  un giocatore corre col pallone fallo apparire solo a lui."
+- **Cosa**: modo "tutti" (predefinito, chiave `settings.nomi` invariata) = nel rallenty i nomi di tutti i giocatori
+  visibili della squadra della persona (stesse regole di ordine e sovrapposizione); in gioco normale solo il nome del
+  portatore; pallone di nessuno = nessun nome. Il modo "pallone" resta: sempre portatore e controllato. Etichette nelle
+  Impostazioni: "Rallenty e portatore" / "Sempre pallone e controllato" / "Nessuno".
+- **Scelte in autonomia**: "rallenty" = tempo sotto `RALLENTY_SOTTO` 0,6 (lo stesso che accende il bordo scuro): duello,
+  fuga, area di tiro, regia del dribbling, dito che disegna (anche in difesa). Il portatore in gioco normale è di
+  **tutte e due** le squadre (Luis dice "un giocatore", non "un mio giocatore"). Nei fermatempo di testa e parata e in
+  pausa/replay/esultanza i nomi restano nascosti come prima. Il passaggio dentro/fuori dal rallenty è netto (niente
+  dissolvenza).
+- **Test**: `tests/test_nomi.gd` (regola in `scegli` con squadra e portatore; in partita: rallenty solo squadra 0, in
+  gioco un nome solo, pallone libero nessuno).
+- **Da provare sull'iPhone**: se il nome del portatore avversario in gioco normale dà fastidio si toglie (una riga in
+  `_in_regola`).

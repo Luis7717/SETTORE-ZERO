@@ -3,8 +3,10 @@
 # giocatore con la telecamera vera (vista.world_to_screen) e si scrive il cognome, bianco col contorno scuro e un
 # filo del colore della maglia sotto. Prima portatore e controllato, poi chi è vicino al pallone, poi gli altri più
 # tenui e più piccoli se lontani; chi si sovrapporrebbe a un nome già scritto o al pallone si salta.
-# Modi (Impostazioni → "Nomi sopra i giocatori", settings.nomi): "tutti", "pallone" (solo portatore e controllato),
-# "nessuno". Solo grafica: legge il motore, non lo cambia.
+# Modi (Impostazioni → "Nomi sopra i giocatori", settings.nomi): "tutti" (predefinito; Luis 2026-11-27: "solo nel
+# momento dei rallenty e solo per i miei giocatori, mentre un giocatore corre col pallone solo a lui") = nel rallenty
+# i nomi dei giocatori della mia squadra, in gioco normale solo il portatore (di tutte e due le squadre; pallone di
+# nessuno = nessun nome); "pallone" = sempre portatore e controllato; "nessuno". Solo grafica: legge il motore.
 extends Control
 
 const Asp := preload("res://scripts/carriera/aspetto.gd")
@@ -107,13 +109,16 @@ static func _iniziale(nome: String) -> String:
 
 ## sceglie le scritte da disegnare. cand: {testo, pos, dim, larg, rango (0 portatore/controllato, 1 vicino al
 ## pallone, 2 altri), dist (m dal pallone), alfa}; palla = rettangolo del pallone a schermo (vuoto = nessuno).
-## Nell'ordine di rango e distanza dal pallone; dopo il rango 0, chi tocca una scritta già messa o il pallone si salta
-static func scegli(cand: Array, modo_: String, palla: Rect2) -> Array:
+## Nell'ordine di rango e distanza dal pallone; dopo il rango 0, chi tocca una scritta già messa o il pallone si salta.
+## Modo "tutti": rallenty = solo i candidati della squadra me (team); fuori dal rallenty solo il portatore (portatore)
+static func scegli(cand: Array, modo_: String, palla: Rect2, rallenty: bool, me: int) -> Array:
 	if modo_ == "nessuno":
 		return []
 	var lista: Array = []
 	for c: Dictionary in cand:
 		if modo_ == "pallone" and int(c.rango) > 0:
+			continue
+		if modo_ == "tutti" and not _in_regola(c, rallenty, me):
 			continue
 		lista.append(c)
 	lista.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
@@ -137,6 +142,13 @@ static func scegli(cand: Array, modo_: String, palla: Rect2) -> Array:
 	return messe
 
 
+## regola del modo "tutti": nel rallenty i miei giocatori, in gioco normale solo chi ha il pallone
+static func _in_regola(c: Dictionary, rallenty: bool, me: int) -> bool:
+	if rallenty:
+		return int(c.get("team", -1)) == me
+	return bool(c.get("portatore", false))
+
+
 ## spazio occupato da una scritta (pos = centro in basso)
 static func rettangolo(c: Dictionary) -> Rect2:
 	var d: float = c.dim
@@ -151,17 +163,21 @@ func nascondi() -> void:
 	visible = false
 
 
-## un fotogramma: m = SimMatch, vista con world_to_screen; alzato = giocatore col cerchietto del rallenty sopra
-func aggiorna(m: Object, me: int, vista: Object, alzato: Object = null) -> void:
+## un fotogramma: m = SimMatch, vista con world_to_screen; alzato = giocatore col cerchietto del rallenty sopra;
+## rallenty = il tempo è rallentato (gioco.gd: bordo scuro del rallenty)
+func aggiorna(m: Object, me: int, vista: Object, alzato: Object = null, rallenty: bool = false) -> void:
 	var t0 := Time.get_ticks_usec()
-	_aggiorna(m, me, vista, alzato)
+	_aggiorna(m, me, vista, alzato, rallenty)
 	us_tot += Time.get_ticks_usec() - t0
 	fotogrammi += 1
 
 
-func _aggiorna(m: Object, me: int, vista: Object, alzato: Object) -> void:
+func _aggiorna(m: Object, me: int, vista: Object, alzato: Object, rallenty: bool) -> void:
 	visible = true
 	if modo == "nessuno" or m == null or vista == null:
+		nascondi()
+		return
+	if modo == "tutti" and not rallenty and m.ball.owner == null: # in gioco normale solo il portatore
 		nascondi()
 		return
 	_controlla_nomi(m)
@@ -181,7 +197,7 @@ func _aggiorna(m: Object, me: int, vista: Object, alzato: Object) -> void:
 		var bq: Vector3 = vista.world_to_screen(b.x, b.y, b.h + 1.27)
 		var r := maxf(3.0, absf(bs.y - bq.y) * 0.3) + MARGINE_PALLONE
 		palla = Rect2(bs.x - r, bs.y - r, 2.0 * r, 2.0 * r)
-	_voci = scegli(cand, modo, palla)
+	_voci = scegli(cand, modo, palla, rallenty, me)
 	queue_redraw()
 
 
@@ -227,7 +243,7 @@ func _candidato(p: Object, i: int, b: Object, ctrl: Object, vista: Object, alzat
 		var mezzo := larg * 0.5 + BORDO_PX
 		x = clampf(x, mezzo, maxf(mezzo, vp.x - mezzo))
 	return {"testo": testo, "pos": Vector2(x, y), "dim": dim, "larg": larg, "rango": rango, "dist": dist,
-		"alfa": alfa, "col": _colori[clampi(int(p.team), 0, 1)]}
+		"alfa": alfa, "col": _colori[clampi(int(p.team), 0, 1)], "team": int(p.team), "portatore": p == b.owner}
 
 
 func _larghezza(testo: String) -> float:

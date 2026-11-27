@@ -429,12 +429,14 @@ func _crea_nomi(k0: Dictionary, k1: Dictionary) -> void:
 
 
 ## nascosti in pausa, nell'esultanza ravvicinata e nei fermatempo del colpo di testa e della parata (hanno il loro
-## cerchio con la scritta); sopra il portatore col cerchietto del rallenty il nome sale sopra il cerchietto
+## cerchio con la scritta); sopra il portatore col cerchietto del rallenty il nome sale sopra il cerchietto.
+## Rallenty = tempo sotto RALLENTY_SOTTO (bordo scuro: duello, fuga, area di tiro, dribbling, disegno): nel modo
+## "tutti" nomi dei miei giocatori, fuori solo il portatore (Luis 2026-11-27)
 func _aggiorna_nomi() -> void:
 	if paused or esultanza.attiva or m.headFor(me) or _parata.reale >= 0.0:
 		nomi.nascondi()
 		return
-	nomi.aggiorna(m, me, vista, _rallenty.portatore if hud.cerchio_rallenty_visibile() else null)
+	nomi.aggiorna(m, me, vista, _rallenty.portatore if hud.cerchio_rallenty_visibile() else null, ts < RALLENTY_SOTTO)
 
 
 ## fermatempo del colpo di testa (sim/testa.gd, Luis 2026-11-23): il tempo si ferma del tutto per
