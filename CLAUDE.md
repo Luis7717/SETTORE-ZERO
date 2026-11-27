@@ -185,32 +185,53 @@
   lato opposto per `DRIB_SHOW_T` 0,35 s col giochetto a schermo (difensore battuto che si butta verso la finta e
   interviene a vuoto), poi cambia direzione e scatta oltre più veloce (`p.burst`, evento `dribble_go`); fallito = frena (non gli finisce
   addosso), contrasto del difensore e portatore che inciampa (`vista.dribbling` / `vista.dribbling_go`).
-  **Animazioni del dribbling** (Luis 2026-11-24, "animazioni da rivedere"; rifatte il 2026-11-26, "fanno pena"):
-  coreografie calcolate ancorate al campo (`scripts/partita/mosse/coreo.gd`): piedi fermi a terra finché appoggiano,
-  passi programmati dove sarà il corpo (più un passo da solo se una gamba si allunga troppo), pallone mosso solo dai
-  tocchi (a terra o in volo; il piede può restare "legato" al pallone: suola che lo trascina), giro del corpo per
-  chiavi, piedi che restano fuori dal corpo dell'altro (`ostacolo`). **16 giochetti veri** (`sim/skill.gd` +
-  `mosse/coreo_skill.gd`, stesso `id`): finta di corpo, stop e via, suola, doppio passo, croqueta, finta di tiro,
-  taglio secco (chop), finta e giro (Cruyff), colpo di tacco, bicicletta, elastico, tunnel, veronica, elastico
-  inverso, sombrero, arcobaleno. Il giochetto lo **sceglie il motore** (solo con `rifiniture`, evento `dribble`:
-  `skill`, `show`): più Dribbling (`drb`) = più scelta e i difficili più spesso (`Skill.scegli`; tunnel, sombrero e
-  arcobaleno solo col difensore davanti), con un generatore a parte (`skillRng`: la sequenza di `rnd()` e l'esito
-  restano identici); ognuno dura il suo tempo prima dello scatto (`show` 0,32-0,6 s) e muove il portatore a modo suo
-  (`lat`, `vel`). Ogni giochetto ha la parte A (la finta) e la parte B (`dribble_go`: tocco che porta via il pallone
-  e primi passi). Difensore secondo il giochetto (`coreo_dribbling.gd`): si butta sulla finta e allunga la gamba a
-  vuoto, gambe larghe e si piega a guardare (tunnel), guarda in su e indietreggia (sombrero, arcobaleno), si copre
-  dal tiro (finta di tiro). **Corpi staccati**: dal dribbling prenotato in poi il difensore resta ad almeno
-  `DRIB_GAP` 2,6 m dal portatore (1,9 m nel sorpasso, 2,3 m nel fallito; indietreggia lui, mai il portatore) e la
-  telecamera della regia sta dalla parte opposta al lato del dribbling (guarda nel verso dello scatto: il portatore
-  passa di fianco al difensore senza coprirlo), più vicina (`DRIB_DIST` 7,5 m). Dopo lo scatto il rallenty dura
-  ancora secondo il giochetto (`DOPO_SKILL`: veronica, tunnel, pallonetti). **Fallito**: affondo del difensore con
-  l'interno del piede, il portatore cade su un ginocchio con una mano a terra e si rialza (`DRIB_KO_STUN` 0,6 s fermo).
+  **Animazioni del dribbling** (Luis 2026-11-24, "animazioni da rivedere"; rifatte il 2026-11-26, "fanno pena", e
+  di nuovo una per una il 2026-11-27): coreografie calcolate ancorate al campo (`scripts/partita/mosse/coreo.gd`):
+  piedi fermi a terra finché appoggiano, passi programmati dove sarà il corpo (più un passo da solo se una gamba si
+  allunga troppo), pallone mosso solo dai tocchi (a terra o in volo; il piede
+  può restare "legato" al pallone: suola che lo trascina), giro del corpo per chiavi, piedi che restano fuori dal corpo
+  dell'altro (`ostacolo`). **Gambe mai deformate**: il ginocchio piega sempre davanti al corpo (`GINOCCHIO_YAW`), un
+  piede a terra gira sul posto col corpo (`TORSIONE_MAX`), un piede in volo non va oltre la gamba (`ALLUNGO_VOLO`) e
+  non resta sospeso (`VOLO_MAX`), allo scatto (`taglia`) riparte da dov'è.
+  **16 giochetti veri**, **uno per file** in `mosse/skill/<id>.gd` (`a(c, S, g)` = la finta, dura `show`;
+  `b(c, S, tg)` = dallo scatto `dribble_go`), registro `mosse/coreo_skill.gd`, aiuti comuni `skill/comune.gd` (`K.`:
+  `via`, `rincorsa`, `passo`, braccia), tabella `sim/skill.gd` (stesso `id`): finta di corpo, stop e via, suola,
+  doppio passo, croqueta, finta di tiro, taglio secco (chop), finta e giro (Cruyff), colpo di tacco, **pedalata**
+  (giri alternati del piede intorno al pallone), elastico, tunnel, veronica, elastico inverso, sombrero,
+  **bicicletta** (per Luis = "rainbow": pallone portato su dietro il polpaccio e alzato col tacco sopra la testa
+  propria e del difensore). Il giochetto lo **sceglie il motore** (solo con `rifiniture`, evento `dribble`: `skill`,
+  `show`): più Dribbling (`drb`) = più scelta e i difficili più spesso (`Skill.scegli`; tunnel, sombrero e bicicletta
+  solo col difensore davanti), con un generatore a parte (`skillRng`: la sequenza di `rnd()` e l'esito restano
+  identici); ognuno dura il suo tempo prima dello scatto (`show` 0,38-0,7 s).
+  **In corsa, senza fermarsi** (Luis: "si pianta prima del giochetto"): durante il giochetto il motore porta il
+  portatore avanti e di lato (`av`, `lat`, `vel` × `DRIB_SHOW_V` 4,2 m/s, `dribShowSteer`), il difensore indietreggia
+  davanti a lui (`DRIB_GAP` 2,6 m) e i piedi fanno passi di corsa (`appoggia_corsa`, `K.rincorsa`).
+  **Pallone staccato con fisica vera** (tunnel, sombrero, bicicletta; Luis: "torna magneticamente, deve andarlo a
+  prendere lui"): al calcio (`tk`) parte un pallone che si vede (`ball.finto`, `dribPallaLancia`: rasoterra tra le gambe
+  del difensore o pallonetto sopra la sua testa, attrito e gravità di `C.ballPhys`), il portatore gli gira intorno e lo
+  va a riprendere (`dribChaseStep`, evento `dribble_presa`); per le regole il pallone resta suo. Durante
+  l'inseguimento non si aprono duello né fuga (`dribBusy`) e dopo la presa c'è un attimo di respiro (`duelCd`).
+  Difensore secondo il giochetto (`coreo_dribbling.gd`): si butta sulla finta e affonda basso a vuoto, gambe larghe e
+  poi si torce a guardare dietro (tunnel), guarda in su e indietreggia (sombrero, bicicletta), si copre dal tiro (finta
+  di tiro). **Corpi staccati**: dal dribbling prenotato in poi il difensore resta ad almeno `DRIB_GAP` 2,6 m dal
+  portatore (1,9 m nel sorpasso, 1,5 m nell'inseguimento, 2,3 m nel fallito; indietreggia lui, mai il portatore) e la
+  telecamera della regia sta dalla parte opposta al lato del dribbling (45°, `GIRO`; nel **tunnel quasi dritta**,
+  `GIRO_SKILL` 12°: il difensore di fronte a gambe aperte), più vicina (`DRIB_DIST` 7,5 m). Dopo lo scatto il rallenty
+  dura ancora secondo il giochetto (`DOPO_SKILL`). Il **nome del giochetto** è una nota piccola in alto
+  (`hud.nota`, non copre il portatore). **Fallito**: affondo del difensore con l'interno del piede, il portatore cade
+  su un ginocchio con una mano a terra e si rialza (`DRIB_KO_STUN` 0,6 s fermo).
   **Portatore di corsa** (`figura.gd` `_corsa_col_pallone`): busto più dritto, braccia strette che vanno a tempo con
-  le gambe. I dribbling dell'IA tengono i giochetti di prima (`giochetti.gd`). Test `tests/test_skill.gd` (motore),
-  `tests/test_coreo.gd` (tutti i giochetti, compenetrazione dei corpi, pallone). Prove:
+  le gambe. I dribbling dell'IA tengono i giochetti di prima (`giochetti.gd`). **Test**: `tests/test_skill.gd` (motore,
+  tabella), `tests/test_dribbling_inseguimento.gd`, `tests/test_coreo.gd` (tutti i giochetti: piedi, pallone,
+  compenetrazione dei due corpi), **`tests/test_skill_<id>.gd` uno per giochetto** (la traccia in comune è
+  `traccia(id)` in `test_skill_finta.gd`), `tests/test_skill_gambe.gd` (tutti i giochetti e il fallito, portatore e
+  difensore: niente salti di caviglie e ginocchia da un fotogramma all'altro, gambe mai una dentro l'altra, mai
+  stirate, ginocchio mai al contrario). Prove:
   `prova_vista.tscn -- --scena=dribbling_ok|dribbling_ko --seme=1 [--giochetto=ID] [--vista=lato|largo|diag|alto]`
-  (anche `partita.tscn -- --scena=dribbling_ok --giochetto=ID`: la telecamera vera); misure:
-  `-s res://tools/diag_skill.gd -- [--ko] [--giochetto=ID] [--righe]` (distanze), `-s res://tools/diag_coreo.gd`.
+  (da vicino, un passo del motore per fotogramma come in partita; anche
+  `partita.tscn -- --scena=dribbling_ok --giochetto=ID`: la telecamera vera); misure:
+  `-s res://tools/diag_gambe.gd [-- --id=ID --chi=p|o]` (gambe), `-s res://tools/diag_skill.gd -- [--ko]
+  [--giochetto=ID] [--righe]` (distanze), `-s res://tools/diag_coreo.gd`.
   Esito con la stessa probabilità di prima. Prove: `--scena=dribbling|dribbling_ok|dribbling_ko`. Lato: opposto allo sbilanciamento del
   difensore, verso lo spazio libero, sempre verso il centro entro 8 m dalla linea laterale (`dribSide`); il giochetto va
   da quel lato (`e.side`) e il portatore gli passa accanto senza attraversarlo. Se il duello finisce prima (palla persa,
