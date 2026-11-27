@@ -6,9 +6,6 @@ const Coreo := preload("../coreo.gd")
 const K := preload("comune.gd")
 
 
-const Finta := preload("finta.gd")
-
-
 # finta di tiro: ultimo passo lungo con l'appoggio accanto al pallone (il corpo gli arriva sopra), gamba caricata
 # dietro e braccio alto come per calciare; il piede scende ma si ferma sul pallone e l'interno lo taglia dal lato scelto
 static func a(c: Coreo, S: float, g: float) -> void:
@@ -16,7 +13,7 @@ static func a(c: Coreo, S: float, g: float) -> void:
 	var pS := K.ls(S)
 	var pF := K.ls(F)
 	var tp := 0.58 * g
-	Finta.rincorsa(c, pS, tp)
+	K.rincorsa(c, pS, tp)
 	# il pallone rallenta da solo: allo scatto è accanto al piede d'appoggio
 	c.palla_a(g + 0.05, {"rel": Vector3(F * 0.04, 0, 0.18)})
 	c.appoggia(pS, tp, Vector2(S * 0.2, 0.3), S * 0.12, 0.06)

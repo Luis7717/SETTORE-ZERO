@@ -13,6 +13,7 @@ const Duel := preload("res://sim/duel.gd")
 const FINE_GO := 0.4           # la coreografia finisce tanto dopo lo scatto (poi il clip di corsa)
 const PASSO_CORSA := 0.085     # s tra due appoggi nei primi passi dello scatto
 const PASSO_A := 0.15          # s tra due appoggi nei passi di corsa durante il giochetto
+const PASSO := 0.11            # s tra due appoggi dei passi di corsa che portano al giochetto (rincorsa)
 const H := Corpo.ANKLE_H
 const SCALA := 1.25            # m del gioco per m del modello
 # braccia (mano rispetto alla spalla: x fuori, y su, z avanti): gomiti piegati, mai dritte e ferme
@@ -78,6 +79,35 @@ static func vel_corpo(id: String, S: float) -> Vector3:
 static func passo(c: Coreo, s: String, tt: float, T: float = PASSO_A, rel: Vector2 = Vector2.ZERO, alto: float = 0.09) -> void:
 	c.appoggia_corsa(s, tt, T, rel, alto)
 	c.stacca(altro(s), tt - 0.01)
+
+
+## passi di corsa fino a quando il piede `s` fa la sua cosa (appoggio largo, tocco, giro) a `tp`: l'altro piede
+## appoggia PASSO prima, `s` PASSO prima ancora, e così indietro fino ad adesso, partendo dai piedi come sono (uno può
+## essere in volo): niente piede piantato e niente corpo sospeso mentre il motore lo porta avanti. Ritorna da quando
+## `s` è libero (s).
+static func rincorsa(c: Coreo, s: String, tp: float, T: float = PASSO) -> float:
+	var passi: Array = []
+	var tt := tp - T
+	var a := altro(s)
+	while tt > 0.02:
+		passi.push_front([tt, a])
+		a = altro(a)
+		tt -= T
+	if not passi.is_empty():
+		var primo := String(passi[0][1])
+		if c.a_terra(primo) and not c.a_terra(altro(primo)):
+			# il primo appoggio toccherebbe al piede che è già a terra: prima atterra quello in volo
+			if float(passi[0][0]) > 0.09:
+				passi.push_front([0.03, altro(primo)])
+			else:
+				passi.pop_front()
+		elif c.a_terra(primo):
+			c.stacca(primo, 0.01)
+	if passi.is_empty():
+		return libera(c, s)
+	for k: Array in passi:
+		passo(c, String(k[1]), float(k[0]), T, Vector2.ZERO, 0.13)
+	return float(passi.back()[0])
 
 
 # punto fisso nel mondo davanti al corpo com'è adesso (z avanti, x a sinistra; m del modello), a terra

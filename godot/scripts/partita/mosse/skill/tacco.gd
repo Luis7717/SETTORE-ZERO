@@ -6,9 +6,6 @@ const Coreo := preload("../coreo.gd")
 const K := preload("comune.gd")
 
 
-const Finta := preload("finta.gd")
-
-
 # colpo di tacco (tacco contro tacco): in corsa il corpo passa sopra il pallone, che rallenta; il piede della finta lo
 # scavalca col ginocchio alto e col tacco lo manda indietro, verso il piede rimasto dietro, che allo scatto lo calcia
 # in avanti dal lato scelto
@@ -17,7 +14,7 @@ static func a(c: Coreo, S: float, g: float) -> void:
 	var pS := K.ls(S)
 	var pF := K.ls(F)
 	var th := 0.8 * g
-	Finta.rincorsa(c, pF, th - 0.1)
+	K.rincorsa(c, pF, th - 0.1)
 	# ginocchio alto sopra il pallone, poi il piede scende davanti al pallone e il tacco lo colpisce all'indietro
 	c.passa_palla(pF, th - 0.1, Vector3(F * 0.03, 0.5, 0.06), Vector3(0, 0.5, 0), 0.0)
 	c.tocca(pF, th, "heel", Vector3(-S * 0.1, -0.3, 0), {"rel": Vector3(F * 0.02, 0, 0.16)})

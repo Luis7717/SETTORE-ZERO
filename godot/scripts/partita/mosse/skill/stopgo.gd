@@ -6,9 +6,6 @@ const Coreo := preload("../coreo.gd")
 const K := preload("comune.gd")
 
 
-const Finta := preload("finta.gd")
-
-
 # stop e via: passo di frenata, la suola ferma il pallone sul prato (il pallone resta lì e il corpo gli arriva sopra),
 # il portatore si alza dritto e l'altro piede si rimette sotto (il difensore si rilassa), tira appena indietro il
 # pallone e riparte di scatto
@@ -17,7 +14,7 @@ static func a(c: Coreo, S: float, g: float) -> void:
 	var pS := K.ls(S)
 	var pF := K.ls(F)
 	var t1 := 0.3 * g
-	Finta.rincorsa(c, pS, t1)
+	K.rincorsa(c, pS, t1)
 	c.tocca(pS, t1, "sole", Vector3(0, -0.25, 0), {"rel": Vector3(S * 0.05, 0, 0.56)})
 	c.tocca(pS, 0.62 * g, "sole", Vector3(0, -0.2, 0), {"resta": true, "lega": true})
 	c.tocca(pS, 0.92 * g, "sole", Vector3(0, -0.16, 0), {"rel": Vector3(S * 0.06, 0, 0.3), "lega": true})

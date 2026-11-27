@@ -6,9 +6,6 @@ const Coreo := preload("../coreo.gd")
 const K := preload("comune.gd")
 
 
-const Finta := preload("finta.gd")
-
-
 # elastico: l'esterno del piede della finta porta il pallone fuori (e il corpo ci va dietro), poi il piede gli gira
 # intorno e l'interno lo riporta di scatto attraverso il corpo dal lato scelto
 static func a(c: Coreo, S: float, g: float) -> void:
@@ -16,7 +13,7 @@ static func a(c: Coreo, S: float, g: float) -> void:
 	var pS := K.ls(S)
 	var pF := K.ls(F)
 	var tf := 0.4 * g
-	Finta.rincorsa(c, pF, tf)
+	K.rincorsa(c, pF, tf)
 	c.tocca(pF, tf, "outside", Vector3(-F * 0.35, 0.15, 0), {"rel": Vector3(F * 0.04, 0, 0.5)})
 	c.tocca(pF, 0.74 * g, "outside", Vector3(-F * 0.5, 0.15, 0), {"rel": Vector3(F * 0.5, 0, 0.52), "lega": true, "frena": true})
 	c.passa_palla(pF, 0.92 * g, Vector3(F * 0.2, 0.2, 0.02), Vector3(-S * 0.6, 0.25, 0), 0.0)

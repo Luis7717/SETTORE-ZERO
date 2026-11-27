@@ -6,9 +6,6 @@ const Coreo := preload("../coreo.gd")
 const K := preload("comune.gd")
 
 
-const Finta := preload("finta.gd")
-
-
 # suola in corsa: l'altro piede regge, la suola del piede della finta si posa sul pallone e lo fa rotolare attraverso
 # il corpo fino al lato scelto; a metà il piede che regge fa un saltello dallo stesso lato (il corpo non si ferma),
 # poi il pallone rotola via da solo, la gamba della suola scende e l'esterno dell'altro piede lo porta avanti
@@ -17,7 +14,7 @@ static func a(c: Coreo, S: float, g: float) -> void:
 	var pS := K.ls(S)
 	var pF := K.ls(F)
 	var t1 := 0.5 * g
-	Finta.rincorsa(c, pF, t1)
+	K.rincorsa(c, pF, t1)
 	c.tocca(pF, t1, "sole", Vector3(F * 0.2, -0.22, 0), {"rel": Vector3(F * 0.14, 0, 0.48)})
 	c.tocca(pF, 0.86 * g, "sole", Vector3(-F * 0.25, -0.22, 0), {"rel": Vector3(S * 0.36, 0, 0.44), "lega": true})
 	c.palla_a(g + 0.1, {"rel": Vector3(S * 0.52, 0, 0.5)})
