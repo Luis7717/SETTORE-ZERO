@@ -1,12 +1,8 @@
 name: Tiro a Giro IPA
 
 on:
-  push:
-    branches: [tiro-a-giro]
-    # un cambio solo nella versione Godot non rifà l'IPA web (quella ha il suo workflow, tiro-a-giro-godot-ipa.yml)
-    paths-ignore:
-      - 'godot/**'
-      - '.github/workflows/tiro-a-giro-godot-ipa.yml'
+  # Luis 2026-11-27: l'IPA web non serve più, si costruisce solo la versione Godot (tiro-a-giro-godot-ipa.yml).
+  # Niente più build a ogni push; resta avviabile a mano da GitHub (Actions → Run workflow).
   workflow_dispatch:
 
 permissions:
