@@ -1909,3 +1909,35 @@ le fasce si chiamano **esterno sinistro / destro (ES / ED)**.
 - Il portiere non si può scegliere. La CPU non usa le scelte.
 - Capitano: "C" gialla sulla carta del campione e "· capitano" nel pannello. **Non fatto**: la fascia al braccio in
   partita (serve un pezzo nuovo nel modello della figura: non era "semplice").
+
+## 2026-11-27 — Portiere che si butta a vuoto sui palloni da lontano
+- **Chiesto** (Luis, provato sull'iPhone): "con i cross da lontano o tiri da lontano il portiere si butta a vuoto molto
+  prima e la palla va in rete".
+- **Causa** (`sim/parata.gd`, `_gkAutoTimed` per il portiere automatico e quello della CPU, `_paraTry` per il manuale):
+  il tuffo partiva quando al pallone mancava `max(PARA_LEAD, need)`, con `need` = tempo che serve alla mano per arrivare
+  al punto. Il tuffo dura 0,8 s (`motion.gd` `diveStep`, poi il portiere è a terra e non para più): se il punto era
+  lontano dal portiere (angolo lontano, pallone fuori dai pali) `need` arrivava a 0,9-1,7 s e il portiere era già per
+  terra quando arrivava il pallone. Secondo caso: un **lancio alto** da 30-40 m (cross, lancio lungo) che dopo il
+  rimbalzo finirebbe verso la porta viene rilevato come tiro (`detectShot` guarda solo la traiettoria): il portiere
+  restava sulla linea in "modo tiro", non usciva come sui cross e si tuffava anche 1-2 s prima su palloni che poi
+  toccava un altro.
+- **Cosa**: `PARA_DIVE_WIN` 0,7 s = il tuffo non parte mai prima (`paraDiveAt`, anche per il manuale, dove però già non
+  succedeva). Sul lancio alto rilevato come tiro (`paraLancio`, `kick.type` "loft") finché all'arrivo manca più di
+  0,7 s (o se è uscito a prenderlo) il portiere fa come sul cross (`_gkSulLancio`: `gkAI` di `ai.gd` col tiro nascosto:
+  esce solo se ci arriva prima degli attaccanti, altrimenti resta tra i pali e si piazza); poi si tuffa se serve.
+  `userDive` col portiere automatico non conta più (il gioco non la manda; il dito finto dei controlli sì e falsava le
+  misure). Tutto solo con l'opzione `parata`: confronti col JS identici, nessun numero casuale nuovo.
+- **Numeri** (`tools/misura_portiere.gd -- --scene --semi=4`, 28 tiri per caso, prima → dopo): tuffo partito più di
+  0,8 s prima dell'arrivo, portiere della CPU: rasoterra 35 m 6 → 0 (gol 2 → 0), alto 40 m 6 → 0, mezza altezza 45 m
+  5 → 0, a giro 45 m 5 → 0; nostro automatico: 4/4/4/4 → 0. Anticipo massimo 0,95-1,15 s → 0,68 s. Parate da 35-45 m
+  salite di 2-4 su 28; da 25 m identiche; manuale identico. Partite vere (`-- --partite=8`, opzioni del gioco, dito
+  finto): tuffi a vuoto troppo presto 1 → 1 (sono già rari col portiere automatico vero), gol a partita
+  0,75-0,88 → 0,75-1,00 (campione piccolo, le partite divergono dal primo tuffo diverso). `controllo_gameplay` non
+  accende `parata`: con questa modifica non cambia niente lì, non rimisurato.
+- **Test**: `tests/test_portiere_lontano.gd` (tiri da 30-45 m: nessun tuffo finito prima del pallone e parate ≥ 70%;
+  lanci lunghi rilevati come tiro: niente tuffo prima di 0,7 s; da 14-18 m all'angolo restano gol 20/23).
+- **Ancora debole**: da lontano ora il portiere para quasi tutto quello che va nello specchio (il limite è solo la
+  portata del tuffo); se i gol da fuori diventano troppo rari si può allargare il bersaglio o limitare i passi laterali.
+  I lanci rilevati come tiro restano "tiri" per le statistiche e per `airPlay` (gli attaccanti non li colpiscono di
+  testa al volo): non toccato. Da provare sull'iPhone: tiri da fuori e lanci lunghi della CPU contro il portiere
+  automatico.

@@ -16,6 +16,10 @@ extends "attacco.gd"
 
 const PARA_LEAD := 0.45      # il tuffo parte quando al pallone mancano tanti secondi di partita ...
 const PARA_MARGIN := 0.12    # ... o prima, se alla mano serve più tempo per arrivare al punto (s in più)
+# Mai prima di tanto (Luis 2026-11-26, "con i cross da lontano o tiri da lontano il portiere si butta a vuoto molto prima"):
+# il tuffo dura 0,8 s (motion.gd diveStep, poi il portiere è a terra); se la mano aveva bisogno di più tempo (tiro largo
+# o fuori dai pali da lontano) partiva fino a 2 s prima e quando arrivava il pallone era già per terra
+const PARA_DIVE_WIN := 0.7
 const PARA_STEP := 0.6       # mentre aspetta, il portiere fa al massimo tanti metri di passi verso il punto (il resto col tuffo)
 # Limiti veri (Luis 2026-11-23: "non tutti i tiri devono essere parabili"): il punto scelto vale come direzione, ma il
 # portiere si ferma dove arriva. Spostamento a passi laterali (non di corsa) e tuffo lungo al massimo tanto
@@ -58,6 +62,8 @@ func diveWin(tm: int) -> bool:
 func userDive(tm: int, dxm: float, th: float) -> bool:
 	if not diveWin(tm):
 		return false
+	if paraCtl and bool(autoGk[tm]):
+		return false # portiere automatico: la linea non conta (il gioco non la manda; il dito finto dei controlli sì)
 	var g := gk(tm)
 	if paraOn(tm):
 		_paraSync()
@@ -218,7 +224,7 @@ func _paraTry(tm: int) -> void:
 	var x0: float = paraShot.gx0 if paraShot != null else g.x
 	var tx: float = paraReachX(x0, g.st.sv("tuf"), float(am.x))
 	var need: float = absf(tx - g.x) / (GK_HUMAN_SPEED + g.st.sv("tuf") * 0.03) + PARA_MARGIN
-	if paraLeft() > maxf(PARA_LEAD, need):
+	if paraLeft() > paraDiveAt(need):
 		return
 	var auto: bool = bool(am.get("auto", false))
 	paraAim[tm] = null
@@ -241,6 +247,10 @@ func gkAI(p: R.Player) -> void:
 	var am: Variant = paraAim[tm] if paraCtl else null
 	var s := ball.shot
 	if paraCtl and am == null and s != null and s.team != tm and phase == "play" and not paraOn(tm):
+		_paraSync()
+		if paraLancio() and (paraLeft() > PARA_DIVE_WIN or p.claim == ball.kick):
+			_gkSulLancio(p)
+			return
 		_gkAutoTimed(p, s)
 		return
 	if am == null or float(am.wait) > 0.0 or s == null or s.team == tm or phase != "play":
@@ -275,7 +285,7 @@ func _gkAutoTimed(p: R.Player, s: R.Shot) -> void:
 		return
 	var vs: float = GK_AI_SPEED + p.st.sv("tuf") * 0.025
 	var need: float = absf(s.cx - p.x) / vs + PARA_MARGIN
-	if paraLeft() > maxf(PARA_LEAD, need):
+	if paraLeft() > paraDiveAt(need):
 		p.tx = C.clamp_(s.gx0 + C.clamp_(s.cx - s.gx0, -PARA_STEP, PARA_STEP), -GW / 2.0, GW / 2.0)
 		p.sprint = false
 		p.spdF = PARA_SHUFFLE_K
@@ -284,3 +294,30 @@ func _gkAutoTimed(p: R.Player, s: R.Shot) -> void:
 	p.tx = gx
 	if absf(s.cx - p.x) > 1.0 or s.ch > 2.0:
 		startDive(p, s.cx, s.ch)
+
+
+## quando parte il tuffo: al pallone manca PARA_LEAD, o il tempo che serve alla mano per arrivare al punto (need), ma
+## mai prima di PARA_DIVE_WIN (il portiere deve essere ancora in volo quando arriva il pallone)
+static func paraDiveAt(need: float) -> float:
+	return C.clamp_(need, PARA_LEAD, PARA_DIVE_WIN)
+
+
+## il "tiro" in volo è un lancio alto (cross, lancio lungo da lontano) che finirebbe verso la porta: non è un tiro, un
+## attaccante o un difensore lo può ancora toccare (Luis 2026-11-26: sui lanci da 30-40 m il portiere restava sulla
+## linea e si tuffava a vuoto 1-2 s prima, anche su palloni che poi controllava un altro)
+func paraLancio() -> bool:
+	return ball.kick != null and ball.kick.type == "loft"
+
+
+## portiere automatico o della CPU sul lancio alto finché manca più di PARA_DIVE_WIN all'arrivo (o se è uscito a
+## prenderlo): come su un cross (ai.gd gkAI senza tiro: esce solo se ci arriva prima degli attaccanti, altrimenti resta
+## tra i pali e si piazza). Il tempo di reazione scorre lo stesso; negli ultimi PARA_DIVE_WIN si tuffa se serve
+func _gkSulLancio(p: R.Player) -> void:
+	if not p.decided:
+		p.reactT -= dtT
+		if p.reactT <= 0.0:
+			p.decided = true
+	var s := ball.shot
+	ball.shot = null
+	super.gkAI(p)
+	ball.shot = s
