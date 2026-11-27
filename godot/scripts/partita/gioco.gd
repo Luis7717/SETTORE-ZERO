@@ -44,12 +44,16 @@
 #   --prove=tiri|punizioni|rigori   allenamento libero a punti (tipo "prove", scripts/partita/prove_tiro_regia.gd)
 #   --pausa-rosa        amichevole con una carriera di prova (file user://prova_pausa_rosa.json, mai il salvataggio vero):
 #                       dopo un attimo pausa e "Rosa e tattica" aperta (cambi, formazione e stili a partita in corso)
-#   --scena=cambio      stessa carriera di prova: due sostituzioni dalla pausa e scena del cambio (cambio_regia.gd)
+#   --scena=cambio      stessa carriera di prova: due sostituzioni dalla pausa a pallone in gioco ("Cambio pronto"),
+#                       2,5 s dopo pallone fuori e scena del cambio (cambio_regia.gd)
 #
 # Rosa e tattica (Luis 2026-11-24): nelle partite della carriera (campionato, amichevole) la pausa e l'intervallo hanno
-# il tasto "Rosa e tattica": la Rosa del menu (rosa.gd in modo partita) si apre sopra la partita ferma; chiudendola i
-# cambi valgono subito nel motore (cambi_partita.gd → SimMatch.cambiaSquadra) e a "Riprendi" / "Secondo tempo" parte
-# la scena del cambio (cambio_regia.gd) col tempo fermo. Non nelle lezioni, nelle prove di tiro né senza carriera.
+# il tasto "Rosa e tattica": la Rosa del menu (rosa.gd in modo partita) si apre sopra la partita ferma. All'intervallo
+# (e in pausa a gioco già fermo, o senza sostituzioni) i cambi valgono subito nel motore (cambi_partita.gd →
+# SimMatch.cambiaSquadra) e a "Riprendi" / "Secondo tempo" parte la scena del cambio (cambio_regia.gd) col tempo fermo.
+# Le sostituzioni decise in pausa a gioco in corso aspettano che la palla esca (Luis 2026-11-27): "Cambio pronto"
+# nell'HUD e alla prima interruzione (CambiPartita.gioco_fermo) motore + scena (_cambi_in_attesa); a fine partita si
+# perdono. Non nelle lezioni, nelle prove di tiro né senza carriera.
 #
 # Dall'app (scripts/app.gd): chi crea la scena chiama `avvia(opz)` prima di aggiungerla o entro il primo fotogramma,
 # con opz = {squadra_a, squadra_b, me, tipo: "campionato"|"amichevole"|"allenamento", durata_tempo, seme,
@@ -387,6 +391,7 @@ func _process(delta: float) -> void:
 		if replay != null:
 			replay.registra(m)
 		_zoom()
+		_cambi_in_attesa() # palla fuori, fallo, gol: entrano i cambi in attesa (tempo fermo per la scena)
 		if _fine_ms > 0 and now > _fine_ms:
 			_fine_ms = 0
 			_finisci(false)
@@ -582,6 +587,7 @@ func _aggiorna_hud() -> void:
 		_cam_tip_visto = true
 	var on: bool = allenamento == null and prove == null and not paused and not gesti.drawing and VD.user_cam_on(m, me)
 	hud.aiuto_visuale(("arr" if _cam_tip_visto else "tip") if on else "")
+	hud.mostra_cambio_pronto(cambi != null and cambi.attesa and not paused)
 	# niente suggerimenti in basso (Luis 2026-11-22: "la telecronaca è ok, togli i suggerimenti in basso"): in partita
 	# parla la cronaca in alto, in allenamento il riquadro in alto con la spiegazione di ogni lezione
 
@@ -864,8 +870,9 @@ func _mostra_pausa() -> void:
 
 func _riprendi() -> void:
 	hud.nascondi_overlay()
-	if not _avvia_cambio():
-		paused = false
+	paused = false
+	if not _cambi_in_attesa() and _avvia_cambio():
+		paused = true
 
 
 func _mostra_intervallo() -> void:
@@ -873,6 +880,8 @@ func _mostra_intervallo() -> void:
 	gesti.cancel()
 	hud.mostra_dribbling(false)
 	_menu_sotto = "intervallo"
+	if cambi != null and cambi.attesa: # cambi in attesa: all'intervallo entrano, la scena a "Secondo tempo"
+		_applica_cambi()
 	hud.mostra_intervallo(m.score[0], m.score[1], cambi != null)
 
 
@@ -891,6 +900,9 @@ func _apri_rosa() -> void:
 		return
 	cambi.leggi_espulsi(m, me)
 	cambi.leggi_energie(m, me)
+	cambi.leggi_in_campo(m, me)
+	if not cambi.attesa:
+		cambi.ricorda(c) # la squadra in campo: torna questa se la partita finisce coi cambi ancora in attesa
 	hud.nascondi_overlay()
 	_rosa_layer = CanvasLayer.new()
 	_rosa_layer.layer = 8
@@ -901,13 +913,18 @@ func _apri_rosa() -> void:
 	_rosa_layer.add_child(_rosa)
 
 
-## "Torna alla partita": i cambi valgono subito nel motore, si torna al menu di prima (pausa o intervallo)
+## "Torna alla partita": i cambi valgono subito nel motore (all'intervallo, a gioco fermo o senza sostituzioni);
+## in pausa a gioco in corso le sostituzioni restano in attesa della prima interruzione (Luis 2026-11-27). Poi si
+## torna al menu di prima (pausa o intervallo)
 func _chiudi_rosa() -> void:
 	if _rosa == null:
 		return
 	var c := carriera_partita()
-	if c != null and cambi.applica(m, me, c) == null:
-		push_warning("Rosa e tattica: cambi non applicati alla partita")
+	if c != null:
+		m.teams[me]["piazzati"] = c.piazzati() # i battitori scelti valgono subito (il motore guarda chi è in campo)
+		cambi.attesa = _menu_sotto != "intervallo" and not CambiPartita.gioco_fermo(m) and cambi.serve_attesa(c.s.lineup)
+		if not cambi.attesa:
+			_applica_cambi()
 	_rosa_layer.queue_free()
 	_rosa_layer = null
 	_rosa = null
@@ -936,12 +953,45 @@ func _fine_cambio() -> void:
 	paused = false
 
 
+## porta nel motore la squadra della carriera (cambi_partita.applica): i cambi vanno in da_mostrare
+func _applica_cambi() -> void:
+	var c := carriera_partita()
+	if c == null or cambi.applica(m, me, c) == null:
+		cambi.attesa = false
+		push_warning("Rosa e tattica: cambi non applicati alla partita")
+
+
+## cambi in attesa e gioco fermo per un'interruzione (fuori, fallo, gol prima del calcio d'inizio; non durante replay
+## ed esultanza): nel motore e scena del cambio col tempo fermo. true = la scena è partita
+func _cambi_in_attesa() -> bool:
+	if cambi == null or not cambi.attesa or paused or stato != "partita" or not CambiPartita.gioco_fermo(m):
+		return false
+	if (replay != null and replay.attivo()) or (esultanza != null and esultanza.attiva):
+		return false
+	_applica_cambi()
+	hud.mostra_cambio_pronto(false)
+	hud.mostra_dribbling(false)
+	if _avvia_cambio():
+		paused = true
+		return true
+	return false
+
+
+## la partita finisce coi cambi ancora in attesa: si perdono (la carriera torna alla squadra in campo)
+func _perdi_cambi_in_attesa() -> void:
+	if cambi != null and cambi.attesa:
+		cambi.annulla(carriera_partita())
+	if hud != null:
+		hud.mostra_cambio_pronto(false)
+
+
 ## scena del cambio in corso (per le prove)
 func cambio_in_corso() -> bool:
 	return _cambio != null and _cambio.attiva
 
 
 func _finisci(forfait: bool) -> void:
+	_perdi_cambi_in_attesa()
 	if allenamento != null:
 		_fine_allenamento(forfait)
 		return
@@ -1046,6 +1096,7 @@ func _titolo() -> String:
 # "Esci" dalla pausa: dall'app la partita finisce subito (in campionato 0-3 a tavolino, come il web);
 # nella partita di prova si mostra la schermata di fine come prima
 func _esci_dalla_pausa() -> void:
+	_perdi_cambi_in_attesa()
 	if not avviata_da_app():
 		_finisci(true)
 		return
@@ -1308,8 +1359,11 @@ func _prepara_scena(nome: String) -> void:
 		"pausa":
 			await get_tree().create_timer(0.8).timeout
 			_mostra_pausa()
-		"cambio": # due sostituzioni dalla pausa (Rosa e tattica), poi la scena del cambio
+		"cambio": # due sostituzioni dalla pausa a pallone in gioco: "Cambio pronto" e, dopo 2,5 s, pallone fuori =
+			# scena del cambio (Luis 2026-11-27: i cambi aspettano che la palla esca)
 			await get_tree().create_timer(2.0).timeout
+			if m.phase != "play":
+				_metti_in_gioco() # niente attesa del calcio d'inizio della persona
 			_mostra_pausa()
 			_apri_rosa()
 			await get_tree().process_frame
@@ -1317,6 +1371,10 @@ func _prepara_scena(nome: String) -> void:
 			_rosa.chiusa.emit()
 			await get_tree().create_timer(0.3).timeout
 			_riprendi()
+			await get_tree().create_timer(2.5).timeout
+			if m.phase == "play":
+				m.ball.last = m.team(1 - me)[9]
+				m.out(C.HW + 0.6, m.ball.y, 0.0)
 		"recupero": # il nostro n. 4 ruba il pallone in contrasto frontale al n. 10 avversario che gli corre addosso
 			# (Luis 2026-11-24: "quando recupero palla me la rubano subito"): si vede chi ha perso il pallone e il rallenty
 			_metti_in_gioco()

@@ -28,7 +28,7 @@ func _fine() -> void:
 func _panchinaro(c: Carriera, cambi: CambiPartita, pos: String = "") -> Variant:
 	var scelto: Variant = null
 	for q: Dictionary in c.bench():
-		if cambi.uscito(q.id) or c.infortunio(q.id) > 0:
+		if cambi.uscito(q.id) or cambi.in_campo.has(q.id) or c.infortunio(q.id) > 0: # (in_campo: aspetta di uscire)
 			continue
 		if q.pos == pos:
 			return q.id
@@ -236,4 +236,130 @@ func test_energie_in_partita_dal_motore() -> bool:
 	eq(cp.energia(p.src.id), 63, "energia del motore in percentuale")
 	eq(cp.energia(-999), 100, "chi non è in campo (panchina): piena")
 	m.dispose()
+	return done()
+
+
+# Luis 2026-11-27 "per fare i cambi aspetta che la palla esca": le sostituzioni in attesa si contano subito nei 5,
+# chi deve uscire non è ancora "uscito" (resta in campo nel motore) e finché aspettano si possono disfare
+func test_cambi_in_attesa_si_contano_e_si_disfano() -> bool:
+	var c := _carriera()
+	var m := _partita(c)
+	var cambi := CambiPartita.new()
+	cambi.leggi_in_campo(m, 0)
+	cambi.ricorda(c)
+	var tit: Variant = c.s.lineup[9]
+	var entra: Variant = _panchinaro(c, cambi, "A")
+	eq(_sostituisci(c, cambi, tit, entra), "", "sostituzione decisa")
+	eq(cambi.fatti, 1, "conta subito")
+	eq(cambi.restano(), 4, "ne restano 4")
+	check(cambi.serve_attesa(c.s.lineup), "c'è un cambio da aspettare")
+	check(not cambi.uscito(tit), "chi deve uscire non è ancora uscito")
+	eq(m.team(0)[9].src.id, tit, "nel motore non è cambiato niente")
+	# ci si ripensa: chi doveva uscire rientra, il cambio non conta più
+	eq(_sostituisci(c, cambi, entra, tit), "", "il cambio in attesa si disfa")
+	eq(cambi.fatti, 0, "nessun cambio")
+	check(not cambi.serve_attesa(c.s.lineup), "niente da aspettare")
+	# catena: A esce per B, poi B (mai entrato) esce per C = una sola sostituzione
+	eq(_sostituisci(c, cambi, tit, entra), "", "A per B")
+	var terzo: Variant = _panchinaro(c, cambi)
+	eq(_sostituisci(c, cambi, entra, terzo), "", "B per C")
+	eq(cambi.fatti, 1, "una sola sostituzione")
+	# al limite: 5 in attesa, il sesto no, disfarne uno sì
+	for k in 4:
+		eq(_sostituisci(c, cambi, c.s.lineup[1 + k], _panchinaro(c, cambi)), "", "cambio %d" % (k + 2))
+	eq(cambi.fatti, 5, "5 in attesa")
+	check(_sostituisci(c, cambi, c.s.lineup[6], _panchinaro(c, cambi)).contains("5 cambi"), "il sesto no")
+	var fuori1: Variant = cambi.in_campo.filter(func(id: Variant) -> bool: return not c.s.lineup.has(id))[0]
+	var dentro1: Variant = cambi.entrati_in_attesa(c.s.lineup)[0]
+	eq(_sostituisci(c, cambi, dentro1, fuori1), "", "al limite si può disfare")
+	eq(cambi.fatti, 4, "4 in attesa")
+	m.dispose()
+	_fine()
+	return done()
+
+
+func test_cambi_in_attesa_entrano_nel_motore() -> bool:
+	var c := _carriera()
+	var m := _partita(c)
+	var cambi := CambiPartita.new()
+	cambi.leggi_in_campo(m, 0)
+	cambi.ricorda(c)
+	var tit: Variant = c.s.lineup[9]
+	var entra: Variant = _panchinaro(c, cambi, "A")
+	_sostituisci(c, cambi, tit, entra)
+	cambi.attesa = true
+	var fatti: Variant = cambi.applica(m, 0, c)
+	eq((fatti as Array).size(), 1, "un cambio nel motore")
+	check(not cambi.attesa, "non più in attesa")
+	eq(cambi.confermati, 1, "confermato")
+	check(cambi.uscito(tit), "ora è uscito davvero")
+	check(cambi.in_campo.has(entra) and not cambi.in_campo.has(tit), "in campo letti dal motore")
+	check(cambi.errore_scambio(c.s.lineup, entra, tit, func(x: Variant) -> String: return "x") != "", "non rientra più")
+	eq(cambi.base.lineup, c.s.lineup, "la squadra ricordata è quella in campo")
+	m.dispose()
+	_fine()
+	return done()
+
+
+# la partita finisce coi cambi in attesa: si perdono, la carriera torna alla squadra in campo
+func test_cambi_in_attesa_si_perdono_a_fine_partita() -> bool:
+	var c := _carriera()
+	var m := _partita(c)
+	var cambi := CambiPartita.new()
+	cambi.leggi_in_campo(m, 0)
+	cambi.ricorda(c)
+	var prima: Array = c.s.lineup.duplicate()
+	var form: String = str(c.s.formation)
+	var att := c.stileAtt()
+	_sostituisci(c, cambi, c.s.lineup[9], _panchinaro(c, cambi, "A"))
+	c.s.lineup = cambi.formazione_stessi_11(C.FORMATIONS["3-5-2"], c.s.lineup, func(id: Variant, r: String) -> int: return Carriera.overallAs(c.player(id), r))
+	c.s.formation = "3-5-2"
+	c.setStili("contropiede" if att != "contropiede" else "possesso", null)
+	cambi.attesa = true
+	cambi.annulla(c)
+	eq(c.s.lineup, prima, "titolari di prima")
+	eq(c.s.formation, form, "formazione di prima")
+	eq(c.stileAtt(), att, "stile di prima")
+	eq(cambi.fatti, 0, "nessun cambio")
+	check(not cambi.attesa, "niente in attesa")
+	var d := Carriera.new()
+	d.percorso = SALVA
+	check(d.load() and d.s.lineup == prima, "salvato com'era")
+	m.dispose()
+	_fine()
+	return done()
+
+
+# quando possono entrare: ripresa non ancora battuta (anche durante la scena del battitore), non in gioco, non col
+# portiere che tiene il pallone, non a rincorsa partita, non durante la festa del gol (dopo, al calcio d'inizio sì)
+func test_gioco_fermo_alle_interruzioni() -> bool:
+	var c := _carriera()
+	var m := _partita(c)
+	check(CambiPartita.gioco_fermo(m), "calcio d'inizio")
+	var n := 0
+	while m.phase != "play" and n < 3000:
+		m.step(DT)
+		n += 1
+	check(not CambiPartita.gioco_fermo(m), "palla in gioco")
+	m.ball.last = m.team(1)[9]
+	m.out(C.HW + 0.6, 10.0, 0.0)
+	check(m.phase == "restart" and m.restart.type == "throw", "rimessa")
+	check(CambiPartita.gioco_fermo(m), "rimessa: fermo (scena %s)" % m.restart.scena)
+	m.restart.pend = {}
+	check(not CambiPartita.gioco_fermo(m), "rincorsa partita: no")
+	m.restart.pend = null
+	m.setRestart("gk", 0, 0.0, -45.0, m.gk(0))
+	check(not CambiPartita.gioco_fermo(m), "pallone in mano al portiere: no")
+	m.setRestart("freekick", 0, 0.0, 0.0)
+	check(CambiPartita.gioco_fermo(m), "punizione")
+	m.goal(0)
+	check(not CambiPartita.gioco_fermo(m), "festa del gol: no")
+	n = 0
+	while m.phase == "goal" and n < 600:
+		m.step(DT)
+		n += 1
+	check(m.phase == "restart" and m.restart.type == "kickoff", "calcio d'inizio dopo il gol")
+	check(CambiPartita.gioco_fermo(m), "prima del calcio d'inizio: fermo")
+	m.dispose()
+	_fine()
 	return done()

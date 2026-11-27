@@ -155,6 +155,12 @@ func test_rosa_in_partita_senza_aspetto_e_vendi() -> bool:
 	n._tocca(riserva)
 	eq(c.s.lineup[9], riserva, "sostituzione fatta")
 	eq(n.pillola, "Cambi 4/5", "un cambio in meno")
+	# cambio in attesa (Luis 2026-11-27: si aspetta la palla fuori): chi deve uscire si sceglie ancora, si può disfare
+	n._tocca(tit)
+	eq(n.sel, tit, "in attesa: chi deve uscire si sceglie ancora")
+	n.sel = null
+	n.tgt = null
+	cambi.usciti.append(tit) # come dopo applica: uscito davvero dal campo
 	n._tocca(tit)
 	eq(n.sel, null, "chi è uscito non si sceglie")
 	check(not c.s.lineup.has(tit), "e non rientra")
