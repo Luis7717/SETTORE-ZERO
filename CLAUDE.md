@@ -457,6 +457,12 @@
   `capelli.gd`). Polsi di saluto, cuore, orecchie e silenzio rimisurati (`mosse/esultanza.gd`), `MANO_PALLA` del
   portiere più su. Foto di controllo: `-s res://tools/foto_modelli.gd -- --file=CARTELLA/x.png [--corsa=5]
   [--solo=N --viste=0,1,2,3 --tile=480x720]`; test `tests/test_proporzioni.gd`.
+- **Nome del campione con la tastiera del gioco** (Luis 2026-11-27, "se clicco Nome crasha l'app",
+  `scripts/menu/tastiera_nome.gd`): nell'editor del campione (scheda Nome) niente LineEdit né tastiera di iOS; il
+  nome è un tasto che apre una tastiera fatta di tasti del menu (QWERTY, accentate, ' . -, maiuscola automatica,
+  Cancella, Fatto; × o tocco fuori = nessun cambio). Il nome della squadra (`nuova_carriera.gd`) resta un LineEdit.
+  Controllo `test_editor_nuova_carriera_scheda_nome` (ogni scheda col suo tasto, nessun LineEdit, niente più largo
+  dello schermo).
 - **Stellina del campione** (Luis 2026-11-24): quando il controllato è il campione (`src.champ`) sopra di lui c'è una
   stellina gialla (`TV.stellina()`, ×`STELLA_K` 1,1) al posto del triangolo (`vista.gd` `_aggiorna_segni`).
 - **Nomi sopra i giocatori** (Luis 2026-11-26, `scripts/partita/nomi_giocatori.gd`): cognome (iniziale + cognome se
