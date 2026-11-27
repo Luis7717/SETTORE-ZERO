@@ -32,6 +32,7 @@ const PALCO_ALTO := 0.38         # frazione dello schermo (min(38vh, 320px) del 
 const PALCO_MAX := 320.0
 const PALCO_STEMMA := 0.34
 const FACCIA := 76.0             # lato del viso disegnato nel palco
+const NOME_MAX := 20             # lettere del nome del campione
 
 var flow := ""
 var mode := ""
@@ -42,6 +43,7 @@ var _anteprima: MenuAnteprima = null
 var _faccia: MenuFaccia = null
 var _stemma_grande: MenuStemma = null
 var _cartellino: Label = null
+var tastiera: MenuTastiera = null   # tastiera del nome aperta (scheda Nome)
 
 
 func prepara() -> void:
@@ -128,6 +130,9 @@ func colori_squadra() -> Array:
 
 
 func torna_indietro() -> void:
+	if tastiera != null and is_instance_valid(tastiera):   # prima si chiude la tastiera del nome
+		_chiudi_tastiera()
+		return
 	if flow == "new" and mode == "champ":
 		mode = "crest"
 		tab = "shape"
@@ -469,15 +474,12 @@ func _pannello_stemma() -> void:
 
 func _pannello_nome() -> void:
 	_riga("Nome", "")
-	var nome := LineEdit.new()
-	nome.text = str(d.name)
-	nome.max_length = 20
-	nome.custom_minimum_size.y = 52
-	nome.select_all_on_focus = false
-	nome.virtual_keyboard_type = LineEdit.KEYBOARD_TYPE_DEFAULT
-	nome.text_changed.connect(func(t: String) -> void:
-		d.name = t.left(20)
-		_aggiorna_palco())
+	# niente LineEdit né tastiera di iOS (Luis 2026-11-27: "se clicco Nome crasha l'app"): il nome è un tasto che
+	# apre la tastiera del gioco (tastiera_nome.gd)
+	var nome := U.bottone("%s  ·  cambia" % str(d.name), "Riga", _apri_tastiera, 52)
+	nome.name = "TastoNome"
+	nome.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	nome.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	corpo.add_child(nome)
 	var f := U.griglia(6, 6, 8) # 12 ruoli specifici: due righe da sei
 	var ruolo_ora: String = d.get("ruolo", D.Ruoli.PREDEFINITO.get(d.pos, "ATT"))
@@ -513,6 +515,23 @@ func _pannello_nome() -> void:
 		q.add_child(b)
 	corpo.add_child(q)
 	corpo.add_child(U.paragrafo("Il campione entra in rosa come un giovane forte della Terza Divisione (%s), con l'aspetto che hai scelto." % D.ruolo_nome(d.get("ruolo", d.pos)).to_lower(), 13.5))
+
+
+## tastiera del gioco per il nome; Fatto con un nome vuoto lascia quello di prima
+func _apri_tastiera() -> void:
+	_chiudi_tastiera()
+	tastiera = MenuTastiera.nuova(str(d.name), NOME_MAX, sicura, func(t: String) -> void:
+		if t != "":
+			d.name = t.left(NOME_MAX)
+		_chiudi_tastiera()
+		ridisegna(), _chiudi_tastiera)
+	add_child(tastiera)
+
+
+func _chiudi_tastiera() -> void:
+	if tastiera != null and is_instance_valid(tastiera):
+		tastiera.queue_free()
+	tastiera = null
 
 
 ## altezza e corporatura scelte (fisico.gd)

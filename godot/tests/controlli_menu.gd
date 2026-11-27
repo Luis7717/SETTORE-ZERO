@@ -432,6 +432,77 @@ func test_editor_nuova_squadra_crea_la_carriera_e_va_all_allenamento() -> bool:
 	return done()
 
 
+## Nuova carriera → stemma → campione: ogni scheda (Viso, Capelli, Divisa, Nome, Esultanza) si apre col tasto vero,
+## senza LineEdit (niente tastiera di iOS) e senza uscire di lato dallo schermo; nella scheda Nome il nome si cambia
+## con la tastiera del gioco (Luis 2026-11-27: "se clicco Nome crasha l'app")
+func test_editor_nuova_carriera_scheda_nome() -> bool:
+	var c := Carriera.new()
+	c.percorso = SALVA
+	_inizia(c)
+	var n := _apri("editor", {"flow": "new", "club": "Prova Nome", "kit": 3})
+	n._conferma()
+	eq(n.mode, "champ", "dopo lo stemma il campione")
+	var largo := n.get_viewport_rect().size.x
+	for sk: Array in n.schede_del_modo():
+		var tasto := _tasto_con_testo(n.fisso_sopra, str(sk[1]))
+		check(tasto != null, "tasto della scheda %s" % sk[1])
+		if tasto == null:
+			continue
+		tasto.pressed.emit()
+		tasto.button_up.emit()   # come il dito vero: dopo pressed arriva button_up (tasto già tolto)
+		eq(n.tab, str(sk[0]), "scheda %s aperta" % sk[1])
+		check(n.corpo.get_child_count() > 0, "scheda %s non vuota" % sk[1])
+		eq(n.find_children("*", "LineEdit", true, false).size(), 0, "scheda %s senza LineEdit" % sk[1])
+		var w := n.corpo.get_combined_minimum_size().x
+		check(w <= largo, "scheda %s larga %.0f su %.0f" % [sk[1], w, largo])
+		if sk[0] == "me":
+			_scrivi_nome(n)
+	_finisci(n)
+	return done()
+
+
+# scheda Nome: tasto del nome → tastiera del gioco → cancella, scrive, Fatto; poi × chiude senza cambiare
+func _scrivi_nome(n: MenuSchermata) -> void:
+	var tasto_nome := n.corpo.find_child("TastoNome", true, false) as Button
+	check(tasto_nome != null, "tasto del nome")
+	if tasto_nome == null:
+		return
+	tasto_nome.pressed.emit()
+	var k: MenuTastiera = n.tastiera
+	check(k != null and k.is_inside_tree(), "tastiera aperta")
+	if k == null:
+		return
+	for i in 30:
+		_tasto_con_testo(k, "Cancella").pressed.emit()
+	eq(k.testo, "", "tutto cancellato")
+	for t: String in ["D", "e", "spazio", "R", "o", "s", "s", "i"]:
+		var b := _tasto_con_testo(k, t)
+		check(b != null, "tasto %s" % t)
+		if b != null:
+			b.pressed.emit()
+	eq(k.testo, "De Rossi", "maiuscola da sola all'inizio e dopo lo spazio")
+	_tasto_con_testo(k, "Fatto").pressed.emit()
+	eq(str(n.d.name), "De Rossi", "il nome scritto va al campione")
+	check(n.tastiera == null, "tastiera chiusa")
+	var dopo := n.corpo.find_child("TastoNome", true, false) as Button
+	check(dopo != null and dopo.text.begins_with("De Rossi"), "il tasto mostra il nome nuovo")
+	if dopo == null:
+		return
+	dopo.pressed.emit()
+	_tasto_con_testo(n.tastiera, "x").pressed.emit()   # dopo "i" minuscola
+	_tasto_con_testo(n.tastiera, "×").pressed.emit()
+	eq(str(n.d.name), "De Rossi", "× chiude senza cambiare")
+	n._casuale()   # Casuale nella scheda Nome: nome nuovo
+	check(str(n.d.name) != "" and str(n.d.name) != "De Rossi", "nome a caso")
+
+
+func _tasto_con_testo(radice: Node, t: String) -> Button:
+	for b: Node in radice.find_children("*", "Button", true, false):
+		if (b as Button).text == t:
+			return b
+	return null
+
+
 func test_dopo_partita_continua_porta_alla_fine_stagione() -> bool:
 	_inizia(_carriera())
 	var stagione := {"pos": 2, "prize": 140, "bonus": 70, "outcome": "up", "div": 2, "newDiv": 1}
