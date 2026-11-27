@@ -13,6 +13,8 @@ const T_POLPACCIO := 0.77    # in volo: il pallone è salito a metà polpaccio d
 const Z_PIANTA := 0.33       # davanti al corpo quando il piede lo scavalca
 const Z_POLPACCIO := -0.06    # sul polpaccio (gamba piegata, stinco inclinato) a metà salita ...
 const H_POLPACCIO := 0.44    # ... alto tanto
+const APRE := 0.3            # rad: il piede dietro tiene la punta girata verso il lato scelto mentre stringe e porta su ...
+const LARGO_S := 0.1         # ... e la gamba davanti, nel saltello, sta tanto dalla sua parte (m del modello): gambe staccate
 const SALTO := 0.08          # di quanto sale il bacino nel saltello (m del modello): le gambe si raccolgono sotto
 # parte B: corsa a testa alta verso il pallone che scende
 const PASSO_B := 0.16        # s tra due appoggi (falcata vera, non passettini)
@@ -45,11 +47,12 @@ static func a(c: Coreo, S: float, _g: float) -> void:
 	c.appoggia_palla(pS, tp, Vector3(S * 0.02, K.H, 0.2), 0.0, 0.1)
 	c.stacca(pF, tp + 0.01)
 	# --- piede dietro: il collo dietro il pallone (punta in giù), poi sotto, e lo porta su lungo il polpaccio
-	c.tocca(pF, ts, "instep", Vector3(0, 0.95, 0), {"resta": true}, 0.07)
-	c.tocca(pF, tm, "instep", Vector3(0, 0.45, 0), {"rel": Vector3(S * 0.02, 0, Z_POLPACCIO), "h": H_POLPACCIO, "lega": true})
+	# (punta girata verso il lato scelto: la caviglia resta dalla sua parte e le due gambe non si attraversano)
+	c.tocca(pF, ts, "instep", Vector3(S * APRE, 0.95, 0), {"resta": true}, 0.07)
+	c.tocca(pF, tm, "instep", Vector3(S * APRE, 0.45, 0), {"rel": Vector3(S * 0.02, 0, Z_POLPACCIO), "h": H_POLPACCIO, "lega": true})
 	# --- saltello: il piede davanti stacca, resta basso sotto il pallone, poi la gamba si piega indietro: colpo di tacco
 	c.stacca(pS, ts + 0.01)
-	c.passa(pS, tm, Vector3(S * 0.03, 0.28, Z_POLPACCIO + 0.06), Vector3(0, 0.6, 0), 0.0)
+	c.passa(pS, tm, Vector3(S * LARGO_S, 0.28, Z_POLPACCIO + 0.06), Vector3(0, 0.6, 0), 0.0)
 	c.tocca(pS, tk, "heel", Vector3(0, 1.25, 0), {"rel": Vector3(S * 0.02, 0, da), "h": dh - 0.02}, 0.0)
 	c.passa(pS, tk + 0.07, Vector3(S * 0.08, 0.72, -0.3), Vector3(0, 1.6, 0), 0.0)
 	# il piede dietro lascia il pallone e scende: è lui che atterra (subito dopo il colpo di tacco)

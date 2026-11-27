@@ -48,7 +48,7 @@ static func a(c: Coreo, S: float, g: float) -> void:
 # un giro del piede `s` (lato dir) intorno al davanti del pallone: entra da dietro-dentro, passa alto davanti al
 # pallone con la punta in dentro, esce fuori e appoggia largo accanto al pallone
 static func _giro(c: Coreo, s: String, dir: float, ta: float, per: float) -> void:
-	c.passa_palla(s, ta + 0.3 * per, Vector3(-dir * 0.1, 0.17, -0.12), Vector3(-dir * 0.3, 0.3, 0), 0.03)
+	c.passa_palla(s, ta + 0.3 * per, Vector3(-dir * 0.03, 0.17, -0.12), Vector3(-dir * 0.3, 0.3, 0), 0.03)
 	c.passa_palla(s, ta + 0.56 * per, Vector3(dir * 0.02, GIRO_ALTO, GIRO_AVANTI), Vector3(dir * 0.1, 0.3, 0), 0.02)
 	c.passa_palla(s, ta + 0.8 * per, Vector3(dir * 0.32, GIRO_ALTO - 0.07, GIRO_AVANTI - 0.04), Vector3(dir * 0.45, 0.2, 0), 0.0)
 	c.appoggia_palla(s, ta + per, Vector3(dir * LARGO, K.H, 0.02), dir * 0.4, 0.0)

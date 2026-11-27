@@ -25,10 +25,11 @@ const Skill := preload("res://sim/skill.gd")
 
 const GO := 0.35               # scatto previsto (s; quello vero arriva con 'dribble_go' e riprogramma la parte B)
 const T_CONTRASTO := 0.2       # fallito: il piede del difensore arriva sul pallone dopo tanto (s)
-const ALLUNGO := 0.82          # il difensore allunga la gamba al massimo a questa frazione della sua lunghezza
+const ALLUNGO := 0.95          # il difensore allunga la gamba (bassa, verso il pallone) al massimo a questa frazione della sua lunghezza
 # giochetti della persona (ordine di sim/skill.gd)
 const FINTE := Sk.IDS
 const STILE_DIF := {"tunnel": "gambe", "sombrero": "alto", "bicicletta": "alto", "fintatiro": "blocco"}
+const GAMBE_LARGHE := 0.22      # tunnel: ogni piede del difensore sta tanto più in fuori dell'anca (m del modello)
 const BR_RIPOSO := Sk.BR_RIPOSO
 
 ## solo per le prove (prova_vista --giochetto=...) quando il motore non dice il giochetto: giochetto fisso
@@ -97,11 +98,22 @@ static func difensore_vuoto(c: Coreo, lato: float, show: float, palla: Callable,
 	match String(c.dati.stile):
 		"gambe":
 			# passo di lato: resta a gambe larghe davanti al pallone
-			c.appoggia(pL, ta, Vector2(L * 0.42, 0.04), L * 0.3, 0.07)
+			# (i due piedi si allargano di qua e di là di dove sarà il corpo al calcio: il pallone gli passa in mezzo)
+			# (indietreggia davanti al portatore fino al calcio: ogni piede atterra dove sarà il corpo in quel momento,
+			# così al calcio sono alla pari, uno di qua e uno di là)
+			var tl := maxf(ta, show - 0.1)
+			var tr := show - 0.03
+			c.appoggia_corsa(pL, tl, 2.0 * (show - tl), Vector2(L * GAMBE_LARGHE, 0.0), 0.07)
+			c.stacca(pO, tl - 0.04)
+			c.appoggia_corsa(pO, tr, 2.0 * (show - tr), Vector2(-L * GAMBE_LARGHE, 0.0), 0.04)
 			c.chiave_bacino(ta, Vector3(L * 0.1, 0.84, 0.0))
 			c.chiave_angoli(ta, Vector3(L * 0.1, 0.1, L * 0.04))
 			c.chiave_busto(ta, Vector3(0.16, L * 0.1, 0))
 			Sk.braccia(c, ta, pL, Vector3(0.37, -0.2, 0.08), Vector3(0.36, -0.2, 0.1))
+			# ... e al calcio è in mezzo ai due piedi, basso sulle ginocchia
+			c.chiave_bacino(show, Vector3(0, 0.83, 0.0))
+			c.chiave_angoli(show, Vector3(0, 0.1, 0))
+			c.chiave_busto(show, Vector3(0.2, 0, 0))
 		"alto":
 			c.appoggia(pL, ta, Vector2(L * 0.3, 0.06), L * 0.3, 0.06)
 			c.chiave_bacino(ta, Vector3(L * 0.05, 0.86, 0.02))
@@ -138,21 +150,30 @@ static func difensore_go(c: Coreo, ritardo: float = 0.03) -> void:
 	var t1 := tg + ritardo
 	match String(c.dati.get("stile", "affondo")):
 		"gambe":
-			# il pallone gli passa tra le gambe: si piega a guardare, le ginocchia si chiudono tardi, poi si gira
-			c.chiave_bacino(t1 + 0.18, Vector3(0, 0.78, -0.06))
-			c.chiave_angoli(t1 + 0.18, Vector3(0, 0.3, 0))
-			c.chiave_busto(t1 + 0.18, Vector3(0.7, 0, 0))
-			Sk.braccia(c, t1 + 0.18, pL, Vector3(0.1, -0.5, 0.2), Vector3(0.1, -0.5, 0.2))
-			c.stacca(pO, t1 + 0.2)
-			c.appoggia(pO, t1 + 0.32, Vector2(-L * 0.1, 0.0), 0.0, 0.04)
-			c.chiave_bacino(t1 + 0.55, Vector3(0, 0.9, -0.04))
-			c.chiave_angoli(t1 + 0.55, Vector3(0, 0.1, 0))
-			c.chiave_busto(t1 + 0.55, Vector3(0.2, 0, 0))
-			c.stacca(pL, t1 + 0.5)
-			c.appoggia(pL, t1 + 0.64, Vector2(L * 0.13, 0.04), 0.0, 0.08)
-			Sk.braccia(c, t1 + 0.6, pL, BR_RIPOSO, BR_RIPOSO)
-			c.yaw_fisso_fino = t1 + 0.4
-			c.fine = t1 + 0.72
+			# il pallone gli passa tra le gambe: resta piantato a gambe larghe (si vede il pallone passare in mezzo),
+			# abbassa la testa a guardarlo, braccia larghe; se ne accorge tardi: si torce a guardarlo dietro di sé
+			# dalla parte da cui passa il portatore (−L), chiude le gambe e si gira
+			c.niente_passi_fino = t1 + 0.44
+			c.chiave_bacino(t1 + 0.16, Vector3(0, 0.83, -0.02))
+			c.chiave_angoli(t1 + 0.16, Vector3(0, 0.12, 0))
+			c.chiave_busto(t1 + 0.16, Vector3(0.34, 0, 0))
+			Sk.braccia(c, t1 + 0.16, pL, Vector3(0.4, -0.2, 0.12), Vector3(0.4, -0.2, 0.12))
+			c.chiave_sguardo(t1 + 0.1, 1.0)
+			c.chiave_bacino(t1 + 0.44, Vector3(0, 0.86, -0.02))
+			c.chiave_angoli(t1 + 0.44, Vector3(-L * 0.1, 0.08, 0))
+			c.chiave_busto(t1 + 0.44, Vector3(0.14, 0, -L * 0.45))
+			Sk.braccia(c, t1 + 0.44, pL, Vector3(0.3, -0.26, -0.16), Vector3(0.36, -0.16, 0.2))
+			c.chiave_sguardo(t1 + 0.44, 0.3, -L * 0.6)
+			c.stacca(pO, t1 + 0.46)
+			c.appoggia(pO, t1 + 0.6, Vector2(-L * 0.2, 0.0), 0.0, 0.05)
+			c.chiave_bacino(t1 + 0.7, Vector3(0, 0.9, -0.04))
+			c.chiave_angoli(t1 + 0.7, Vector3(0, 0.1, 0))
+			c.chiave_busto(t1 + 0.7, Vector3(0.18, 0, 0))
+			c.stacca(pL, t1 + 0.6)
+			c.appoggia(pL, t1 + 0.74, Vector2(L * 0.16, 0.04), 0.0, 0.08)
+			Sk.braccia(c, t1 + 0.74, pL, BR_RIPOSO, BR_RIPOSO)
+			c.yaw_fisso_fino = t1 + 0.5
+			c.fine = t1 + 0.8
 		"alto":
 			# il pallone gli passa sopra: testa in su, busto indietro, braccia su, un passo indietro, poi si gira
 			c.chiave_bacino(t1 + 0.16, Vector3(0, 0.93, -0.1))
@@ -184,7 +205,8 @@ static func _affondo_go(c: Coreo, t1: float) -> void:
 	var wc: WeakRef = weakref(c)   # (la funzione resta negli eventi di c: senza, c terrebbe in vita sé stessa)
 	var allunga := func() -> Vector3:
 		if not memo.has("p"):
-			memo["p"] = (wc.get_ref() as Coreo).verso(palla.call(), ALLUNGO, 0.12)
+			var cc := wc.get_ref() as Coreo
+			memo["p"] = cc.dal_suo_lato(pO, cc.verso(palla.call(), ALLUNGO, 0.12), 0.1)
 		return memo.p
 	var blocco := String(c.dati.get("stile", "")) == "blocco"
 	if blocco:

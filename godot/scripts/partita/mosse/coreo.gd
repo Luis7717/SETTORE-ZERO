@@ -33,6 +33,12 @@ const PALLA_R := 0.16         # raggio del pallone a schermo (m del gioco: vista
 const ANCA := 0.115           # m del modello: anca di lato rispetto al bacino
 const YAW_K := 14.0           # 1/s: il verso mostrato va verso quello voluto con questa rapidità...
 const YAW_V := 9.0            # ... e al massimo a questa velocità (rad/s)
+# gambe mai deformate (Luis 2026-11-26: "alla fine della veronica le gambe si deformavano", "le gambe lampeggiano"):
+const TORSIONE_MAX := 1.2     # rad: un piede a terra girato più di così rispetto al corpo gira sul posto con lui (perno)
+const GINOCCHIO_YAW := 1.0    # rad: il ginocchio punta dove punta il piede, ma mai più di così di lato rispetto al corpo
+const GINOCCHIO_PITCH := 1.2  # rad: ... e con la punta molto in giù (tacco, collo) resta in avanti
+const VOLO_MAX := 0.3         # s: un piede in volo senza un punto dove andare entro tanto appoggia da solo
+const ALLUNGO_VOLO := 0.985   # frazione della gamba: un piede in volo non va più lontano dall'anca (gamba stirata)
 
 var t := 0.0
 var fine := INF               # fine dell'episodio (s); poi ESCE di uscita
@@ -88,6 +94,7 @@ var _fin_coda := -1.0         # fino a quando dura il ritorno al pallone del mot
 var _fin_t := 0.0
 var _fin_d := Vector3.ZERO
 var _fin_dh := 0.0
+var niente_passi_fino := -INF  # fino a qui (s) i piedi a terra non fanno passi da soli (posa piantata voluta: il tunnel)
 var presa := Callable()       # chiamata (senza argomenti) quando il portatore riprende il pallone staccato
 
 
@@ -245,6 +252,16 @@ func taglia(tt: float, anche_palla: bool = true) -> void:
 			if float(e.t) <= tt:
 				ev.append(e)
 		_piedi[s].ev = ev
+		# un piede in volo riparte da dov'è adesso verso il suo nuovo punto (sennò salterebbe: il punto di partenza
+		# del volo era quello del passo cancellato, di qualche decimo di secondo fa)
+		var f: Dictionary = _piedi[s]
+		if not f.terra:
+			f.da = f.pos
+			f.da_t = tt
+			f.da_yaw = f.yaw
+			f.da_pitch = f.pitch
+			f.da_roll = f.roll
+			f.su = null
 	if not anche_palla:   # il pallone continua come programmato (è in volo: sombrero, arcobaleno)
 		return
 	var tk: Array = []
@@ -261,13 +278,29 @@ func pallone_previsto(tt: float) -> Vector3:
 	return _palla_pos + _palla_v * maxf(0.0, tt - t)
 
 
-## caviglia (mondo) verso `punto` a altezza h (m del modello), al massimo a frac della gamba dal bacino
+## caviglia (mondo) verso `punto` ad altezza h (m del modello), fin dove arriva la gamba tesa a frac della sua
+## lunghezza restando a quell'altezza (un affondo basso: se il punto è lontano il piede non sale verso di lui)
 func verso(punto: Vector3, frac: float, h: float) -> Vector3:
 	var bac := _bacino_mondo()
-	var q := Vector3(punto.x, h * _scala.y, punto.z)
-	var d := q - bac
 	var lim := frac * GAMBA * _scala.y
-	return bac + d.normalized() * lim if d.length() > lim else q
+	var hy := h * _scala.y
+	var oriz := sqrt(maxf(0.0, lim * lim - (bac.y - hy) * (bac.y - hy)))
+	var d := Vector3(punto.x - bac.x, 0.0, punto.z - bac.z)
+	if d.length() > oriz:
+		d = d.normalized() * oriz
+	return Vector3(bac.x + d.x, hy, bac.z + d.z)
+
+
+## punto q (mondo) spostato, se serve, perché stia dal lato del piede s di almeno min_x (m del modello) rispetto alla
+## mezzeria del corpo com'è adesso: una gamba allungata non passa davanti all'altra
+func dal_suo_lato(s: String, q: Vector3, min_x: float) -> Vector3:
+	var rot := Basis(Vector3.UP, yaw)
+	var loc := rot.inverse() * (q - _pos)
+	var x: float = loc.x * Corpo.SIDE[s]
+	if x >= min_x * _scala.x:
+		return q
+	loc.x = min_x * _scala.x * Corpo.SIDE[s]
+	return _pos + rot * loc
 
 
 func _metti(nome: String, tt: float, v: Vector3) -> void:
@@ -380,12 +413,31 @@ func passo(dt: float, p: Object, b: Object) -> void:
 	else:
 		peso = minf(1.0, peso + dt / ENTRA) if dt > 0.0 else peso
 	_aggiorna_palla()
-	for s: String in ["l", "r"]:
-		_aggiorna_piede(s)
-	_passi_automatici()
+	if t >= fine and peso <= 0.0:
+		# il corpo è tornato al clip di corsa (resta solo il pallone staccato da inseguire): i piedi seguono il corpo,
+		# così se la coreografia riprende (la presa del pallone) ripartono da sotto le anche e non da dov'erano
+		# rimasti, metri indietro (gamba stirata all'indietro per un attimo)
+		_piedi_sotto_il_corpo()
+	else:
+		for s: String in ["l", "r"]:
+			_aggiorna_piede(s)
+		_passi_automatici()
 	# finita la coreografia del corpo, resta finché comanda ancora il pallone (staccato: il portatore lo sta inseguendo)
 	if t >= fine and peso <= 0.0 and not _palla_staccata():
 		finito = true
+
+
+func _piedi_sotto_il_corpo() -> void:
+	for s: String in ["l", "r"]:
+		var f: Dictionary = _piedi[s]
+		f.terra = false
+		f.pos = mondo_a(t, Vector3(Corpo.SIDE[s] * ANCA, Corpo.ANKLE_H + 0.04, 0.0))
+		f.yaw = yaw
+		f.pitch = 0.0
+		f.roll = 0.0
+		f.su = null
+		(f.ev as Array).clear()
+		_stacca_ora(f, t)
 
 
 func _palla_staccata() -> bool:
@@ -522,6 +574,11 @@ func _aggiorna_piede(s: String) -> void:
 				f.su = {"part": e.part, "ang": e.ang} if e.tipo == "tocco" else null
 	if f.terra:
 		f.su = null
+		# perno: girato troppo rispetto al corpo (che intanto ha girato: veronica, il difensore che si volta), il piede
+		# gira sul posto insieme a lui
+		var tors := wrapf(float(f.yaw) - yaw, -PI, PI)
+		if absf(tors) > TORSIONE_MAX:
+			f.yaw = yaw + signf(tors) * TORSIONE_MAX
 		return
 	# in volo: dal punto di prima al prossimo punto (appoggio, tocco o passaggio)
 	var nx: Dictionary = {}
@@ -529,7 +586,9 @@ func _aggiorna_piede(s: String) -> void:
 		if e.tipo != "stacca":
 			nx = e
 			break
-	if nx.is_empty():   # nessun appoggio programmato: appoggia presto sotto l'anca
+	# nessun movimento programmato, o solo tra un bel po' (il passo che stava facendo è stato tagliato dallo scatto):
+	# appoggia presto sotto l'anca, non resta sospeso a mezz'aria ad aspettarlo
+	if nx.is_empty() or float(nx.t) > maxf(t, float(f.da_t)) + VOLO_MAX:
 		nx = {"t": t + PASSO_AUTO * 0.5, "tipo": "appoggia", "rel": Vector2(Corpo.SIDE[s] * ANCA, 0.08), "yaw": 0.0, "alto": PASSO_ALTO * 0.5}
 		ev.append(nx)
 		ev.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a.t) < float(b.t))
@@ -547,7 +606,7 @@ func _aggiorna_piede(s: String) -> void:
 		var a0: Vector3 = f.su.ang
 		var qs := _piede_su(s, String(nx.part), a0.lerp(nx.ang, e2), _palla_pos, _palla_h, yaw_a(t))
 		f.pos = qs.pos
-	f.pos = _fuori_ostacolo(f.pos)
+	f.pos = _entro_gamba(s, _fuori_ostacolo(f.pos))
 	f.yaw = lerp_angle(float(f.da_yaw), float(q.yaw), e2)
 	# punta in giù a metà passo verso un appoggio; verso un tocco la posa del tocco
 	var giu := 0.35 * sin(PI * u) if nx.tipo == "appoggia" else 0.0
@@ -614,6 +673,25 @@ func _piede_su(s: String, part: String, ang: Vector3, bp: Vector3, h: float, yb:
 	return {"pos": q, "yaw": yb + ang.x, "pitch": ang.y, "roll": ang.z}
 
 
+# anca del lato s nel mondo (il bacino con le sue inclinazioni di adesso)
+func _anca_mondo(s: String) -> Vector3:
+	var an: Vector3 = _curva("angoli").at(t)
+	var tr := Corpo.trunk(_curva("bacino").at(t), Corpo.q_body(an.x, an.y, an.z), Vector3.ZERO)
+	return _pos + Basis(Vector3.UP, yaw).scaled(_scala) * Corpo.hip(tr, s)
+
+
+# caviglia in volo (mondo) riportata a portata di gamba: mai più lontana dall'anca di ALLUNGO_VOLO della gamba
+func _entro_gamba(s: String, q: Vector3) -> Vector3:
+	var anca := _anca_mondo(s)
+	var d := q - anca
+	var lim := ALLUNGO_VOLO * GAMBA * _scala.y
+	if d.length() <= lim:
+		return q
+	var r := anca + d.normalized() * lim
+	r.y = maxf(r.y, Corpo.ANKLE_H * _scala.y * 0.9)
+	return r
+
+
 # punto (caviglia, mondo) portato fuori dal cilindro intorno all'altro giocatore
 func _fuori_ostacolo(q: Vector3) -> Vector3:
 	if not ostacolo.is_valid():
@@ -637,6 +715,8 @@ func altro() -> Vector3:
 
 # un piede a terra troppo lontano dall'anca (il motore ha portato via il corpo) fa da solo un passo
 func _passi_automatici() -> void:
+	if t < niente_passi_fino:
+		return
 	var bac := _bacino_mondo()
 	var rot := Basis(Vector3.UP, yaw).scaled(_scala)
 	for s: String in ["l", "r"]:
@@ -659,9 +739,11 @@ func _passi_automatici() -> void:
 		if not altro.terra and anca.distance_to(f.pos) <= SALTELLO * GAMBA * _scala.y:
 			continue
 		_stacca_ora(f, t)
+		# il prossimo movimento già programmato per questo piede (appoggio, tocco o passaggio): se è a momenti il piede
+		# ci vola direttamente; un appoggio automatico in mezzo lo farebbe atterrare e ripartire in due fotogrammi
 		var nx: Dictionary = {}
 		for e: Dictionary in f.ev:
-			if e.tipo == "appoggia":
+			if e.tipo != "stacca":
 				nx = e
 				break
 		if nx.is_empty() or float(nx.t) > t + PASSO_AUTO * 1.5:
@@ -702,8 +784,13 @@ func frame(N: Transform3D, palla_mondo: Vector3, palla_h: float = 0.0) -> Dictio
 		var x: float = Corpo.SIDE[s]
 		arms[s] = {"hand": Corpo.shoulder(tr, s) + q3 * Vector3(off.x * x, off.y, off.z), "pole": q3 * Vector3(0.35 * x, -0.25, -1)}
 		var f: Dictionary = _piedi[s]
-		var fq := Corpo.q_body(wrapf(float(f.yaw) - yaw, -PI, PI), float(f.pitch), float(f.roll))
-		legs[s] = {"ankle": inv * (f.pos as Vector3), "fq": fq, "pole": Mossa._knee_dir(fq)}
+		var fy := wrapf(float(f.yaw) - yaw, -PI, PI)
+		var fq := Corpo.q_body(fy, float(f.pitch), float(f.roll))
+		# il ginocchio punta dove punta il piede, ma sempre davanti al corpo (mai al contrario)
+		# (col seno: continuo anche quando il piede è girato all'indietro, dove un limite secco salterebbe da un lato all'altro)
+		var gq := Corpo.q_body(GINOCCHIO_YAW * sin(clampf(fy, -PI, PI)) if absf(fy) > GINOCCHIO_YAW else fy,
+			clampf(float(f.pitch), -0.6, GINOCCHIO_PITCH), 0.0)
+		legs[s] = {"ankle": inv * (f.pos as Vector3), "fq": fq, "pole": Mossa._knee_dir(gq)}
 	return {"t": t, "pelvis": {"p": bp, "q": pq}, "yaw": an.x, "rot": tr.q, "legs": legs, "arms": arms}
 
 
