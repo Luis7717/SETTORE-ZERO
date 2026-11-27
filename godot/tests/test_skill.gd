@@ -42,7 +42,7 @@ func test_sedici_giochetti_con_i_campi_giusti() -> bool:
 	for s: Dictionary in Skill.LISTA:
 		check(not visti.has(s.id), "id unico: %s" % s.id)
 		visti[s.id] = true
-		check(float(s.show) >= 0.3 and float(s.show) <= 0.6, "%s: durata sensata (%.2f s)" % [s.id, s.show])
+		check(float(s.show) >= 0.3 and float(s.show) <= 0.7, "%s: durata sensata (%.2f s)" % [s.id, s.show])
 		check(float(s.dri) >= prima, "%s: in ordine di difficoltà" % s.id)
 		prima = float(s.dri)
 		check(String(s.name) != "", "%s: nome a schermo" % s.id)

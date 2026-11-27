@@ -18,7 +18,7 @@ const K := preload("comune.gd")
 # del giro della parte A vengono riscritte nel riferimento della parte B (verso del motore) perché la velocità del giro
 # non cambi allo scatto. I piedi appoggiano davvero: passi corti e saltelli di perno che seguono il giro.
 # Posizioni nel "riferimento della corsa": x sinistra, z nel verso della corsa (all'inizio in A, del motore in B).
-const VER_W := 9.0             # rad/s: velocità del giro (un giro intero in 0,7 s: una veronica svelta, in corsa)
+const VER_W := 7.5             # rad/s: velocità del giro (un giro intero in 0,84 s; era 9 con show 0,5: troppo svelta da leggere)
 const VER_A1 := 0.45           # rad: giro già fatto quando la prima suola tocca il pallone
 const VER_T1 := 0.1            # s: prima suola sul pallone
 const VER_FRENA := 0.09        # s: la prima suola resta sul pallone (lo frena)
