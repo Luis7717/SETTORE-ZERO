@@ -1910,3 +1910,14 @@ largo), non sui nomi delle formazioni: valgono anche per le formazioni nuove.
   27% che copriva il portatore nel momento chiave.
 - **Non fatto**: la richiesta facoltativa della croqueta (scatto dalla direzione portatore→difensore salvata
   all'inizio del giochetto): tocca la corsa dopo ogni giochetto con `lat` negativo e andava misurata a parte; lasciata.
+- **Numeri** (`controllo_gameplay`, 10 partite 2×150 s, forza 60, seme 1): con la sola correzione del motore
+  (duello/fuga durante l'inseguimento) tutto identico a prima (a forza 60 tunnel e pallonetti non escono quasi mai).
+  Con la tabella nuova (i giochetti durano un tempo diverso, quindi le partite cambiano dal primo dribbling): V/N/P
+  4/4/2 → 4/4/2, gol 1,0-0,6 → 0,7-0,4, tiri 3,1-7,1 → 2,1-7,5, Dribbling 15,8 a partita (riusciti 51% → 44%: la
+  probabilità è la stessa, cambia il campione), rallenty del dribbling 49 → 50 s veri a partita, "dopo il dribbling
+  riuscito" perso 8 → 8; un "portatore umano fuori" in 10 partite (prima 0; nel controllo precedente erano 1-4 su 40):
+  da tenere d'occhio, campione piccolo.
+- **Ancora debole**: nelle misure una gamba a terra arriva per un attimo a 1,10 della sua lunghezza (croqueta,
+  sombrero, pedalata: il piede scivola ~10 cm); finta e giro e veronica tengono le due gambe più vicine del limite
+  degli altri; su iPhone col notch la nota del nome può toccare la cronaca; il confronto ravvicinato del tunnel
+  (`prova_vista`) finisce col portatore che rallenta perché lì non c'è la guida automatica (in partita prosegue).
