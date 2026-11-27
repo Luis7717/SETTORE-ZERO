@@ -56,7 +56,7 @@ const TOWN := ["Borgoalto", "Roccamarina", "Valdoro", "Monteluce", "Pietrafina",
 ## campione creato nell'editor: un buon giovane della Terza Divisione (le squadre lì stanno tra 50 e 60)
 const CHAMP_LEVEL := 62
 # momenti: false = partita intera, true = momenti chiave (~10 azioni, il resto simulato: scripts/partita/momenti.gd)
-# nomi (Luis 2026-11-26): nomi sopra i giocatori in partita, "tutti" / "pallone" (portatore e controllato) / "nessuno"
+# nomi (Luis 2026-11-26): nomi sopra i giocatori in partita, "tutti" (rallenty: i miei; in gioco: il portatore) / "pallone" (sempre portatore e controllato) / "nessuno"
 # gkManuale (Luis 2026-11-23): parata col dito, fermatempo e bersaglio, da provare; predefinito no = portiere automatico,
 # anche per i salvataggi vecchi (la vecchia chiave autoGk resta nel salvataggio ma non conta più: portiere_auto)
 const SETTINGS_DEFAULT := {"half": 150, "diff": 1, "sound": true, "autoGk": false, "music": true, "vibra": true, "momenti": false, "gkManuale": false, "nomi": "tutti"}

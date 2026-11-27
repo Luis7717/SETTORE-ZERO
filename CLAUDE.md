@@ -462,8 +462,12 @@
   nome già scritto o copre il pallone si salta; i lontanissimi (sotto `PPM_MINIMO`) non si scrivono, nelle visuali
   molto vicine (dribbling, angolo, rimessa: `PPM_PIENO`..`PPM_SPARISCE` 40-60 px per metro) sbiadiscono. Nascosti in
   pausa, replay, scena del cambio, esultanza del campione e fermatempo di colpo di testa e parata (`_aggiorna_nomi` in
-  `gioco.gd`). Impostazioni → **Nomi sopra i giocatori**: Tutti (predefinito) / Solo pallone e controllato / Nessuno,
-  chiave nuova `settings.nomi` ("tutti" | "pallone" | "nessuno"), passata dall'app come opzione `nomi` di `avvia()`;
+  `gioco.gd`). **Quando** (Luis 2026-11-27, modo "tutti"): solo nel **rallenty** (tempo sotto `RALLENTY_SOTTO`: duello,
+  fuga, area di tiro, dribbling, dito che disegna) e solo i **miei** giocatori; in gioco normale solo il **portatore**
+  (di tutte e due le squadre), pallone di nessuno = nessun nome (`_in_regola`, candidati con `team`/`portatore`).
+  Impostazioni → **Nomi sopra i giocatori**: Rallenty e portatore ("tutti", predefinito) / Sempre pallone e
+  controllato ("pallone": portatore e controllato sempre) / Nessuno,
+  chiave `settings.nomi` ("tutti" | "pallone" | "nessuno"), passata dall'app come opzione `nomi` di `avvia()`;
   prova: `--nomi=...`. Test `tests/test_nomi.gd`.
 - **Maglie di casa e trasferta** (Luis 2026-11-24, `scripts/carriera/divise.gd`, applicate in `app.gd` `_partita`):
   casa = colori della squadra, trasferta = maglia fissa per colore (`TRASFERTA`, chiara per le scure e scura per le
