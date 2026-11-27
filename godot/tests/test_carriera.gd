@@ -55,7 +55,7 @@ static func _senza_sub(sq: Dictionary) -> Dictionary:
 	return c
 
 
-## stato della carriera senza quello che il web non ha: impostazioni music, vibra, momenti e gkManuale, chiavi della fase B
+## stato della carriera senza quello che il web non ha: impostazioni music, vibra, momenti, gkManuale e nomi, chiavi della fase B
 ## (CHIAVI_GODOT: forma, infortuni, obiettivo, rivale, ...) e le sotto-statistiche `sub` dei giocatori
 static func come_web(s: Dictionary) -> Dictionary:
 	var c: Dictionary = s.duplicate(true)
@@ -63,6 +63,7 @@ static func come_web(s: Dictionary) -> Dictionary:
 	c.settings.erase("vibra")
 	c.settings.erase("momenti")
 	c.settings.erase("gkManuale")
+	c.settings.erase("nomi")
 	for k: String in CarrieraScript.CHIAVI_GODOT:
 		c.erase(k)
 	for p: Variant in c.get("squad", []): # statistiche dettagliate (sim/sottostat.gd): solo Godot

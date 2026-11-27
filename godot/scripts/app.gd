@@ -42,6 +42,7 @@ const ProveApp := preload("res://scripts/app_prove.gd")
 const AudioPartita := preload("res://scripts/partita/audio_partita.gd")
 const Meteo := preload("res://scripts/partita/meteo.gd")
 const DiviseScript := preload("res://scripts/carriera/divise.gd")
+const NomiGiocatori := preload("res://scripts/partita/nomi_giocatori.gd")
 const MUSICA := "res://assets/audio/music.mp3"
 const MUSICA_VOLUME := 0.35     # come Sfx.music del web (gain 0,35)
 const CLIC_HZ := 520.0          # tocco: come Sfx.click del web (triangolo 520 Hz, 0,05 s, volume 0,12)
@@ -191,7 +192,7 @@ func _partita(tipo: String, avversario: Dictionary, titolo: String, durata: floa
 	# squadraPartita: niente infortunati, chi è giù di forma parte stanco
 	var opz := {"squadra_a": carriera.squadraPartita(), "squadra_b": avversario, "me": 0, "tipo": tipo,
 		"durata_tempo": durata, "seme": randi() % 1000000000, "titolo": titolo, "autoGk": Carriera.portiere_auto(s.settings, tipo),
-		"derby": derby}
+		"derby": derby, "nomi": NomiGiocatori.modo_valido(s.settings.get("nomi"))}
 	# maglia di casa e da trasferta: le due squadre sempre ben distinguibili (Luis 2026-11-24)
 	var ko := DiviseScript.indice_di(avversario.get("kit", {}))
 	if ko >= 0:

@@ -445,6 +445,18 @@
   [--solo=N --viste=0,1,2,3 --tile=480x720]`; test `tests/test_proporzioni.gd`.
 - **Stellina del campione** (Luis 2026-11-24): quando il controllato è il campione (`src.champ`) sopra di lui c'è una
   stellina gialla (`TV.stellina()`, ×`STELLA_K` 1,1) al posto del triangolo (`vista.gd` `_aggiorna_segni`).
+- **Nomi sopra i giocatori** (Luis 2026-11-26, `scripts/partita/nomi_giocatori.gd`): cognome (iniziale + cognome se
+  due compagni hanno lo stesso, `nomi_brevi`) sopra la testa, bianco col contorno scuro e un filo del colore della
+  maglia sotto. Disegno 2D in un solo Control (CanvasLayer `NOMI_LIVELLO` 4, sotto l'HUD), proiettato ogni
+  fotogramma con `vista.world_to_screen`; niente Label3D. Grandezza coi px per metro (`DIM_MIN..DIM_MAX` 9-13 punti).
+  Ordine (`scegli`): portatore e controllato (sempre, sopra triangolo/stellina; sopra il cerchietto del rallenty se
+  c'è), poi chi è entro `VICINO_PALLONE` 9 m dal pallone, poi gli altri più tenui; dopo i primi, chi si sovrappone a un
+  nome già scritto o copre il pallone si salta; i lontanissimi (sotto `PPM_MINIMO`) non si scrivono, nelle visuali
+  molto vicine (dribbling, angolo, rimessa: `PPM_PIENO`..`PPM_SPARISCE` 40-60 px per metro) sbiadiscono. Nascosti in
+  pausa, replay, scena del cambio, esultanza del campione e fermatempo di colpo di testa e parata (`_aggiorna_nomi` in
+  `gioco.gd`). Impostazioni → **Nomi sopra i giocatori**: Tutti (predefinito) / Solo pallone e controllato / Nessuno,
+  chiave nuova `settings.nomi` ("tutti" | "pallone" | "nessuno"), passata dall'app come opzione `nomi` di `avvia()`;
+  prova: `--nomi=...`. Test `tests/test_nomi.gd`.
 - **Maglie di casa e trasferta** (Luis 2026-11-24, `scripts/carriera/divise.gd`, applicate in `app.gd` `_partita`):
   casa = colori della squadra, trasferta = maglia fissa per colore (`TRASFERTA`, chiara per le scure e scura per le
   chiare). La squadra di casa veste quella di casa; l'ospite la sua di casa se si distingue (`SIMILI`), altrimenti la
