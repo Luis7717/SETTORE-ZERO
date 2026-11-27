@@ -203,6 +203,10 @@
   `show`): più Dribbling (`drb`) = più scelta e i difficili più spesso (`Skill.scegli`; tunnel, sombrero e bicicletta
   solo col difensore davanti), con un generatore a parte (`skillRng`: la sequenza di `rnd()` e l'esito restano
   identici); ognuno dura il suo tempo prima dello scatto (`show` 0,38-0,7 s).
+  **Base di 13 giochetti nuovi** (2026-11-27, in tutto 29): `suola_via`, `finta_rientro`, `doppiopasso_inv`, `suola_180`,
+  `ponte`, `elastico3`, `giro_tocco`, `waka`, `colpetto_giro`, `cucchiaio_finta`, `abracadabra`, `veronica_classe`,
+  `tornado`: riga in `sim/skill.gd`, voce nel registro e file `skill/<id>.gd` **provvisorio** (copia di un giochetto
+  simile, coi suoi numeri): da rifare uno per uno sul gesto vero; i test comuni li prendono da soli dal registro.
   **In corsa, senza fermarsi** (Luis: "si pianta prima del giochetto"): durante il giochetto il motore porta il
   portatore avanti e di lato (`av`, `lat`, `vel` × `DRIB_SHOW_V` 4,2 m/s, `dribShowSteer`), il difensore indietreggia
   davanti a lui (`DRIB_GAP` 2,6 m) e i piedi fanno passi di corsa (`appoggia_corsa`, `K.rincorsa`).

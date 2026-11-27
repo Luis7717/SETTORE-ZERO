@@ -1,4 +1,4 @@
-# I giochetti del dribbling della persona (Luis 2026-11-26: "fanno pena, falli veri e aggiungine"): 16 movimenti del
+# I giochetti del dribbling della persona (Luis 2026-11-26: "fanno pena, falli veri e aggiungine"): 29 movimenti del
 # calcio vero costruiti con coreo.gd (piedi fermi a terra, passi programmati, pallone mosso solo dai tocchi).
 # Quale giochetto e quanto dura lo decide il motore (sim/skill.gd: evento 'dribble' con skill e show); qui si decide
 # come si muovono gambe, busto, braccia e pallone. Niente è copiato da altri giochi: sono i gesti del calcio.
@@ -40,9 +40,24 @@ const GIOCHETTI := {
 	"elastico_inv": preload("skill/elastico_inv.gd"),
 	"sombrero": preload("skill/sombrero.gd"),
 	"bicicletta": preload("skill/bicicletta.gd"),
+	"suola_via": preload("skill/suola_via.gd"),
+	"finta_rientro": preload("skill/finta_rientro.gd"),
+	"doppiopasso_inv": preload("skill/doppiopasso_inv.gd"),
+	"suola_180": preload("skill/suola_180.gd"),
+	"ponte": preload("skill/ponte.gd"),
+	"elastico3": preload("skill/elastico3.gd"),
+	"giro_tocco": preload("skill/giro_tocco.gd"),
+	"waka": preload("skill/waka.gd"),
+	"colpetto_giro": preload("skill/colpetto_giro.gd"),
+	"cucchiaio_finta": preload("skill/cucchiaio_finta.gd"),
+	"abracadabra": preload("skill/abracadabra.gd"),
+	"veronica_classe": preload("skill/veronica_classe.gd"),
+	"tornado": preload("skill/tornado.gd"),
 }
-const IDS := ["finta", "stopgo", "suola", "doppiopasso", "croqueta", "fintatiro", "chop", "cruyff", "tacco", "pedalata",
-	"elastico", "tunnel", "veronica", "elastico_inv", "sombrero", "bicicletta"]
+const IDS := ["finta", "stopgo", "suola_via", "finta_rientro", "suola", "doppiopasso", "doppiopasso_inv",
+	"suola_180", "croqueta", "fintatiro", "chop", "ponte", "elastico3", "cruyff", "tacco", "pedalata", "giro_tocco",
+	"elastico", "tunnel", "waka", "veronica", "colpetto_giro", "cucchiaio_finta", "elastico_inv", "abracadabra",
+	"veronica_classe", "sombrero", "tornado", "bicicletta"]
 const BR_RIPOSO := K.BR_RIPOSO
 
 

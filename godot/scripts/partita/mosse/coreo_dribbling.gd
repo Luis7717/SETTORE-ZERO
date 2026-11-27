@@ -28,7 +28,9 @@ const T_CONTRASTO := 0.2       # fallito: il piede del difensore arriva sul pall
 const ALLUNGO := 0.95          # il difensore allunga la gamba (bassa, verso il pallone) al massimo a questa frazione della sua lunghezza
 # giochetti della persona (ordine di sim/skill.gd)
 const FINTE := Sk.IDS
-const STILE_DIF := {"tunnel": "gambe", "sombrero": "alto", "bicicletta": "alto", "fintatiro": "blocco"}
+# (i giochetti provvisori copiati da un altro tengono lo stile del modello: ponte ← tunnel, cucchiaio_finta ← fintatiro)
+const STILE_DIF := {"tunnel": "gambe", "sombrero": "alto", "bicicletta": "alto", "fintatiro": "blocco",
+	"ponte": "gambe", "cucchiaio_finta": "blocco"}
 const GAMBE_LARGHE := 0.22      # tunnel: ogni piede del difensore sta tanto più in fuori dell'anca (m del modello)
 const BR_RIPOSO := Sk.BR_RIPOSO
 

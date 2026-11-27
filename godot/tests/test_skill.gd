@@ -35,8 +35,8 @@ func test_scelta_secondo_il_dribbling() -> bool:
 	return done()
 
 
-func test_sedici_giochetti_con_i_campi_giusti() -> bool:
-	eq(Skill.LISTA.size(), 16, "16 giochetti")
+func test_tutti_i_giochetti_con_i_campi_giusti() -> bool:
+	eq(Skill.LISTA.size(), 29, "29 giochetti (16 + i 13 del 2026-11-27)")
 	var visti := {}
 	var prima := -1.0
 	for s: Dictionary in Skill.LISTA:

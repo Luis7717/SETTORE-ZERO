@@ -1,4 +1,4 @@
-# Gambe dei giochetti del dribbling, per tutti i 16 giochetti e per il dribbling fallito, portatore e difensore
+# Gambe dei giochetti del dribbling, per tutti i giochetti del registro (coreo_skill.gd IDS) e per il dribbling fallito, portatore e difensore
 # (solo grafica; Luis 2026-11-26: "le gambe lampeggiano, non si capisce nulla", "si incrociano le gambe"):
 #   - niente lampi: da un fotogramma all'altro (60 al secondo veri; durante il rallenty della regia del dribbling il
 #     tempo di partita va al 30%, quindi lì un fotogramma è 1/200 s di partita) caviglie e ginocchia non saltano (piede
@@ -23,7 +23,9 @@ const SALTO_GINOCCHIO := 0.3
 # un po' ci sta (piedi che stringono il pallone, ginocchia che si sfiorano), di più si vedono attraversarsi
 const DENTRO_GAMBE := 0.12
 # ... ma dove una gamba passa apposta raccolta dietro o intorno all'altra (trascinamento dietro l'appoggio, giro) un po' di più
-const DENTRO_ID := {"cruyff": 0.16, "veronica": 0.16}
+const DENTRO_ID := {"cruyff": 0.16, "veronica": 0.16,
+	# provvisori, copiati da quei due
+	"colpetto_giro": 0.16, "giro_tocco": 0.16, "veronica_classe": 0.16}
 const ALLUNGO_MAX := 1.12    # frazione della gamba (anca → caviglia voluta): un piede a terra fa un passo a 0,93, col saltello (altro
 # piede in volo) a 1,02 misurati dal bacino dritto; col bacino inclinato arriva a 1,1 (il piede scivola un attimo di ~10 cm)
 const ALLUNGO_MIN := 0.25    # ... e sotto è schiacciata contro l'anca (ginocchio che esce dal corpo)

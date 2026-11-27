@@ -5,7 +5,7 @@ extends "test_base.gd"
 
 const D := preload("../sim/duel.gd")
 const TD := preload("test_dribbling.gd")
-const IDS := ["tunnel", "sombrero", "bicicletta"]
+const IDS := ["tunnel", "sombrero", "bicicletta", "ponte"]
 const RESPIRO := 0.9      # s di partita dopo la presa senza duelli nuovi (DUEL_CD meno un passo)
 
 
