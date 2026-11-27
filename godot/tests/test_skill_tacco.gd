@@ -32,5 +32,20 @@ func test_tacco_il_piede_scavalca_il_pallone_e_il_tacco_lo_manda_indietro() -> b
 		if r.go and float(r.t) < tg + 0.15:
 			dietro = minf(dietro, (r.palla as Vector2).y)
 	check(dietro < 0.0, "il tacco manda il pallone indietro, sotto il corpo (%.2f m)" % dietro)
+	# Luis 2026-11-27: "il contatto di tacco non si vede da dietro": il pallone non resta nascosto sotto il corpo.
+	# Prima del tacco sta dal lato della finta (davanti al piede che lo scavalca), poi esce dietro dal lato scelto
+	var lato_prima := 0.0
+	var lato_dietro := 0.0
+	var piu_dietro := 0.0
+	for r: Dictionary in righe:
+		var pb: Vector2 = r.palla
+		if not r.go:
+			lato_prima = minf(lato_prima, pb.x)
+		if float(r.t) < tg + 0.15 and pb.y < piu_dietro:
+			piu_dietro = pb.y
+			lato_dietro = pb.x
+	check(lato_prima < -0.12, "prima del tacco il pallone è dal lato della finta, fuori da sotto il corpo (%.2f m)" % lato_prima)
+	check(piu_dietro < -0.25, "il pallone va dietro il corpo abbastanza da vedersi da dietro (%.2f m)" % piu_dietro)
+	check(lato_dietro > 0.2, "... ed esce dal lato scelto, dietro la gamba d'appoggio (%.2f m)" % lato_dietro)
 	check((TF.riga_a(righe, tg + 0.3).palla as Vector2).y > 0.5, "poi il pallone torna davanti, calciato dal piede dietro")
 	return done()

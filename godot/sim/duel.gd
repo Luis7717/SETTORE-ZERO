@@ -695,7 +695,7 @@ func dribShowStep(dt: float) -> void:
 
 
 # il pallone che si vede si stacca dal portatore: rasoterra verso le gambe del difensore (si ferma `oltre` m dopo di
-# lui per l'attrito) o pallonetto che gli passa sopra la testa (punto più alto `su`, cade `oltre` m dopo di lui)
+# lui per l'attrito; con `palla_lato` gli passa accanto invece che tra le gambe) o pallonetto che gli passa sopra la testa (punto più alto `su`, cade `oltre` m dopo di lui)
 func dribPallaLancia(f: R.Duel) -> void:
 	var p := f.p
 	var o := f.o
@@ -723,8 +723,15 @@ func dribPallaLancia(f: R.Duel) -> void:
 	else:
 		s.x = ball.x
 		s.y = ball.y
-		ux = o.x - s.x
-		uy = o.y - s.y
+		# "ponte" (skill.gd `palla_lato`, Luis 2026-11-27): il pallone non va verso il centro del difensore (quello è il
+		# tunnel) ma gli passa accanto, a tanto dal suo centro (m), dal lato opposto a quello da cui passa il portatore
+		var pl: float = float(sk.get("palla_lato", 0.0))
+		var bx: float = o.x + uy * f.side * pl
+		var by: float = o.y - ux * f.side * pl
+		var cx: float = ux
+		var cy: float = uy
+		ux = bx - s.x
+		uy = by - s.y
 		d = C.orf(C.hyp(ux, uy), 1.0)
 		ux /= d
 		uy /= d
@@ -732,6 +739,9 @@ func dribPallaLancia(f: R.Duel) -> void:
 		s.vx = ux * v0
 		s.vy = uy * v0
 		f.tl = 0.0
+		if pl != 0.0: # l'inseguimento (dribChaseStep) gira intorno al difensore lungo la corsa, non lungo il pallone
+			ux = cx
+			uy = cy
 	f.ux = ux
 	f.uy = uy
 	ball.finto = s
@@ -807,8 +817,9 @@ func dribChaseStep(dt: float) -> void:
 	var ty: float = by
 	var path: float = C.hyp(bx - p.x, by - p.y)
 	if rel < 0.3:
-		tx = o.x + nx * DRIB_CHASE_LAT + f.ux * 0.8
-		ty = o.y + ny * DRIB_CHASE_LAT + f.uy * 0.8
+		var giro: float = float(f.sk.get("giro", DRIB_CHASE_LAT)) # (skill.gd `giro`: il ponte gli passa più vicino)
+		tx = o.x + nx * giro + f.ux * 0.8
+		ty = o.y + ny * giro + f.uy * 0.8
 		path = C.hyp(tx - p.x, ty - p.y) + C.hyp(bx - tx, by - ty)
 	var wx: float = tx - p.x
 	var wy: float = ty - p.y
