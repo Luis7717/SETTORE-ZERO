@@ -1217,6 +1217,8 @@ func _prepara_scena(nome: String) -> void:
 				m.userKick(me, {"type": "auto", "tx": cm.x, "ty": cm.y, "curve": 6.0, "tratto": true})
 				await get_tree().create_timer(0.15).timeout
 				_linea_curva_di_prova(Vector3(cm.x, cm.y, 0.9), Vector3(2.5, dy * C.HL, 1.2), 0.0, true)
+		"lontano", "lontano_cpu", "cross_lontano": # portiere sui palloni da lontano (Luis 2026-11-26, _scena_lontano)
+			await _scena_lontano(nome)
 		"parata", "parata_linea": # tiro avversario da 20 m verso la nostra porta: fermatempo della parata col bersaglio
 			_metti_in_gioco()
 			var dp := -1.0 if me == 0 else 1.0 # verso della nostra porta
@@ -1517,6 +1519,47 @@ func _metti_in_gioco() -> void:
 	b.vx = 0.0
 	b.vy = 0.0
 	b.vh = 0.0
+
+
+## portiere sui palloni da lontano (Luis 2026-11-26, "il portiere si butta a vuoto molto prima"):
+## lontano = tiro della CPU da 38 m all'angolo lontano contro il nostro portiere automatico; lontano_cpu = nostro tiro
+## rasoterra da 35 m all'angolo contro il portiere della CPU; cross_lontano = lancio alto della CPU da 34 m che dopo il
+## rimbalzo va sul secondo palo, nostro automatico. Gli altri lontani; si aspetta che sparisca la scritta d'inizio
+func _scena_lontano(nome: String) -> void:
+	await get_tree().create_timer(3.6).timeout
+	_metti_in_gioco()
+	var cpu_tira: bool = nome != "lontano_cpu"
+	var tm: int = (1 - me) if cpu_tira else me
+	var dp: float = 1.0 if tm == 0 else -1.0 # verso dove attacca chi calcia
+	var gy: float = dp * C.HL
+	var k: R.Player = m.team(tm)[9]
+	m.autoGk[me] = true
+	for p: R.Player in m.players: # gli altri lontani, nella metà campo di chi calcia
+		_sposta(p, (p.i % 11 - 5) * 5.0, -gy * 0.6 + (p.team - 0.5) * 2.0)
+	var g: R.Player = m.gk(1 - tm)
+	_sposta(g, -1.0 if nome == "lontano" else 0.0, gy - dp * 0.6)
+	match nome:
+		"lontano": # all'angolo lontano dal portiere: prima si tuffava ~0,9 s prima e il pallone arrivava col portiere a terra
+			_sposta(k, 8.0, gy - dp * 38.0)
+		"lontano_cpu":
+			_sposta(k, -5.0, gy - dp * 35.0)
+		"cross_lontano": # lancio che dopo il rimbalzo va sul secondo palo (rilevato come tiro)
+			_sposta(k, 12.0 * dp, gy - dp * 34.0)
+	k.fx = 0.0
+	k.fy = dp
+	k.st.tir = 99.0 # mira quasi esatta: il pallone va dove si vuole mostrare
+	k.st.pas = 99.0
+	m.ball.owner = k
+	m.ball.last = k
+	m.ball.x = k.x
+	m.ball.y = k.y + 0.6 * dp
+	match nome:
+		"lontano":
+			m.kick(k, {"type": "shot", "tx": -3.4 * dp, "ty": gy, "th": 0.6})
+		"lontano_cpu":
+			m.kick(k, {"type": "shot", "tx": 3.3, "ty": gy, "th": 0.0, "tratto": true, "curve": 0.0, "human": true})
+		"cross_lontano":
+			m.kick(k, {"type": "loft", "tx": 3.0 * dp, "ty": gy - dp * 10.0})
 
 
 ## prova del dribbling: n. 10 col pallone e un difensore 6,5 m davanti; aperto il duello si tocca Dribbling.

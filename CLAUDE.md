@@ -367,7 +367,15 @@
   Con `parata` il portiere automatico e quello della CPU sul tiro, dopo la reazione, vanno a passi laterali e si
   tuffano solo quando al pallone mancano `PARA_LEAD` 0,45 s (o il tempo che serve alla mano), come quello manuale
   (`_gkAutoTimed`, Luis 2026-11-24: "tirando dal centrocampo il portiere si butta a terra e la palla va in rete";
-  prima da 48 m ne parava 5/12, ora 12/12). Nelle lezioni guidate
+  prima da 48 m ne parava 5/12, ora 12/12). **Mai prima di `PARA_DIVE_WIN` 0,7 s** (Luis 2026-11-26, "con i cross da
+  lontano o tiri da lontano il portiere si butta a vuoto molto prima", `paraDiveAt` in `sim/parata.gd`): il tuffo dura
+  0,8 s e se la mano chiedeva più tempo (pallone largo o fuori dai pali) partiva fino a 2 s prima e il portiere era a
+  terra quando arrivava il pallone; vale anche per il manuale. **Lancio alto rilevato come tiro** (`paraLancio`: cross o
+  lancio lungo, `kick.type` "loft", che finirebbe verso la porta dopo il rimbalzo): finché all'arrivo manca più di
+  `PARA_DIVE_WIN` il portiere automatico e quello della CPU fanno come sul cross (`_gkSulLancio` = `gkAI` di `ai.gd`
+  senza tiro: escono solo se ci arrivano prima degli attaccanti, altrimenti restano tra i pali), poi si tuffano solo se
+  serve. Misura: `-s res://tools/misura_portiere.gd -- --partite=8` (partite vere, tuffi "a vuoto") e `-- --scene`;
+  prove `--scena=lontano|lontano_cpu|cross_lontano`; test `tests/test_portiere_lontano.gd`. Nelle lezioni guidate
   sempre manuale. **Manuale (prova)**: sul tiro la visuale va dietro la propria porta e il tempo **si ferma** per 3 s
   veri (`scripts/partita/fermatempo_parata.gd`, `parata_regia.gd`, cerchio "Para!"), con un **bersaglio** rosso
   sulla porta (`bersaglio_tiro.gd`: ellisse che contiene il punto vero, centro spostato col seme, più grande con
