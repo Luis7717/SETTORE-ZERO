@@ -1878,7 +1878,7 @@ le fasce si chiamano **esterno sinistro / destro (ES / ED)**.
   da cambiare se Luis corregge un modulo; le posizioni x/y restano in `core.gd`).
 - **Malus** (moltiplica tiro, passaggi, dribbling, difesa, testa, come il vecchio `POSPEN`; velocità e fisico no):
   suo ruolo 1 · seconda scelta 0,98 · compatibile 0,97 · altra fascia 0,94 · stessa linea 0,90 · linea accanto 0,86 ·
-  terzino⇄ala stessa fascia 0,84 · difesa⇄attacco 0,72 (era 0,82) · porta 0,6 come prima. Prima dentro la stessa linea
+  terzino⇄ala stessa fascia 0,84 (tolto il 2026-11-27: ora 0,72, vedi sotto) · difesa⇄attacco 0,72 (era 0,82) · porta 0,6 come prima. Prima dentro la stessa linea
   non c'era malus: ora un DC terzino perde il 10%.
 - **Valutazione**: pesi per ruolo sulle sotto-statistiche (`PESI`) più una taratura per ruolo (`tara()`), calcolata
   dalle tabelle, che fa valere un giocatore "generico" in media quanto valeva con la formula del web: così valore,
@@ -1908,7 +1908,23 @@ le fasce si chiamano **esterno sinistro / destro (ES / ED)**.
 - Senza scelta la punizione la batte sempre il più vicino (com'era): "automatico" non cerca il migliore in `pun`.
 - Il portiere non si può scegliere. La CPU non usa le scelte.
 - Capitano: "C" gialla sulla carta del campione e "· capitano" nel pannello. **Non fatto**: la fascia al braccio in
-  partita (serve un pezzo nuovo nel modello della figura: non era "semplice").
+  partita (serve un pezzo nuovo nel modello della figura: non era "semplice"). Fatta il 2026-11-27, vedi sotto.
+
+## 2026-11-27 — Fascia da capitano in partita; terzini mai ali
+- **Chiesto** (Luis): "Mettila la fascia al braccio in partita, basta una striscia gialla sul braccio" e "i terzini
+  non possono mai fare le ali, al massimo gli esterni come dicevamo".
+- **Fascia**: dipinta nello shader della divisa, non un pezzo di modello: banda gialla sul braccio sinistro (x > 0
+  nella posa a T) tra il 20% e il 47% del tratto spalla→gomito, cioè sopra l'orlo della manica corta (che finisce dal
+  55%); con le maniche lunghe sta sulla manica, senza maniche sulla pelle. Segue il braccio da sola (posa di riposo),
+  niente costo in più per gli altri 21. Bordi più scuri (fino al 55%) per vederla anche su una maglia gialla. Lo shader ha
+  già 16 instance uniform (il massimo di Godot): l'accensione è `numero.z` + 2 (z era 0/1 = cognome sì/no). Solo il
+  campione della squadra della persona (`p.team == me`, `src.champ`); se il campione esce in un cambio la fascia
+  non passa a nessuno (scelta mia: il capitano è sempre il campione).
+- **Terzini e ali**: incompatibili come difesa⇄attacco (0,72) anche dello stesso lato; nessuna seconda scelta tra
+  loro; una seconda scelta vietata già salvata (o chiesta nell'editor del campione) diventa l'esterno del lato del
+  ruolo (TS/AS → ES, TD/AD → ED). La formazione automatica non li mette mai lì finché c'è un altro giocatore
+  (penale di 1000 punti nei conti, non nella valutazione mostrata). La Rosa resta libera: la persona può ancora
+  mettere a mano un terzino sull'ala, col malus pieno e il badge "fuori ruolo".
 
 ## 2026-11-27 — Portiere che si butta a vuoto sui palloni da lontano
 - **Chiesto** (Luis, provato sull'iPhone): "con i cross da lontano o tiri da lontano il portiere si butta a vuoto molto

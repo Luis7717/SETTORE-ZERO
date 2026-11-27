@@ -10,6 +10,7 @@ const CarrieraScript := preload("res://scripts/carriera/carriera.gd")
 const Salv := preload("res://scripts/carriera/salvataggio.gd")
 const Ruoli := preload("res://sim/ruoli.gd")
 const Sotto := preload("res://sim/sottostat.gd")
+const JS := preload("res://scripts/carriera/js.gd")
 const DIR := "user://test_ruoli/"
 const LUIS := {
 	"4-4-2": "TS DC DC TD ES CC CC ED ATT ATT",
@@ -95,19 +96,25 @@ func test_compatibili_e_malus() -> bool:
 		eq(Ruoli.fattore(_gioc(coppia[1]), coppia[0]), Ruoli.F_COMPATIBILE, "%s fa %s" % [coppia[1], coppia[0]])
 	eq(Ruoli.fattore(_gioc("CC"), "COC"), Ruoli.F_COMPATIBILE, "il CC può fare il COC")
 	eq(Ruoli.fattore(_gioc("COC"), "CC"), Ruoli.F_GRUPPO, "il COC non fa il CC")
-	eq(Ruoli.fattore(_gioc("TS"), "AS"), Ruoli.F_FASCIA, "terzino e ala non sono compatibili (solo tramite l'esterno)")
+	for coppia: Array in [["TS", "AS"], ["TS", "AD"], ["TD", "AD"], ["TD", "AS"], ["AS", "TS"], ["AD", "TD"], ["AS", "TD"]]:
+		eq(Ruoli.fattore(_gioc(coppia[0]), coppia[1]), Ruoli.F_LONTANO, "%s non fa mai %s: malus da linea lontana" % coppia)
+		check(Ruoli.vietato(_gioc(coppia[0]), coppia[1]), "%s su %s: vietato" % coppia)
+	eq(Ruoli.fattore(_gioc("TS", "AS"), "AS"), Ruoli.F_LONTANO, "terzino con l'ala come seconda (salvataggio di prima): niente sconto")
+	check(not Ruoli.vietato(_gioc("TS"), "ES") and not Ruoli.vietato(_gioc("AS"), "ES"), "l'esterno sì")
 	eq(Ruoli.fattore(_gioc("DC"), "DC"), 1.0, "nel suo ruolo niente malus")
 	eq(Ruoli.fattore(_gioc("DC", "TD"), "TD"), Ruoli.F_SECONDA, "seconda scelta: quasi niente")
 	eq(Ruoli.fattore(_gioc("TS"), "TD"), Ruoli.F_SPECCHIO, "altra fascia")
 	eq(Ruoli.fattore(_gioc("AS"), "DC"), Ruoli.F_LONTANO, "ala in difesa centrale: molto penalizzata")
 	eq(Ruoli.fattore(_gioc("ATT"), "P"), Ruoli.F_PORTIERE, "in porta come prima")
 	check(Ruoli.F_SECONDA > Ruoli.F_COMPATIBILE and Ruoli.F_COMPATIBILE > Ruoli.F_FUORI and Ruoli.F_FUORI > Ruoli.F_SPECCHIO
-		and Ruoli.F_SPECCHIO > Ruoli.F_GRUPPO and Ruoli.F_GRUPPO > Ruoli.F_VICINO and Ruoli.F_VICINO > Ruoli.F_FASCIA
-		and Ruoli.F_FASCIA > Ruoli.F_LONTANO and Ruoli.F_LONTANO > Ruoli.F_PORTIERE, "malus in ordine di distanza")
+		and Ruoli.F_SPECCHIO > Ruoli.F_GRUPPO and Ruoli.F_GRUPPO > Ruoli.F_VICINO and Ruoli.F_VICINO > Ruoli.F_LONTANO
+		and Ruoli.F_LONTANO > Ruoli.F_PORTIERE, "malus in ordine di distanza")
 	for r: String in Ruoli.TUTTI:
 		if r == "P":
 			continue
 		check(Ruoli.SECONDE.has(r) and not (Ruoli.SECONDE[r] as Array).has(r), r + ": ha seconde scelte diverse da sé")
+		for r2: String in Ruoli.SECONDE[r]:
+			check(not (Ruoli.VIETATI.get(r, []) as Array).has(r2), "%s: mai %s come seconda scelta" % [r, r2])
 		var somma := 0.0
 		for k: String in Ruoli._pesi(r):
 			somma += float(Ruoli._pesi(r)[k])
@@ -277,6 +284,82 @@ func test_cpu_coi_ruoli_e_statistiche_coerenti() -> bool:
 	check(c.squadraPartita().get("moduli", false), "la mia squadra: posti dei moduli del gioco")
 	check(not c.myMatchTeam().has("moduli") and not c.aiMatchTeam(t0).has("moduli"), "squadre del web: come prima")
 	check(not c.aiMatchTeam(t0).players[3].has("ruolo"), "aiMatchTeam (confronti col JS) senza ruoli")
+	c.reset()
+	return done()
+
+
+## Luis 2026-11-27: "i terzini non possono mai fare le ali, al massimo gli esterni come dicevamo"
+func test_terzini_mai_ali() -> bool:
+	# seconda scelta vietata (salvataggi di prima): diventa l'esterno dello stesso lato
+	for caso: Array in [["TS", "AS", "ES"], ["TS", "AD", "ES"], ["TD", "AD", "ED"], ["TD", "AS", "ED"], ["AS", "TS", "ES"], ["AD", "TD", "ED"]]:
+		var p := _gioc(caso[0], caso[1])
+		Ruoli.sistema_seconda(p)
+		eq(p.ruolo2, caso[2], "%s con seconda %s → %s" % caso)
+	var ok := _gioc("TS", "DC")
+	Ruoli.sistema_seconda(ok)
+	eq(ok.ruolo2, "DC", "seconda scelta permessa: resta")
+	# giocatori generati e seconde scelte calcolate: mai tra terzini e ali
+	for r: String in ["TS", "TD", "AS", "AD"]:
+		for k in 40:
+			var g := _gioc(r)
+			var semi := [0.1, 0.6, 0.9]
+			var x: float = semi[k % 3]
+			Sotto.crea(g, JS.rng32(1000 + k))
+			Ruoli.modella(g, r, func() -> float: return x)
+			check(not Ruoli.vietato({"ruolo": r}, g.ruolo2), "%s generato: seconda %s" % [r, g.ruolo2])
+	# migrazione al caricamento: un terzino con l'ala come seconda torna esterno
+	var c := _nuova("migra.json")
+	var td: Variant = null
+	for p: Dictionary in c.s.squad:
+		if p.get("ruolo") == "TD":
+			td = p
+			break
+	check(td != null, "la rosa nuova ha un terzino destro")
+	td["ruolo2"] = "AD"
+	c.save()
+	var c2 := CarrieraScript.new()
+	c2.percorso = c.percorso
+	c2.load()
+	eq(c2.player(td.id).ruolo2, "ED", "caricato: il TD con seconda AD ora ha ED")
+	# campione creato con una seconda scelta vietata
+	var ch: Dictionary = c2.addChampion({"name": "Terzino", "ruolo": "TS", "ruolo2": "AS", "look": {}, "num": 3})
+	eq(ch.ruolo2, "ES", "campione terzino: l'ala come seconda diventa esterno")
+	# formazione automatica: tutti i difensori diventano terzini fortissimi (7 per 4 posti di difesa), centrocampisti
+	# centrali forti, esterni e attaccanti scarsi: senza il divieto i terzini in più andrebbero sulle ali (99 × 0,72
+	# contro 30), col divieto no (in attacco al centro sì: non è vietato)
+	c2.s.formation = "4-3-3"
+	var n_terzini := 0
+	for p: Dictionary in c2.s.squad:
+		if p.pos == "D":
+			p["ruolo"] = "TS" if n_terzini % 2 == 0 else "TD"
+			p["ruolo2"] = "DC"
+			n_terzini += 1
+		var forte: bool = p.pos == "D" or p.get("ruolo") in ["CC", "CDC"]
+		if forte or p.get("ruolo") in ["AS", "AD", "ATT", "ES", "ED", "COC"]:
+			for k: String in ["vel", "tir", "pas", "dri", "dif", "fis"]:
+				p[k] = 99 if forte else 30
+			p["tes"] = 99 if forte else 30
+			p.erase("sub")
+	c2.autoLineup()
+	var FR := c2.ruoliPosti()
+	for i in 11:
+		var p: Dictionary = c2.player(c2.s.lineup[i])
+		check(not Ruoli.vietato(p, FR[i]), "autoLineup 4-3-3: %s non va sul posto %s" % [p.ruolo, FR[i]])
+	# fixLineup: buco su un'ala, in panchina un terzino fortissimo (99 × 0,72 = 71) e attaccanti scarsi (30) → non il
+	# terzino (senza il divieto lo sceglierebbe)
+	var i_as := FR.find("AS")
+	var nuovo: Dictionary = c2.player(c2.s.lineup[1]).duplicate(true)
+	nuovo["id"] = 99999
+	nuovo["ruolo"] = "TS"
+	nuovo.erase("champ")
+	c2.s.squad.append(nuovo)
+	check(c2._punti_posto(nuovo, "AS") < c2._punti_posto(c2.player(c2.s.lineup[i_as]), "AS"), "punti: terzino sull'ala sotto chiunque")
+	var via: Variant = c2.s.lineup[i_as] # chi era sull'ala se ne va (venduto): restano terzini forti e attaccanti scarsi
+	c2.s.squad = c2.s.squad.filter(func(p: Dictionary) -> bool: return p.id != via)
+	c2.fixLineup()
+	var preso: Dictionary = c2.player(c2.s.lineup[i_as])
+	check(not Ruoli.vietato(preso, "AS"), "fixLineup: niente terzino sull'ala (preso %s)" % preso.ruolo)
+	c2.reset()
 	c.reset()
 	return done()
 
