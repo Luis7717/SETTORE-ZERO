@@ -19,7 +19,7 @@ const DOPO_OK := 0.12
 # veronica, il taglio dietro la gamba) il rallenty dura fino a lì (Luis 2026-11-26: "falli vedere")
 # (tunnel e pallonetti: il pallone tra le gambe o che sale sopra la testa; poi il tempo torna normale e la corsa a
 # riprenderlo si guarda a velocità vera)
-const DOPO_SKILL := {"veronica": 0.42, "tunnel": 0.4, "sombrero": 0.3, "bicicletta": 0.3, "chop": 0.24, "cruyff": 0.26,
+const DOPO_SKILL := {"veronica": 0.42, "tunnel": 0.4, "sombrero": 0.5, "bicicletta": 0.18, "chop": 0.24, "cruyff": 0.26,
 	"tacco": 0.2, "croqueta": 0.2, "elastico": 0.18, "elastico_inv": 0.18}
 const DOPO_KO := 0.8         # fallito: contrasto e caduta si guardano per tanto (s di partita)
 const USCITA_K := 2.2        # 1/s: alla fine il tempo torna normale con questa dolcezza (TEMPO_K del gioco è 14)
@@ -27,6 +27,9 @@ const USCITA_K_OK := 7.0     # 1/s: ... dopo il dribbling riuscito invece in fre
 const USCITA_FINE := 0.97    # tempo tornato quasi normale: la regia ha finito ...
 const USCITA_MAX := 1.0      # ... o comunque dopo tanto tempo di partita (se dopo c'è un altro rallenty, es. area di tiro)
 const GIRO := deg_to_rad(45.0)  # la telecamera gira di tanto intorno al portatore, dal lato del dribbling
+# ... ma nel tunnel quasi dritta alle spalle del portatore: il difensore si vede di fronte a gambe aperte e il pallone
+# che gli passa in mezzo (di lato le due gambe si coprono e non si capisce che è un tunnel, Luis 2026-11-26)
+const GIRO_SKILL := {"tunnel": deg_to_rad(12.0)}
 const BASE_MAX := deg_to_rad(35.0) # verso del difensore rispetto alla direzione d'attacco: contato al massimo così
 # grafica dell'esito (vista.gd → trick / reazione), per tutti i dribbling (anche della CPU), in s di partita
 const GIOCHETTO_CODA := 0.25 # col giochetto del motore (show) il movimento finisce tanto dopo lo scatto (accelerando)
@@ -82,6 +85,9 @@ func evento(e: Dictionary, me: int) -> void:
 				fase = "giochetto"
 				ok = bool(e.ok)
 				dopo = float(DOPO_SKILL.get(String(e.get("skill", "")), DOPO_OK))
+				if ok and GIRO_SKILL.has(String(e.get("skill", ""))):
+					yaw = giro_camera(Vector2(p.x, p.y), Vector2(o.x, o.y), side, -1.0 if me == 1 else 1.0,
+						float(GIRO_SKILL[String(e.skill)]))
 				# riuscito col giochetto del motore: il rallenty dura fino allo scatto (poi dribble_go: DOPO_OK);
 				# fallito: il tempo di guardare il contrasto
 				resta = (float(e.get("show", 0.0)) + dopo) if ok else DOPO_KO
@@ -148,10 +154,10 @@ func _inizia(pp: Object, oo: Object, lato: float, me: int) -> void:
 ## cui il portatore scatterà: durante il giochetto i due si vedono uno accanto all'altro e nel sorpasso il portatore
 ## passa di fianco al difensore, staccato (Luis 2026-11-26: prima la telecamera stava dal lato del sorpasso e il
 ## portatore passava davanti al difensore coprendolo: a schermo sembravano uno dentro l'altro).
-static func giro_camera(pp: Vector2, po: Vector2, lato: float, dir: float) -> float:
+static func giro_camera(pp: Vector2, po: Vector2, lato: float, dir: float, giro: float = GIRO) -> float:
 	var u := (po - pp) * dir
 	var base := 0.0 if u.length() < 0.1 else clampf(atan2(u.x, u.y), -BASE_MAX, BASE_MAX)
-	return base - GIRO * signf(lato) if lato != 0.0 else base
+	return base - giro * signf(lato) if lato != 0.0 else base
 
 
 ## Grafica dell'esito di un dribbling (evento 'dribble' {p, o, ok, side, show}): durata del giochetto a schermo (−1 =

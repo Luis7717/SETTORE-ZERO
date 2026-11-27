@@ -120,8 +120,8 @@ func test_il_pallone_passa_tra_le_gambe_e_il_portatore_lo_va_a_prendere() -> boo
 	# (dove stanno le caviglie del difensore lo decide coreo_dribbling.gd, stile "gambe": qui si misura soltanto, vedi
 	# la nota; il pallone deve passare sotto di lui, vicino al suo centro)
 	check(absf(r.centro) < 0.3, "il pallone passa sotto il difensore (a %.2f m dal suo centro)" % r.centro)
-	if not (r.gamba_sx <= -GAMBA_MIN and r.gamba_dx >= GAMBA_MIN):
-		note("ATTENZIONE: il pallone non passa in mezzo alle caviglie del difensore (servono almeno %.2f m per parte)" % GAMBA_MIN)
+	check(r.gamba_sx <= -GAMBA_MIN and r.gamba_dx >= GAMBA_MIN,
+		"il pallone passa in mezzo alle caviglie del difensore, ad almeno %.2f m da ognuna (%.2f e %.2f)" % [GAMBA_MIN, r.gamba_sx, r.gamba_dx])
 	check(r.stacco > 2.0, "il pallone si allontana dal portatore (%.2f m)" % r.stacco)
 	check(r.presa, "il portatore lo riprende")
 	check(r.v_port_presa > r.v_palla_presa + 1.0,
@@ -140,5 +140,6 @@ func test_dopo_il_calcio_parte_di_scatto_non_resta_fermo_e_dritto() -> bool:
 	check(r.bacino_min < 0.88, "bacino basso nella spinta (%.2f)" % r.bacino_min)
 	check(r.fermo <= FERMO_MAX, "mai piantato su due piedi dopo il calcio (%.2f s)" % r.fermo)
 	check(r.v_port_min >= 1.8, "non si ferma dopo il calcio (minimo %.1f m/s)" % r.v_port_min)
-	check(r.ginocchio > 0.3, "prima del calcio il ginocchio sale (caviglia a %.2f m)" % r.ginocchio)
+	# (Luis 2026-11-27: "tocco basso e deciso": la gamba si carica dietro, ma senza il ginocchio alto di prima)
+	check(r.ginocchio > 0.22 and r.ginocchio < 0.45, "prima del calcio la gamba si carica, bassa (caviglia a %.2f m)" % r.ginocchio)
 	return done()

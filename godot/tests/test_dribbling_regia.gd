@@ -128,6 +128,36 @@ func test_telecamera_girata_dal_lato_del_dribbling() -> bool:
 	return done()
 
 
+func test_rallenty_dopo_lo_scatto_e_telecamera_secondo_il_giochetto() -> bool:
+	var sd := TD.first_ok_seed()
+	var visti := {}
+	for id: String in ["finta", "tunnel", "sombrero", "bicicletta", "tacco"]:
+		# Arrange
+		var s := TD.setup(sd, 5.0)
+		var m: SimMatchScript = s[0]
+		m.rifiniture = true
+		m.skillForza = id
+		(s[1] as R.Player).st.dri = 99
+		(s[2] as R.Player).st.dif = 20
+		var rg := Regia.new()
+		m.userDribble(0)
+		# Act
+		check(avanza_fino(m, rg, "dribble", 1.3), id + ": esito arrivato")
+		visti[id] = {"dopo": rg.dopo, "giro": absf(rg.yaw)}
+		check(avanza_fino(m, rg, "dribble_go", 1.0), id + ": scatto arrivato")
+		# Assert: dallo scatto il rallenty dura ancora `dopo` s di partita
+		near(rg.resta, rg.dopo, DT + 1e-6, id + ": dopo lo scatto resta il suo tempo")
+		m.dispose()
+	near(float(visti.finta.dopo), Regia.DOPO_OK, 1e-6, "finta: il sorpasso si vede appena")
+	check(float(visti.sombrero.dopo) >= 0.45, "sombrero: visuale vicina finché il pallone passa sopra il difensore (%.2f s)" % visti.sombrero.dopo)
+	check(float(visti.bicicletta.dopo) <= 0.2, "bicicletta: dopo il tacco si riparte presto (%.2f s)" % visti.bicicletta.dopo)
+	near(float(visti.tacco.dopo), 0.2, 1e-6, "tacco")
+	# il tunnel si guarda quasi da dietro (il difensore di fronte, a gambe aperte), gli altri di tre quarti
+	check(float(visti.tunnel.giro) < deg_to_rad(20.0), "tunnel: telecamera quasi dritta (%.0f°)" % rad_to_deg(visti.tunnel.giro))
+	check(float(visti.finta.giro) > deg_to_rad(35.0), "finta: telecamera di tre quarti (%.0f°)" % rad_to_deg(visti.finta.giro))
+	return done()
+
+
 func test_visuale_del_dribbling_portatore_e_difensore_a_schermo() -> bool:
 	for lato: float in [1.0, -1.0]:
 		# Arrange

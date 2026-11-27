@@ -18,8 +18,8 @@ const BR_SPINTA_AV := Vector3(0.1, -0.16, 0.36)    # braccia della corsa di scat
 const BR_SPINTA_DI := Vector3(0.2, -0.3, -0.3)
 
 
-# tunnel: in corsa, mezza finta di corpo per far allargare le gambe al difensore, il ginocchio del lato scelto sale
-# (il passo "sospeso" che si vede da lontano) e la punta scende a colpire il pallone dritto tra le sue gambe (da lì è
+# tunnel: in corsa, mezza finta di corpo per far allargare le gambe al difensore, la gamba del lato scelto si carica
+# appena dietro e la punta colpisce il pallone basso e deciso, dritto tra le sue gambe (da lì è
 # il pallone staccato del motore: dritto, rallenta per l'attrito); il portatore gli gira intorno e lo va a riprendere
 static func a(c: Coreo, S: float, g: float) -> void:
 	var F := -S
@@ -31,9 +31,10 @@ static func a(c: Coreo, S: float, g: float) -> void:
 	c.appoggia_corsa(pF, tp, 0.16, Vector2(F * 0.1, 0.0), 0.07)
 	c.stacca(pS, tp + 0.02)
 	# ginocchio su, piede sotto, poi giù di punta sul pallone (quello del motore, ai suoi piedi) verso il difensore
-	c.passa(pS, tp + 0.55 * (g - tp), Vector3(S * 0.12, 0.3, 0.16), Vector3(0, 0.55, 0), 0.0)
-	c.tocca(pS, g, "toe", Vector3(-S * 0.25, 0.3, 0), {"moto": true}, 0.0)
-	c.passa(pS, g + 0.1, Vector3(S * 0.08, 0.2, 0.5), Vector3(0, 0.1, 0), 0.0)
+	# (tocco basso e deciso: la gamba si carica poco dietro, la punta colpisce rasoterra e prosegue bassa in avanti)
+	c.passa(pS, tp + 0.55 * (g - tp), Vector3(S * 0.1, 0.24, -0.06), Vector3(0, 0.7, 0), 0.0)
+	c.tocca(pS, g, "toe", Vector3(-S * 0.1, 0.3, 0), {"moto": true}, 0.0)
+	c.passa(pS, g + 0.1, Vector3(S * 0.06, 0.14, 0.52), Vector3(0, 0.05, 0), 0.0)
 	c.chiave_bacino(0.6 * g, Vector3(F * 0.1, 0.87, 0.0))
 	c.chiave_angoli(0.6 * g, Vector3(F * 0.25, 0.06, F * 0.06))
 	c.chiave_busto(0.6 * g, Vector3(0.14, F * 0.18, F * 0.22))
