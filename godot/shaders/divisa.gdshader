@@ -7,8 +7,9 @@
 //            1 righe verticali, 2 orizzontali, 3 banda diagonale, 4 metà e metà), calzettoni (0 alti, 1 bassi, 2 ripiegati)
 //   stile2 = taglio dei capelli (0..16 come HAIR_STYLES di src/looks.js), barba (0..6), sopracciglia (0..5),
 //            pantaloncini (0 corti, 1 lunghi)
-//   numero = cella (x, y) del cognome e numero nell'atlante "schiene" (scripts/partita/schiene.gd), z = 1 se c'è,
-//            w = maglia larga (1) o aderente (0)
+//   numero = cella (x, y) del cognome e numero nell'atlante "schiene" (scripts/partita/schiene.gd), z = 1 se c'è
+//            (+2 = fascia da capitano: niente uniform nuova, il limite è 16 e sono tutte usate), w = maglia larga (1)
+//            o aderente (0)
 //   corsa  = 0..1 quanto corre (la maglia ondeggia)
 //   occhi_forma = forma degli occhi (0..5 come EYE_SHAPES di src/looks.js)
 // Colletto (2026-11-22; prima i tre erano quasi uguali: la V restava dentro il cilindro del collo e la polo era solo
@@ -86,6 +87,11 @@ const float COLLO_R = 0.085;      // mezza larghezza del collo (m)
 const float SCOLLO_R = 0.078;     // raggio dello scollo attorno al collo (m)
 const float BORDO = 0.014;        // bordini (colletto, maniche, calzettoni) (m)
 const float AA = 0.005;           // bordi morbidi dei motivi (m)
+// fascia da capitano (Luis 2026-11-27, "basta una striscia gialla sul braccio"): sul braccio sinistro (x > 0), sopra il
+// gomito, tra queste frazioni del tratto spalla → gomito (sopra l'orlo della manica corta, che finisce da 0,55 in giù)
+const vec2 FASCIA_T = vec2(0.2, 0.47);
+const vec3 FASCIA_COLORE = vec3(1.0, 0.72, 0.02);   // giallo (lineare)
+const float FASCIA_ORLO = 0.15;   // bordi un po' più scuri (frazione della larghezza): si vede anche su una maglia gialla
 const vec2 OCCHI_UV = vec2(0.875); // tassello degli occhi nell'atlante (come EYE_PX del web: 896/1024)
 const vec2 CELLA = vec2(0.125, 0.25); // atlante delle schiene: 8 × 4 celle
 const float SCHIENA = 0.4;        // m di schiena coperti da una cella (come il canvas 256 px del web)
@@ -417,7 +423,7 @@ vec3 busto(vec3 p, float zf, float pixel, float vl, inout float ruvido) {
 			ruvido = mix(ruvido, 0.82, pc.a);
 		}
 		// cognome e numero sulla schiena (letti da dietro: il lato sinistro del giocatore è a sinistra)
-		if (numero.z > 0.5 && zf < collo_z - 0.03) {
+		if (mod(numero.z, 2.0) > 0.5 && zf < collo_z - 0.03) {
 			vec2 uv = vec2(0.5 - p.x / SCHIENA, (collo_y - 0.02 - p.y) / SCHIENA);
 			if (uv.x > 0.0 && uv.x < 1.0 && uv.y > 0.0 && uv.y < 1.0) {
 				vec4 t = texture(schiene, (numero.xy + uv) * CELLA);
@@ -711,6 +717,15 @@ void fragment() {
 		} else if (abs(fract((zf * 1.6 + p.y * 3.0) * 6.0) - 0.5) < 0.12 && p.y < scarpa_alto - 0.01 && ax > 0.125) {
 			c = dot(scarpe.rgb, vec3(0.3, 0.59, 0.11)) > 0.6 ? vec3(0.1) : vec3(0.92);   // righe sul fianco
 		}
+	}
+	if (numero.z > 1.5 && classe.x < 0.5 && p.x > spalla_x && p.y > anca_y) {
+		// fascia da capitano: segue il braccio perché è dipinta sulla posa di riposo (a T, braccio lungo x)
+		float t = (p.x - spalla_x) / (gomito_x - spalla_x);
+		float pt = max(fwidth(t), 1e-4);
+		float dentro = sm(FASCIA_T.x - pt, FASCIA_T.x + pt, t) * sm(FASCIA_T.y + pt, FASCIA_T.y - pt, t);
+		float e = min(t - FASCIA_T.x, FASCIA_T.y - t) / (FASCIA_T.y - FASCIA_T.x);
+		c = mix(c, FASCIA_COLORE * mix(0.45, 1.0, sm(0.0, FASCIA_ORLO, e)), dentro);
+		ruvido = mix(ruvido, 0.7, dentro);
 	}
 	ALBEDO = c;
 	ROUGHNESS = ruvido;

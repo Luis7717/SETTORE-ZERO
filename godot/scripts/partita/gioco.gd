@@ -45,6 +45,8 @@
 #   --pausa-rosa        amichevole con una carriera di prova (file user://prova_pausa_rosa.json, mai il salvataggio vero):
 #                       dopo un attimo pausa e "Rosa e tattica" aperta (cambi, formazione e stili a partita in corso)
 #   --scena=cambio      stessa carriera di prova: due sostituzioni dalla pausa e scena del cambio (cambio_regia.gd)
+#   --capitano          stessa carriera di prova col campione (attaccante, il n. 10 delle scene): fascia da capitano
+#                       al braccio (con --scena=giro lo si vede correre col pallone)
 #
 # Rosa e tattica (Luis 2026-11-24): nelle partite della carriera (campionato, amichevole) la pausa e l'intervallo hanno
 # il tasto "Rosa e tattica": la Rosa del menu (rosa.gd in modo partita) si apre sopra la partita ferma; chiudendola i
@@ -212,7 +214,7 @@ func _ready() -> void:
 	_leggi_opzioni()
 	if _avvio.is_empty():
 		await get_tree().process_frame # chi ha creato la scena può ancora chiamare avvia()
-	if _avvio.is_empty() and (_opzioni.has("pausa-rosa") or _opzioni.get("scena", "") == "cambio"):
+	if _avvio.is_empty() and (_opzioni.has("pausa-rosa") or _opzioni.has("capitano") or _opzioni.get("scena", "") == "cambio"):
 		_avvio_carriera_prova()
 	_parti()
 
@@ -230,11 +232,17 @@ func carriera_partita() -> Object:
 	return c if c is Object and c.get("s") is Dictionary else null
 
 
-# --pausa-rosa / --scena=cambio: amichevole con una carriera nuova su un file di prova (mai il salvataggio vero)
+# --pausa-rosa / --scena=cambio / --capitano: amichevole con una carriera nuova su un file di prova (mai il salvataggio vero)
 func _avvio_carriera_prova() -> void:
 	var c := Carriera.new()
 	c.percorso = SALVA_PROVA_ROSA
 	c.create("Prova", 1, 4242)
+	if _opzioni.has("capitano"):
+		var ch: Dictionary = c.addChampion({"name": "Capitano", "ruolo": "ATT", "look": {}, "num": 10})
+		var i: int = c.s.lineup.find(ch.id)
+		if i >= 0 and i != 9: # al posto 9, il "n. 10" delle scene (--scena=giro, gol, ...)
+			c.s.lineup[i] = c.s.lineup[9]
+			c.s.lineup[9] = ch.id
 	carriera_prova = c
 	var avv: Dictionary = c.team(c.s.divs[2][1])
 	_avvio = {"squadra_a": c.squadraPartita(), "squadra_b": c.avversarioPartita(avv), "me": 0, "tipo": "amichevole",
