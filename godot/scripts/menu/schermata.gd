@@ -56,6 +56,7 @@ var sicura := Rect2()            # area sicura in punti dell'interfaccia
 var sfondo: Control
 var colonna: VBoxContainer
 var testata: PanelContainer
+var _linea_misura := Callable()   # aggancio di testata.resized per la linea colorata (uno solo, _costruisci_testata)
 var fisso_sopra: VBoxContainer   # sotto la barra, fuori dallo scorrimento (anteprima e schede dell'editor)
 var fisso_sotto: VBoxContainer   # in fondo, fuori dallo scorrimento (pulsanti dell'editor)
 var scorri: ScrollContainer
@@ -411,10 +412,19 @@ func _costruisci_testata() -> void:
 		linea.draw_rect(Rect2(0, -1, w, 1), T.LINE)
 		linea.draw_polygon(pts, cols))
 	testata.add_child(linea)
-	testata.resized.connect(func() -> void:
+	# un solo aggancio alla volta: a ogni mostra() la linea si rifà e il vecchio aggancio puntava a una linea già
+	# liberata (Luis 2026-11-27, crash su iPhone toccando "Nome" nella creazione del campione: queue_redraw su un
+	# oggetto liberato fa crashare la build release, in debug è solo un errore)
+	if _linea_misura.is_valid() and testata.resized.is_connected(_linea_misura):
+		testata.resized.disconnect(_linea_misura)
+	_linea_misura = func() -> void:
+		if not is_instance_valid(linea):
+			return
 		linea.position = Vector2(-16, testata.size.y - 2)
 		linea.size = Vector2(testata.size.x + 32, 2)
-		linea.queue_redraw())
+		linea.queue_redraw()
+	testata.resized.connect(_linea_misura)
+	_linea_misura.call()
 
 
 ## pulsante ‹ (le schermate possono ridefinirlo)

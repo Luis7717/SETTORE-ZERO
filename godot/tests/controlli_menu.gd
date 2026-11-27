@@ -463,6 +463,10 @@ func test_editor_nuova_carriera_scheda_nome() -> bool:
 		check(w <= largo, "scheda %s larga %.0f su %.0f" % [sk[1], w, largo])
 		if sk[0] == "me":
 			_scrivi_nome(n)
+	# crash su iPhone (2026-11-27): ogni cambio di scheda lasciava un aggancio di testata.resized verso una linea già
+	# liberata; al primo ridimensionamento della barra la build release crashava (queue_redraw su oggetto liberato)
+	eq(n.testata.resized.get_connections().size(), 1, "un solo aggancio della linea della testata dopo i cambi di scheda")
+	n.testata.size += Vector2(0, 3)   # barra che cambia misura: niente linee vecchie da ridisegnare
 	_finisci(n)
 	return done()
 
