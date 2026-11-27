@@ -1974,3 +1974,31 @@ le fasce si chiamano **esterno sinistro / destro (ES / ED)**.
   gioco un nome solo, pallone libero nessuno).
 - **Da provare sull'iPhone**: se il nome del portatore avversario in gioco normale dà fastidio si toglie (una riga in
   `_in_regola`).
+
+## 2026-11-27 — Godot: i cambi aspettano che la palla esca
+
+Luis: "Per fare i cambi aspetta che la palla esca." (`scripts/partita/cambi_partita.gd`, `gioco.gd`, `hud_partita.gd`)
+- **Quando entrano**: alla prima ripresa non ancora battuta (`CambiPartita.gioco_fermo`: `phase == "restart"`):
+  rimessa, rinvio, angolo, punizione (anche per fuorigioco), rigore, calcio d'inizio dopo il gol. Scelte mie: subito
+  all'inizio della ripresa, anche se il battitore sta ancora andando a prendere il pallone o c'è il raccattapalle
+  (scena di `riprese.gd`: la scena del cambio congela il motore e poi la ripresa continua da dove era); **non** col
+  pallone in mano al portiere (`gk`: non è un'interruzione, il pallone non è uscito), **non** a rincorsa già partita
+  (`r.pend`), **non** durante festa, esultanza e replay del gol (si aspetta il calcio d'inizio). `SimMatch.cambiaSquadra`
+  è chiamato solo così, col motore fermo; il motore non è stato toccato (confronti col JS e `rnd()` invariati).
+- **Cosa aspetta**: se c'è almeno una sostituzione aspetta tutto quello che è cambiato nella Rosa (titolari, formazione,
+  stili), perché `applica` porta nel motore la squadra della carriera intera: separare formazione e stili dalle
+  sostituzioni sarebbe stato più complicato. Senza sostituzioni (solo formazione, stili, scambi tra titolari) vanno
+  subito come prima; i battitori dei calci piazzati sempre subito (il motore guarda comunque chi è in campo). In pausa
+  a gioco già fermo vanno subito (scena a Riprendi), all'intervallo pure (scena a Secondo tempo).
+- **Conteggio**: i cambi in attesa contano subito nei 5 (`fatti` = `confermati` + titolari non ancora nel motore) e
+  "USCITO" vale solo per chi è uscito davvero: riaperta la Rosa chi doveva uscire si può rimettere (il cambio non conta
+  più); A per B e poi B per C, con B mai entrato, conta una sola sostituzione. Al limite dei 5 si può sempre disfare.
+- **Fine partita coi cambi in attesa** (fischio finale, Esci/Abbandona): si perdono, la carriera torna alla squadra in
+  campo (`annulla`, con titolari, formazione e stili ricordati all'apertura della Rosa, `ricorda`) e si salva.
+- **HUD**: "Cambio pronto", piccola pillola gialla sotto il tasto della pausa, solo a gioco in corso. Nessuna scritta in
+  più nella Rosa (i cambi in attesa si vedono già fatti).
+- **Test**: `tests/test_cambi_partita.gd` (+4: conteggio e disfare, ingresso nel motore, perdita a fine partita,
+  `gioco_fermo` alle interruzioni), `tests/prova_cambio.gd` rifatta (attesa a pallone in gioco, Rosa riaperta 3/5,
+  pallone fuori → motore + scena, intervallo subito, perdita a fine partita).
+- **Da provare sull'iPhone**: se aspettare tutta la tattica insieme alla sostituzione va bene, e se la scritta si vede.
+

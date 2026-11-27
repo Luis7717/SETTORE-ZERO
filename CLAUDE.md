@@ -150,7 +150,18 @@
   compreso), chi è uscito resta in panchina "USCITO", l'espulso non si tocca, chi entra ha energia piena; scambi tra
   titolari, formazione (gli stessi 11 nei posti nuovi, `formazione_stessi_11`) e stili liberi. Chiusa la Rosa i cambi
   vanno subito nel motore (`SimMatch.cambiaSquadra`: stesso giocatore = stesso src, posti e ruoli della formazione, stili;
-  evento `sub` con `fuori`, cronaca "Cambio: entra X, esce Y") e si salvano nella carriera. A Riprendi / Secondo tempo
+  evento `sub` con `fuori`, cronaca "Cambio: entra X, esce Y") e si salvano nella carriera. **Cambi alla palla fuori**
+  (Luis 2026-11-27, "per fare i cambi aspetta che la palla esca"): dalla pausa a pallone in gioco le sostituzioni
+  restano in attesa (`cambi.attesa`, scritta piccola gialla "Cambio pronto" sotto il tasto della pausa,
+  `hud.mostra_cambio_pronto`) e vanno nel motore con la scena alla prima interruzione (`CambiPartita.gioco_fermo`:
+  ripresa non ancora battuta, anche durante la scena del battitore/raccattapalle; non col pallone in mano al portiere
+  `gk`, non a rincorsa partita, non durante festa/replay del gol: lì al calcio d'inizio; `_cambi_in_attesa` in
+  `gioco.gd`); con una sostituzione aspettano anche formazione e stili cambiati insieme, senza sostituzioni (o a gioco
+  già fermo) vanno subito; i battitori dei piazzati subito. All'intervallo entrano subito (`_mostra_intervallo`).
+  Contano subito nei 5 (`fatti` = `confermati` + `entrati_in_attesa`), "USCITO" solo chi è uscito davvero: riaperta
+  la Rosa si possono disfare (chi doveva uscire rientra). Se la partita finisce prima (fischio, Esci) si perdono:
+  `annulla` rimette nella carriera la squadra in campo (`base`, `ricorda`). Prova: `--scena=cambio` (cambi a pallone
+  in gioco, "Cambio pronto", 2,5 s dopo pallone fuori e scena). A Riprendi / Secondo tempo
   la **scena del cambio** (`cambio_regia.gd`, 3,4 s veri, tempo fermo, un tocco la salta): chi esce cammina verso la
   linea laterale a centrocampo, chi entra corre al suo posto, targhette ▲ verde / ▼ rossa e riquadro CAMBIO in basso,
   telecamera dal lato opposto. Non nelle lezioni, nelle prove di tiro né senza carriera. **Campione sempre titolare**

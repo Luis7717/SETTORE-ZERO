@@ -56,6 +56,8 @@ const LAMPO_S := 0.45
 const BIG_SOTTO_DIM := 26                          # carattere della seconda riga della scritta grande
 const BIG_SOTTO_MARGINE := 16.0
 const PUNTI_SALTO := 1.45                          # il punteggio cambiato si ingrandisce così e torna giù
+const TESTO_CAMBIO := "Cambio pronto"         # cambi in attesa che la palla esca (gioco.gd, cambi_partita.gd)
+const CAMBIO_SOTTO := 92.0                         # ... scritta piccola sotto il tasto della pausa e la scritta della visuale
 
 var vista = null                  # per l'anteprima del calcio e per niente altro (world_to_screen)
 var gesti = null
@@ -89,6 +91,7 @@ var _cartellino: Panel            # cartellino giallo o rosso sopra la scritta g
 var _suggerimento: PanelContainer
 var _suggerimento_l: Label
 var _dribbling: Button
+var _cambio_pronto: PanelContainer   # "Cambio pronto": sostituzioni decise in pausa che aspettano la palla fuori
 var _cam_tip: PanelContainer
 var _frecce: Array[Label] = []
 var _fade: ColorRect
@@ -277,6 +280,13 @@ func _crea_angoli() -> void:
 	_mappa = Minimappa.new()
 	_mappa.size = Vector2(78, 118)
 	add_child(_mappa)
+	_cambio_pronto = _pillola()
+	var lc: Label = _cambio_pronto.get_child(0)
+	lc.text = TESTO_CAMBIO
+	lc.add_theme_font_size_override("font_size", 11)
+	lc.add_theme_color_override("font_color", GIALLO)
+	_cambio_pronto.visible = false
+	add_child(_cambio_pronto)
 
 
 func _crea_centro() -> void:
@@ -393,6 +403,8 @@ func _disponi() -> void:
 	_rallenty_mat.set_shader_parameter("dim", tutto)
 	var top := s.position.y + 8.0
 	_pausa.position = Vector2(s.position.x + MARGINE, top)
+	_cambio_pronto.reset_size()
+	_cambio_pronto.position = Vector2(s.position.x + MARGINE, top + CAMBIO_SOTTO)
 	_segnapunti.reset_size()
 	_segnapunti.position = Vector2(s.position.x + (s.size.x - _segnapunti.size.x) / 2.0, top)
 	_orologio.reset_size()
@@ -479,6 +491,15 @@ func aggiorna(m, me: int) -> void:
 	_mappa.m = m
 	_mappa.me = me
 	_mappa.queue_redraw()
+
+
+## scritta discreta "Cambio pronto" sotto la pausa (cambi in attesa che la palla esca)
+func mostra_cambio_pronto(si: bool) -> void:
+	_cambio_pronto.visible = si
+
+
+func cambio_pronto_visibile() -> bool:
+	return _cambio_pronto.visible
 
 
 ## testo in basso; caldo = giallo e grande (parata, rigore)
