@@ -54,6 +54,11 @@ const SECONDE := {
 	"CC": ["COC", "CDC", "ES", "ED"], "COC": ["ATT", "AS", "AD"], "ES": ["TS", "AS", "ED", "CC"],
 	"ED": ["TD", "AD", "ES", "CC"], "AS": ["ES", "AD", "ATT"], "AD": ["ED", "AS", "ATT"], "ATT": ["COC", "AS", "AD"],
 }
+## terzini e ali non si scambiano mai (Luis 2026-11-27: "i terzini non possono mai fare le ali, al massimo gli
+## esterni"): nessuna seconda scelta tra loro, malus pieno da linea lontana e autoLineup/fixLineup non li mettono lì
+const VIETATI := {"TS": ["AS", "AD"], "TD": ["AS", "AD"], "AS": ["TS", "TD"], "AD": ["TS", "TD"]}
+## esterno dello stesso lato: prende il posto di una seconda scelta vietata (salvataggi di prima)
+const ESTERNO := {"TS": "ES", "AS": "ES", "TD": "ED", "AD": "ED"}
 const SPECCHIO := {"TS": "TD", "TD": "TS", "ES": "ED", "ED": "ES", "AS": "AD", "AD": "AS"}
 ## fascia del ruolo: -1 sinistra, 1 destra, 0 centro
 const LATO := {"TS": -1, "ES": -1, "AS": -1, "TD": 1, "ED": 1, "AD": 1}
@@ -64,8 +69,7 @@ const F_COMPATIBILE := 0.97    # in un ruolo compatibile
 const F_SPECCHIO := 0.94       # stesso ruolo sull'altra fascia
 const F_GRUPPO := 0.9          # altro ruolo della stessa linea (DC terzino, COC centrocampista, punta ala)
 const F_VICINO := 0.86         # linea accanto (difesa ⇄ centrocampo, centrocampo ⇄ attacco)
-const F_FASCIA := 0.84         # difesa ⇄ attacco sulla stessa fascia (terzino ala)
-const F_LONTANO := 0.72        # difesa ⇄ attacco (ala in difesa centrale)
+const F_LONTANO := 0.72        # difesa ⇄ attacco (ala in difesa centrale, terzino ala: VIETATI)
 const F_PORTIERE := 0.6        # portiere fuori dalla porta, o un altro in porta (come prima)
 ## sotto questo fattore la Rosa segna "fuori ruolo"
 const F_FUORI := 0.96
@@ -207,6 +211,8 @@ static func fattore(p: Dictionary, posto: String, portiere: float = F_PORTIERE) 
 		return 1.0
 	if (r == "P") != (posto == "P"):
 		return portiere
+	if vietato(p, posto):
+		return F_LONTANO
 	if seconda_di(p) == posto:
 		return F_SECONDA
 	if (COMPATIBILI.get(r, []) as Array).has(posto):
@@ -216,8 +222,13 @@ static func fattore(p: Dictionary, posto: String, portiere: float = F_PORTIERE) 
 	if a == b:
 		return F_SPECCHIO if SPECCHIO.get(r, "") == posto else F_GRUPPO
 	if a != "C" and b != "C":
-		return F_FASCIA if int(LATO.get(r, 0)) != 0 and LATO.get(r, 0) == LATO.get(posto, 9) else F_LONTANO
+		return F_LONTANO
 	return F_VICINO
+
+
+## terzino in un posto da ala o ala in un posto da terzino (VIETATI): la formazione automatica non ce li mette mai
+static func vietato(p: Dictionary, posto: String) -> bool:
+	return (VIETATI.get(di(p), []) as Array).has(posto)
 
 
 ## valutazione mostrata nel suo ruolo
@@ -283,13 +294,17 @@ static func assegna_rosa(squad: Array, lineup: Array, posti_modulo: Array) -> in
 	return fatti
 
 
-## `ruolo2` giusto: niente per il portiere, mai uguale al ruolo; se manca o è sbagliato lo sceglie seconda()
+## `ruolo2` giusto: niente per il portiere, mai uguale al ruolo; se manca o è sbagliato lo sceglie seconda(); un
+## terzino con un'ala come seconda scelta (o un'ala con un terzino) prende l'esterno dello stesso lato
 static func sistema_seconda(p: Dictionary) -> void:
 	var r := di(p)
 	if r == "P":
 		p.erase("ruolo2")
 		return
 	var s: Variant = p.get("ruolo2")
+	if valido(s) and (VIETATI.get(r, []) as Array).has(s):
+		p["ruolo2"] = ESTERNO[r]
+		return
 	if not valido(s) or s == r or s == "P":
 		p["ruolo2"] = seconda(p)
 

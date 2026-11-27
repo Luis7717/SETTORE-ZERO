@@ -633,10 +633,17 @@ func _kit_di(p: Object) -> Dictionary:
 	var shorts := _colore(k.get("shorts", 0xffffff))
 	var i: int = m.players.find(p)
 	var cel := Schiene.cella(maxi(i, 0))
+	var z := (1.0 if i >= 0 else 0.0) + (2.0 if capitano(p) else 0.0)
 	return {"maglia": shirt, "calzoncini": shorts, "calzettoni": _colore(k.get("socks", k.get("shirt", 0xffffff))),
 		"bordino": _secondo_colore(shirt, shorts),
 		"stile": Asp.stile_figura(st),
-		"numero": Vector4(cel.x, cel.y, 1.0 if i >= 0 else 0.0, st.fit)}
+		"numero": Vector4(cel.x, cel.y, z, st.fit)}
+
+
+## fascia da capitano (Luis 2026-11-27): il capitano è sempre il campione (Carriera.capitano()), solo nella mia
+## squadra; dipinta dallo shader della divisa (numero.z + 2)
+func capitano(p: Object) -> bool:
+	return p.team == me and p.src is Dictionary and bool(p.src.get("champ", false))
 
 
 func _stile_squadra(k: int) -> Dictionary:

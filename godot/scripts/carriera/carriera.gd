@@ -87,6 +87,8 @@ var crescitaRosa := false
 ## (giocatori senza `ruolo`: tutto come il web)
 var ruoli := true
 ## ruoli della rosa nuova, nell'ordine in cui create() genera i giocatori di ogni gruppo (i primi due sono i più forti)
+## punti tolti a un terzino su un'ala (o un'ala da terzino) nella formazione automatica: mai, se c'è un altro
+const PENALE_VIETATO := 1000.0
 const ROSA_NUOVA := {"D": ["DC", "DC", "TS", "TD", "DC", "TD"], "C": ["CC", "CC", "ES", "ED", "CDC", "COC"], "A": ["ATT", "ATT", "AS", "AD"]}
 ## obiettivo della stagione appena chiusa da endSeason (per il giudizio in dopoPartita; non si salva)
 var _obiettivo_finito := {}
@@ -448,6 +450,7 @@ func _nasce(p: Dictionary, r: String, r2: Variant = null) -> void:
 	Ruoli.modella(p, r, JS.rng32(Asp.hash32("ruolo", s.get("semeB", 0), p.id)))
 	if Ruoli.valido(r2) and r2 != r and r2 != "P" and r != "P":
 		p["ruolo2"] = r2
+		Ruoli.sistema_seconda(p)
 
 
 ## ruolo chiesto da ogni posto della formazione: specifico (sim/ruoli.gd) o, nei confronti col JS, il gruppo
@@ -623,10 +626,10 @@ func autoLineup() -> void:
 	JS.v8_sort(order, func(a: int, b: int) -> float: return float("PADC".find(F[a][0]) - "PADC".find(F[b][0])))
 	for i: int in order:
 		var best: Variant = null
-		var bo := -1
+		var bo := -INF
 		for p: Dictionary in s.squad:
 			if not used.has(p.id):
-				var o := overallAs(p, FR[i])
+				var o := _punti_posto(p, FR[i])
 				if o > bo:
 					bo = o
 					best = p
@@ -647,7 +650,7 @@ func _sistema_posti(l: Array, FR: Array) -> Array:
 	for p: Dictionary in s.squad:
 		var riga: Array = []
 		for i in n:
-			riga.append(overallAs(p, FR[i]))
+			riga.append(_punti_posto(p, FR[i]))
 		val[p.id] = riga
 	for id: Variant in out:
 		if not val.has(id):
@@ -684,6 +687,15 @@ func _sistema_posti(l: Array, FR: Array) -> Array:
 	return out
 
 
+## punti del giocatore nel posto per la formazione automatica: la valutazione nel posto, ma un terzino su un'ala (o
+## un'ala da terzino, Ruoli.VIETATI) solo se non c'è proprio nessun altro
+func _punti_posto(p: Dictionary, posto: String) -> float:
+	var o := float(overallAs(p, posto))
+	if ruoli and Ruoli.vietato(p, posto):
+		o -= PENALE_VIETATO
+	return o
+
+
 ## dopo vendite e acquisti: riempie i buchi della formazione
 func fixLineup() -> void:
 	var ids := {}
@@ -703,10 +715,10 @@ func fixLineup() -> void:
 		if s.lineup[i] != null:
 			continue
 		var best: Variant = null
-		var bo := -1
+		var bo := -INF
 		for p: Dictionary in s.squad:
 			if not used.has(p.id):
-				var o := overallAs(p, FR[i])
+				var o := _punti_posto(p, FR[i])
 				if o > bo:
 					bo = o
 					best = p
@@ -1347,11 +1359,11 @@ func schieraSani() -> Array:
 		if id == null or infortunio(id) <= 0:
 			continue
 		var best: Variant = null
-		var bo := -1
+		var bo := -INF
 		for p: Dictionary in s.squad:
 			if s.lineup.has(p.id) or infortunio(p.id) > 0:
 				continue
-			var o := overallAs(p, FR[i])
+			var o := _punti_posto(p, FR[i])
 			if o > bo:
 				bo = o
 				best = p

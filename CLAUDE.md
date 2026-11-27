@@ -112,7 +112,10 @@
   in campo (non espulso, non portiere), sennò sceglie il motore come sempre; senza campo motore identico. Punizione
   lontana = oltre `PUN_LONTANA_M` 25 m dalla porta avversaria; oltre `PUN_ZONA_M` 45 m batte il più vicino come sempre;
   angolo destro/sinistro visti da chi attacca. **Capitano = sempre il campione** (`Carriera.capitano()`): "C" gialla
-  sulla sua carta e "· capitano" nel pannello; la fascia al braccio in partita non c'è ancora. Test
+  sulla sua carta e "· capitano" nel pannello; in partita **fascia gialla** sul braccio sinistro sopra il gomito
+  (Luis 2026-11-27): dipinta dallo shader della divisa (`divisa.gdshader`, `FASCIA_T` del tratto spalla→gomito, bordi
+  più scuri), accesa da `numero.z` + 2 (le 16 instance uniform sono tutte usate) solo per il campione della mia squadra
+  (`vista.gd` `capitano()`); prova `res://scenes/partita.tscn -- --capitano`, foto `tools/foto_modelli.gd -- --fascia`. Test
   `tests/test_calci_piazzati.gd`, controllo `test_rosa_calci_piazzati`, foto `08_rosa_piazzati*`.
 - **Ruoli e moduli** (Godot, Luis 2026-11-26, `godot/sim/ruoli.gd`): al posto di D/C/A ogni giocatore ha un ruolo
   specifico nel campo `ruolo` e (tranne il portiere) una seconda scelta `ruolo2`: P, TD, TS, DC (difesa), CDC mediano,
@@ -123,8 +126,7 @@
   dalle squadre con `"moduli": true` = `squadraPartita`/`avversarioPartita`; `C.schema(modulo)`, `C.schema_ruoli`).
   **Malus fuori ruolo** (`Ruoli.fattore`, in `C.effStats(src, gruppo, ruoloPosto)` e nella valutazione): suo ruolo 1;
   seconda scelta 0,98; compatibili 0,97 (`COMPATIBILI`: TS⇄ES, TD⇄ED, ES⇄AS, ED⇄AD, ATT⇄COC, DC⇄CDC, CC→COC ma non
-  COC→CC); altra fascia 0,94; stessa linea 0,90; linea accanto 0,86; terzino⇄ala stessa fascia 0,84; difesa⇄attacco
-  0,72; porta 0,6 (e `por` al massimo 25) come prima. Chi non ha `ruolo` usa `POSPEN` come sempre.
+  COC→CC); altra fascia 0,94; stessa linea 0,90; linea accanto 0,86; difesa⇄attacco 0,72; porta 0,6 (e `por` al massimo 25) come prima. Chi non ha `ruolo` usa `POSPEN` come sempre.
   **Valutazione per ruolo** (`Ruoli.PESI`, sulle sotto-statistiche; `Carriera.overall`/`overallAs` la usano per chi ha
   `ruolo`, il portiere e chi non ce l'ha restano con la formula del web): `tara()` fa sì che un giocatore "generico"
   valga in media come prima, quindi valore e prezzi non si spostano. **Giocatori generati** (rosa nuova `_rosa_nuova`,
@@ -136,7 +138,11 @@
   `_sistema_posti` scambia i titolari finché migliora. `Carriera.ruoli = false` (solo `test_carriera.gd`) = tutto come
   il web. A schermo: sigla del ruolo su carte, Rosa ("DC · 2ª CDC", "in campo TS (fuori ruolo)"), Mercato, Statistiche
   (nome del ruolo e seconda scelta), editor del campione (12 ruoli); badge arancio sulla carta solo se fuori ruolo
-  davvero (fattore sotto `F_FUORI` 0,96). Test `tests/test_ruoli.gd`.
+  davvero (fattore sotto `F_FUORI` 0,96). **Terzini mai ali** (Luis 2026-11-27, "al massimo gli esterni"):
+  terzino⇄ala (`Ruoli.VIETATI`, anche dello stesso lato) = 0,72 come difesa⇄attacco, mai seconda scelta tra loro
+  (`sistema_seconda` cambia un'ala seconda scelta di un terzino, o viceversa, nell'esterno del lato del ruolo,
+  `ESTERNO`: vale per i salvataggi vecchi e per il campione); `autoLineup`/`fixLineup`/`schieraSani`/`_sistema_posti`
+  non ce li mettono (`_punti_posto`, `PENALE_VIETATO`: solo se non c'è proprio nessun altro). Test `tests/test_ruoli.gd`.
 - **Rosa e tattica nella pausa** (Godot, Luis 2026-11-24): nelle partite della carriera (campionato, amichevole) la
   pausa e l'intervallo hanno il tasto **Rosa e tattica**: la Rosa del menu (`rosa.gd` con `{"in_partita": true, "cambi",
   "carriera"}`) si apre sopra la partita ferma, senza Aspetto, Vendi né altre schermate, con "Cambi N/5" (quanti restano)

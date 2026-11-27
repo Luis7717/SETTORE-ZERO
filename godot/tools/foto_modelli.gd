@@ -3,7 +3,8 @@
 # corpo intero di fronte, di fianco, da dietro, di tre quarti, e la testa di fronte, di tre quarti e di fianco.
 # Uso (finestra vera, non --headless):
 #   $G --path godot -s res://tools/foto_modelli.gd -- --file=CARTELLA/nome.png [--corsa=5] [--tagli=2,4,8,15,9]
-#   [--solo=N] [--viste=0,1,2] [--tile=300x460]   (--corsa: velocità in m/s, 0 = fermo; --tagli: taglio dei capelli per riga)
+#   [--solo=N] [--viste=0,1,2] [--tile=300x460] [--fascia]   (--corsa: velocità in m/s, 0 = fermo; --tagli: taglio dei
+#   capelli per riga; --fascia: fascia da capitano sul braccio sinistro)
 extends SceneTree
 
 const Figura := preload("res://scripts/partita/figura.gd")
@@ -111,7 +112,7 @@ func _giro(opz: Dictionary) -> void:
 		vp.add_child(fig)
 		var stile := {"fit": d.fit, "sleeves": d.sleeves, "collar": r % 3, "pattern": 0, "shorts": 0, "socks": 0}
 		var kit := {"maglia": Color(d.maglia), "calzoncini": Color("#20242c"), "calzettoni": Color(d.maglia), "bordino": Color.WHITE,
-			"stile": Asp.stile_figura(stile), "numero": Vector4(0, 0, 0, d.fit)}
+			"stile": Asp.stile_figura(stile), "numero": Vector4(0, 0, 2.0 if opz.has("fascia") else 0.0, d.fit)}
 		var look := {"skin": d.skin, "hair": int(tagli[r % tagli.size()]), "hairColor": r % 5, "eyes": r % 6, "beard": [0, 1, 0, 5, 0][r % 5], "brows": r % 6}
 		fig.prepara(kit, Asp.parametri_figura(look, stile), 0.0, TV.avviso())
 		var p := Fermo.new()
