@@ -53,6 +53,8 @@ func _uno(sd: int, ko: bool, d0: float, righe: bool, forza: String) -> void:
 				t_ev = m.time
 				esito = "ok" if e.ok else "ko"
 				print("  %.2f dribble %s lato %s show %s skill %s d=%.2f" % [m.time, esito, e.side, e.get("show"), e.get("skill", "-"), C.hyp(p.x - o.x, p.y - o.y)])
+			elif e.type == "dribble_palla" or e.type == "dribble_presa":
+				print("  %.2f %s %s" % [m.time, e.type, e.get("ok", "")])
 			elif e.type == "dribble_go":
 				print("  %.2f dribble_go d=%.2f" % [m.time, C.hyp(p.x - o.x, p.y - o.y)])
 		m.events.clear()
@@ -63,9 +65,11 @@ func _uno(sd: int, ko: bool, d0: float, righe: bool, forza: String) -> void:
 		if t_ev >= 0.0:
 			dmin = minf(dmin, d)
 			if righe and i % 3 == 0:
-				print("  %.2f d=%.2f p=(%.2f,%.2f) v=%.1f o=(%.2f,%.2f) v=%.1f palla %s" % [m.time, d, p.x, p.y, C.hyp(p.vx, p.vy), o.x, o.y, C.hyp(o.vx, o.vy),
-					"p" if m.ball.owner == p else ("o" if m.ball.owner == o else "-")])
-			if m.time > t_ev + 1.6:
+				var fi = m.ball.finto
+				print("  %.2f d=%.2f p=(%.2f,%.2f) v=%.1f o=(%.2f,%.2f) v=%.1f palla %s%s" % [m.time, d, p.x, p.y, C.hyp(p.vx, p.vy), o.x, o.y, C.hyp(o.vx, o.vy),
+					"p" if m.ball.owner == p else ("o" if m.ball.owner == o else "-"),
+					"" if fi == null else " finto=(%.2f,%.2f h%.2f) v=%.1f" % [fi.x, fi.y, fi.h, C.hyp(fi.vx, fi.vy)]])
+			if m.time > t_ev + 2.6:
 				break
 	print("seme %d %s: distanza minima %.2f m" % [sd, esito, dmin])
 	m.dispose()

@@ -306,7 +306,7 @@ func _prepara_scena() -> void:
 			pass
 
 
-# dribbling della persona a passo fisso: n. 10 col pallone, difensore davanti, tasto Dribbling (come la scena di
+# dribbling della persona a tempo fisso (1/60 s veri a fotogramma): n. 10 col pallone, difensore davanti, tasto Dribbling (come la scena di
 # gioco.gd), tempo al 30%; esito e scatto alla vista come in partita. Schermate con --foto, poi esce.
 func _dribbling_da_vicino() -> void:
 	_manuale = true
@@ -350,7 +350,6 @@ func _dribbling_da_vicino() -> void:
 	var foto: String = _opz.get("foto", "")
 	var ogni := int(_opz.get("ogni-passi", "4"))
 	var regia := DribblingRegia.new()
-	var acc := 0.0
 	var prenotato := false
 	var n := 0
 	var k := 0
@@ -358,25 +357,24 @@ func _dribbling_da_vicino() -> void:
 	var fine := -1.0
 	while n < 2400:
 		var ts := regia.velocita() if regia.velocita() > 0.0 else (0.3 if prenotato else 1.0)
+		# un passo del motore a ogni fotogramma, lungo quanto il tempo rallentato (come gioco.gd): con passi interi da
+		# 1/60 nel rallenty il motore restava fermo tre fotogrammi e saltava al quarto, e piedi e pallone a schermo con lui
 		var dt := DT * ts
-		acc += dt
-		while acc >= DT - 1e-9:
-			m.step(DT)
-			acc -= DT
-			for e: Dictionary in m.events:
-				regia.evento(e, 0)
-				match String(e.type):
-					"dribble":
-						var es := DribblingRegia.esito(e)
-						var tk: Dictionary = vista.dribbling(e, es)
-						print("prova dribbling: %s %s lato %s (a %.2f m)" % [tk.get("name", "-"), "riuscito" if e.ok else "fallito", e.side,
-							Vector2(att.x - dif.x, att.y - dif.y).length()])
-						fine = m.time + 1.3
-					"dribble_go":
-						vista.dribbling_go(e)
-						print("prova dribbling: scatto a %.2f m" % Vector2(att.x - dif.x, att.y - dif.y).length())
-			m.events.clear()
-			regia.passo(m, 0, DT, ts)
+		m.step(dt)
+		for e: Dictionary in m.events:
+			regia.evento(e, 0)
+			match String(e.type):
+				"dribble":
+					var es := DribblingRegia.esito(e)
+					var tk: Dictionary = vista.dribbling(e, es)
+					print("prova dribbling: %s %s lato %s (a %.2f m)" % [tk.get("name", "-"), "riuscito" if e.ok else "fallito", e.side,
+						Vector2(att.x - dif.x, att.y - dif.y).length()])
+					fine = m.time + 1.3
+				"dribble_go":
+					vista.dribbling_go(e)
+					print("prova dribbling: scatto a %.2f m" % Vector2(att.x - dif.x, att.y - dif.y).length())
+		m.events.clear()
+		regia.passo(m, 0, dt, ts)
 		if not prenotato and m.duelFor(0):
 			if lato != 0.0:
 				m.userDribble(0)

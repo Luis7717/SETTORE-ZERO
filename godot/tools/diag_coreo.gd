@@ -1,5 +1,5 @@
 # Diagnosi (non è un test): piedi, bacino e pallone di una coreografia del dribbling passo per passo.
-#   $G --headless --path godot -s res://tools/diag_coreo.gd -- --giochetto=bicicletta [--ko]
+#   $G --headless --path godot -s res://tools/diag_coreo.gd -- --giochetto=pedalata [--ko]
 extends SceneTree
 
 const Coreo := preload("res://scripts/partita/mosse/coreo.gd")

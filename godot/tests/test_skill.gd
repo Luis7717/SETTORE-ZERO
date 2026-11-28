@@ -31,18 +31,18 @@ func test_scelta_secondo_il_dribbling() -> bool:
 	for k in 4000:
 		var id := String(Skill.scegli(99.0, (k + 0.5) / 4000.0).id)
 		conta[id] = int(conta.get(id, 0)) + 1
-	check(int(conta.arcobaleno) > 2 * int(conta.finta), "arcobaleno %d volte, finta %d" % [conta.arcobaleno, conta.finta])
+	check(int(conta.bicicletta) > 2 * int(conta.finta), "bicicletta %d volte, finta %d" % [conta.bicicletta, conta.finta])
 	return done()
 
 
-func test_sedici_giochetti_con_i_campi_giusti() -> bool:
-	eq(Skill.LISTA.size(), 16, "16 giochetti")
+func test_tutti_i_giochetti_con_i_campi_giusti() -> bool:
+	eq(Skill.LISTA.size(), 29, "29 giochetti (16 + i 13 del 2026-11-27)")
 	var visti := {}
 	var prima := -1.0
 	for s: Dictionary in Skill.LISTA:
 		check(not visti.has(s.id), "id unico: %s" % s.id)
 		visti[s.id] = true
-		check(float(s.show) >= 0.3 and float(s.show) <= 0.6, "%s: durata sensata (%.2f s)" % [s.id, s.show])
+		check(float(s.show) >= 0.3 and float(s.show) <= 0.7, "%s: durata sensata (%.2f s)" % [s.id, s.show])
 		check(float(s.dri) >= prima, "%s: in ordine di difficoltà" % s.id)
 		prima = float(s.dri)
 		check(String(s.name) != "", "%s: nome a schermo" % s.id)
@@ -53,14 +53,14 @@ func test_il_giochetto_non_tocca_i_numeri_casuali() -> bool:
 	# Arrange / Act: stesso seme, giochetto scelto dal motore o fisso, con e senza rifiniture
 	var sd := TD.first_ok_seed()
 	var a := TD.book_and_resolve(sd, true, "")
-	var b := TD.book_and_resolve(sd, true, "bicicletta")
+	var b := TD.book_and_resolve(sd, true, "pedalata")
 	var c := TD.book_and_resolve(sd, false, "")
 	# Assert: la sequenza della partita è allo stesso punto, l'esito è lo stesso
 	eq((a[0] as SimMatchScript).rng.a, (b[0] as SimMatchScript).rng.a, "stessa sequenza con un giochetto o l'altro")
 	eq((a[0] as SimMatchScript).rng.a, (c[0] as SimMatchScript).rng.a, "stessa sequenza con e senza rifiniture")
 	eq(bool(a[3].ok), bool(c[3].ok), "stesso esito")
 	check(String(a[3].skill) != "", "il motore dice il giochetto: %s" % a[3].skill)
-	eq(String(b[3].skill), "bicicletta", "giochetto fisso")
+	eq(String(b[3].skill), "pedalata", "giochetto fisso")
 	eq(String(c[3].skill), "", "senza rifiniture niente giochetto")
 	eq(float(c[3].show), 0.0, "... e niente attesa")
 	check((c[0] as SimMatchScript).dribGap == null, "... e nessuna distanza tenuta")
@@ -102,8 +102,12 @@ func test_ogni_giochetto_dura_il_suo_tempo_e_poi_scatta() -> bool:
 				dmin_a = minf(dmin_a, d)
 		# Assert
 		check(go, "%s: lo scatto arriva" % s.id)
-		check(dmin_a >= D.DRIB_GAP - 0.25, "%s: durante il giochetto restano staccati (%.2f m)" % [s.id, dmin_a])
-		check(dmin_b >= D.DRIB_GAP_GO - 0.4, "%s: nel sorpasso non si toccano (%.2f m)" % [s.id, dmin_b])
+		# (il portatore ora avanza durante il giochetto e il difensore indietreggia davanti a lui: la distanza resta un
+		# po' sotto DRIB_GAP; che i corpi non si compenetrino lo controlla test_coreo.gd)
+		check(dmin_a >= D.DRIB_GAP - 0.5, "%s: durante il giochetto restano staccati (%.2f m)" % [s.id, dmin_a])
+		# tunnel e pallonetti: il difensore non viene spostato (il pallone gli passa tra le gambe o sopra la testa)
+		var gap_go: float = (D.DRIB_CHASE_GAP - 0.25) if s.has("palla") else (D.DRIB_GAP_GO - 0.4)
+		check(dmin_b >= gap_go, "%s: nel sorpasso non si toccano (%.2f m)" % [s.id, dmin_b])
 		check(p.y > o.y + 0.5, "%s: oltre il difensore" % s.id)
 		check(m.ball.owner == p, "%s: col pallone" % s.id)
 		m.dispose()

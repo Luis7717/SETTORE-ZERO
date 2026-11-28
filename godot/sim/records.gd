@@ -188,6 +188,7 @@ class Ball:
 	var prev: Player = null
 	var kick: Kick = null
 	var shot: Shot = null
+	var finto: Ball = null # giochetto del dribbling (tunnel, pallonetti; solo "rifiniture"): il pallone che si vede, staccato dal portatore che lo va a riprendere (per le regole resta suo)
 	var dbl: Player = null # ha battuto il calcio da fermo e non può ritoccare il pallone finché non lo tocca un altro
 	var dblT: float = 0.0  # ... tempo di pallone libero da allora (sicurezza DBL_FREE)
 
@@ -238,6 +239,11 @@ class Duel:
 	var bt: float = 0.0   # ... tempo di partita dal tocco del tasto
 	var lat: float = 1.0  # giochetto (dribShow): quanto va di lato verso la finta (skill.gd) ...
 	var vel: float = 1.0  # ... e a che frazione di DRIB_SHOW_V
+	var sk: Dictionary = {} # ... il giochetto (riga di skill.gd)
+	var lancio: bool = false # ... il pallone finto è già partito (tunnel, pallonetti)
+	var ux: float = 0.0   # inseguimento del pallone finto (dribChase): verso del pallone ...
+	var uy: float = 0.0
+	var tl: float = 0.0   # ... e tempo che manca alla caduta del pallonetto (s)
 
 
 # Colpo di testa controllato (testa.gd): pallone alto di un compagno che sta per arrivare a un attaccante della squadra

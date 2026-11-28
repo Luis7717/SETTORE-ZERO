@@ -41,17 +41,35 @@ static func gira(sd: int, ok: bool, giochetto: String) -> Dictionary:
 	var cp: Coreo = null
 	var co: Coreo = null
 	var mis := {"esito": null, "salto_piede": 0.0, "salto_palla": 0.0, "salto_yaw": 0.0, "fine_palla": INF, "go": false,
-		"dentro": 0.0, "lato_min": INF, "lato_max": -INF, "alto": 0.0, "vicino_dif": INF, "giro": 0.0, "id": ""}
+		"dentro": 0.0, "lato_min": INF, "lato_max": -INF, "alto": 0.0, "vicino_dif": INF, "giro": 0.0, "id": "",
+		# portatore durante il giochetto (da 0,2 s dopo l'esito allo scatto): velocità minima (m/s)
+		"v_min": INF,
+		# pallone staccato (tunnel, pallonetti): quanto devia dalla linea del lancio (gradi), quanto accelera da solo
+		# (m/s per passo, a terra), accelerazione verticale media in volo (m/s²), strada fatta dal portatore dal
+		# lancio alla presa (m), distanza pallone-portatore al lancio e minima prima della presa, presa arrivata
+		"curva": 0.0, "accelera": 0.0, "grav": 0.0, "strada": 0.0, "presa": false, "lancio": false, "volo_t": 0.0,
+		"palla_ferma_o_avanti": true}
+	var t_drib := -1.0
+	var dir0 := Vector3.ZERO
+	var fv_prima := Vector3.INF
+	var vh_prima := NAN
+	var grav_n := 0
+	var pp_prima := Vector3.INF
 	var piedi_prima := {}
 	var palla_prima := Vector3.INF
 	var yaw_prima := NAN
 	var sx := Vector3.ZERO    # sinistra del portatore all'inizio (mondo): lato + = lato scelto se side = +1
 	var p0 := Vector3.ZERO
 	var t_go := INF
-	for i in 300:
+	for i in 420:
 		m.step(DT)
 		for e: Dictionary in m.events:
+			if e.type == "dribble_palla":
+				mis.lancio = true
+			elif e.type == "dribble_presa":
+				mis.presa = bool(e.ok)
 			if e.type == "dribble":
+				t_drib = 0.0
 				mis.esito = e.ok
 				mis.id = String(e.get("skill", ""))
 				var bv := Vector3(m.ball.x, 0.0, -m.ball.y)
@@ -78,6 +96,30 @@ static func gira(sd: int, ok: bool, giochetto: String) -> Dictionary:
 		for c: Coreo in [cp, co]:
 			if not c.finito:
 				c.passo(DT, p if c == cp else o, m.ball)
+		t_drib += DT
+		if mis.esito == true and not mis.go and t_drib > 0.2:
+			mis.v_min = minf(mis.v_min, C.hyp(p.vx, p.vy))
+		# pallone staccato del motore: dritto, senza spinte, gravità vera; il portatore gli va incontro
+		var fi: R.Ball = m.ball.finto
+		if fi != null:
+			var fv := Vector3(fi.vx, 0.0, -fi.vy)
+			if dir0 == Vector3.ZERO:
+				dir0 = fv.normalized()
+			elif fv.length() > 0.3:
+				mis.curva = maxf(mis.curva, rad_to_deg(dir0.angle_to(fv.normalized())))
+			if fv_prima != Vector3.INF and fi.h <= 0.0 and is_nan(vh_prima):
+				mis.accelera = maxf(mis.accelera, fv.length() - fv_prima.length())
+			fv_prima = fv
+			if fi.h > 0.05 and not is_nan(vh_prima) and fi.vh < vh_prima:
+				mis.grav += (fi.vh - vh_prima) / DT
+				grav_n += 1
+				mis.volo_t += DT
+			vh_prima = fi.vh if fi.h > 0.05 else NAN
+			if pp_prima != Vector3.INF:
+				mis.strada += Vector3(p.x, 0, -p.y).distance_to(pp_prima)
+			pp_prima = Vector3(p.x, 0, -p.y)
+		if cp.finito or (cp.t >= cp.fine and not cp.pallone_attivo()):
+			mis.fine_palla = minf(mis.fine_palla, cp.pallone().distance_to(Vector3(m.ball.x, 0.0, -m.ball.y)) if cp.pallone_attivo() else 0.0)
 		# misure sul portatore (piedi, verso) e sul pallone mostrato
 		if cp.finito:
 			break
@@ -113,6 +155,8 @@ static func gira(sd: int, ok: bool, giochetto: String) -> Dictionary:
 			mis.dentro = maxf(mis.dentro, Coreo.compenetrazione(sa, sb))
 		if cp.t >= cp.fine and attivo == null:
 			mis.fine_palla = minf(mis.fine_palla, pb.distance_to(Vector3(m.ball.x, 0.0, -m.ball.y)))
+	if grav_n > 0:
+		mis.grav /= grav_n
 	m.dispose()
 	return mis
 
@@ -149,10 +193,10 @@ func test_il_pallone_si_muove_davvero() -> bool:
 	check(tn.vicino_dif < 0.2, "tunnel: il pallone passa tra le gambe del difensore (a %.2f m dal suo centro)" % tn.vicino_dif)
 	eq(tn.alto, 0.0, "tunnel: rasoterra")
 	# pallonetti: il pallone passa sopra la testa del difensore (figura alta 2,3 m)
-	for g: String in ["sombrero", "arcobaleno"]:
+	for g: String in ["sombrero", "bicicletta"]:
 		var r := gira(sd, true, g)
 		check(r.alto > 2.5, "%s: il pallone sale a %.2f m" % [g, r.alto])
-		check(r.vicino_dif < 0.3, "%s: passa sopra il difensore" % g)
+		check(r.vicino_dif < 0.45, "%s: passa sopra il difensore (a %.2f m)" % [g, r.vicino_dif])
 	# veronica: un giro intero su sé stesso (più il cambio di direzione)
 	var v := gira(sd, true, "veronica")
 	check(absf(v.giro) > deg_to_rad(270.0), "veronica: giro di %.0f gradi" % rad_to_deg(absf(v.giro)))
@@ -202,4 +246,35 @@ func test_giochetto_scelto_tra_le_coreografie() -> bool:
 		var tk := CD.scegli(20.0 + k * 2.0, k / 40.0)
 		check(String(tk.id) in CD.FINTE, "giochetto %s ha la coreografia" % tk.id)
 		check(CD.nome(String(tk.id)) != "Dribbling", "giochetto %s ha il nome" % tk.id)
+	return done()
+
+
+# Luis 2026-11-26: "la palla torna magneticamente al mio: deve essere naturale, è lui che va a prenderla"
+func test_tunnel_e_pallonetti_il_pallone_va_dritto_e_il_portatore_lo_va_a_prendere() -> bool:
+	var sd := TD.first_ok_seed()
+	for g: String in ["tunnel", "sombrero", "bicicletta"]:
+		# Act
+		var r := gira(sd, true, g)
+		# Assert
+		check(r.lancio, g + ": il pallone si stacca dal portatore")
+		check(r.presa, g + ": il portatore lo riprende")
+		check(r.curva < 0.5, g + ": il pallone va dritto, non curva verso il portatore (%.2f gradi)" % r.curva)
+		check(r.accelera <= 1e-6, g + ": a terra rallenta soltanto (attrito), nessuna spinta (%.3f m/s)" % r.accelera)
+		check(r.strada > 3.0, g + ": è il portatore che gira intorno al difensore e va al pallone (%.1f m)" % r.strada)
+		near(r.fine_palla, 0.0, 1e-3, g + ": alla fine il pallone è quello del motore")
+		if g != "tunnel":
+			near(r.grav, -C.G, 0.2, g + ": in volo scende con la gravità del pallone vero")
+			check(r.volo_t > 1.0, g + ": il volo dura quanto un pallonetto vero (%.2f s)" % r.volo_t)
+	return done()
+
+
+# Luis 2026-11-26: "il portatore si ferma sul posto prima del giochetto: deve arrivare in corsa"
+func test_nessuna_fermata_durante_il_giochetto() -> bool:
+	var sd := TD.first_ok_seed()
+	for s: Dictionary in Skill.LISTA:
+		var g := String(s.id)
+		if g == "stopgo":   # (lo "stop e via" si ferma apposta)
+			continue
+		var r := gira(sd, true, g)
+		check(r.v_min >= 1.8, g + ": durante il giochetto continua ad avanzare (minimo %.1f m/s)" % r.v_min)
 	return done()

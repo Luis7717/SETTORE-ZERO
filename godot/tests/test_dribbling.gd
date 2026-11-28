@@ -4,6 +4,7 @@ extends "test_base.gd"
 
 const D := preload("../sim/duel.gd")
 const M := preload("../sim/match.gd")
+const Skill := preload("../sim/skill.gd")
 
 
 # portatore umano (squadra 0) in (px, 0) verso +y, difensore della squadra 1 davanti a `d` m (spostato di ox);
@@ -145,7 +146,7 @@ func test_esito_uguale_con_e_senza_rifiniture() -> bool:
 	return done()
 
 
-func test_giochetto_frena_poi_scatta_oltre_il_difensore() -> bool:
+func test_giochetto_rallenta_senza_fermarsi_poi_scatta_oltre_il_difensore() -> bool:
 	# Arrange
 	var sd := first_ok_seed()
 	check(sd > 0, "un seme col dribbling riuscito")
@@ -155,10 +156,12 @@ func test_giochetto_frena_poi_scatta_oltre_il_difensore() -> bool:
 	var o: R.Player = r[2]
 	var e: Dictionary = r[3]
 	# Assert: il giochetto parte, il tempo del motore lo dice alla grafica
-	near(float(e.show), D.DRIB_SHOW_T, 1e-6, "evento dribble con la durata del giochetto")
+	var show_t := float(Skill.trova("finta").show)
+	near(float(e.show), show_t, 1e-6, "evento dribble con la durata del giochetto")
 	check(m.dribShow != null and m.dribShow.p == p, "giochetto in corso")
 	# Act: durante il giochetto
 	var vmax := 0.0
+	var vmin := 99.0
 	var dmin := 99.0
 	var go: Variant = null
 	var t := 0.0
@@ -173,12 +176,14 @@ func test_giochetto_frena_poi_scatta_oltre_il_difensore() -> bool:
 			break
 		if t > 0.2: # dopo la frenata
 			vmax = maxf(vmax, C.hyp(p.vx, p.vy))
+			vmin = minf(vmin, C.hyp(p.vx, p.vy))
 		dmin = minf(dmin, dist(p, o))
 		check(m.ball.owner == p, "il pallone resta al portatore")
 	# Assert
 	check(go != null, "poi lo scatto (dribble_go)")
-	near(t, D.DRIB_SHOW_T, 2.0 * DT, "lo scatto dopo DRIB_SHOW_T")
-	check(vmax <= D.DRIB_SHOW_V + 0.3, "durante il giochetto va piano: %.2f m/s" % vmax)
+	near(t, show_t, 2.0 * DT, "lo scatto dopo la durata del giochetto")
+	check(vmax <= D.DRIB_SHOW_V + 0.3, "durante il giochetto rallenta: %.2f m/s" % vmax)
+	check(vmin >= 1.8, "... ma non si ferma (Luis 2026-11-26): %.2f m/s" % vmin)
 	check(dmin >= D.DRIB_NEAR - 0.2, "non finisce addosso al difensore: %.2f m" % dmin)
 	check((p.x - x0) * side > 0.0, "la finta va dal lato opposto a quello scelto (+1 = sinistra = x minori)")
 	check(m.dribShow == null, "giochetto finito")
@@ -237,7 +242,7 @@ func test_dribbling_fallito_frena_davanti_al_difensore() -> bool:
 			trovato = true
 			var o_dir := Vector2(o.x - p.x, o.y - p.y).normalized()
 			# Assert
-			check(Vector2(p.vx, p.vy).dot(o_dir) <= D.DRIB_SHOW_V + 1e-6, "frena: non corre addosso al difensore")
+			check(Vector2(p.vx, p.vy).dot(o_dir) <= D.DRIB_KO_V + 1e-6, "frena: non corre addosso al difensore")
 			check(m.dribShow == null, "niente giochetto")
 			m.dispose()
 			break

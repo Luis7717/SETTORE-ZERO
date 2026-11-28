@@ -2018,3 +2018,56 @@ Luis: "Per fare i cambi aspetta che la palla esca." (`scripts/partita/cambi_part
 - **Nomi**: circa 800 cognomi di 13 paesi; su 300 giocatori al massimo ~10 nomi doppi (prima ~45). I cognomi di
   campioni famosi sono stati tolti o cambiati.
 - **Musiche**: 7 brani CC0 di Freesound (anteprime MP3 di qualità alta, ~20 MB in tutto nell'IPA).
+
+## 2026-11-27 — Giochetti del dribbling rifatti uno per uno (nove rami uniti) e gambe "che lampeggiano"
+- **Giudizio di Luis sui video**: "Tunnel male, le altre da rifinire ma decenti. Bicicletta stupenda, anche lì si
+  incrociano le gambe". Poi: nel tunnel "le gambe lampeggiano, non si capisce nulla"; nella veronica "alla fine le
+  gambe si deformavano".
+- **Un file per giochetto** (`mosse/skill/<id>.gd`) e un test per giochetto (`tests/test_skill_<id>.gd`): nove agenti
+  in parallelo, ognuno sul suo, poi tutto unito qui. `rincorsa` (i passi di corsa che portano al giochetto) è passata
+  da `skill/finta.gd` a `skill/comune.gd` (`K.rincorsa`).
+- **Motore (solo con `rifiniture`, esito identico, nessun `rnd()` nuovo)**: mentre il portatore insegue il pallone
+  staccato (tunnel, sombrero, bicicletta) non si aprono più duello né fuga (`dribBusy`): prima, con un altro avversario
+  davanti, il rallenty del duello si apriva a metà inseguimento e il portatore restava "bloccato" col pallone ancora
+  lontano. Dopo la presa: scelto `duelCd` per quel portatore (1 s, come alla fine di un duello) e NON `DRIB_CHASE_STUN`
+  più lungo: lo sbilanciamento del difensore saltato conta dallo scatto, non dalla presa (un pallonetto dura 1,5 s e
+  più), mentre il respiro deve valere dalla presa e per chiunque gli stia davanti.
+- **Perché le gambe lampeggiavano** (trovato misurando caviglie e ginocchia fotogramma per fotogramma,
+  `tools/diag_gambe.gd`): (1) nelle foto ravvicinate il motore andava a passi interi da 1/60 dentro un rallenty al
+  30%: fermo tre fotogrammi e un salto al quarto (`prova_vista` ora fa un passo per fotogramma come il gioco); (2)
+  allo scatto (`taglia`) i piedi in volo ripartivano dal punto di un passo cancellato; (3) il ginocchio puntava dove
+  punta il piede: col corpo che gira su un piede a terra (veronica, il difensore che si volta) si piegava al
+  contrario; (4) il passo automatico metteva un appoggio in mezzo a un movimento già programmato (atterra e riparte in
+  due fotogrammi: pedalata); (5) il difensore, tagliato il suo passo dallo scatto, restava con un piede sospeso per
+  mezzo secondo e allungava l'altra gamba all'altezza dell'anca verso un pallone lontano 2,6 m (da quando i corpi
+  restano staccati): ora l'affondo è basso, corto e dal suo lato; (6) ripreso il pallone dopo un pallonetto, i piedi
+  ripartivano da dov'erano rimasti metri indietro.
+- **Misura delle gambe** (`tests/test_skill_gambe.gd`, tutti i giochetti e il fallito, portatore e difensore): i
+  salti si contano per fotogramma vero, cioè col rallenty della regia (30% fino a `show` + `DOPO_SKILL`): a tempo
+  pieno una gamba che scende a calciare in 0,03 s di partita sarebbe un "salto" di 0,7 m, ma a schermo dura sei
+  fotogrammi. Soglie: caviglia e ginocchio 0,3 m per fotogramma, gambe una dentro l'altra al massimo 0,12 m (0,16 per
+  finta e giro e veronica, dove una gamba passa apposta raccolta dietro l'altra), gamba mai oltre 1,12 della sua
+  lunghezza, ginocchio mai al contrario.
+- **Tunnel**: telecamera quasi dritta alle spalle del portatore (`GIRO_SKILL` 12° invece di 45°): di tre quarti le due
+  gambe del difensore si coprono e non si capisce che il pallone passa in mezzo. Difensore piantato a gambe larghe e
+  pari fino a che il pallone è passato (niente passi automatici in quel momento), testa giù, poi si torce a guardare
+  dietro e si gira. Tocco del portatore basso (via il ginocchio alto).
+- **Tabella** (`sim/skill.gd`, richieste degli agenti): veronica `show` 0,5→0,65 e `vel` 0,8→1,0 (giro a 7,5 rad/s
+  invece di 9), chop 0,42→0,48, cruyff `show` 0,55→0,6 e `vel` 0,75→0,55, croqueta 0,5→0,55, pedalata 0,6→0,7,
+  doppio passo `vel` 0,55→0,7, finta di tiro `vel` 0,5→0,65, tacco `lat` 0,5→0. `DOPO_SKILL`: sombrero 0,3→0,5,
+  bicicletta 0,3→0,18.
+- **Nome del giochetto**: nota piccola in alto (26 px al 19,5% dell'altezza, 0,7 s) invece della scritta grande al
+  27% che copriva il portatore nel momento chiave.
+- **Non fatto**: la richiesta facoltativa della croqueta (scatto dalla direzione portatore→difensore salvata
+  all'inizio del giochetto): tocca la corsa dopo ogni giochetto con `lat` negativo e andava misurata a parte; lasciata.
+- **Numeri** (`controllo_gameplay`, 10 partite 2×150 s, forza 60, seme 1): con la sola correzione del motore
+  (duello/fuga durante l'inseguimento) tutto identico a prima (a forza 60 tunnel e pallonetti non escono quasi mai).
+  Con la tabella nuova (i giochetti durano un tempo diverso, quindi le partite cambiano dal primo dribbling): V/N/P
+  4/4/2 → 4/4/2, gol 1,0-0,6 → 0,7-0,4, tiri 3,1-7,1 → 2,1-7,5, Dribbling 15,8 a partita (riusciti 51% → 44%: la
+  probabilità è la stessa, cambia il campione), rallenty del dribbling 49 → 50 s veri a partita, "dopo il dribbling
+  riuscito" perso 8 → 8; un "portatore umano fuori" in 10 partite (prima 0; nel controllo precedente erano 1-4 su 40):
+  da tenere d'occhio, campione piccolo.
+- **Ancora debole**: nelle misure una gamba a terra arriva per un attimo a 1,10 della sua lunghezza (croqueta,
+  sombrero, pedalata: il piede scivola ~10 cm); finta e giro e veronica tengono le due gambe più vicine del limite
+  degli altri; su iPhone col notch la nota del nome può toccare la cronaca; il confronto ravvicinato del tunnel
+  (`prova_vista`) finisce col portatore che rallenta perché lì non c'è la guida automatica (in partita prosegue).
