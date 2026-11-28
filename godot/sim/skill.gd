@@ -11,6 +11,8 @@ extends RefCounted
 # negativo = dal lato scelto, col pallone).
 # `palla` = il pallone si stacca dal portatore e lui lo va a riprendere (sim/duel.gd dribPallaLancia / dribChaseStep):
 #   "terra" rasoterra tra le gambe del difensore, "alta" pallonetto sopra la sua testa; parte `tk` s dopo l'inizio.
+#   terra: `palla_lato` = il pallone non passa tra le gambe ma accanto al difensore, a tanto dal suo centro (m), dal
+#   lato opposto a quello da cui passa il portatore (il ponte); `giro` = a quanto di lato gli passa il portatore (m).
 #   alta: `su` = punto più alto (m), `oltre` = dove cade oltre il difensore (m), `da` = da dove parte rispetto al
 #   portatore lungo la corsa (m, negativo = da dietro: il colpo di tacco) e `dh` = a che altezza (m).
 # I 13 giochetti aggiunti il 2026-11-27 (suola_via, finta_rientro, doppiopasso_inv, suola_180, ponte, elastico3, giro_tocco,
@@ -28,11 +30,11 @@ const LISTA := [
 	{"id": "croqueta", "name": "Croqueta", "show": 0.55, "dri": 40.0, "av": 0.5, "lat": -1.0, "vel": 0.8},
 	{"id": "fintatiro", "name": "Finta di tiro", "show": 0.5, "dri": 40.0, "av": 1.0, "lat": 0.2, "vel": 0.65},
 	{"id": "chop", "name": "Taglio secco", "show": 0.48, "dri": 45.0, "av": 0.8, "lat": 0.8, "vel": 1.0},
-	{"id": "ponte", "name": "Ponte", "show": 0.38, "dri": 45.0, "av": 0.8, "lat": -0.6, "vel": 0.85,
-		"palla": "terra", "tk": 0.38, "oltre": 3.4},
+	{"id": "ponte", "name": "Ponte", "show": 0.36, "dri": 45.0, "av": 1.0, "lat": -0.2, "vel": 0.9,
+		"palla": "terra", "tk": 0.36, "oltre": 2.4, "palla_lato": 1.2, "giro": 2.4},
 	{"id": "elastico3", "name": "Triplo elastico", "show": 0.42, "dri": 48.0, "av": 0.7, "lat": 0.7, "vel": 0.8},
 	{"id": "cruyff", "name": "Finta e giro", "show": 0.6, "dri": 50.0, "av": 0.3, "lat": 1.0, "vel": 0.55},
-	{"id": "tacco", "name": "Colpo di tacco", "show": 0.42, "dri": 55.0, "av": 0.8, "lat": 0.0, "vel": 0.7},
+	{"id": "tacco", "name": "Colpo di tacco", "show": 0.5, "dri": 55.0, "av": 0.8, "lat": 0.0, "vel": 0.7},
 	{"id": "pedalata", "name": "Pedalata", "show": 0.7, "dri": 55.0, "av": 1.0, "lat": 0.1, "vel": 1.0},
 	{"id": "giro_tocco", "name": "Giro e tocco", "show": 0.7, "dri": 58.0, "av": 0.9, "lat": -0.45, "vel": 0.7},
 	{"id": "elastico", "name": "Elastico", "show": 0.42, "dri": 60.0, "av": 0.7, "lat": 0.7, "vel": 0.8},

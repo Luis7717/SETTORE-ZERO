@@ -22,7 +22,7 @@ const DOPO_OK := 0.12
 const DOPO_SKILL := {"veronica": 0.42, "tunnel": 0.4, "sombrero": 0.5, "bicicletta": 0.18, "chop": 0.24, "cruyff": 0.26,
 	"tacco": 0.2, "croqueta": 0.2, "elastico": 0.18, "elastico_inv": 0.18,
 	# provvisori (come il giochetto da cui sono copiati)
-	"ponte": 0.4, "giro_tocco": 0.34, "veronica_classe": 0.3, "colpetto_giro": 0.26, "tornado": 0.24, "waka": 0.2,
+	"ponte": 0.5, "giro_tocco": 0.34, "veronica_classe": 0.3, "colpetto_giro": 0.26, "tornado": 0.24, "waka": 0.2,
 	"elastico3": 0.18, "abracadabra": 0.18}
 const DOPO_KO := 0.8         # fallito: contrasto e caduta si guardano per tanto (s di partita)
 const USCITA_K := 2.2        # 1/s: alla fine il tempo torna normale con questa dolcezza (TEMPO_K del gioco è 14)
@@ -32,7 +32,7 @@ const USCITA_MAX := 1.0      # ... o comunque dopo tanto tempo di partita (se do
 const GIRO := deg_to_rad(45.0)  # la telecamera gira di tanto intorno al portatore, dal lato del dribbling
 # ... ma nel tunnel quasi dritta alle spalle del portatore: il difensore si vede di fronte a gambe aperte e il pallone
 # che gli passa in mezzo (di lato le due gambe si coprono e non si capisce che è un tunnel, Luis 2026-11-26)
-const GIRO_SKILL := {"tunnel": deg_to_rad(12.0)}
+const GIRO_SKILL := {"tunnel": deg_to_rad(12.0), "ponte": deg_to_rad(14.0)}
 const BASE_MAX := deg_to_rad(35.0) # verso del difensore rispetto alla direzione d'attacco: contato al massimo così
 # grafica dell'esito (vista.gd → trick / reazione), per tutti i dribbling (anche della CPU), in s di partita
 const GIOCHETTO_CODA := 0.25 # col giochetto del motore (show) il movimento finisce tanto dopo lo scatto (accelerando)
