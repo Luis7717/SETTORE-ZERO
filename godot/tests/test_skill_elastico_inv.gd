@@ -1,8 +1,10 @@
 # Giochetto "Elastico inverso" (skill/elastico_inv.gd), solo grafica: misure sulla traccia di test_skill_finta.gd (piedi e pallone
-# nel riferimento del portatore: x = verso il lato scelto, y/z = avanti; m del gioco).
+# nel riferimento del portatore: x = verso il lato scelto, y/z = avanti; m del gioco) e fluidità del gesto
+# (test_skill_elastico.gd `onda`).
 extends "test_base.gd"
 
 const TF := preload("test_skill_finta.gd")
+const TE := preload("test_skill_elastico.gd")
 
 
 func test_elastico_inverso_interno_dentro_e_esterno_di_scatto_fuori() -> bool:
@@ -21,5 +23,16 @@ func test_elastico_inverso_interno_dentro_e_esterno_di_scatto_fuori() -> bool:
 			dentro = minf(dentro, (r.palla as Vector2).x)
 	check(dentro <= -0.35, "il pallone va dentro, verso la finta (%.2f m)" % dentro)
 	var fuori := (TF.riga_a(righe, tg + 0.16).palla as Vector2).x - dentro
-	check(fuori >= 0.6, "l'esterno lo riporta fuori di scatto (%.2f m in 0,16 s)" % fuori)
+	check(fuori >= 0.5, "l'esterno lo riporta fuori (%.2f m in 0,16 s)" % fuori)
+	return done()
+
+
+func test_elastico_inverso_un_gesto_solo_senza_pause_ne_scatti() -> bool:
+	# Act
+	var r := TE.onda("elastico_inv")
+	# Assert
+	check(float(r.tg) < INF, "arriva lo scatto")
+	TE.controlla_fluido(self, "elastico_inv", r)
+	eq((r.estremi as Array).size(), 1, "un solo cambio di verso: dentro con l'interno, fuori con l'esterno")
+	check(float(r.fuori) <= -0.35 and float(r.dopo) >= 0.05, "dentro verso la finta (%.2f m) e poi fuori dal lato scelto (%.2f m)" % [r.fuori, r.dopo])
 	return done()

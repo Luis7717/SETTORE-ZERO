@@ -1,37 +1,57 @@
-# Giochetto del dribbling "Triplo elastico" (id `elastico3`), PROVVISORIO: per ora è la copia di skill/elastico.gd (da rifare sul gesto vero)
 # Giochetto del dribbling "Triplo elastico" (id `elastico3`): parte A (la finta, dura `g` = show di sim/skill.gd) e parte B (dallo
 # scatto del motore, evento 'dribble_go'). Aiuti e costanti in comune: comune.gd (K). Vedi ../coreo_skill.gd.
+# Il gesto morbido e continuo (curva del pallone, piede incollato) è quello di elastico.gd (El).
 extends RefCounted
 
 const Coreo := preload("../coreo.gd")
 const K := preload("comune.gd")
+const El := preload("elastico.gd")
+
+const FUORI := 0.4            # m del modello: quanto fuori (verso la finta) va il pallone a ogni cambio ...
+const DENTRO := 0.05          # ... e dove torna tra un cambio e l'altro
+const CAMBIO := 0.11          # s: mezzo cambio (da dentro a fuori, o da fuori a dentro)
+const ULTIMO := 0.14          # s prima dello scatto: il pallone è fuori per la terza volta (poi l'interno lo porta via)
 
 
-# elastico: l'esterno del piede della finta porta il pallone fuori (e il corpo ci va dietro), poi il piede gli gira
-# intorno e l'interno lo riporta di scatto attraverso il corpo dal lato scelto
+# triplo elastico: tre cambi esterno-interno di fila con lo stesso piede (fuori-dentro, fuori-dentro, fuori e via dal
+# lato scelto), rapidi e senza pause: il pallone fa un'onda davanti al corpo e il piede gli gira intorno a ogni estremo
 static func a(c: Coreo, S: float, g: float) -> void:
 	var F := -S
 	var pS := K.ls(S)
 	var pF := K.ls(F)
-	var tf := 0.4 * g
-	K.rincorsa(c, pF, tf)
-	c.tocca(pF, tf, "outside", Vector3(-F * 0.35, 0.15, 0), {"rel": Vector3(F * 0.04, 0, 0.5)})
-	c.tocca(pF, 0.74 * g, "outside", Vector3(-F * 0.5, 0.15, 0), {"rel": Vector3(F * 0.5, 0, 0.52), "lega": true, "frena": true})
-	c.passa_palla(pF, 0.92 * g, Vector3(F * 0.2, 0.2, 0.02), Vector3(-S * 0.6, 0.25, 0), 0.0)
-	c.tocca(pF, g + 0.05, "inside", K.interno(S, 1.2), {"rel": Vector3(F * 0.5, 0, 0.52)})
-	# il piede che regge fa un saltello per seguire il corpo
-	c.stacca(pS, 0.6 * g)
-	c.appoggia_corsa(pS, 0.6 * g + 0.07, 0.14, Vector2(0.0, -0.04), 0.04)
-	c.chiave_bacino(tf, Vector3(F * 0.04, 0.9, -0.03))
-	c.chiave_bacino(0.74 * g, Vector3(F * 0.15, 0.86, 0.0))
-	c.chiave_angoli(0.74 * g, Vector3(F * 0.34, 0.06, F * 0.08))
-	c.chiave_busto(0.74 * g, Vector3(0.14, F * 0.24, F * 0.26))
-	K.braccia(c, 0.74 * g, pS, Vector3(0.14, -0.26, 0.28), Vector3(0.38, -0.12, 0.0))
-	c.chiave_sguardo(0.7 * g, 0.6, F * 0.3)
+	# all'indietro dall'ultimo "fuori": cinque mezzi cambi
+	var t3 := g - ULTIMO
+	var t0 := maxf(0.04, t3 - 5.0 * CAMBIO)
+	var q := (t3 - t0) / 5.0
+	var nodi: Array = [[t0, Vector3(F * 0.02, 0, 0.56)]]
+	for i in 5:
+		var fuori := i % 2 == 0
+		var x := (FUORI + (0.05 if i == 4 else 0.0)) if fuori else DENTRO
+		nodi.append([t0 + q * (i + 1), Vector3(F * x, 0, 0.54 if fuori else 0.5)])
+	nodi.append([g + El.FINE_CAMBIO, Vector3(S * 0.07, 0, 0.48)])
+	var d := {"piede": pF, "nodi": nodi}
+	c.dati["el"] = d
+	# il piede d'appoggio saltella a ogni rientro del pallone
+	El.saltelli(c, pS, [t0 + 0.04, t0 + 2.0 * q - 0.02, t0 + 4.0 * q - 0.04], g)
+	K.libera(c, pF)
+	El.piano(c, d)
+	# il corpo ondeggia col pallone: bacino basso, un po' verso la finta quando il pallone è fuori; braccia larghe
+	c.chiave_bacino(t0, Vector3(F * 0.02, 0.89, -0.03))
+	for i in 5:
+		var fuori := i % 2 == 0
+		var tt := t0 + q * (i + 1)
+		c.chiave_bacino(tt, Vector3(F * (0.13 if fuori else 0.06), 0.85 if fuori else 0.87, 0.0))
+		c.chiave_angoli(tt, Vector3(F * (0.26 if fuori else 0.1), 0.07, F * (0.07 if fuori else 0.02)))
+		c.chiave_busto(tt, Vector3(0.15, F * (0.18 if fuori else 0.06), F * (0.2 if fuori else 0.06)))
+	c.chiave_bacino(g, Vector3(F * 0.04, 0.87, 0.02))
+	c.chiave_angoli(g, Vector3(F * 0.05, 0.14, 0.0))
+	c.chiave_busto(g, Vector3(0.2, F * 0.05, 0.0))
+	K.braccia(c, t0 + q, pS, Vector3(0.36, -0.16, 0.1), Vector3(0.4, -0.1, 0.0))
+	K.braccia(c, t3, pS, Vector3(0.3, -0.2, 0.2), Vector3(0.4, -0.1, 0.0))
+	c.chiave_sguardo(t0 + q, 0.8, F * 0.2)
+	c.chiave_sguardo(t3, 0.6, F * 0.3)
 
 
-# parte B: S = lato scelto, tg = adesso (lo scatto): l'interno riporta il pallone di scatto dall'altra parte del corpo
+# parte B: S = lato scelto, tg = adesso (lo scatto): l'interno finisce l'ultimo cambio dal lato scelto e via
 static func b(c: Coreo, S: float, tg: float) -> void:
-	var pF := K.ls(-S)
-	K.via(c, S, tg, pF, "inside", K.interno(S, 1.2), 0.04,
-		{"palla": [[tg + 0.15, {"rel": Vector3(S * 0.24, 0, 0.5)}]]})
+	El.esci(c, S, tg)
