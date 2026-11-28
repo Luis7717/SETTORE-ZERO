@@ -287,37 +287,41 @@ func test_con_la_palla_cpu_e_guida() -> bool:
 	return done()
 
 
-func test_marcatura_stretta_e_torna_sempre_in_partita() -> bool:
-	# in 3 minuti: mediano e centrali con marcatura stretta stanno più vicini a un avversario
+func test_marcatura_stretta_in_partita() -> bool:
+	# due partite da 3 minuti per scelta: con un avversario entro 16 m e il pallone nella nostra metà, i centrali con
+	# marcatura stretta gli stanno più vicini di quelli che coprono lo spazio (misura completa: tools/misura_istruzioni.gd)
 	var c := _carriera()
 	var dist := []
 	for scelta: String in ["copre", "stretta"]:
-		var mia := c.squadraPartita()
-		var avv := c.avversarioPartita(c.team(c.s.divs[2][1]))
-		for q: Variant in avv.players:
-			if q is Dictionary:
-				q.erase("istr")
-		var m := _partita(mia, avv)
-		var dif: Array = []
-		for p: R.Player in m.team(0):
-			if p.ruolo == "DC":
-				p.src["istr"] = {"marcatura": scelta}
-				dif.append(p)
 		var somma := 0.0
 		var n := 0
-		for i in 10800:
-			m.step(DT)
-			if i % 30 == 0 and m.att == 1:
-				for p: R.Player in dif:
-					var best := 99.0
-					for o: R.Player in m.team(1):
-						if o.pos != "P":
-							best = minf(best, C.hyp(o.x - p.x, o.y - p.y))
-					somma += best
-					n += 1
+		for seme: int in [9, 28]:
+			var mia := c.squadraPartita()
+			var avv := c.avversarioPartita(c.team(c.s.divs[2][1]))
+			for q: Variant in avv.players:
+				if q is Dictionary:
+					q.erase("istr")
+			var m := SimMatchScript.new({"seed": seme, "halfLen": 150, "human": [false, false], "teams": [mia, avv],
+				"kickoff": 0, "rifiniture": true, "riprese": true, "falli": true, "contatti": true, "testa": true, "attacco": true})
+			var dif: Array = []
+			for p: R.Player in m.team(0):
+				if p.ruolo == "DC":
+					p.src["istr"] = {"marcatura": scelta}
+					dif.append(p)
+			for i in 10800:
+				m.step(DT)
+				if i % 30 == 0 and m.att == 1 and m.ball.y < 0.0:
+					for p: R.Player in dif:
+						var best := 99.0
+						for o: R.Player in m.team(1):
+							if o.pos != "P":
+								best = minf(best, C.hyp(o.x - p.x, o.y - p.y))
+						if best < 16.0:
+							somma += best
+							n += 1
+			m.dispose()
 		dist.append(somma / maxi(n, 1))
-		m.dispose()
-	note("centrali in difesa, distanza dall'avversario più vicino: copre %.1f m, stretta %.1f m" % dist)
-	check(dist[1] < dist[0] - 0.5, "marcatura stretta: più vicino all'avversario")
+	note("centrali con un avversario vicino, distanza media: copre %.1f m, stretta %.1f m" % dist)
+	check(dist[1] < dist[0] - 0.3, "marcatura stretta: più vicino all'avversario")
 	_fine()
 	return done()

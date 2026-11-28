@@ -2089,3 +2089,31 @@ Luis: "Per fare i cambi aspetta che la palla esca." (`scripts/partita/cambi_part
   6 m dal fondo; Gioca semplice: la CPU con un passaggio sicuro passa almeno al 70%, guida automatica al massimo 0,55;
   Porta palla: voglia di passare ×0,45 senza pressione (×0,3 per Imposta), guida almeno 1,0. Da rivedere coi giudizi.
 - Le istruzioni salvate con i nomi di prima non esistono: la prima versione non era ancora uscita in una build.
+
+## 2026-11-28 (notte) — Istruzioni misurate in partite vere con tutti gli stili
+- Luis: "testa bene tutto che le tattiche funzionino davvero. Ben mischiate con stile di gioco offensivo e
+  difensivo". Strumento nuovo `godot/tools/misura_istruzioni.gd`: per ogni istruzione e ogni stile (d'attacco per
+  quelle che si vedono quando attacchiamo, di difesa per le altre) tre partite a seme fisso con la scelta di sinistra,
+  Equilibrato e quella di destra a tutti i giocatori del ruolo, contro una squadra equilibrata senza istruzioni; misura
+  quello che il nome promette e stampa se va nel verso giusto rispetto a Equilibrato. Un'istruzione per processo
+  (480 partite in un processo solo finiscono la memoria): `--chiave=K --semi=3`.
+- **Misure** (ultima versione, `RIGA` = scelta sinistra / equilibrato / scelta destra): 10 su 10 per Spinta, Dove
+  attacca, Posizione del mediano, Marcatura, Compito della mezzala, Compito del trequartista, Ala, Movimento,
+  Riferimento, Uscite; 9 su 10 per In fascia (Attaccato alla linea con Lanci lunghi: 24,4 m contro 25,1 dalla metà
+  larghezza), Con la palla (Porta palla con Equilibrato), Sui cross (Attacca il secondo palo con Contropiede);
+  8 su 10 Pressione (Pressa i difensori con Pressing e Fuorigioco: lo stile già pressa, differenze sotto 0,4 m);
+  7 su 10 Si inserisce in area (con Possesso e Contropiede quasi nessuno entra in area, con o senza istruzione) e Con
+  la palla dei centrali (toccano pochi palloni: misura molto variabile). Partite sane in tutte le prove: 0,3-0,8 gol e
+  4-7 tiri ogni partita da 2×90 s.
+- **Correzioni fatte con le misure**: Marcatura stretta ora resta attaccata (1,1 m) all'avversario che stava già
+  seguendo (anche l'uomo dello stile A uomo), tra lui e la porta un po' verso il pallone, entro 16 m dal suo posto;
+  Copre lo spazio più basso (−6%) e segue l'attaccante solo al 35%. Attaccato alla linea / Resta larga: anche senza
+  palla sulla linea, non attaccano l'area, e la guida automatica li tiene sulla fascia. Secondo palo, Si inserisce,
+  Box to box: entrano in area sulla linea del fuorigioco e fino in fondo quando parte il nostro passaggio (prima
+  restavano in fuorigioco o fuori area); l'ala del secondo palo lo fa anche se è tra chi attacca l'area. Pressa i
+  difensori: da metà campo (prima da 8 m oltre) e portatore entro 32 m. Profondità e Sul filo: valgono anche quando
+  l'attaccante si offre al portatore. Gioca semplice passa almeno al 90% con un passaggio sicuro, Porta palla ×0,3,
+  Imposta palla al piede ×0,1. Le istruzioni "con la palla" si misurano col tempo col pallone per tocco (con gli
+  stili lenti i metri non dicevano niente), il secondo palo con la distanza dal palo lontano.
+- Test `test_marcatura_stretta_in_partita` (due partite, misura solo con un avversario vicino e il pallone nella
+  nostra metà): prima falliva nella batteria intera.

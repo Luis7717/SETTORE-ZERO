@@ -522,7 +522,7 @@
   {"<id>": {chiave: scelta}} (`Carriera.istruzioni`, `setIstruzione`); `squadraPartita` mette `istr` nella copia del
   giocatore, `cambi_partita.applica` le aggiorna nella pausa. CPU: `Istr.per_squadra` secondo i suoi stili (70% dei
   giocatori) più un po' a caso col seme (`avversarioPartita`). Senza `istr` o con Equilibrato il motore è identico
-  (ganci +0 / ×1, stessa sequenza di `rnd()`). Test `tests/test_istruzioni.gd`; foto `09_rosa_istruzioni*`
+  (ganci +0 / ×1, stessa sequenza di `rnd()`). Test `tests/test_istruzioni.gd`; misura in partite vere con tutti gli stili: `-s res://tools/misura_istruzioni.gd -- --chiave=K --semi=3` (un'istruzione per processo, risultati in DECISIONI.md); foto `09_rosa_istruzioni*`
   (`prova_menu.tscn -- --tutte=DIR --solo=09_rosa`).
 - **Nomi dei calciatori** (Luis 2026-11-28, "uno diverso per giocatore, prendi spunto da quelli reali",
   `scripts/carriera/nomi_calciatori.gd`): circa 800 cognomi comuni di 13 paesi (niente cognomi di campioni famosi), il

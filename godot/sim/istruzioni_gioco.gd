@@ -66,17 +66,23 @@ const PROF_DA := -30.0         # ... e sulla linea del fuorigioco già col pallo
 const FILO_TAGLI := 1.5        # Sul filo del fuorigioco: tagli un po' più spessi ...
 const FILO_GAP := 0.4          # ... e sempre a tanto dalla linea
 const RESTA_SU := 0.1          # Resta su: in difesa più alto
-const PRESSA_DA := 8.0         # Pressa i difensori: pallone dei loro da qui in avanti (m nel nostro verso d'attacco) ...
-const PRESSA_R := 25.0         # ... e portatore entro tanto ...
+const PRESSA_DA := 0.0         # Pressa i difensori: pallone dei loro da qui in avanti (m nel nostro verso d'attacco) ...
+const PRESSA_R := 32.0         # ... e portatore entro tanto ...
 const PRESSA_GAP := 2.0        # ... ci si mette davanti a tanto (m)
-const COPRE_GIU := -0.03       # Copre lo spazio: più basso
-const STRETTA_R := 10.0        # Marcatura stretta: avversario entro tanto dal suo posto (m) ...
-const STRETTA_DAVANTI := 1.0   # ... davanti a lui, verso il pallone (m)
+const COPRE_GIU := -0.06       # Copre lo spazio: più basso ...
+const COPRE_SEGUE := 0.35      # ... e segue l'attaccante solo di questa frazione (resta vicino al suo posto, mai più su)
+const STRETTA_R := 16.0        # Marcatura stretta: avversario entro tanto dal suo posto (m) ...
+const STRETTA_GAP := 1.1       # ... attaccato a lui a tanto, tra lui e la porta, un po' verso il pallone ...
+const STRETTA_PALLA := 0.35    # ... (quanto verso il pallone rispetto alla porta)
+const STRETTA_CORSA := 3.0     # ... di corsa se è più lontano di tanto (m)
 const TRA_LINEE := 10.0        # Tra le linee: almeno tanti metri sotto la linea del fuorigioco
-const INSERIMENTO := 14.0      # Si inserisce: nella scelta di chi attacca l'area conta come più vicino di tanto (m)
-const SEMPLICE_WANT := 0.7     # Gioca semplice: con un passaggio sicuro la CPU passa almeno con questa probabilità
-const PORTA_WANT := 0.45       # Porta palla: senza pressione la voglia di passare della CPU ×
-const IMPOSTA_WANT := 0.3      # Imposta palla al piede: nella propria metà senza pressione ×
+const INSERIMENTO := 14.0      # Si inserisce: nella scelta di chi attacca l'area conta come più vicino di tanto (m) ...
+const INSERIMENTO_DA := 0.68   # ... e col pallone oltre questa frazione del campo va da solo verso il dischetto ...
+const INSERIMENTO_Y := 11.0    # ... a tanti metri dalla linea di fondo
+const BOX_DENTRO := 2.0        # Box to box: arriva fino a tanto dentro l'area
+const SEMPLICE_WANT := 0.9     # Gioca semplice: con un passaggio sicuro la CPU passa almeno con questa probabilità
+const PORTA_WANT := 0.3       # Porta palla: senza pressione la voglia di passare della CPU ×
+const IMPOSTA_WANT := 0.1      # Imposta palla al piede: nella propria metà senza pressione ×
 const SEMPLICE_SPD := 0.55     # Gioca semplice: andatura della guida automatica al massimo questa
 const PORTA_SPD := 1.0         # Porta palla: andatura della guida automatica almeno questa (se non pressato)
 const USCITE_FUORI := [0.7, 1.4] # portiere pali / esce: distanza dalla porta ×
@@ -207,13 +213,24 @@ func support(p: R.Player) -> void:
 	var b := ball
 	var tm := p.team
 	var c := b.owner
-	if c == null or c.team != tm or helpers[tm].has(p) or boxRun[tm].has(p):
+	# anche col pallone in viaggio (passaggio nostro): support() si chiama solo quando attacchiamo
+	if (c != null and c.team != tm) or c == p:
 		return
+	var bf: float = C.clamp_((b.y * dir_(tm) + HL) / L, 0.0, 1.0)
+	# chi attacca l'area segue la sua corsa (attacco.gd), tranne l'ala che attacca il secondo palo: va dentro l'area
+	if boxRun[tm].has(p) and not _secondoPalo(p, bf):
+		return
+	var aiuta: bool = helpers[tm].has(p) # d'appoggio al portatore: cambia solo chi attacca la profondità
 	var dir: float = -1.0 if tm else 1.0
 	var line: float = maxf(offLine[tm], b.y * dir)
-	match _ruolo(p):
+	var ruolo := _ruolo(p)
+	if aiuta and ruolo != "ATT" and not _secondoPalo(p, bf):
+		return
+	match ruolo:
 		"ATT":
 			var v := _iv(p, "movimento")
+			if aiuta and v <= 0 and _iv(p, "riferimento") <= 0:
+				return
 			if v < 0: # falso nove: incontro, ben sotto la linea
 				_sottoLinea(p, line - FALSO_DIETRO, FALSO_INCONTRO)
 			elif v > 0 and b.y * dir > PROF_DA: # profondità: sulla linea del fuorigioco
@@ -223,11 +240,56 @@ func support(p: R.Player) -> void:
 				_sottoLinea(p, line - BOA_DIETRO, BOA_INCONTRO)
 			elif rf > 0: # sul filo: sempre sulla linea, anche col pallone lontano
 				_sullaLinea(p, FILO_GAP)
+		"ED", "ES":
+			if _iv(p, "fascia") < 0: # attaccato alla linea: anche senza palla resta largo
+				var sg: float = C.sign_(p.bx) if p.bx != 0.0 else 1.0
+				p.tx = sg * (HW - WIDE_GAP)
+		"AD", "AS":
+			var sg2: float = C.sign_(p.bx) if p.bx != 0.0 else 1.0
+			if _iv(p, "ala") < 0: # resta larga: anche senza palla sulla linea
+				p.tx = sg2 * (HW - WIDE_GAP)
+			var cr := _iv(p, "cross")
+			if cr != 0 and _crossAltroLato(sg2, bf):
+				if cr > 0: # secondo palo: in area sul palo lontano
+					p.tx = sg2 * (GW / 2.0 + PALO_X)
+					_inArea(p, HL - PALO_FONDO)
+				else: # aspetta fuori area, al limite
+					var lim: float = HL - BOX_D - CROSS_FUORI
+					if p.ty * dir > lim:
+						p.ty = lim * dir
 		"COC":
-			if _iv(p, "area") < 0: # tra le linee: dietro le punte
+			var ar := _iv(p, "area")
+			if ar < 0: # tra le linee: dietro le punte
 				var cap2: float = line - TRA_LINEE
 				if p.ty * dir > cap2:
 					p.ty = cap2 * dir
+			elif ar > 0 and bf > INSERIMENTO_DA: # si inserisce: col pallone nell'ultimo terzo entra verso il dischetto
+				p.tx *= 0.4
+				_inArea(p, HL - INSERIMENTO_Y)
+		"CC":
+			if _iv(p, "mezzala") > 0 and bf > INSERIMENTO_DA: # box to box: arriva al limite dell'area e dentro
+				p.tx *= 0.6
+				_inArea(p, HL - BOX_D - BOX_DENTRO)
+
+
+func dir_(tm: int) -> float:
+	return -1.0 if tm else 1.0
+
+
+func _secondoPalo(p: R.Player, bf: float) -> bool:
+	var r := _ruolo(p)
+	return (r == "AD" or r == "AS") and _iv(p, "cross") > 0 and _crossAltroLato(C.sign_(p.bx) if p.bx != 0.0 else 1.0, bf)
+
+
+# entra in area fino a `y` (m dalla metà campo nel verso d'attacco): sulla linea del fuorigioco finché il pallone è
+# di un compagno (niente fischi), fino in fondo quando parte il nostro passaggio o cross
+func _inArea(p: R.Player, y: float) -> void:
+	var dir: float = -1.0 if p.team else 1.0
+	var volo: bool = ball.owner == null and ball.kick != null and ball.kick.team == p.team
+	var lv: float = y if volo else minf(y, maxf(offLine[p.team] - 0.4, ball.y * dir))
+	if p.ty * dir < lv:
+		p.ty = lv * dir
+	p.sprint = C.hyp(p.tx - p.x, p.ty - p.y) > 3.0
 
 
 # resta almeno fino a `cap` (m nel verso d'attacco) e si sposta verso il pallone di `k`
@@ -268,6 +330,11 @@ func istrRunBias(q: R.Player) -> float:
 			var sgn: float = C.sign_(q.bx) if q.bx != 0.0 else 1.0
 			if cr != 0 and _crossAltroLato(sgn, C.clamp_((ball.y * dir + HL) / L, 0.0, 1.0)):
 				return -INSERIMENTO if cr > 0 else 1000.0
+			if _iv(q, "ala") < 0:
+				return 1000.0 # resta larga: non taglia in area
+		"ED", "ES":
+			if _iv(q, "fascia") < 0:
+				return 1000.0
 		"ATT":
 			if _iv(q, "movimento") < 0:
 				return INSERIMENTO * 0.5 # falso nove: in area ci va meno spesso
@@ -294,7 +361,8 @@ func istrGambleK(p: R.Player) -> float:
 func istrAutoGx(p: R.Player, gx: float) -> float:
 	if not _ha(p):
 		return gx
-	var v := _iv(p, "ala")
+	var r := _ruolo(p)
+	var v := _iv(p, "ala") if r == "AD" or r == "AS" else (mini(_iv(p, "fascia"), 0) if r == "ED" or r == "ES" else 0)
 	if v == 0:
 		return gx
 	var dir: float = -1.0 if p.team else 1.0
@@ -363,21 +431,35 @@ func defend(p: R.Player) -> void:
 				p.ty = bersaglio.y + uy / n * PRESSA_GAP
 				p.sprint = true
 	elif (ruolo == "DC" or ruolo == "CDC") and _iv(p, "marcatura") > 0:
+		# l'avversario che stava già seguendo (il più vicino al posto scelto dal motore: anche l'uomo assegnato dello
+		# stile A uomo), purché entro STRETTA_R dal suo posto
 		var an := defAnchor(p)
 		var mo: R.Player = null
-		var md: float = STRETTA_R
+		var md: float = 1e9
 		for o: R.Player in players:
-			if o.team != tm and not o.off and o.pos != "P" and o != c:
-				var d: float = C.hyp(o.x - an[0], o.y - an[1])
+			if o.team != tm and not o.off and o.pos != "P" and o != c and C.hyp(o.x - an[0], o.y - an[1]) < STRETTA_R:
+				var d: float = C.hyp(o.x - p.tx, o.y - p.ty)
 				if d < md:
 					md = d
 					mo = o
-		if mo != null:
-			var ux2: float = b.x - mo.x
-			var uy2: float = b.y - mo.y
-			var n2: float = C.orf(C.hyp(ux2, uy2), 1.0)
-			p.tx = mo.x + ux2 / n2 * STRETTA_DAVANTI
-			p.ty = mo.y + uy2 / n2 * STRETTA_DAVANTI
+		if mo != null: # tra lui e la porta, un po' verso il pallone (anticipo)
+			var gx: float = -mo.x
+			var gy: float = own - mo.y
+			var gn: float = C.orf(C.hyp(gx, gy), 1.0)
+			var bx: float = b.x - mo.x
+			var by: float = b.y - mo.y
+			var bn: float = C.orf(C.hyp(bx, by), 1.0)
+			var ux: float = gx / gn * (1.0 - STRETTA_PALLA) + bx / bn * STRETTA_PALLA
+			var uy: float = gy / gn * (1.0 - STRETTA_PALLA) + by / bn * STRETTA_PALLA
+			var un: float = C.orf(C.hyp(ux, uy), 1.0)
+			p.tx = mo.x + ux / un * STRETTA_GAP
+			p.ty = mo.y + uy / un * STRETTA_GAP
+			p.sprint = C.hyp(p.tx - p.x, p.ty - p.y) > STRETTA_CORSA
+	elif (ruolo == "DC" or ruolo == "CDC") and _iv(p, "marcatura") < 0:
+		var an2 := defAnchor(p) # copre: resta vicino al suo posto, mai più su
+		p.tx = an2[0] + (p.tx - an2[0]) * COPRE_SEGUE
+		var ty_f: float = minf(p.ty * dir, an2[1] * dir)
+		p.ty = (an2[1] * dir + (ty_f - an2[1] * dir) * COPRE_SEGUE) * dir if ty_f < an2[1] * dir else ty_f * dir
 
 
 # avversario (non portiere, non il portatore) più vicino a p
