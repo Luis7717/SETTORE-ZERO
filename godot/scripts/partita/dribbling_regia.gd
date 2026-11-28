@@ -22,7 +22,7 @@ const DOPO_OK := 0.12
 const DOPO_SKILL := {"veronica": 0.42, "tunnel": 0.4, "sombrero": 0.5, "bicicletta": 0.18, "chop": 0.24, "cruyff": 0.26,
 	"tacco": 0.2, "croqueta": 0.2, "elastico": 0.18, "elastico_inv": 0.18,
 	# provvisori (come il giochetto da cui sono copiati)
-	"ponte": 0.4, "giro_tocco": 0.42, "veronica_classe": 0.42, "colpetto_giro": 0.26, "tornado": 0.24, "waka": 0.2,
+	"ponte": 0.4, "giro_tocco": 0.34, "veronica_classe": 0.3, "colpetto_giro": 0.26, "tornado": 0.24, "waka": 0.2,
 	"elastico3": 0.18, "abracadabra": 0.18}
 const DOPO_KO := 0.8         # fallito: contrasto e caduta si guardano per tanto (s di partita)
 const USCITA_K := 2.2        # 1/s: alla fine il tempo torna normale con questa dolcezza (TEMPO_K del gioco è 14)

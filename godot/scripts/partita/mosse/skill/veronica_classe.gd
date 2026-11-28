@@ -1,4 +1,3 @@
-# Giochetto del dribbling "Veronica di classe" (id `veronica_classe`), PROVVISORIO: per ora è la copia di skill/veronica.gd (da rifare sul gesto vero)
 # Giochetto del dribbling "Veronica di classe" (id `veronica_classe`): parte A (la finta, dura `g` = show di sim/skill.gd) e parte B (dallo
 # scatto del motore, evento 'dribble_go'). Aiuti e costanti in comune: comune.gd (K). Vedi ../coreo_skill.gd.
 extends RefCounted
@@ -7,27 +6,28 @@ const Coreo := preload("../coreo.gd")
 const K := preload("comune.gd")
 
 
-# veronica (roulette vera), in corsa e senza pause (Luis 2026-11-26: "si ferma, rotea in modo innaturale e prosegue"):
-#   1. la suola del primo piede (lato scelto S) si posa sul pallone e lo frena: il pallone resta quasi fermo sul prato
-#      mentre il corpo, che continua ad avanzare, gli passa accanto e comincia a girare (verso −S: il piede sul pallone
-#      porta avanti quell'anca);
-#   2. saltello: il primo piede lascia il pallone e appoggia oltre, il corpo basso (ginocchia piegate, busto sopra il
-#      pallone) gira fino a dare la schiena al difensore; l'altra gamba gira intorno raccolta;
-#   3. la suola dell'altro piede prende il pallone (rimasto dietro, coperto dal corpo) e lo trascina in avanti finendo
-#      il giro; allo scatto del motore (parte B) lo lascia davanti e appoggia: è la prima falcata della corsa.
-# Il giro è uno solo, sempre nello stesso verso e a velocità costante (VER_W) dalla prima suola all'uscita: le chiavi
-# del giro della parte A vengono riscritte nel riferimento della parte B (verso del motore) perché la velocità del giro
-# non cambi allo scatto. I piedi appoggiano davvero: passi corti e saltelli di perno che seguono il giro.
+# veronica di classe (la roulette "con stile"; riferimento: primo piano del video di Luis a 11:41). Stessi tocchi della
+# veronica (skill/veronica.gd: prima suola che frena il pallone, giro, seconda suola che lo trascina via) ma fatta da
+# chi la sa fare bene, e si deve vedere la differenza:
+#   - giro più stretto e veloce (VC_W: un giro intero in 0,6 s invece di 0,84) e giochetto più corto (show 0,5);
+#   - a metà giro un saltello vero: il bacino sale (VC_SALTO), i piedi si scambiano in aria sopra il pallone;
+#   - busto dritto (non accovacciato sul pallone) e braccia larghe e alte che aprono il giro;
+#   - la gamba libera gira raccolta col tallone alto dietro;
+#   - la seconda suola non accompagna il pallone: lo spinge avanti più lontano (VC_AVANTI) e si esce di scatto.
+# Il giro è uno solo, sempre nello stesso verso e a velocità costante dalla prima suola all'uscita: le chiavi del giro
+# della parte A vengono riscritte nel riferimento della parte B (verso del motore).
 # Posizioni nel "riferimento della corsa": x sinistra, z nel verso della corsa (all'inizio in A, del motore in B).
-const VER_W := 7.5             # rad/s: velocità del giro (un giro intero in 0,84 s; era 9 con show 0,5: troppo svelta da leggere)
-const VER_A1 := 0.45           # rad: giro già fatto quando la prima suola tocca il pallone
-const VER_T1 := 0.1            # s: prima suola sul pallone
-const VER_FRENA := 0.09        # s: la prima suola resta sul pallone (lo frena)
-const VER_POSA := 0.14         # s dopo la prima suola: il primo piede appoggia oltre il pallone
-const VER_ANTICIPO := 0.14     # s prima dello scatto: seconda suola sul pallone
-const VER_TRASCINA := 0.06     # s dopo lo scatto: la seconda suola lascia il pallone davanti
+const VER_W := 10.5            # rad/s: velocità del giro (veronica: 7,5)
+const VER_A1 := 0.5            # rad: giro già fatto quando la prima suola tocca il pallone
+const VER_T1 := 0.08           # s: prima suola sul pallone
+const VER_FRENA := 0.06        # s: la prima suola resta sul pallone (lo frena)
+const VER_POSA := 0.11         # s dopo la prima suola: il primo piede appoggia oltre il pallone
+const VER_ANTICIPO := 0.12     # s prima dello scatto: seconda suola sul pallone
+const VER_TRASCINA := 0.08     # s dopo lo scatto: la seconda suola lascia il pallone davanti
 const VER_PASSO := 0.17        # s tra due appoggi nella corsa dopo il giro (falcata vera, non passettini)
 const VER_CONTATTO := 0.1      # s: quanto resta a terra il piede in quella corsa
+const VC_SALTO := 0.99         # m del modello: altezza del bacino nel saltello a metà giro (in piedi 0,93)
+const VC_AVANTI := 0.56        # m del modello: la seconda suola lascia il pallone tanto avanti (veronica: 0,42)
 
 
 # vettore v (x sinistra, z avanti) del riferimento col verso `rif` nel riferimento del corpo com'è girato a tt
@@ -104,21 +104,21 @@ static func a(c: Coreo, S: float, g: float) -> void:
 	# ---- l'altro piede: regge durante la suola, spinge (saltello) e gira intorno raccolto fino al pallone
 	c.stacca(pF, t1 + 0.07)
 	var tm := t1 + 0.07 + 0.5 * (t2 - t1 - 0.07)
-	c.passa(pF, tm, Vector3(-S * 0.2, 0.36, -0.22), Vector3(0, 0.6, 0), 0.0)
-	# ---- corpo: basso sulle ginocchia, busto sopra il pallone, spalle che guidano il giro
-	c.chiave_bacino(t1, Vector3(0, 0.87, -0.02))
-	c.chiave_angoli(t1, Vector3(0, 0.14, 0))
-	c.chiave_busto(t1, Vector3(0.24, 0, G * 0.2))
-	c.chiave_bacino(tl, Vector3(0, 0.81, 0.0))
-	c.chiave_angoli(tl, Vector3(0, 0.2, 0))
-	c.chiave_busto(tl, Vector3(0.4, 0, G * 0.3))
-	c.chiave_bacino(t2, Vector3(0, 0.82, 0.0))
-	c.chiave_angoli(t2, Vector3(0, 0.18, 0))
-	c.chiave_busto(t2, Vector3(0.36, 0, G * 0.25))
-	# braccia: quella del primo piede sale piegata davanti al petto (lancia il giro), l'altra larga dietro; poi larghe
-	K.braccia(c, t1, pS, Vector3(0.1, -0.1, 0.28), Vector3(0.32, -0.24, -0.18))
-	K.braccia(c, tl, pS, Vector3(0.24, -0.16, 0.2), Vector3(0.36, -0.18, -0.08))
-	K.braccia(c, t2, pS, Vector3(0.32, -0.26, -0.04), Vector3(0.32, -0.22, 0.1))
+	c.passa(pF, tm, Vector3(-S * 0.18, 0.5, -0.26), Vector3(0, 1.0, 0), 0.0)
+	# ---- corpo: dritto, su col saltello a metà giro, spalle che guidano il giro
+	c.chiave_bacino(t1, Vector3(0, 0.9, -0.02))
+	c.chiave_angoli(t1, Vector3(0, 0.08, 0))
+	c.chiave_busto(t1, Vector3(0.14, 0, G * 0.2))
+	c.chiave_bacino(tm, Vector3(0, VC_SALTO, 0.0))
+	c.chiave_angoli(tm, Vector3(0, 0.06, 0))
+	c.chiave_busto(tm, Vector3(0.08, 0, G * 0.3))
+	c.chiave_bacino(t2, Vector3(0, 0.89, 0.0))
+	c.chiave_angoli(t2, Vector3(0, 0.1, 0))
+	c.chiave_busto(t2, Vector3(0.14, 0, G * 0.25))
+	# braccia: larghe e alte, aprono il giro (quella del primo piede lo lancia davanti, poi su tutte e due)
+	K.braccia(c, t1, pS, Vector3(0.22, -0.06, 0.26), Vector3(0.38, -0.1, -0.14))
+	K.braccia(c, tm, pS, Vector3(0.42, 0.04, 0.06), Vector3(0.42, 0.02, -0.04))
+	K.braccia(c, t2, pS, Vector3(0.4, -0.06, -0.06), Vector3(0.38, -0.04, 0.1))
 	c.chiave_sguardo(t1, 1.0)
 
 
@@ -153,7 +153,7 @@ static func b(c: Coreo, S: float, tg: float) -> void:
 	c.chiave_sguardo(tg, 1.0)
 	# ---- pallone: la seconda suola finisce di trascinarlo nel verso nuovo e lo lascia davanti; poi quello del motore
 	var tt2 := tg + VER_TRASCINA
-	var dove := Basis(Vector3.UP, rif - c.yaw0) * Vector3(S * 0.1, 0, 0.42)
+	var dove := Basis(Vector3.UP, rif - c.yaw0) * Vector3(S * 0.08, 0, VC_AVANTI)
 	c.tocca(pF, tt2, "sole", Vector3(_punta(c, tt2, G * 0.3, rif), -0.1, 0), {"rel0": dove, "lega": true})
 	c.palla_a(tt2 + 0.16, {"moto": true})
 	# ---- piedi: il primo spinge e si stacca (il corpo adesso scatta); il secondo, lasciato il pallone, appoggia
@@ -165,14 +165,14 @@ static func b(c: Coreo, S: float, tg: float) -> void:
 	c.stacca(pF, t4 + VER_CONTATTO)
 	_richiamo(c, pF, t4 + VER_CONTATTO)
 	var fine := t4 + 3.0 * VER_PASSO
-	K.braccia(c, tt2, pS, Vector3(0.3, -0.28, -0.12), Vector3(0.3, -0.2, 0.14))
+	K.braccia(c, tt2, pS, Vector3(0.36, -0.14, -0.12), Vector3(0.36, -0.1, 0.14))
 	c.chiave_braccio(pS, t4, K.BR_AVANTI)
 	c.chiave_braccio(pF, t4, K.BR_DIETRO)
 	_corsa(c, pS, t4 + VER_PASSO, fine)
-	# ---- corpo: ancora basso mentre trascina, poi su, piegato in avanti di corsa
-	c.chiave_bacino(tt2, Vector3(0, 0.84, 0.0))
-	c.chiave_angoli(tt2, Vector3(0, 0.2, 0))
-	c.chiave_busto(tt2, Vector3(0.32, 0, G * 0.15))
+	# ---- corpo: spinge il pallone avanti, poi su, piegato in avanti di corsa
+	c.chiave_bacino(tt2, Vector3(0, 0.88, 0.0))
+	c.chiave_angoli(tt2, Vector3(0, 0.16, 0))
+	c.chiave_busto(tt2, Vector3(0.2, 0, G * 0.15))
 	c.chiave_bacino(t4 + 0.12, Vector3(0, 0.88, 0.02))
 	c.chiave_angoli(t4 + 0.12, Vector3(0, 0.24, 0))
 	c.chiave_busto(t4 + 0.12, Vector3(0.26, 0, 0))
