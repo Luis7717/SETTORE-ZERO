@@ -30,7 +30,7 @@ const ALLUNGO := 0.95          # il difensore allunga la gamba (bassa, verso il 
 const FINTE := Sk.IDS
 # (i giochetti provvisori copiati da un altro tengono lo stile del modello: ponte ← tunnel, cucchiaio_finta ← fintatiro)
 const STILE_DIF := {"tunnel": "gambe", "sombrero": "alto", "bicicletta": "alto", "fintatiro": "blocco",
-	"ponte": "gambe", "cucchiaio_finta": "blocco"}
+	"ponte": "gambe", "cucchiaio_finta": "affondo"}
 const GAMBE_LARGHE := 0.22      # tunnel: ogni piede del difensore sta tanto più in fuori dell'anca (m del modello)
 const BR_RIPOSO := Sk.BR_RIPOSO
 
