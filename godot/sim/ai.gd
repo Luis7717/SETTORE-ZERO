@@ -1175,6 +1175,7 @@ func _autoDecide(p: R.Player) -> void:
 			spd = AUTO_SPD_CROSS
 	elif sa.lanci:
 		spd = AUTO_SPD_LANCI
+	gx = istrAutoGx(p, gx)
 	# compagni davanti: senza appoggi in avanti si rallenta per aspettarli (non nel contropiede)
 	var ahead := 0
 	for q: R.Player in players:
@@ -1217,6 +1218,11 @@ func _autoDecide(p: R.Player) -> void:
 		spr = true # strada libera verso la porta: di corsa
 	autoSpd[tm] = spd
 	autoSpr[tm] = spr
+
+
+## gancio per le istruzioni (istruzioni_gioco.gd: ala larga o che taglia dentro): verso x della guida automatica
+func istrAutoGx(_p: R.Player, gx: float) -> float:
+	return gx
 
 
 # compagni (portiere escluso) raggiungibili da (x, y) con un passaggio rasoterra a linea libera

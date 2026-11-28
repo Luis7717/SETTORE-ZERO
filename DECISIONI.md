@@ -2002,3 +2002,19 @@ Luis: "Per fare i cambi aspetta che la palla esca." (`scripts/partita/cambi_part
   pallone fuori → motore + scena, intervallo subito, perdita a fine partita).
 - **Da provare sull'iPhone**: se aspettare tutta la tattica insieme alla sostituzione va bene, e se la scritta si vede.
 
+
+## 2026-11-28 — Istruzioni, nomi, musiche, cambi a fine partita
+- **Istruzioni ai giocatori**: una scelta di tre per istruzione, quella di mezzo = motore identico. Valori scelti in
+  autonomia (costanti in cima a `sim/istruzioni_gioco.gd`): terzino offensivo +8% del campo (+8% in più col pallone
+  sulla sua fascia nella metà avversaria), difensivo −12% e x ×0,75; mediano difensivo al massimo al 30% del campo;
+  centrocampisti ±7% in attacco e ±4% in difesa; boa 9 m sotto la linea del fuorigioco; profondità tagli ×2,5;
+  resta su +10% in difesa; pressa dai 8 m oltre la metà campo e portatore entro 25 m; anticipo sull'attaccante entro
+  10 m; portiere distanza dalla porta ×0,7 / ×1,4 e presa dei cross ∓8%. Misura in `test_in_partita_si_vede`: in 3
+  minuti i terzini offensivi stanno in media 8,5 m più avanti dei difensivi. Da rivedere coi giudizi di Luis.
+- **CPU**: lo stile si vede nel 70% dei giocatori del ruolo interessato; gli altri 15% verso una parte e 15% verso
+  l'altra, col seme della squadra e della stagione (stesse istruzioni per tutta la stagione).
+- **Cambi in attesa a fine partita**: non tornano più alla squadra in campo (Luis: "dopo la partita torna a quello
+  base"): restano nella carriera per la partita dopo.
+- **Nomi**: circa 800 cognomi di 13 paesi; su 300 giocatori al massimo ~10 nomi doppi (prima ~45). I cognomi di
+  campioni famosi sono stati tolti o cambiati.
+- **Musiche**: 7 brani CC0 di Freesound (anteprime MP3 di qualità alta, ~20 MB in tutto nell'IPA).

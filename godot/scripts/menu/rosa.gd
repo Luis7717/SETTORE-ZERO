@@ -25,8 +25,9 @@ const Stili := preload("res://sim/stili.gd")
 const Scelte := preload("res://scripts/menu/rosa_scelte.gd")
 const Mercato := preload("res://scripts/carriera/mercato_squadre.gd")
 const StatG := preload("res://scripts/menu/statistiche_giocatore.gd")
+const Istr := preload("res://sim/istruzioni.gd")
 const ALTEZZA_SOPRA := 150.0       # .sqtop
-const MENU := ["formazione", "attacco", "difesa", "piazzati"]
+const MENU := ["formazione", "attacco", "difesa", "piazzati", "istr"]
 const Sotto := preload("res://sim/sottostat.gd")
 ## calci piazzati (Luis 2026-11-26): nome a schermo e sotto-statistiche utili mostrate accanto a ogni giocatore
 const PIAZZATI_NOMI := {"rig": "Rigorista", "punL": "Punizioni lontane", "punV": "Punizioni vicine", "angD": "Angolo destro", "angS": "Angolo sinistro"}
@@ -34,6 +35,10 @@ const PIAZZATI_STAT := {"rig": ["rig"], "punL": ["pun", "lon"], "punV": ["pun", 
 const RIGA_CAMPO := Color(1, 1, 1, 0.11)
 const TASTO_TORNA := 52.0
 const TASTO_STAT := 132.0         # px: larghezza del tasto Statistiche accanto a "Cerca acquirenti"
+const TASTO_STRETTO := 92.0       # px: Statistiche e Istruzioni quando sono tutti e tre nella riga ...
+const TASTO_STRETTO_FONT := 13    # ... col carattere più piccolo ...
+const TASTO_STRETTO_MARGINE := 6.0 # ... e meno margine ai lati
+const Z_MENU := 50                # menu a comparsa sopra tutte le carte
 
 var sel: Variant = null
 var tgt: Variant = null
@@ -62,7 +67,7 @@ func prepara() -> void:
 		tgt = arg.get("tgt")
 		_stat_aperte = bool(arg.get("statistiche", false))
 		_menu = str(arg.get("menu", "attacco" if arg.get("stili", false) else ""))
-		if not MENU.has(_menu.get_slice(":", 0)): # "piazzati:rig" = già dentro la scelta del rigorista
+		if not MENU.has(_menu.get_slice(":", 0).get_slice("/", 0)): # "piazzati:rig" = già dentro la scelta del rigorista
 			_menu = ""
 		in_partita = bool(arg.get("in_partita", false)) and arg.get("cambi") is Object
 		if in_partita:
@@ -173,7 +178,10 @@ func costruisci() -> void:
 		var torna := U.bottone("Torna alla partita", "BtnVai", _torna_alla_partita, TASTO_TORNA)
 		torna.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		corpo.add_child(torna)
-	_mostra_menu(_menu if sp == null else "")
+	# arg {"menu": "istr"} o "istr/spinta" (prove): istruzioni del giocatore scelto
+	if sp != null and (_menu == "istr" or _menu.begins_with("istr/")):
+		_menu = "istr:%d" % int(sp.id) + ("" if _menu == "istr" else ":" + _menu.get_slice("/", 1))
+	_mostra_menu(_menu if sp == null or _menu.begins_with("istr:") else "")
 	_mostra_statistiche()
 
 
@@ -431,6 +439,21 @@ func _mostra_menu(quale: String) -> void:
 		titolo_menu = "Calci piazzati"
 		for k: String in D.Car.PIAZZATI:
 			voci.append({"id": k, "nome": PIAZZATI_NOMI[k], "spiega": _piazzato_ora(k)})
+	elif quale.begins_with("istr:"): # istruzioni del giocatore scelto (Luis 2026-11-28, sim/istruzioni.gd)
+		var pz := quale.split(":")
+		var g: Variant = c.player(int(pz[1]))
+		var ruolo := _ruolo_istr(g)
+		if pz.size() == 2: # le istruzioni del suo ruolo, ognuna con la scelta attuale
+			titolo_menu = "Istruzioni · %s" % D.pos_name(ruolo)
+			for k: String in Istr.del_ruolo(ruolo):
+				var ora := Istr.di(c.istruzioni(g.id), k)
+				voci.append({"id": k, "nome": "%s: %s" % [Istr.nome(k), Istr.nome_scelta(k, ora)], "spiega": Istr.scelte(k)[Istr.verso(c.istruzioni(g.id), k) + 1][2]})
+		else: # le tre scelte di un'istruzione
+			var k2 := pz[2]
+			titolo_menu = Istr.nome(k2)
+			scelto = Istr.di(c.istruzioni(g.id), k2)
+			for sc: Array in Istr.scelte(k2):
+				voci.append({"id": sc[0], "nome": sc[1], "spiega": sc[2]})
 	elif quale.begins_with("piazzati:"): # chi batte: automatico o uno dei titolari (non il portiere)
 		var k := quale.get_slice(":", 1)
 		titolo_menu = str(PIAZZATI_NOMI.get(k, k))
@@ -454,6 +477,7 @@ func _mostra_menu(quale: String) -> void:
 			for nome: String in (Stili.ATTACCO if att else Stili.DIFESA):
 				voci.append({"id": nome, "nome": Stili.NOMI[nome], "spiega": Stili.SPIEGA[nome]})
 	_velo = Scelte.menu(titolo_menu, voci, scelto, sicura, _scelto.bind(quale), _chiudi_menu)
+	_velo.z_index = Z_MENU # sopra la carta scelta (che sta più in alto delle altre)
 	add_child(_velo)
 
 
@@ -484,6 +508,15 @@ func _scelto(id: String, quale: String) -> void:
 	if quale == "piazzati":
 		_apri_menu("piazzati:" + id)
 		return
+	if quale.begins_with("istr:"):
+		var pz := quale.split(":")
+		if pz.size() == 2:
+			_apri_menu(quale + ":" + id)
+		else:
+			carriera().setIstruzione(int(pz[1]), pz[2], id)
+			_menu = "istr:" + pz[1]
+			_aggiorna()
+		return
 	if quale.begins_with("piazzati:"):
 		carriera().setPiazzato(quale.get_slice(":", 1), null if id == "auto" else int(id))
 		_menu = "piazzati"
@@ -495,6 +528,43 @@ func _scelto(id: String, quale: String) -> void:
 	else:
 		carriera().setStili(null, id)
 	_aggiorna()
+
+
+# ---------------------------------------------------------------- istruzioni ai giocatori (sim/istruzioni.gd)
+# ruolo per le istruzioni: quello del posto se è titolare, altrimenti il suo
+func _ruolo_istr(g: Variant) -> String:
+	if not g is Dictionary:
+		return ""
+	var i: int = stato().lineup.find(g.id)
+	var R := C.schema_ruoli(str(stato().formation))
+	return str(R[i][0]) if i >= 0 and i < R.size() else D.ruolo_di(g)
+
+
+# tasto della riga da tre: carattere e margini laterali più piccoli (le scritte non si tagliano su 390 punti)
+func _tasto_stretto(b: Button) -> void:
+	b.add_theme_font_size_override("font_size", TASTO_STRETTO_FONT)
+	for st: String in ["normal", "hover", "pressed", "disabled"]:
+		var sb: StyleBox = b.get_theme_stylebox(st)
+		if sb != null:
+			var copia := sb.duplicate() as StyleBox
+			copia.content_margin_left = TASTO_STRETTO_MARGINE
+			copia.content_margin_right = TASTO_STRETTO_MARGINE
+			b.add_theme_stylebox_override(st, copia)
+
+
+# tasto "Istruzioni" del pannello del giocatore: mostra le scelte diverse da "come sempre"; null se il ruolo non ne ha
+func _tasto_istruzioni(p: Dictionary, ruolo: String) -> Control:
+	if Istr.del_ruolo(ruolo).is_empty():
+		return null
+	# segnato in giallo se ha istruzioni diverse da "come sempre" (il riassunto è nel menu)
+	var cambiate := Istr.testo(carriera().istruzioni(p.id), ruolo) != ""
+	var b := U.bottone("Istruzioni" + (" •" if cambiate else ""), "BtnFantasma", _apri_menu.bind("istr:%d" % int(p.id)), 44)
+	b.name = "TastoIstruzioni"
+	b.custom_minimum_size.x = TASTO_STRETTO
+	b.clip_text = true
+	if cambiate:
+		b.add_theme_color_override("font_color", T.GOLD)
+	return b
 
 
 # ---------------------------------------------------------------- statistiche dettagliate (statistiche_giocatore.gd)
@@ -572,10 +642,19 @@ func _pannello_giocatore(p: Dictionary, F: Array) -> Control:
 		g.add_child(cella)
 	v.add_child(g)
 	v.add_child(U.riempi())
+	var ti := _tasto_istruzioni(p, str(at.role)) # nella riga dei tasti (Luis 2026-11-28)
 	if in_partita: # in partita niente Aspetto né Vendi
 		var st := _stato_partita(p.id)
-		var nota := "Espulso: non si può cambiare" if st == "espulso" else ("Già uscito: non rientra" if st == "uscito" else "Tocca un altro giocatore per scambiarli")
-		v.add_child(U.testo(nota, 12.5, T.BAD if st != "" else T.DIM, T.PESO_FORTE, HORIZONTAL_ALIGNMENT_CENTER))
+		var nota := "Espulso: non si può cambiare" if st == "espulso" else ("Già uscito: non rientra" if st == "uscito" else "Tocca un altro per scambiarli")
+		var rn := U.hbox(8)
+		var tn := U.testo(nota, 12.5, T.BAD if st != "" else T.DIM, T.PESO_FORTE, HORIZONTAL_ALIGNMENT_CENTER)
+		tn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		rn.add_child(tn)
+		if ti != null and st != "uscito":
+			_tasto_stretto(ti)
+			ti.custom_minimum_size.x = TASTO_STAT
+			rn.add_child(ti)
+		v.add_child(rn)
 		return pann
 	# solo il campione creato all'inizio si può modificare (Luis 2026-11-24) e lui non si vende mai (2026-11-25):
 	# il campione ha Aspetto, gli altri Cerca acquirenti (mercato con le squadre, 2026-11-25); tutti Statistiche
@@ -587,14 +666,23 @@ func _pannello_giocatore(p: Dictionary, F: Array) -> Control:
 		asp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		stat.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		bt.add_child(asp)
+		if ti != null:
+			bt.add_child(ti)
+			ti.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			for b: Button in [asp, ti, stat]:
+				_tasto_stretto(b)
 		bt.add_child(stat)
 		v.add_child(bt)
 		return pann
 	var gia := Mercato.in_vendita(stato(), p.id)
 	var vendi := U.bottone("In vendita · togli" if gia else "Cerca acquirenti", "BtnFantasma", _cerca_acquirenti.bind(int(p.id)), 44)
 	vendi.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	stat.custom_minimum_size.x = TASTO_STAT
+	stat.custom_minimum_size.x = TASTO_STAT if ti == null else TASTO_STRETTO
 	bt.add_child(vendi)
+	if ti != null:
+		bt.add_child(ti)
+		for b: Button in [vendi, ti, stat]: # tre tasti in una riga: carattere più piccolo e meno margine
+			_tasto_stretto(b)
 	bt.add_child(stat)
 	v.add_child(bt)
 	return pann

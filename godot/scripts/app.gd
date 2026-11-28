@@ -18,7 +18,8 @@
 #   App.clic()                        suono del tocco (api.click del web), se l'audio è acceso
 #   App.impostazioni()                applica subito le impostazioni della carriera (api.settings del web):
 #                                     audio spento = bus principale muto (menu e partita); musica di sottofondo
-#                                     (assets/audio/music.mp3) solo nei menu, con audio e musica accesi.
+#                                     (più brani a rotazione, scripts/menu/musiche.gd) solo nei menu, con audio e
+#                                     musica accesi.
 #                                     Durata, difficoltà e portiere valgono dalla partita dopo (le legge _partita);
 #                                     la vibrazione la legge MenuSchermata._tocco a ogni tocco.
 #   segnale schermata_cambiata(nome)
@@ -43,7 +44,7 @@ const AudioPartita := preload("res://scripts/partita/audio_partita.gd")
 const Meteo := preload("res://scripts/partita/meteo.gd")
 const DiviseScript := preload("res://scripts/carriera/divise.gd")
 const NomiGiocatori := preload("res://scripts/partita/nomi_giocatori.gd")
-const MUSICA := "res://assets/audio/music.mp3"
+const Musiche := preload("res://scripts/menu/musiche.gd")
 const MUSICA_VOLUME := 0.35     # come Sfx.music del web (gain 0,35)
 const CLIC_HZ := 520.0          # tocco: come Sfx.click del web (triangolo 520 Hz, 0,05 s, volume 0,12)
 const CLIC_DURATA := 0.05
@@ -68,6 +69,8 @@ var opzioni := {}               # opzioni da riga di comando
 var _avviata := false
 var _clic: AudioStreamPlayer
 var _musica: AudioStreamPlayer
+var _brani: Array[String] = []   # musiche dei menu che ci sono davvero (Musiche.disponibili)
+var _brano := -1                  # indice in _brani del brano caricato
 
 
 func _ready() -> void:
@@ -297,11 +300,18 @@ func _prepara_audio() -> void:
 	if DisplayServer.get_name() == "headless":
 		return # senza schermo (prove, build) niente suoni, come audio_partita.gd
 	_clic.stream = AudioPartita.tono_triangolo(CLIC_HZ, CLIC_DURATA, CLIC_VOLUME)
-	if ResourceLoader.exists(MUSICA):
-		var m: AudioStream = (load(MUSICA) as AudioStream).duplicate()
-		if m is AudioStreamMP3:
-			(m as AudioStreamMP3).loop = true
-		_musica.stream = m
+	_brani = Musiche.disponibili()
+	_carica_brano()
+	# finito un brano parte il successivo (i brani non sono in loop)
+	_musica.finished.connect(func() -> void:
+		_carica_brano()
+		impostazioni())
+
+
+# carica nel lettore il brano dopo quello attuale (scelto a caso, mai lo stesso di fila); senza brani niente musica
+func _carica_brano() -> void:
+	_brano = Musiche.prossimo(_brano, _brani.size(), randf())
+	_musica.stream = load(_brani[_brano]) as AudioStream if _brano >= 0 else null
 
 
 ## suono breve a ogni tocco nei menu (api.click del web)
@@ -321,6 +331,9 @@ func impostazioni() -> void:
 		_musica.play()
 	elif not suona and _musica.playing:
 		_musica.stop()
+		# tornando al menu (dopo la partita o riaccesa la musica) parte un altro brano
+		if _musica.stream != null:
+			_carica_brano()
 
 
 # impostazione della carriera (accese se mancano o se la carriera non c'è ancora: come SETTINGS_DEFAULT)

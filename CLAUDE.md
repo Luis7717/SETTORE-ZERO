@@ -159,8 +159,10 @@
   `gioco.gd`); con una sostituzione aspettano anche formazione e stili cambiati insieme, senza sostituzioni (o a gioco
   già fermo) vanno subito; i battitori dei piazzati subito. All'intervallo entrano subito (`_mostra_intervallo`).
   Contano subito nei 5 (`fatti` = `confermati` + `entrati_in_attesa`), "USCITO" solo chi è uscito davvero: riaperta
-  la Rosa si possono disfare (chi doveva uscire rientra). Se la partita finisce prima (fischio, Esci) si perdono:
-  `annulla` rimette nella carriera la squadra in campo (`base`, `ricorda`). Prova: `--scena=cambio` (cambi a pallone
+  la Rosa si possono disfare (chi doveva uscire rientra). Se la partita finisce prima (fischio, Esci) in partita
+  non entrano più, ma titolari, modulo e stili scelti restano nella carriera per la partita dopo (Luis 2026-11-28:
+  "se modifico il modulo durante la partita, dopo la partita torna a quello base"; prima `annulla` rimetteva la squadra
+  in campo, ora toglie solo l'attesa). Prova: `--scena=cambio` (cambi a pallone
   in gioco, "Cambio pronto", 2,5 s dopo pallone fuori e scena). A Riprendi / Secondo tempo
   la **scena del cambio** (`cambio_regia.gd`, 3,4 s veri, tempo fermo, un tocco la salta): chi esce cammina verso la
   linea laterale a centrocampo, chi entra corre al suo posto, targhette ▲ verde / ▼ rossa e riquadro CAMBIO in basso,
@@ -474,6 +476,28 @@
   Cancella, Fatto; × o tocco fuori = nessun cambio). Il nome della squadra (`nuova_carriera.gd`) resta un LineEdit.
   Controllo `test_editor_nuova_carriera_scheda_nome` (ogni scheda col suo tasto, nessun LineEdit, niente più largo
   dello schermo).
+- **Istruzioni ai giocatori** (Luis 2026-11-28, `sim/istruzioni.gd` dati, `sim/istruzioni_gioco.gd` motore, strato tra
+  `attacco.gd` e `parata.gd`): nella Rosa (anche nella pausa) il pannello del giocatore ha il tasto **Istruzioni**
+  (puntino giallo se ne ha di cambiate) che apre le istruzioni del ruolo del suo posto, ognuna con tre scelte (quella in
+  mezzo = come sempre): terzini Spinta difensivo/equilibrato/offensivo; esterni largo/equilibrato/difensivo; mediano
+  difensivo (in attacco mai oltre il suo ultimo quarto, `MEDIANO_MAX`)/equilibrato/offensivo; centrocampista e
+  trequartista difensivo/centrale/avanzato; trequartista anche tra le linee/inserimento; ali larga/taglia dentro (anche
+  la guida automatica del portatore, `istrAutoGx`); attaccante boa/profondità (tagli della CPU `istrGambleK`); ali e
+  attaccanti resta su/pressa i difensori; centrali copre/esce in anticipo; portiere resta tra i pali/esce spesso
+  (`gkClaimBonus`). Ogni giocatore resta nel suo posto: si sposta `anchor` (altezza e larghezza) e il movimento senza
+  palla (`support`, `defend`). Salvataggio: campo nuovo `s.istruzioni` {"<id>": {chiave: scelta}} (`Carriera.istruzioni`,
+  `setIstruzione`); `squadraPartita` mette `istr` nella copia del giocatore, `cambi_partita.applica` le aggiorna nella
+  pausa. CPU: `Istr.per_squadra` secondo i suoi stili (70% dei giocatori) più un po' a caso col seme
+  (`avversarioPartita`). Senza `istr` o con le scelte di mezzo il motore è identico (ganci +0 / ×1). Test
+  `tests/test_istruzioni.gd`; foto `09_rosa_istruzioni*` (`prova_menu.tscn -- --tutte=DIR --solo=09_rosa`).
+- **Nomi dei calciatori** (Luis 2026-11-28, "uno diverso per giocatore, prendi spunto da quelli reali",
+  `scripts/carriera/nomi_calciatori.gd`): circa 800 cognomi comuni di 13 paesi (niente cognomi di campioni famosi), il
+  nome è dello stesso paese del cognome; `Carriera.randomName` usa sempre due numeri casuali (sequenza del seme
+  identica). Le liste corte del web (`NOMI`/`COGNOMI`) restano solo per i confronti col JS (`Carriera.nomi_web`,
+  acceso da `test_carriera.gd`). I salvataggi vecchi tengono i loro nomi. Test `tests/test_nomi_calciatori.gd`.
+- **Musiche dei menu** (Luis 2026-11-28, "aggiungi altre canzoni", `scripts/menu/musiche.gd`): sette brani CC0 di
+  Freesound (`assets/audio/music*.mp3`, crediti in `godot/CREDITI.md`) uno dopo l'altro in ordine sparso, mai lo stesso
+  due volte di fila; tornando al menu dalla partita parte un altro brano. Test `tests/test_musiche.gd`.
 - **Stellina del campione** (Luis 2026-11-24): quando il controllato è il campione (`src.champ`) sopra di lui c'è una
   stellina gialla (`TV.stellina()`, ×`STELLA_K` 1,1) al posto del triangolo (`vista.gd` `_aggiorna_segni`).
 - **Nomi sopra i giocatori** (Luis 2026-11-26, `scripts/partita/nomi_giocatori.gd`): cognome (iniziale + cognome se
@@ -512,4 +536,4 @@
 - Meteo e ora della partita: `scripts/partita/meteo.gd` (prove: `--meteo=sereno|nuvoloso|pioggia|neve`, `--ora=giorno|tramonto|notte`).
 - Build: workflow `.github/workflows/tiro-a-giro-godot-ipa.yml` (push su `tiro-a-giro` che tocca `godot/**`) →
   release **`tiro-a-giro-godot-ipa`**, `TiroAGiroGodot.ipa`, bundle `it.tiroagiro.godot` ("Tiro a Giro 3D"), iOS 15+,
-  chip A12+. Il workflow web ignora i cambi solo in `godot/`.
+  chip A12+. Il workflow dell'IPA web parte solo a mano (Luis 2026-11-27: serve solo la build Godot).

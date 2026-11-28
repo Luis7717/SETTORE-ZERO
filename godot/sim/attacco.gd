@@ -101,6 +101,17 @@ func anchor(p: R.Player) -> PackedFloat64Array:
 	return r
 
 
+# ganci per le istruzioni dei giocatori (istruzioni_gioco.gd): qui non cambiano niente
+## metri in più (o in meno) nella scelta di chi attacca l'area
+func istrRunBias(_q: R.Player) -> float:
+	return 0.0
+
+
+## quante volte più spesso p anticipa il taglio oltre la linea
+func istrGambleK(_p: R.Player) -> float:
+	return 1.0
+
+
 # compagno esterno (|bx| > 0,6) sulla stessa fascia di p, più avanti (side 1) o più indietro (side -1) nella formazione
 func _wideMate(p: R.Player, side: float) -> R.Player:
 	var sgn: float = C.sign_(p.bx)
@@ -146,7 +157,7 @@ func _computeBoxRuns() -> void:
 		for q: R.Player in players:
 			if q.team == tm and q != c and not q.off and (q.pos == "A" or q.pos == "C") and q.state == "play" and not hl.has(q):
 				cand.append(q)
-		cand = stableSort(cand, func(q: R.Player) -> float: return C.hyp(q.x, q.y - gy) + (0.0 if q.pos == "A" else RUN_MID) - (RUN_KEEP if was.has(q) else 0.0))
+		cand = stableSort(cand, func(q: R.Player) -> float: return C.hyp(q.x, q.y - gy) + (0.0 if q.pos == "A" else RUN_MID) - (RUN_KEEP if was.has(q) else 0.0) + istrRunBias(q))
 		boxRun[tm] = cand.slice(0, n)
 
 
@@ -230,7 +241,7 @@ func _gamble(p: R.Player) -> void:
 	if t <= 0.0 and p.y * dir > line - GAMBLE_NEAR:
 		var sk: float = teams[tm].skill
 		var space: float = C.clamp_((HL - line) / GAMBLE_SPACE, 0.3, 1.6)
-		var rate: float = GAMBLE_RATE * (1.5 - sk) * space * (GAMBLE_TRAP if stD[1 - tm].fuorigioco else 1.0)
+		var rate: float = GAMBLE_RATE * (1.5 - sk) * space * (GAMBLE_TRAP if stD[1 - tm].fuorigioco else 1.0) * istrGambleK(p)
 		if rnd() < rate * dtT:
 			t = GAMBLE_T
 	gambleT[key] = t

@@ -13,7 +13,9 @@
 #   nel motore alla prima interruzione (gioco_fermo: pallone fuori, fallo, gol prima del calcio d'inizio) o
 #   all'intervallo. Si contano subito nei 5 (fatti = confermati + entrati in attesa) e finché aspettano si possono
 #   disfare: chi doveva uscire ed è ancora in campo può rientrare (`usciti` = solo chi è uscito davvero). Se la partita
-#   finisce prima, `annulla` rimette nella carriera la squadra che è in campo (base, ricorda).
+#   finisce prima, in quella partita non entrano più, ma restano nella carriera (Luis 2026-11-28: "se modifico il
+#   modulo durante la partita, dopo la partita torna a quello base; stessa cosa per le tattiche e i giocatori"):
+#   `annulla` toglie solo l'attesa, titolari, modulo e stili scelti restano per la partita dopo.
 extends RefCounted
 
 const C := preload("res://sim/core.gd")
@@ -70,18 +72,16 @@ func ricorda(c: Object) -> void:
 	base = {"lineup": (s.lineup as Array).duplicate(), "formation": str(s.formation), "stileAtt": c.stileAtt(), "stileDif": c.stileDif()}
 
 
-## la partita finisce coi cambi in attesa: si perdono, la carriera torna alla squadra in campo (e si salva)
+## la partita finisce coi cambi in attesa: in partita non entrano più, ma la carriera tiene titolari, modulo e stili
+## scelti nella pausa (Luis 2026-11-28; prima tornava alla squadra in campo e a Luis sembrava che il modulo tornasse
+## quello base). `base` resta per sapere cosa c'era in campo
 func annulla(c: Object) -> void:
 	if not attesa:
 		return
 	attesa = false
 	fatti = confermati
-	if base.is_empty() or c == null:
-		return
-	var s: Dictionary = c.s
-	s.lineup = (base.lineup as Array).duplicate()
-	s.formation = base.formation
-	c.setStili(base.stileAtt, base.stileDif) # salva
+	if c != null and c.has_method("save"):
+		c.save()
 
 ## espulsi della squadra me (p.off nel motore), per id del giocatore sorgente
 func leggi_espulsi(m: Object, me: int) -> void:
@@ -208,6 +208,12 @@ func applica(m: Object, me: int, c: Object) -> Variant:
 				return null
 			src = Fisico.applica(q)
 			(src as Dictionary).erase("energy0")
+		# istruzioni scelte nella pausa (sim/istruzioni.gd): valgono subito, anche per chi è già in campo
+		var ist: Dictionary = c.istruzioni(id) if c.has_method("istruzioni") else {}
+		if ist.is_empty():
+			(src as Dictionary).erase("istr")
+		else:
+			src["istr"] = ist
 		srcs.append(src)
 	m.teams[me]["piazzati"] = c.piazzati() # battitori dei calci piazzati scelti nella pausa
 	var fatti_ora: Variant = m.cambiaSquadra(me, srcs, str(s.formation), c.stileAtt(), c.stileDif())

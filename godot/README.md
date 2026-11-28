@@ -257,7 +257,8 @@ spenti (non si sentono e col driver audio finto resterebbero in memoria all'usci
 
 Non ancora fatti (fasi dopo): menu e carriera (la partita parte subito con le squadre di prova), cambi in pausa,
 salvataggio della scritta "Trascina il campo" (si ricorda solo finché l'app è aperta). La musica c'è dal 2026-11-21:
-solo nei menu (`App`, `assets/audio/music.mp3`), mai in partita, come il web.
+solo nei menu (`App`), mai in partita, come il web; dal 2026-11-28 sette brani CC0 a rotazione
+(`scripts/menu/musiche.gd`, `assets/audio/music*.mp3`), mai lo stesso due volte di fila.
 
 ## Sfondo del menu e allenamento guidato (fase 3)
 

@@ -26,6 +26,7 @@ func _fixture() -> Dictionary:
 # (l'oggetto del test prima si libera dopo che è nato il successivo): chi li prova li accende da sé
 func _init() -> void:
 	Asp.particolari_attivi = false
+	CarrieraScript.nomi_web = true # confronti col JS: nomi delle liste corte del web (gli altri test lo rispengono)
 
 
 func same(got: Variant, want: Variant, msg: String) -> bool:
@@ -70,6 +71,7 @@ static func come_web(s: Dictionary) -> Dictionary:
 		if p is Dictionary:
 			p.erase("sub")
 	return c
+
 
 
 func test_pezzi_come_il_js() -> bool:

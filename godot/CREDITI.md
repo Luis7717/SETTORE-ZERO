@@ -23,7 +23,7 @@ pagina Gumroad letto il 2026-11-20 non riporta condizioni scritte. Vale quindi l
 pack, che Luis ha confermato. Citiamo comunque l'autore, qui e nel README. Se l'autore pubblica condizioni diverse,
 valgono quelle.
 
-## Suoni (partita; `music.mp3` nei menu dal 2026-11-21)
+## Suoni (partita; musiche `music*.mp3` nei menu dal 2026-11-21)
 
 Tutti da Freesound, **CC0 1.0**, ritagliati per il web (dettagli e tempi in `assets/CREDITI.md`):
 
@@ -35,6 +35,16 @@ Tutti da Freesound, **CC0 1.0**, ritagliati per il web (dettagli e tempi in `ass
 | audio/whistle_long.mp3 | https://freesound.org/people/SpliceSound/sounds/218318/ | SpliceSound |
 | audio/kick.mp3 | https://freesound.org/people/bittermelonheart/sounds/555042/ | bittermelonheart |
 | audio/music.mp3 | https://freesound.org/people/neko_4444/sounds/739064/ | neko_4444 |
+| audio/music_uplifting.mp3 | https://freesound.org/people/Seth_Makes_Sounds/sounds/670819/ | Seth_Makes_Sounds |
+| audio/music_commercial.mp3 | https://freesound.org/people/Seth_Makes_Sounds/sounds/660452/ | Seth_Makes_Sounds |
+| audio/music_summer.mp3 | https://freesound.org/people/Seth_Makes_Sounds/sounds/820076/ | Seth_Makes_Sounds |
+| audio/music_pop.mp3 | https://freesound.org/people/Seth_Makes_Sounds/sounds/686610/ | Seth_Makes_Sounds |
+| audio/music_dance.mp3 | https://freesound.org/people/evanjones4/sounds/320089/ | evanjones4 |
+| audio/music_rock.mp3 | https://freesound.org/people/Prime45/sounds/470766/ | Prime45 |
+
+Le musiche dei menu (dal 2026-11-28 sette, a rotazione: `scripts/menu/musiche.gd`) sono l'anteprima MP3 di qualità
+alta di Freesound (`cdn.freesound.org/previews/..._hq.mp3`), intere e senza ritocchi; licenza CC0 controllata sulla
+pagina di ognuna il 2026-11-28.
 
 `audio/cori.wav` (2026-11-22): coro dello stadio **sintetizzato da noi** (`tools/cori_sintesi.gd`, rifatto con
 `tools/genera_cori.gd`): melodia originale, voci a dente di sega col filtro della vocale "o", battimani di rumore,

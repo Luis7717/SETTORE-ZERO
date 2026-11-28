@@ -21,6 +21,8 @@ class_name Carriera
 extends RefCounted
 
 const JS := preload("res://scripts/carriera/js.gd")
+const NomiCalciatori := preload("res://scripts/carriera/nomi_calciatori.gd")
+const Istr := preload("res://sim/istruzioni.gd")
 const Asp := preload("res://scripts/carriera/aspetto.gd")
 const Stemma := preload("res://scripts/carriera/stemma_dati.gd")
 const Salv := preload("res://scripts/carriera/salvataggio.gd")
@@ -86,6 +88,7 @@ var crescitaRosa := false
 ## ruolo per posto, le statistiche dei giocatori generati seguono il ruolo. false solo nei confronti col JS
 ## (giocatori senza `ruolo`: tutto come il web)
 var ruoli := true
+static var nomi_web := false   # true solo nei confronti col JS (test_carriera.gd): nomi delle liste corte del web
 ## ruoli della rosa nuova, nell'ordine in cui create() genera i giocatori di ogni gruppo (i primi due sono i più forti)
 ## punti tolti a un terzino su un'ala (o un'ala da terzino) nella formazione automatica: mai, se c'è un altro
 const PENALE_VIETATO := 1000.0
@@ -105,9 +108,15 @@ static func pick(r: Callable, a: Array) -> Variant:
 	return a[int(floor(r.call() * a.size()))]
 
 
+## nome a caso "L. Ferrante": dal 2026-11-28 circa 800 cognomi di vari paesi (scripts/carriera/nomi_calciatori.gd,
+## Luis: "uno diverso per giocatore"); `nomi_web` = le liste corte del web (solo i confronti col JS). Sempre due
+## numeri casuali, quindi la sequenza del seme resta la stessa.
 static func randomName(r: Callable) -> String:
-	var nome: String = pick(r, NOMI)
-	return nome.left(1) + ". " + String(pick(r, COGNOMI))
+	if nomi_web:
+		var nome: String = pick(r, NOMI)
+		return nome.left(1) + ". " + String(pick(r, COGNOMI))
+	var a: float = r.call()
+	return NomiCalciatori.nome(a, r.call())
 
 
 ## valutazione di p nel posto `pos`: un gruppo (P/D/C/A, come il web) o un ruolo specifico (sim/ruoli.gd).
@@ -1202,6 +1211,12 @@ func avversarioPartita(t: Dictionary) -> Dictionary:
 	var st := stileDi(t)
 	sq["stileAtt"] = st.att
 	sq["stileDif"] = st.dif
+	# istruzioni dei giocatori della CPU secondo i loro stili (Luis 2026-11-28), fisse per squadra e stagione
+	var F: Array = C.schema(String(sq.get("formation", "4-4-2")))
+	var ist := Istr.per_squadra(st.att, st.dif, Ruoli.posti(String(sq.get("formation", "4-4-2")), F), Asp.hash32("istruzioni", t.get("seed", 0), s.season))
+	for i in mini(ist.size(), (sq.players as Array).size()):
+		if not (ist[i] as Dictionary).is_empty() and sq.players[i] is Dictionary:
+			sq.players[i]["istr"] = ist[i]
 	return sq
 
 
@@ -1390,6 +1405,9 @@ func squadraPartita() -> Dictionary:
 		var e := 1.0 if p.get("champ", false) else Forma.energia(forma_di(p.id)) # il campione parte sempre al 100%
 		if e < 1.0:
 			q["energy0"] = e
+		var ist := istruzioni(p.id)
+		if not ist.is_empty():
+			q["istr"] = ist # istruzioni del giocatore (sim/istruzioni.gd): le legge il motore
 		gioc.append(q)
 	t.players = gioc
 	t.bench = t.bench.filter(func(p: Dictionary) -> bool: return infortunio(p.id) <= 0).map(func(p: Dictionary) -> Dictionary: return Fisico.applica(p))
@@ -1419,6 +1437,30 @@ func setPiazzato(k: String, id: Variant) -> bool:
 	var pz := piazzati()
 	pz[k] = int(id) if id != null else null
 	s["piazzati"] = pz
+	save()
+	return true
+
+
+# ---------------------------------------------------------------- istruzioni ai giocatori (Luis 2026-11-28)
+## istruzioni del giocatore id ({chiave: scelta}, solo quelle diverse da "come sempre"; sim/istruzioni.gd)
+func istruzioni(id: Variant) -> Dictionary:
+	var tutte: Variant = s.get("istruzioni") if s is Dictionary else null
+	return Istr.pulisci(tutte.get(str(id)) if tutte is Dictionary else null)
+
+
+## dà al giocatore id la scelta per l'istruzione chiave e salva; false se non va
+func setIstruzione(id: Variant, chiave: String, scelta: String) -> bool:
+	if player(id) == null or not Istr.valida(chiave, scelta):
+		return false
+	var tutte: Dictionary = s.get("istruzioni") if s.get("istruzioni") is Dictionary else {}
+	var d := istruzioni(id)
+	d[chiave] = scelta
+	d = Istr.pulisci(d)
+	if d.is_empty():
+		tutte.erase(str(id))
+	else:
+		tutte[str(id)] = d
+	s["istruzioni"] = tutte
 	save()
 	return true
 

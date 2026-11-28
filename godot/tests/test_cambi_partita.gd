@@ -171,6 +171,62 @@ func test_formazione_e_stili_nel_motore() -> bool:
 	return done()
 
 
+# Luis 2026-11-28: "se modifico il modulo durante la partita, dopo la partita torna a quello base; stessa cosa per
+# le tattiche e i giocatori": formazione, stili e sostituzione decisi nella pausa restano nella carriera dopo la
+# partita (fine partita, registrazione del risultato, salvataggio e ricaricamento)
+func test_modulo_tattiche_e_cambi_restano_dopo_la_partita() -> bool:
+	var c := _carriera()
+	c.addChampion({"name": "Campione", "ruolo": "ATT", "look": {}, "num": 10})
+	c.save()
+	var m := _partita(c)
+	for i in 200:
+		m.step(DT)
+	var cambi := CambiPartita.new()
+	cambi.leggi_in_campo(m, 0)
+	cambi.ricorda(c)
+	var nuovo := "4-3-3" if c.s.formation != "4-3-3" else "3-5-2"
+	c.s.lineup = cambi.formazione_stessi_11(C.schema(nuovo), c.s.lineup, func(id: Variant, r: String) -> int: return Carriera.overallAs(c.player(id), r), c.ruoliPosti(nuovo))
+	c.s.formation = nuovo
+	c.save()
+	c.setStili("contropiede", "catenaccio")
+	var ch: Variant = c.campione().id
+	var tit: Variant = null
+	for id: Variant in c.s.lineup.slice(1):
+		if not _stesso(id, ch):
+			tit = id
+			break
+	var entra: Variant = _panchinaro(c, cambi)
+	eq(_sostituisci(c, cambi, tit, entra), "", "sostituzione permessa")
+	c.save()
+	check(cambi.applica(m, 0, c) is Array, "cambi nel motore")
+	var lineup: Array = c.s.lineup.duplicate()
+	for i in 600:
+		m.step(DT)
+	m.dispose()
+	# fine partita come in app.gd: niente cambi in attesa da perdere, risultato, dopo partita, campione, salvataggio
+	cambi.annulla(c)
+	var res := c.finishMatch(1, 0, [])
+	if not res.is_empty():
+		c.dopoPartita(res, {"me": 0, "gol_a": 1, "gol_b": 0})
+	c.tieniCampione()
+	c.save()
+	for giro in 2:
+		eq(c.s.formation, nuovo, "%s: il modulo scelto in partita resta" % ["dopo la partita", "ricaricato"][giro])
+		eq([c.stileAtt(), c.stileDif()], ["contropiede", "catenaccio"], "%s: le tattiche restano" % ["dopo la partita", "ricaricato"][giro])
+		check(c.s.lineup.has(entra), "%s: chi è entrato resta titolare" % ["dopo la partita", "ricaricato"][giro])
+		eq(c.s.lineup, lineup, "%s: titolari e posti come a fine partita" % ["dopo la partita", "ricaricato"][giro])
+		var c2 := Carriera.new()
+		c2.percorso = SALVA
+		c2.load()
+		c = c2
+	_fine()
+	return done()
+
+
+static func _stesso(a: Variant, b: Variant) -> bool:
+	return str(a) == str(b)
+
+
 # Luis 2026-11-24: il campione fuori partita non va in panchina; in partita sì, e alla partita dopo è di nuovo titolare
 func test_campione_sempre_titolare_fuori_partita() -> bool:
 	var c := _carriera()
@@ -302,29 +358,31 @@ func test_cambi_in_attesa_entrano_nel_motore() -> bool:
 
 
 # la partita finisce coi cambi in attesa: si perdono, la carriera torna alla squadra in campo
-func test_cambi_in_attesa_si_perdono_a_fine_partita() -> bool:
+func test_cambi_in_attesa_restano_nella_carriera_a_fine_partita() -> bool:
 	var c := _carriera()
 	var m := _partita(c)
 	var cambi := CambiPartita.new()
 	cambi.leggi_in_campo(m, 0)
 	cambi.ricorda(c)
 	var prima: Array = c.s.lineup.duplicate()
-	var form: String = str(c.s.formation)
 	var att := c.stileAtt()
 	_sostituisci(c, cambi, c.s.lineup[9], _panchinaro(c, cambi, "A"))
 	c.s.lineup = cambi.formazione_stessi_11(C.FORMATIONS["3-5-2"], c.s.lineup, func(id: Variant, r: String) -> int: return Carriera.overallAs(c.player(id), r))
 	c.s.formation = "3-5-2"
 	c.setStili("contropiede" if att != "contropiede" else "possesso", null)
 	cambi.attesa = true
+	var scelti: Array = c.s.lineup.duplicate()
 	cambi.annulla(c)
-	eq(c.s.lineup, prima, "titolari di prima")
-	eq(c.s.formation, form, "formazione di prima")
-	eq(c.stileAtt(), att, "stile di prima")
-	eq(cambi.fatti, 0, "nessun cambio")
+	# Luis 2026-11-28: quello che si è scelto nella pausa resta nella carriera anche se in partita non è entrato
+	eq(c.s.lineup, scelti, "titolari scelti nella pausa")
+	check(c.s.lineup != prima, "non tornano quelli di prima")
+	eq(c.s.formation, "3-5-2", "modulo scelto nella pausa")
+	check(c.stileAtt() != att, "stile scelto nella pausa")
+	eq(cambi.fatti, 0, "nessun cambio fatto in partita")
 	check(not cambi.attesa, "niente in attesa")
 	var d := Carriera.new()
 	d.percorso = SALVA
-	check(d.load() and d.s.lineup == prima, "salvato com'era")
+	check(d.load() and d.s.lineup == scelti and d.s.formation == "3-5-2", "salvato com'è stato scelto")
 	m.dispose()
 	_fine()
 	return done()
