@@ -30,7 +30,7 @@ const LISTA := [
 	{"id": "chop", "name": "Taglio secco", "show": 0.48, "dri": 45.0, "av": 0.8, "lat": 0.8, "vel": 1.0},
 	{"id": "ponte", "name": "Ponte", "show": 0.38, "dri": 45.0, "av": 0.8, "lat": -0.6, "vel": 0.85,
 		"palla": "terra", "tk": 0.38, "oltre": 3.4},
-	{"id": "elastico3", "name": "Triplo elastico", "show": 0.42, "dri": 48.0, "av": 0.7, "lat": 0.7, "vel": 0.8},
+	{"id": "elastico3", "name": "Triplo elastico", "show": 0.7, "dri": 48.0, "av": 1.0, "lat": 0.3, "vel": 0.5},
 	{"id": "cruyff", "name": "Finta e giro", "show": 0.6, "dri": 50.0, "av": 0.3, "lat": 1.0, "vel": 0.55},
 	{"id": "tacco", "name": "Colpo di tacco", "show": 0.42, "dri": 55.0, "av": 0.8, "lat": 0.0, "vel": 0.7},
 	{"id": "pedalata", "name": "Pedalata", "show": 0.7, "dri": 55.0, "av": 1.0, "lat": 0.1, "vel": 1.0},
