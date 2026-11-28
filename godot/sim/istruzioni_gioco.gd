@@ -1,54 +1,84 @@
 # Istruzioni ai giocatori nel motore (Luis 2026-11-28; dati e nomi in istruzioni.gd). Ogni giocatore resta nel suo
-# posto della formazione: l'istruzione sposta solo quanto sale o scende, quanto si allarga e cosa fa senza palla.
-# Legge p.src.istr ({chiave: scelta}) col ruolo del posto (p.ruolo; senza, il ruolo predefinito del gruppo). Senza
-# `istr` o con le scelte di mezzo niente cambia: tutti i metodi chiamano super() e tornano subito.
-#  - terzini (spinta): difensivo = resta indietro e più dentro; offensivo = sale tanto e, col pallone sulla sua fascia
-#    nella metà avversaria, arriva fino al fondo;
-#  - esterni (fascia): largo = sulla linea laterale; difensivo = più basso e rientra di più;
-#  - mediano: difensivo = in attacco mai oltre il suo ultimo quarto (MEDIANO_MAX); offensivo = fino a centrocampo e oltre;
-#  - centrocampista e trequartista (posizione): più alti o più bassi, in attacco e un po' in difesa;
-#  - trequartista (area): inserimento = attacca l'area per primo; tra le linee = mai in area, dietro le punte;
-#  - ali: larga = sulla linea e la guida automatica va sul fondo; taglia dentro = più strette e la guida punta al centro;
-#  - attaccanti (movimento): profondità = sempre sulla linea del fuorigioco e tagli più frequenti (CPU); boa = resta
-#    BOA_DIETRO metri sotto la linea e viene incontro al pallone (sui cross va in area come gli altri);
-#  - ali e attaccanti (pressione): pressa = va sui difensori quando impostano nella loro metà; resta su = in difesa
-#    resta alto;
-#  - centrali (marcatura): anticipo = va addosso all'attaccante vicino, davanti a lui; copre = più dietro, mai fuori;
-#  - portiere (uscite): esce = più fuori dai pali e prende più cross; pali = più vicino alla linea, meno cross.
+# posto della formazione: l'istruzione sposta solo quanto sale o scende, quanto si allarga, cosa fa senza palla e come
+# porta il pallone. Legge p.src.istr ({chiave: scelta}) col ruolo del posto (p.ruolo; senza, il ruolo predefinito del
+# gruppo). Senza `istr` o con le scelte di mezzo (Equilibrato) niente cambia: tutti i metodi chiamano super() e tornano.
+#  - terzini: spinta (Resta bloccato = indietro e più dentro; Si sovrappone = sale tanto e, col pallone sulla sua fascia
+#    nella metà avversaria, fino al fondo); corsia (Sempre in fascia = attaccato alla linea quando attacchiamo; Si
+#    accentra = in attacco entra in mezzo al campo, all'altezza dei centrocampisti);
+#  - esterni (fascia): Attaccato alla linea = sulla linea laterale; Torna sempre = in difesa molto più basso e più
+#    vicino al terzino;
+#  - mediano: Si abbassa tra i centrali = in attacco scende tra i due centrali (x quasi 0, mai oltre ABBASSA_Y);
+#    Accompagna l'azione = più alto; marcatura come i centrali;
+#  - centrocampista (compito): Resta in copertura = più basso in attacco e in difesa; Box to box = più alto in attacco,
+#    più basso in difesa e attacca l'area (istrRunBias);
+#  - trequartista: compito (Aiuta il centrocampo / Seconda punta) e area (Tra le linee = mai in area; Si inserisce);
+#  - ali: ala (Resta larga / Taglia dentro, anche la guida automatica); cross (col pallone sull'altra fascia nell'ultimo
+#    terzo: Aspetta fuori area = al limite; Attacca il secondo palo = in area sul palo lontano e prima nella corsa in area);
+#  - attaccante: movimento (Falso nove = viene incontro fino a FALSO_DIETRO sotto la linea, niente tagli; Attacca la
+#    profondità = tagli più spessi e sulla linea col pallone oltre PROF_DA); riferimento (Fa la boa = BOA_DIETRO sotto la
+#    linea, verso il pallone; Sul filo del fuorigioco = sempre sulla linea, anche col pallone lontano, tagli un po' più
+#    spessi); pressione come le ali (Resta su / Pressa i difensori);
+#  - centrali e mediano (marcatura): Copre lo spazio = più basso; Marcatura stretta = addosso all'avversario vicino,
+#    davanti a lui verso il pallone;
+#  - con la palla (tutti tranne il portiere; centrali: imposta): Gioca semplice = la CPU passa prima e la guida automatica
+#    rallenta e protegge; Porta palla = la CPU passa meno se non è pressata e la guida va più veloce e non aspetta i
+#    compagni; Imposta palla al piede = come Porta palla ma solo nella propria metà;
+#  - portiere (uscite): Esce spesso = più fuori dai pali e prende più cross; Resta tra i pali = il contrario.
 extends "attacco.gd"
 
 const Istr := preload("istruzioni.gd")
 const RuoliI := preload("ruoli.gd")
 
-const SPINTA_SU := 0.08        # terzino offensivo: più alto (frazione del campo) ...
+const SPINTA_SU := 0.08        # Si sovrappone: più alto (frazione del campo) ...
 const SPINTA_FONDO := 0.08     # ... e ancora di più col pallone sulla sua fascia oltre SPINTA_FONDO_DA
 const SPINTA_FONDO_DA := 0.5
-const SPINTA_GIU := -0.12      # terzino difensivo: più basso ...
+const SPINTA_GIU := -0.12      # Resta bloccato: più basso ...
 const SPINTA_DENTRO := 0.75    # ... e più dentro (frazione della sua x)
-const FASCIA_SU := 0.03        # esterno largo: un po' più alto
-const FASCIA_GIU := -0.07      # esterno difensivo: più basso in attacco ...
-const FASCIA_RIENTRO := -0.05  # ... e in difesa
-const MEDIANO_MAX := 0.3       # mediano difensivo: in attacco al massimo qui (frazione del campo dalla propria porta)
-const MEDIANO_SU := 0.09       # mediano offensivo: più alto in attacco ...
-const MEDIANO_DIF := 0.03      # ... e di tanto (su o giù) in difesa
-const MEZZALA_ATT := 0.07      # centrocampista e trequartista: su o giù in attacco ...
-const MEZZALA_DIF := 0.04      # ... e in difesa
-const ALA_DENTRO := 0.55       # ala che taglia: x in attacco (frazione della metà larghezza)
+const ACCENTRA_X := 0.3        # Si accentra: x in attacco (frazione della sua x) ...
+const ACCENTRA_SU := 0.05      # ... e un po' più alto, all'altezza del centrocampo
+const FASCIA_SU := 0.03        # Attaccato alla linea: un po' più alto
+const TORNA_GIU := -0.04       # Torna sempre: più basso in attacco ...
+const TORNA_DIF := -0.1        # ... e molto più basso in difesa ...
+const TORNA_DENTRO := 0.85     # ... un po' più dentro, vicino al terzino (frazione della sua x)
+const ABBASSA_Y := 0.2         # Si abbassa tra i centrali: in attacco al massimo qui (frazione del campo dalla sua porta) ...
+const ABBASSA_X := 0.15        # ... e quasi al centro (frazione della sua x)
+const MEDIANO_SU := 0.09       # Accompagna l'azione: più alto in attacco ...
+const MEDIANO_DIF := 0.03      # ... e un po' in difesa
+const MEZZALA_ATT := 0.07      # centrocampista: su o giù in attacco ...
+const MEZZALA_DIF := 0.04      # ... e in difesa (Box to box: giù anche lui)
+const BOX_AREA := 8.0          # Box to box: nella scelta di chi attacca l'area conta come più vicino di tanto (m)
+const TREQ_SU := 0.1           # Seconda punta: più alto in attacco
+const ALA_DENTRO := 0.55       # Taglia dentro: x in attacco (frazione della metà larghezza)
 const ALA_GUIDA_DENTRO := 0.2  # ... e la guida automatica punta a questa frazione della sua x
-const BOA_GIU := -0.04         # boa: un po' più bassa ...
-const BOA_DIETRO := 9.0        # ... e almeno tanti metri sotto la linea del fuorigioco
-const BOA_INCONTRO := 0.35     # ... spostata verso il pallone di questa frazione
-const PROF_TAGLI := 2.5        # profondità: tagli oltre la linea così più spesso (CPU)
+const CROSS_LATO := 8.0        # sui cross: pallone oltre tanti metri sull'altra fascia ...
+const CROSS_DA := 0.68         # ... e oltre questa frazione del campo
+const CROSS_FUORI := 4.0       # Aspetta fuori area: tanti metri fuori dall'area
+const PALO_X := 1.5            # Attacca il secondo palo: tanto oltre il palo lontano ...
+const PALO_FONDO := 6.0        # ... a tanti metri dalla linea di fondo
+const FALSO_GIU := -0.1        # Falso nove: più basso ...
+const FALSO_DIETRO := 16.0     # ... almeno tanti metri sotto la linea del fuorigioco ...
+const FALSO_INCONTRO := 0.45   # ... verso il pallone di questa frazione
+const BOA_GIU := -0.03         # Fa la boa: un po' più bassa ...
+const BOA_DIETRO := 7.0        # ... almeno tanti metri sotto la linea del fuorigioco
+const BOA_INCONTRO := 0.3      # ... spostata verso il pallone di questa frazione
+const PROF_TAGLI := 2.5        # Attacca la profondità: tagli oltre la linea così più spesso (CPU)
 const PROF_DA := -30.0         # ... e sulla linea del fuorigioco già col pallone da qui (m nel verso d'attacco)
-const RESTA_SU := 0.1          # resta su: in difesa più alto
-const PRESSA_DA := 8.0         # pressa: pallone dei loro da qui in avanti (m nel nostro verso d'attacco) ...
+const FILO_TAGLI := 1.5        # Sul filo del fuorigioco: tagli un po' più spessi ...
+const FILO_GAP := 0.4          # ... e sempre a tanto dalla linea
+const RESTA_SU := 0.1          # Resta su: in difesa più alto
+const PRESSA_DA := 8.0         # Pressa i difensori: pallone dei loro da qui in avanti (m nel nostro verso d'attacco) ...
 const PRESSA_R := 25.0         # ... e portatore entro tanto ...
 const PRESSA_GAP := 2.0        # ... ci si mette davanti a tanto (m)
-const COPRE_GIU := -0.03       # centrale che copre: più basso
-const ANTICIPO_R := 10.0       # centrale in anticipo: attaccante entro tanto dal suo posto (m) ...
-const ANTICIPO_DAVANTI := 1.0  # ... davanti a lui, verso il pallone (m)
-const TRA_LINEE := 10.0        # trequartista tra le linee: almeno tanti metri sotto la linea del fuorigioco
-const INSERIMENTO := 14.0      # inserimento: nella scelta di chi attacca l'area conta come più vicino di tanto (m)
+const COPRE_GIU := -0.03       # Copre lo spazio: più basso
+const STRETTA_R := 10.0        # Marcatura stretta: avversario entro tanto dal suo posto (m) ...
+const STRETTA_DAVANTI := 1.0   # ... davanti a lui, verso il pallone (m)
+const TRA_LINEE := 10.0        # Tra le linee: almeno tanti metri sotto la linea del fuorigioco
+const INSERIMENTO := 14.0      # Si inserisce: nella scelta di chi attacca l'area conta come più vicino di tanto (m)
+const SEMPLICE_WANT := 0.7     # Gioca semplice: con un passaggio sicuro la CPU passa almeno con questa probabilità
+const PORTA_WANT := 0.45       # Porta palla: senza pressione la voglia di passare della CPU ×
+const IMPOSTA_WANT := 0.3      # Imposta palla al piede: nella propria metà senza pressione ×
+const SEMPLICE_SPD := 0.55     # Gioca semplice: andatura della guida automatica al massimo questa
+const PORTA_SPD := 1.0         # Porta palla: andatura della guida automatica almeno questa (se non pressato)
 const USCITE_FUORI := [0.7, 1.4] # portiere pali / esce: distanza dalla porta ×
 const USCITE_PRESA := 0.08     # ... e presa dei cross (probabilità in meno / in più)
 
@@ -76,6 +106,11 @@ func _ha(p: R.Player) -> bool:
 	return d is Dictionary and not (d as Dictionary).is_empty()
 
 
+## pallone sull'altra fascia nell'ultimo terzo (per le istruzioni sui cross dell'ala dal lato sgn)
+func _crossAltroLato(sgn: float, bf: float) -> bool:
+	return ball.x * sgn < -CROSS_LATO and bf > CROSS_DA
+
+
 # ------------------------------------------------------------ posti in campo
 func anchor(p: R.Player) -> PackedFloat64Array:
 	var r := super(p)
@@ -96,35 +131,63 @@ func anchor(p: R.Player) -> PackedFloat64Array:
 			elif noi and v < 0:
 				ayf += SPINTA_GIU
 				r[0] *= SPINTA_DENTRO
+			var c := _iv(p, "corsia")
+			if noi and c < 0:
+				r[0] = sgn * (HW - WIDE_GAP)
+			elif noi and c > 0:
+				r[0] *= ACCENTRA_X
+				ayf += ACCENTRA_SU
 		"ED", "ES":
 			var v := _iv(p, "fascia")
 			if noi and v < 0:
 				r[0] = sgn * (HW - WIDE_GAP)
 				ayf += FASCIA_SU
 			elif v > 0:
-				ayf += FASCIA_GIU if noi else FASCIA_RIENTRO
+				ayf += TORNA_GIU if noi else TORNA_DIF
+				if not noi:
+					r[0] *= TORNA_DENTRO
 		"CDC":
 			var v := _iv(p, "mediano")
 			if noi and v < 0:
-				ayf = minf(ayf, MEDIANO_MAX)
+				ayf = minf(ayf, ABBASSA_Y)
+				r[0] *= ABBASSA_X
 			elif noi and v > 0:
 				ayf += MEDIANO_SU
-			elif v != 0:
-				ayf += MEDIANO_DIF * v
+			elif v > 0:
+				ayf += MEDIANO_DIF
+			if _iv(p, "marcatura") < 0:
+				ayf += COPRE_GIU
 		"CC":
-			ayf += _iv(p, "mezzala") * (MEZZALA_ATT if noi else MEZZALA_DIF)
+			var v := _iv(p, "mezzala")
+			if v < 0:
+				ayf -= MEZZALA_ATT if noi else MEZZALA_DIF
+			elif v > 0:
+				ayf += MEZZALA_ATT if noi else -MEZZALA_DIF
 		"COC":
-			ayf += _iv(p, "trequarti") * (MEZZALA_ATT if noi else MEZZALA_DIF)
+			var v := _iv(p, "trequarti")
+			if v < 0:
+				ayf -= MEZZALA_ATT if noi else MEZZALA_DIF
+			elif v > 0 and noi:
+				ayf += TREQ_SU
 		"AD", "AS":
 			var v := _iv(p, "ala")
 			if noi and v < 0:
 				r[0] = sgn * (HW - WIDE_GAP)
 			elif noi and v > 0:
 				r[0] = sgn * HW * ALA_DENTRO
+			var cr := _iv(p, "cross")
+			if noi and cr != 0 and _crossAltroLato(sgn, bf):
+				if cr < 0: # al limite dell'area
+					ayf = minf(ayf, (HL - BOX_D - CROSS_FUORI + HL) / L)
+				else: # sul palo lontano (il suo lato)
+					r[0] = sgn * (GW / 2.0 + PALO_X)
+					ayf = (HL - PALO_FONDO + HL) / L
 			if not noi and _iv(p, "pressione") < 0:
 				ayf += RESTA_SU
 		"ATT":
 			if noi and _iv(p, "movimento") < 0:
+				ayf += FALSO_GIU
+			if noi and _iv(p, "riferimento") < 0:
 				ayf += BOA_GIU
 			if not noi and _iv(p, "pressione") < 0:
 				ayf += RESTA_SU
@@ -151,16 +214,15 @@ func support(p: R.Player) -> void:
 	match _ruolo(p):
 		"ATT":
 			var v := _iv(p, "movimento")
-			if v < 0: # boa: sotto la linea, verso il pallone
-				var cap: float = line - BOA_DIETRO
-				if p.ty * dir > cap:
-					p.ty = cap * dir
-				p.tx += (b.x - p.tx) * BOA_INCONTRO
+			if v < 0: # falso nove: incontro, ben sotto la linea
+				_sottoLinea(p, line - FALSO_DIETRO, FALSO_INCONTRO)
 			elif v > 0 and b.y * dir > PROF_DA: # profondità: sulla linea del fuorigioco
-				var lv: float = minf(offLine[tm] - 0.8, HL - 6.0)
-				if p.ty * dir < lv:
-					p.ty = lv * dir
-					p.sprint = C.hyp(p.tx - p.x, p.ty - p.y) > 4.0
+				_sullaLinea(p, 0.8)
+			var rf := _iv(p, "riferimento")
+			if rf < 0 and v >= 0: # boa: davanti ai difensori, verso il pallone
+				_sottoLinea(p, line - BOA_DIETRO, BOA_INCONTRO)
+			elif rf > 0: # sul filo: sempre sulla linea, anche col pallone lontano
+				_sullaLinea(p, FILO_GAP)
 		"COC":
 			if _iv(p, "area") < 0: # tra le linee: dietro le punte
 				var cap2: float = line - TRA_LINEE
@@ -168,20 +230,65 @@ func support(p: R.Player) -> void:
 					p.ty = cap2 * dir
 
 
+# resta almeno fino a `cap` (m nel verso d'attacco) e si sposta verso il pallone di `k`
+func _sottoLinea(p: R.Player, cap: float, k: float) -> void:
+	var dir: float = -1.0 if p.team else 1.0
+	if p.ty * dir > cap:
+		p.ty = cap * dir
+	p.tx += (ball.x - p.tx) * k
+
+
+# sale fino alla linea del fuorigioco (meno `gap` metri)
+func _sullaLinea(p: R.Player, gap: float) -> void:
+	var dir: float = -1.0 if p.team else 1.0
+	var lv: float = minf(offLine[p.team] - gap, HL - 6.0)
+	if p.ty * dir < lv:
+		p.ty = lv * dir
+		p.sprint = C.hyp(p.tx - p.x, p.ty - p.y) > 4.0
+
+
 func istrRunBias(q: R.Player) -> float:
 	if not _ha(q):
 		return 0.0
-	if _ruolo(q) == "COC":
-		var v := _iv(q, "area")
-		if v > 0:
-			return -INSERIMENTO
-		if v < 0:
-			return 1000.0 # tra le linee: in area va solo se non c'è nessun altro
+	match _ruolo(q):
+		"COC":
+			var v := _iv(q, "area")
+			if v > 0:
+				return -INSERIMENTO
+			if v < 0:
+				return 1000.0 # tra le linee: in area va solo se non c'è nessun altro
+		"CC":
+			if _iv(q, "mezzala") > 0:
+				return -BOX_AREA
+			if _iv(q, "mezzala") < 0:
+				return 1000.0
+		"AD", "AS":
+			var cr := _iv(q, "cross")
+			var dir: float = -1.0 if q.team else 1.0
+			var sgn: float = C.sign_(q.bx) if q.bx != 0.0 else 1.0
+			if cr != 0 and _crossAltroLato(sgn, C.clamp_((ball.y * dir + HL) / L, 0.0, 1.0)):
+				return -INSERIMENTO if cr > 0 else 1000.0
+		"ATT":
+			if _iv(q, "movimento") < 0:
+				return INSERIMENTO * 0.5 # falso nove: in area ci va meno spesso
 	return 0.0
 
 
 func istrGambleK(p: R.Player) -> float:
-	return PROF_TAGLI if _ha(p) and _ruolo(p) == "ATT" and _iv(p, "movimento") > 0 else (0.0 if _ha(p) and _iv(p, "movimento") < 0 else 1.0)
+	if not _ha(p) or _ruolo(p) != "ATT":
+		return 1.0
+	var k := 1.0
+	var v := _iv(p, "movimento")
+	if v > 0:
+		k *= PROF_TAGLI
+	elif v < 0:
+		k = 0.0
+	var rf := _iv(p, "riferimento")
+	if rf > 0:
+		k *= FILO_TAGLI
+	elif rf < 0:
+		k = 0.0
+	return k
 
 
 func istrAutoGx(p: R.Player, gx: float) -> float:
@@ -196,6 +303,36 @@ func istrAutoGx(p: R.Player, gx: float) -> float:
 	if v > 0: # taglia dentro: verso il centro e la porta
 		return p.x * ALA_GUIDA_DENTRO
 	return gx
+
+
+# ------------------------------------------------------------ con la palla
+## -1 Gioca semplice / 0 / +1 Porta palla (centrali: +1 Imposta palla al piede, solo nella propria metà)
+func _conPalla(p: R.Player) -> int:
+	if not _ha(p):
+		return 0
+	if _ruolo(p) == "DC":
+		var v := _iv(p, "imposta")
+		var dir: float = -1.0 if p.team else 1.0
+		return v if v < 0 or p.y * dir < 0.0 else 0
+	return _iv(p, "con_palla")
+
+
+func istrWant(p: R.Player, pass_: Variant, want: float, press: float) -> float:
+	var v := _conPalla(p)
+	if v < 0 and pass_ != null and float(pass_.safe) > 0.15:
+		return maxf(want, SEMPLICE_WANT)
+	if v > 0 and press >= PRESS_NEAR:
+		return want * (IMPOSTA_WANT if _ruolo(p) == "DC" else PORTA_WANT)
+	return want
+
+
+func istrAutoSpd(p: R.Player, spd: float, pressed: bool) -> float:
+	var v := _conPalla(p)
+	if v < 0:
+		return minf(spd, SEMPLICE_SPD)
+	if v > 0 and not pressed:
+		return maxf(spd, PORTA_SPD)
+	return spd
 
 
 # ------------------------------------------------------------ senza palla, col pallone loro
@@ -225,10 +362,10 @@ func defend(p: R.Player) -> void:
 				p.tx = bersaglio.x + ux / n * PRESSA_GAP
 				p.ty = bersaglio.y + uy / n * PRESSA_GAP
 				p.sprint = true
-	elif ruolo == "DC" and _iv(p, "marcatura") > 0:
+	elif (ruolo == "DC" or ruolo == "CDC") and _iv(p, "marcatura") > 0:
 		var an := defAnchor(p)
 		var mo: R.Player = null
-		var md: float = ANTICIPO_R
+		var md: float = STRETTA_R
 		for o: R.Player in players:
 			if o.team != tm and not o.off and o.pos != "P" and o != c:
 				var d: float = C.hyp(o.x - an[0], o.y - an[1])
@@ -239,8 +376,8 @@ func defend(p: R.Player) -> void:
 			var ux2: float = b.x - mo.x
 			var uy2: float = b.y - mo.y
 			var n2: float = C.orf(C.hyp(ux2, uy2), 1.0)
-			p.tx = mo.x + ux2 / n2 * ANTICIPO_DAVANTI
-			p.ty = mo.y + uy2 / n2 * ANTICIPO_DAVANTI
+			p.tx = mo.x + ux2 / n2 * STRETTA_DAVANTI
+			p.ty = mo.y + uy2 / n2 * STRETTA_DAVANTI
 
 
 # avversario (non portiere, non il portatore) più vicino a p

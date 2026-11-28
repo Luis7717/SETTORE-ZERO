@@ -13,9 +13,10 @@
 #   nel motore alla prima interruzione (gioco_fermo: pallone fuori, fallo, gol prima del calcio d'inizio) o
 #   all'intervallo. Si contano subito nei 5 (fatti = confermati + entrati in attesa) e finché aspettano si possono
 #   disfare: chi doveva uscire ed è ancora in campo può rientrare (`usciti` = solo chi è uscito davvero). Se la partita
-#   finisce prima, in quella partita non entrano più, ma restano nella carriera (Luis 2026-11-28: "se modifico il
-#   modulo durante la partita, dopo la partita torna a quello base; stessa cosa per le tattiche e i giocatori"):
-#   `annulla` toglie solo l'attesa, titolari, modulo e stili scelti restano per la partita dopo.
+#   finisce prima, in quella partita non entrano più.
+# - Fine partita (Luis 2026-11-28: "tutto quello che modifico in partita non deve salvarsi, deve tornare tutto come
+#   prima della partita"): all'inizio `ricorda_prima` fotografa la squadra della carriera (titolari, modulo, stili,
+#   istruzioni, calci piazzati); a fine partita o uscendo dalla pausa `ripristina` la rimette com'era e salva.
 extends RefCounted
 
 const C := preload("res://sim/core.gd")
@@ -30,6 +31,7 @@ var usciti: Array = []         # id di chi è uscito davvero dal campo (non rien
 var in_campo: Array = []       # id dei giocatori nel motore (leggi_in_campo; [] = presi dai titolari al primo scambio)
 var attesa := false            # cambi decisi in pausa, nel motore alla prima interruzione (gioco_fermo) o all'intervallo
 var base := {}                 # la squadra della carriera com'è nel motore (ricorda), per annullare i cambi in attesa
+var prima := {}                # la squadra della carriera prima della partita (ricorda_prima): torna a fine partita
 var espulsi: Array = []        # id degli espulsi della persona (leggi_espulsi)
 var da_mostrare: Array = []    # cambi applicati al motore e non ancora mostrati dalla scena del cambio
 var energie := {}              # energia in partita (0..100) per id, letta all'apertura della Rosa (leggi_energie)
@@ -67,21 +69,43 @@ static func gioco_fermo(m: Object) -> bool:
 
 
 ## ricorda la squadra della carriera com'è nel motore (da chiamare a cambi non in attesa, all'apertura della Rosa)
+## fotografia della squadra prima della partita (titolari, modulo, stili, istruzioni, calci piazzati)
+func ricorda_prima(c: Object) -> void:
+	var s: Dictionary = c.s
+	prima = {"lineup": (s.lineup as Array).duplicate(), "formation": str(s.formation), "stileAtt": c.stileAtt(),
+		"stileDif": c.stileDif(), "istruzioni": (s.get("istruzioni", {}) as Dictionary).duplicate(true),
+		"piazzati": (s.get("piazzati", {}) as Dictionary).duplicate(true), "ha_istr": s.has("istruzioni"),
+		"ha_pz": s.has("piazzati")}
+
+
+## fine partita: la carriera torna com'era prima della partita (quello cambiato nella pausa valeva solo lì) e si salva
+func ripristina(c: Object) -> void:
+	attesa = false
+	fatti = confermati
+	if prima.is_empty() or c == null:
+		return
+	var s: Dictionary = c.s
+	s.lineup = (prima.lineup as Array).duplicate()
+	s.formation = prima.formation
+	for k: String in ["istruzioni", "piazzati"]:
+		if prima["ha_istr" if k == "istruzioni" else "ha_pz"]:
+			s[k] = (prima[k] as Dictionary).duplicate(true)
+		else:
+			s.erase(k)
+	c.setStili(prima.stileAtt, prima.stileDif) # salva
+
+
 func ricorda(c: Object) -> void:
 	var s: Dictionary = c.s
 	base = {"lineup": (s.lineup as Array).duplicate(), "formation": str(s.formation), "stileAtt": c.stileAtt(), "stileDif": c.stileDif()}
 
 
-## la partita finisce coi cambi in attesa: in partita non entrano più, ma la carriera tiene titolari, modulo e stili
-## scelti nella pausa (Luis 2026-11-28; prima tornava alla squadra in campo e a Luis sembrava che il modulo tornasse
-## quello base). `base` resta per sapere cosa c'era in campo
-func annulla(c: Object) -> void:
+## la partita finisce coi cambi in attesa: in partita non entrano più (la carriera la rimette a posto `ripristina`)
+func annulla(_c: Object) -> void:
 	if not attesa:
 		return
 	attesa = false
 	fatti = confermati
-	if c != null and c.has_method("save"):
-		c.save()
 
 ## espulsi della squadra me (p.off nel motore), per id del giocatore sorgente
 func leggi_espulsi(m: Object, me: int) -> void:

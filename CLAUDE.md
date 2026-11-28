@@ -160,9 +160,11 @@
   già fermo) vanno subito; i battitori dei piazzati subito. All'intervallo entrano subito (`_mostra_intervallo`).
   Contano subito nei 5 (`fatti` = `confermati` + `entrati_in_attesa`), "USCITO" solo chi è uscito davvero: riaperta
   la Rosa si possono disfare (chi doveva uscire rientra). Se la partita finisce prima (fischio, Esci) in partita
-  non entrano più, ma titolari, modulo e stili scelti restano nella carriera per la partita dopo (Luis 2026-11-28:
-  "se modifico il modulo durante la partita, dopo la partita torna a quello base"; prima `annulla` rimetteva la squadra
-  in campo, ora toglie solo l'attesa). Prova: `--scena=cambio` (cambi a pallone
+  non entrano più. **A fine partita tutto torna come prima** (Luis 2026-11-28: "tutto quello che modifico in partita
+  non deve salvarsi, deve tornare tutto come prima della partita"): all'inizio `CambiPartita.ricorda_prima` fotografa
+  titolari, modulo, stili, istruzioni e calci piazzati della carriera; al fischio finale o uscendo dalla pausa
+  `ripristina` (`_perdi_cambi_in_attesa` in `gioco.gd`) li rimette e salva. Nella pausa le scelte valgono solo per
+  quella partita. Prova: `--scena=cambio` (cambi a pallone
   in gioco, "Cambio pronto", 2,5 s dopo pallone fuori e scena). A Riprendi / Secondo tempo
   la **scena del cambio** (`cambio_regia.gd`, 3,4 s veri, tempo fermo, un tocco la salta): chi esce cammina verso la
   linea laterale a centrocampo, chi entra corre al suo posto, targhette ▲ verde / ▼ rossa e riquadro CAMBIO in basso,
@@ -503,18 +505,25 @@
   dello schermo).
 - **Istruzioni ai giocatori** (Luis 2026-11-28, `sim/istruzioni.gd` dati, `sim/istruzioni_gioco.gd` motore, strato tra
   `attacco.gd` e `parata.gd`): nella Rosa (anche nella pausa) il pannello del giocatore ha il tasto **Istruzioni**
-  (puntino giallo se ne ha di cambiate) che apre le istruzioni del ruolo del suo posto, ognuna con tre scelte (quella in
-  mezzo = come sempre): terzini Spinta difensivo/equilibrato/offensivo; esterni largo/equilibrato/difensivo; mediano
-  difensivo (in attacco mai oltre il suo ultimo quarto, `MEDIANO_MAX`)/equilibrato/offensivo; centrocampista e
-  trequartista difensivo/centrale/avanzato; trequartista anche tra le linee/inserimento; ali larga/taglia dentro (anche
-  la guida automatica del portatore, `istrAutoGx`); attaccante boa/profondità (tagli della CPU `istrGambleK`); ali e
-  attaccanti resta su/pressa i difensori; centrali copre/esce in anticipo; portiere resta tra i pali/esce spesso
-  (`gkClaimBonus`). Ogni giocatore resta nel suo posto: si sposta `anchor` (altezza e larghezza) e il movimento senza
-  palla (`support`, `defend`). Salvataggio: campo nuovo `s.istruzioni` {"<id>": {chiave: scelta}} (`Carriera.istruzioni`,
-  `setIstruzione`); `squadraPartita` mette `istr` nella copia del giocatore, `cambi_partita.applica` le aggiorna nella
-  pausa. CPU: `Istr.per_squadra` secondo i suoi stili (70% dei giocatori) più un po' a caso col seme
-  (`avversarioPartita`). Senza `istr` o con le scelte di mezzo il motore è identico (ganci +0 / ×1). Test
-  `tests/test_istruzioni.gd`; foto `09_rosa_istruzioni*` (`prova_menu.tscn -- --tutte=DIR --solo=09_rosa`).
+  (puntino giallo se ne ha di cambiate) che apre le istruzioni del ruolo del suo posto, ognuna con tre scelte; quella in
+  mezzo è sempre **Equilibrato** (= motore identico), le altre hanno nomi che dicono cosa fa il giocatore (rifatte lo
+  stesso giorno, "niente avanzato / arretrato"): terzini **Spinta** Resta bloccato / Si sovrappone e **Dove attacca**
+  Sempre in fascia / Si accentra; esterni **In fascia** Attaccato alla linea / Torna sempre; mediano **Posizione** Si
+  abbassa tra i centrali / Accompagna l'azione; centrocampista **Compito** Resta in copertura / Box to box;
+  trequartista **Compito** Aiuta il centrocampo / Seconda punta e **Senza palla** Tra le linee / Si inserisce in area;
+  ali **Ala** Resta larga / Taglia dentro (anche la guida automatica, `istrAutoGx`) e **Sui cross** Aspetta fuori area /
+  Attacca il secondo palo; attaccante **Movimento** Falso nove / Attacca la profondità e **Riferimento** Fa la boa / Sul
+  filo del fuorigioco (tagli della CPU `istrGambleK`); ali e attaccante **Senza palla** Resta su / Pressa i difensori;
+  centrali e mediano **Marcatura** Copre lo spazio / Marcatura stretta; centrali **Con la palla** Gioca semplice /
+  Imposta palla al piede (solo nella propria metà); tutti gli altri di movimento **Con la palla** Gioca semplice / Porta
+  palla (CPU: `istrWant` sulla voglia di passare; guida automatica del portatore: `istrAutoSpd`); portiere **Uscite**
+  Resta tra i pali / Esce spesso (`gkClaimBonus`). Ogni giocatore resta nel suo posto: si sposta `anchor` (altezza e
+  larghezza) e il movimento senza palla (`support`, `defend`, `istrRunBias`). Salvataggio: campo nuovo `s.istruzioni`
+  {"<id>": {chiave: scelta}} (`Carriera.istruzioni`, `setIstruzione`); `squadraPartita` mette `istr` nella copia del
+  giocatore, `cambi_partita.applica` le aggiorna nella pausa. CPU: `Istr.per_squadra` secondo i suoi stili (70% dei
+  giocatori) più un po' a caso col seme (`avversarioPartita`). Senza `istr` o con Equilibrato il motore è identico
+  (ganci +0 / ×1, stessa sequenza di `rnd()`). Test `tests/test_istruzioni.gd`; foto `09_rosa_istruzioni*`
+  (`prova_menu.tscn -- --tutte=DIR --solo=09_rosa`).
 - **Nomi dei calciatori** (Luis 2026-11-28, "uno diverso per giocatore, prendi spunto da quelli reali",
   `scripts/carriera/nomi_calciatori.gd`): circa 800 cognomi comuni di 13 paesi (niente cognomi di campioni famosi), il
   nome è dello stesso paese del cognome; `Carriera.randomName` usa sempre due numeri casuali (sequenza del seme

@@ -285,6 +285,7 @@ func carrierAI(p: R.Player) -> void:
 					want = 0.3
 			if sa.on:
 				want = _styleWant(sa, p, pass_, want, press)
+			want = istrWant(p, pass_, want, press)
 			if rnd() < want:
 				kick(p, {"type": pass_.type if pass_.safe > 0.0 else "loft", "tx": pass_.tx, "ty": pass_.ty})
 				return
@@ -1186,6 +1187,7 @@ func _autoDecide(p: R.Player) -> void:
 	var pressed: bool = press < PRESS_NEAR
 	if pressed:
 		spd = AUTO_SPD_SHIELD # protegge palla: va dove c'è spazio, anche di lato o indietro
+	spd = istrAutoSpd(p, spd, pressed)
 	var base: float = F.atan2_(ty - p.y, gx - p.x)
 	var bs: float = -1e9
 	var ba: float = base
@@ -1223,6 +1225,16 @@ func _autoDecide(p: R.Player) -> void:
 ## gancio per le istruzioni (istruzioni_gioco.gd: ala larga o che taglia dentro): verso x della guida automatica
 func istrAutoGx(_p: R.Player, gx: float) -> float:
 	return gx
+
+
+## ganci per le istruzioni (istruzioni_gioco.gd: Gioca semplice / Porta palla): voglia di passare della CPU e andatura
+## della guida automatica; qui niente cambia (la sequenza di rnd() resta la stessa)
+func istrWant(_p: R.Player, _pass: Variant, want: float, _press: float) -> float:
+	return want
+
+
+func istrAutoSpd(_p: R.Player, spd: float, _pressed: bool) -> float:
+	return spd
 
 
 # compagni (portiere escluso) raggiungibili da (x, y) con un passaggio rasoterra a linea libera

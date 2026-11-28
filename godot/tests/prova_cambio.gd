@@ -175,11 +175,10 @@ func _process(_d: float) -> bool:
 			lineup_prima = (c2.s.lineup as Array).duplicate()
 			_cambi_dalla_pausa(1)
 			check(g.cambi.attesa and c2.s.lineup != lineup_prima, "terzo cambio in attesa")
-			var scelti: Array = (c2.s.lineup as Array).duplicate()
 			g._riprendi()
 			g._finisci(false) # la partita finisce prima che la palla esca
 			check(not g.cambi.attesa and g.cambi.fatti == 2, "il cambio in attesa non entra più in partita")
-			# Luis 2026-11-28: quello scelto nella pausa resta nella carriera per la partita dopo
-			check(c2.s.lineup == scelti and c2.s.lineup != lineup_prima, "la carriera tiene i titolari scelti nella pausa")
+			# Luis 2026-11-28: a fine partita la squadra torna quella di prima della partita (non quella dei cambi)
+			check(c2.s.lineup == g.cambi.prima.lineup, "la carriera torna alla squadra di prima della partita")
 			fine()
 	return false

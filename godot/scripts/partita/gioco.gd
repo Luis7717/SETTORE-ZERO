@@ -55,7 +55,7 @@
 # SimMatch.cambiaSquadra) e a "Riprendi" / "Secondo tempo" parte la scena del cambio (cambio_regia.gd) col tempo fermo.
 # Le sostituzioni decise in pausa a gioco in corso aspettano che la palla esca (Luis 2026-11-27): "Cambio pronto"
 # nell'HUD e alla prima interruzione (CambiPartita.gioco_fermo) motore + scena (_cambi_in_attesa); a fine partita non
-# entrano più ma restano nella carriera (Luis 2026-11-28). Non nelle lezioni, nelle prove di tiro né senza carriera.
+# entrano più e tutto quello cambiato nella pausa torna come prima della partita (Luis 2026-11-28). Non nelle lezioni, nelle prove di tiro né senza carriera.
 #
 # Dall'app (scripts/app.gd): chi crea la scena chiama `avvia(opz)` prima di aggiungerla o entro il primo fotogramma,
 # con opz = {squadra_a, squadra_b, me, tipo: "campionato"|"amichevole"|"allenamento", durata_tempo, seme,
@@ -274,6 +274,7 @@ func _parti() -> void:
 	_crea_nomi(k0, k1)
 	if carriera_partita() != null:
 		cambi = CambiPartita.new()
+		cambi.ricorda_prima(carriera_partita()) # a fine partita la squadra torna questa (Luis 2026-11-28)
 	_cambio = CambioRegia.new()
 	add_child(_cambio)
 	_cambio.finita.connect(_fine_cambio)
@@ -990,10 +991,11 @@ func _cambi_in_attesa() -> bool:
 	return false
 
 
-## la partita finisce coi cambi ancora in attesa: in partita non entrano più, nella carriera restano (Luis 2026-11-28)
+## fine partita (fischio o Esci): i cambi in attesa non entrano più e la carriera torna com'era prima della partita
+## (Luis 2026-11-28: "quando finisce la partita ritorna formazione, tattiche, posizioni, giocatori a quella prima")
 func _perdi_cambi_in_attesa() -> void:
-	if cambi != null and cambi.attesa:
-		cambi.annulla(carriera_partita())
+	if cambi != null:
+		cambi.ripristina(carriera_partita())
 	if hud != null:
 		hud.mostra_cambio_pronto(false)
 

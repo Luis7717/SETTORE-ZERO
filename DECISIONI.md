@@ -2013,8 +2013,10 @@ Luis: "Per fare i cambi aspetta che la palla esca." (`scripts/partita/cambi_part
   minuti i terzini offensivi stanno in media 8,5 m più avanti dei difensivi. Da rivedere coi giudizi di Luis.
 - **CPU**: lo stile si vede nel 70% dei giocatori del ruolo interessato; gli altri 15% verso una parte e 15% verso
   l'altra, col seme della squadra e della stagione (stesse istruzioni per tutta la stagione).
-- **Cambi in attesa a fine partita**: non tornano più alla squadra in campo (Luis: "dopo la partita torna a quello
-  base"): restano nella carriera per la partita dopo.
+- **Fine partita**: avevo capito al contrario (le scelte della pausa restavano). Luis ha chiarito: "tutto quello che
+  modifico in partita non deve salvarsi, deve tornare tutto come prima della partita". Ora a fine partita (o uscendo)
+  tornano titolari, posti, modulo, tattiche, istruzioni e battitori dei calci piazzati di prima della partita.
+  Chi è entrato dalla panchina conta per la stanchezza solo se era già titolare (Forma.giornata guarda i titolari).
 - **Nomi**: circa 800 cognomi di 13 paesi; su 300 giocatori al massimo ~10 nomi doppi (prima ~45). I cognomi di
   campioni famosi sono stati tolti o cambiati.
 - **Musiche**: 7 brani CC0 di Freesound (anteprime MP3 di qualità alta, ~20 MB in tutto nell'IPA).
@@ -2071,3 +2073,19 @@ Luis: "Per fare i cambi aspetta che la palla esca." (`scripts/partita/cambi_part
   sombrero, pedalata: il piede scivola ~10 cm); finta e giro e veronica tengono le due gambe più vicine del limite
   degli altri; su iPhone col notch la nota del nome può toccare la cronaca; il confronto ravvicinato del tunnel
   (`prova_vista`) finisce col portatore che rallenta perché lì non c'è la guida automatica (in partita prosegue).
+
+## 2026-11-28 — Istruzioni rifatte coi nomi (idee 6-15 accettate da Luis)
+- Luis: "togli quelle un po' tipo avanzato, arretrato, e dagli dei nomi che indichino quello che poi farà il
+  giocatore". Tutte rifatte: in mezzo sempre Equilibrato, ai lati un comportamento con un nome (elenco in CLAUDE.md).
+- Dove le idee si sovrapponevano le ho unite: "Esce in anticipo" del centrale è diventato **Marcatura stretta** (vale
+  anche per il mediano); "difensivo" dell'esterno è **Torna sempre**; "difensivo" del mediano (resta nell'ultimo
+  quarto) è **Si abbassa tra i centrali** (ancora più basso, `ABBASSA_Y` 20% del campo); "Difensore che imposta" è
+  la scelta **Imposta palla al piede** del centrale (solo nella sua metà campo); "boa" è passata da Movimento a
+  **Riferimento** insieme a "Sul filo del fuorigioco", e Movimento ora è Falso nove / Attacca la profondità.
+- Valori scelti in autonomia (costanti in cima a `sim/istruzioni_gioco.gd`): Si accentra x ×0,3 e +5% del campo;
+  Torna sempre −10% in difesa e x ×0,85; Box to box ±7% in attacco, −4% in difesa e più vicino di 8 m nella scelta di
+  chi va in area; Falso nove −10% e 16 m sotto la linea del fuorigioco; boa 7 m sotto; filo 0,4 m dalla linea e tagli
+  ×1,5; secondo palo: col pallone oltre 8 m sull'altra fascia nell'ultimo 32% del campo, 1,5 m oltre il palo lontano a
+  6 m dal fondo; Gioca semplice: la CPU con un passaggio sicuro passa almeno al 70%, guida automatica al massimo 0,55;
+  Porta palla: voglia di passare ×0,45 senza pressione (×0,3 per Imposta), guida almeno 1,0. Da rivedere coi giudizi.
+- Le istruzioni salvate con i nomi di prima non esistono: la prima versione non era ancora uscita in una build.
