@@ -23,7 +23,7 @@ const DOPO_SKILL := {"veronica": 0.42, "tunnel": 0.4, "sombrero": 0.5, "biciclet
 	"tacco": 0.2, "croqueta": 0.2, "elastico": 0.18, "elastico_inv": 0.18,
 	# provvisori (come il giochetto da cui sono copiati)
 	"ponte": 0.5, "giro_tocco": 0.34, "veronica_classe": 0.3, "colpetto_giro": 0.26, "tornado": 0.24, "waka": 0.2,
-	"elastico3": 0.18, "abracadabra": 0.18}
+	"elastico3": 0.18, "abracadabra": 0.18, "suola_via": 0.22, "suola_180": 0.24}
 const DOPO_KO := 0.8         # fallito: contrasto e caduta si guardano per tanto (s di partita)
 const USCITA_K := 2.2        # 1/s: alla fine il tempo torna normale con questa dolcezza (TEMPO_K del gioco è 14)
 const USCITA_K_OK := 7.0     # 1/s: ... dopo il dribbling riuscito invece in fretta (il portatore scatta via)
